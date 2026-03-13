@@ -1,0 +1,20 @@
+{
+  "home": {
+    "title": "Chatter",
+    "description": "Connect and communicate"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name"
+  },
+  "common": {
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading..."
+  }
+}

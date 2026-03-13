@@ -1,0 +1,20 @@
+{
+  "home": {
+    "title": "Chatter",
+    "description": "소통하고 연결하세요"
+  },
+  "auth": {
+    "login": "로그인",
+    "register": "회원가입",
+    "email": "이메일",
+    "password": "비밀번호",
+    "name": "이름"
+  },
+  "common": {
+    "submit": "제출",
+    "cancel": "취소",
+    "save": "저장",
+    "delete": "삭제",
+    "loading": "로딩 중..."
+  }
+}
