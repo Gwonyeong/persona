@@ -31,12 +31,12 @@ body:has(.admin-layout) #root {
   background-color: transparent;
 }
 
-/* 스크롤바 숨기기 */
-.scrollbar-hide::-webkit-scrollbar {
+/* 스크롤바 숨기기 (전역) */
+*::-webkit-scrollbar {
   display: none;
 }
 
-.scrollbar-hide {
+* {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }

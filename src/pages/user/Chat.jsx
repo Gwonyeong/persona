@@ -56,11 +56,18 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingSegments])
 
+  const FREE_CHAT_LIMIT = 3
+
   const send = async () => {
     if (!input.trim() || sending) return
+
+    // 게스트: 유저 메시지가 FREE_CHAT_LIMIT개 이상이면 로그인 유도
     if (!token) {
-      setShowLoginModal(true)
-      return
+      const userMsgCount = messages.filter((m) => m.role === 'USER').length
+      if (userMsgCount >= FREE_CHAT_LIMIT) {
+        setShowLoginModal(true)
+        return
+      }
     }
     const text = input.trim()
     setInput('')
@@ -314,13 +321,23 @@ export default function Chat() {
             ))}
           </div>
         )}
-        <div className="flex gap-2">
-          <input
+        <div className="flex gap-2 items-end">
+          <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && send()}
+            onChange={(e) => {
+              setInput(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                send()
+              }
+            }}
             placeholder="메시지를 입력하세요..."
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
+            rows={1}
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none"
           />
           {suggestedReplies.length > 0 && (
             <button
@@ -341,7 +358,7 @@ export default function Chat() {
           <button
             onClick={send}
             disabled={!input.trim() || sending}
-            className="px-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors"
+            className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">

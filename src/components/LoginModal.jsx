@@ -1,7 +1,51 @@
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { api } from '../lib/api'
+import useStore from '../store/useStore'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 export default function LoginModal({ onClose }) {
-  const navigate = useNavigate()
+  const { setToken, setUser } = useStore()
+  const googleBtnRef = useRef(null)
+
+  useEffect(() => {
+    const initGoogle = () => {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+      })
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: 280,
+        text: 'signin_with',
+        locale: 'ko',
+      })
+    }
+
+    if (window.google?.accounts?.id) {
+      initGoogle()
+    } else {
+      const script = document.createElement('script')
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.onload = initGoogle
+      document.body.appendChild(script)
+    }
+  }, [])
+
+  const handleCredentialResponse = async (response) => {
+    try {
+      const { token, user } = await api.post('/auth/google', {
+        credential: response.credential,
+      })
+      setToken(token)
+      setUser(user)
+      onClose()
+    } catch (error) {
+      console.error('Login failed:', error)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
@@ -15,20 +59,11 @@ export default function LoginModal({ onClose }) {
           이 기능을 사용하려면 로그인해주세요.
         </p>
 
-        <div className="flex flex-col gap-2.5">
-          <button
-            onClick={() => {
-              onClose()
-              navigate('/login')
-            }}
-            className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            로그인
-          </button>
+        <div className="flex flex-col gap-2.5 items-center">
+          <div ref={googleBtnRef} />
           <button
             onClick={onClose}
-            className="w-full py-3 bg-gray-800 text-gray-300 font-medium rounded-xl hover:bg-gray-700 transition-colors"
+            className="px-10 py-2.5 bg-gray-800 text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-700 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             닫기

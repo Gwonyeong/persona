@@ -14,7 +14,7 @@ export default function MyPage() {
 
   const handleLogout = () => {
     clearAuth()
-    navigate('/login')
+    navigate('/')
   }
 
   return (

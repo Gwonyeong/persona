@@ -2,8 +2,6 @@ import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import useStore from './store/useStore'
 import { api } from './lib/api'
-import Login from './pages/Login'
-
 // Admin
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
@@ -32,8 +30,6 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-
       {/* 어드민 */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />

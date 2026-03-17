@@ -9,24 +9,23 @@ const PACKAGES = [
 ]
 
 export default function MaskChargeModal({ onClose }) {
-  const { masks, setMasks } = useStore()
+  const { masks } = useStore()
   const [selected, setSelected] = useState(1)
   const [loading, setLoading] = useState(false)
 
+  const [errorMsg, setErrorMsg] = useState('')
+
   const handlePurchase = async () => {
     setLoading(true)
+    setErrorMsg('')
     try {
-      // TODO: 실제 결제 연동 후 purchase API 호출
-      const { masks: newMasks } = await api.post('/masks/purchase', {
-        amount: PACKAGES[selected].amount,
+      const pkg = PACKAGES[selected]
+      await api.post('/masks/purchase-attempt', {
+        package: `${pkg.label}_${pkg.price}`,
       })
-      setMasks(newMasks)
-      onClose()
-    } catch (error) {
-      console.error('Purchase failed:', error)
-    } finally {
-      setLoading(false)
-    }
+    } catch {}
+    setLoading(false)
+    setErrorMsg('죄송합니다. 시스템 에러가 발생했습니다.')
   }
 
   return (
@@ -74,6 +73,10 @@ export default function MaskChargeModal({ onClose }) {
         <p className="text-xs text-gray-500 text-center mb-4">
           가면 1개로 캐릭터와 1회 대화할 수 있어요
         </p>
+
+        {errorMsg && (
+          <p className="text-sm text-red-400 text-center mb-4">{errorMsg}</p>
+        )}
 
         {/* 버튼 */}
         <div className="flex flex-col gap-2.5">
