@@ -1,10 +1,11 @@
 {
   "home": {
-    "title": "Chatter",
+    "title": "Pesona",
     "description": "소통하고 연결하세요"
   },
   "auth": {
     "login": "로그인",
+    "logout": "로그아웃",
     "register": "회원가입",
     "email": "이메일",
     "password": "비밀번호",

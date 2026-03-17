@@ -1,45 +1,57 @@
+import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
-import { useTranslation } from 'react-i18next'
+import useStore from './store/useStore'
+import { api } from './lib/api'
+import Login from './pages/Login'
 
-const LANG_MAP = { ko: 'ko', en: 'en', ja: 'ja' }
+// Admin
+import AdminLayout from './pages/admin/AdminLayout'
+import Dashboard from './pages/admin/Dashboard'
+import AdminCharacters from './pages/admin/Characters'
+import CharacterStyles from './pages/admin/CharacterStyles'
+import AdminUsers from './pages/admin/Users'
 
-function Home() {
-  const { t, i18n } = useTranslation()
-  const lang = LANG_MAP[i18n.language] || 'ko'
-
-  return (
-    <div>
-      <Helmet>
-        <html lang={lang} />
-        <title>{t('home.title')}</title>
-        <meta name="description" content={t('home.description')} />
-        <meta property="og:title" content={t('home.title')} />
-        <meta property="og:description" content={t('home.description')} />
-        <meta property="og:type" content="website" />
-      </Helmet>
-      <div className="flex gap-2 p-4">
-        {Object.keys(LANG_MAP).map((lng) => (
-          <button
-            key={lng}
-            onClick={() => i18n.changeLanguage(lng)}
-            className={`px-3 py-1 rounded ${i18n.language === lng ? 'bg-black text-white' : 'bg-gray-200'}`}
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            {lng.toUpperCase()}
-          </button>
-        ))}
-      </div>
-      <h1 className="text-2xl font-bold px-4">{t('home.title')}</h1>
-      <p className="px-4 text-gray-600">{t('home.description')}</p>
-    </div>
-  )
-}
+// User
+import UserLayout from './pages/user/UserLayout'
+import Home from './pages/user/Home'
+import CharacterDetail from './pages/user/CharacterDetail'
+import ChatList from './pages/user/ChatList'
+import Chat from './pages/user/Chat'
+import MyPage from './pages/user/MyPage'
 
 function App() {
+  const { token, setUser, clearAuth } = useStore()
+
+  useEffect(() => {
+    if (!token) return
+    api
+      .get('/auth/me')
+      .then(({ user }) => setUser(user))
+      .catch(() => clearAuth())
+  }, [token])
+
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+
+      {/* 어드민 */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="characters" element={<AdminCharacters />} />
+        <Route path="characters/:id/styles" element={<CharacterStyles />} />
+        <Route path="users" element={<AdminUsers />} />
+      </Route>
+
+      {/* 유저 - 탭바 레이아웃 */}
+      <Route element={<UserLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/chats" element={<ChatList />} />
+        <Route path="/my" element={<MyPage />} />
+      </Route>
+
+      {/* 유저 - 탭바 없는 전체화면 */}
+      <Route path="/characters/:id" element={<CharacterDetail />} />
+      <Route path="/chats/:id" element={<Chat />} />
     </Routes>
   )
 }

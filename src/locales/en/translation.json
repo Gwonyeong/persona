@@ -1,10 +1,11 @@
 {
   "home": {
-    "title": "Chatter",
+    "title": "Pesona",
     "description": "Connect and communicate"
   },
   "auth": {
     "login": "Login",
+    "logout": "Logout",
     "register": "Register",
     "email": "Email",
     "password": "Password",

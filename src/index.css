@@ -9,14 +9,34 @@ html, body, #root {
 body {
   display: flex;
   justify-content: center;
-  background-color: #f5f5f5;
+  background-color: #030712;
 }
 
 #root {
   width: 100%;
   max-width: 480px;
-  background-color: #ffffff;
+  background-color: #030712;
   min-height: 100%;
   position: relative;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 어드민 페이지는 전체 화면 사용 */
+body:has(.admin-layout) {
+  background-color: #030712;
+}
+
+body:has(.admin-layout) #root {
+  max-width: 100%;
+  box-shadow: none;
+  background-color: transparent;
+}
+
+/* 스크롤바 숨기기 */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
