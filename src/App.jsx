@@ -8,6 +8,7 @@ import Dashboard from './pages/admin/Dashboard'
 import AdminCharacters from './pages/admin/Characters'
 import CharacterStyles from './pages/admin/CharacterStyles'
 import AdminUsers from './pages/admin/Users'
+import CharacterMissions from './pages/admin/CharacterMissions'
 
 // User
 import UserLayout from './pages/user/UserLayout'
@@ -35,6 +36,7 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="characters" element={<AdminCharacters />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
+        <Route path="characters/:id/missions" element={<CharacterMissions />} />
         <Route path="users" element={<AdminUsers />} />
       </Route>
 

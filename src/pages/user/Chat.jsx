@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import MissionPanel from '../../components/MissionPanel'
+import MissionToast from '../../components/MissionToast'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -39,7 +41,10 @@ export default function Chat() {
   const [streamingSegments, setStreamingSegments] = useState([])
   const streamingRef = useRef({ segments: [], currentType: null, currentContent: '' })
   const messagesEndRef = useRef(null)
+  const [showMissionPanel, setShowMissionPanel] = useState(false)
+  const [completedMissions, setCompletedMissions] = useState(null)
   const token = useStore((s) => s.token)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
@@ -50,6 +55,9 @@ export default function Chat() {
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
     })
+    if (token) {
+      api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
+    }
   }, [id])
 
   useEffect(() => {
@@ -124,6 +132,10 @@ export default function Chat() {
             if (lastCharMsg?.suggestedReplies?.length) {
               setSuggestedReplies(lastCharMsg.suggestedReplies)
             }
+            // 미션 달성 토스트
+            if (data.completedMissions?.length) {
+              setCompletedMissions(data.completedMissions)
+            }
             setSending(false)
             break
           }
@@ -182,6 +194,21 @@ export default function Chat() {
           )}
         </div>
         <span className="font-semibold text-sm text-white">{character.name}</span>
+        <div className="ml-auto">
+          <button
+            onClick={() => setShowMissionPanel(true)}
+            className="text-gray-400 hover:text-white"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          </button>
+        </div>
       </header>
 
       {/* 메시지 영역 */}
@@ -220,7 +247,10 @@ export default function Chat() {
               className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'CHARACTER' && (
-                <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-1">
+                <div
+                  className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-1 cursor-pointer"
+                  onClick={() => profileUrl && setLightboxUrl(profileUrl)}
+                >
                   {profileUrl ? (
                     <img src={profileUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -231,6 +261,9 @@ export default function Chat() {
               <div className="max-w-[75%]">
                 {msg.role === 'CHARACTER' && (
                   <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
+                )}
+                {msg.role === 'USER' && currentUser && (
+                  <p className="text-xs text-gray-400 mb-1 font-medium text-right">{currentUser.name || '나'}</p>
                 )}
                 {/* 첫 캐릭터 메시지에만 감정 이미지 표시 */}
                 {isFirstCharMsg && msgImageUrl && (
@@ -244,13 +277,27 @@ export default function Chat() {
                 <div
                   className={`text-sm leading-relaxed px-3.5 py-2.5 ${
                     msg.role === 'USER'
-                      ? 'bg-indigo-600 text-white rounded-2xl rounded-br-none'
+                      ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
                       : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'
                   }`}
                 >
                   {renderContent(msg.content)}
                 </div>
+                {isFirstCharMsg && (
+                  <p className="text-[11px] text-gray-600 mt-1.5 px-1">AI가 생성한 이야기가 포함되어 있어요</p>
+                )}
               </div>
+              {msg.role === 'USER' && (
+                <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 ml-2 mt-1">
+                  {currentUser?.avatarUrl ? (
+                    <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">
+                      {currentUser?.name?.[0] || '?'}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}
@@ -337,7 +384,7 @@ export default function Chat() {
             }}
             placeholder="메시지를 입력하세요..."
             rows={1}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none"
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none"
           />
           {suggestedReplies.length > 0 && (
             <button
@@ -368,16 +415,27 @@ export default function Chat() {
         </div>
       </div>
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+      {showMissionPanel && (
+        <MissionPanel
+          conversationId={parseInt(id)}
+          onClose={() => setShowMissionPanel(false)}
+        />
+      )}
+      {completedMissions && (
+        <MissionToast
+          missions={completedMissions}
+          onDone={() => setCompletedMissions(null)}
+        />
+      )}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/80"
           onClick={() => setLightboxUrl(null)}
         >
           <img
             src={lightboxUrl}
             alt=""
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}

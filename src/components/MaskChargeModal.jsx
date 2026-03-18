@@ -29,7 +29,7 @@ export default function MaskChargeModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+    <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">

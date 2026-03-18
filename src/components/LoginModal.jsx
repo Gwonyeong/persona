@@ -48,7 +48,7 @@ export default function LoginModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+    <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
       {/* 배경 오버레이 */}
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 

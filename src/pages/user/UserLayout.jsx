@@ -43,7 +43,7 @@ export default function UserLayout() {
   const [showLoginModal, setShowLoginModal] = useState(false)
 
   return (
-    <div className="user-layout flex flex-col h-screen bg-gray-950 text-gray-100">
+    <div className="user-layout flex flex-col h-dvh bg-gray-950 text-gray-100">
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>

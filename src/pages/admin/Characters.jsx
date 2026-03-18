@@ -128,6 +128,13 @@ export default function Characters() {
                         이미지
                       </button>
                       <button
+                        onClick={() => navigate(`/admin/characters/${c.id}/missions`)}
+                        className="text-emerald-400 hover:text-emerald-300 text-xs"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        미션
+                      </button>
+                      <button
                         onClick={() => remove(c.id)}
                         className="text-red-400 hover:text-red-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
