@@ -19,7 +19,20 @@ import Chat from './pages/user/Chat'
 import MyPage from './pages/user/MyPage'
 
 function App() {
-  const { token, setUser, clearAuth } = useStore()
+  const { token, setToken, setUser, clearAuth } = useStore()
+
+  // 네이티브 앱 딥링크 인증 수신
+  useEffect(() => {
+    window.__handleNativeAuth = (nativeToken, nativeUser) => {
+      try {
+        setToken(nativeToken)
+        setUser(JSON.parse(decodeURIComponent(nativeUser)))
+      } catch (e) {
+        console.error('Native auth handling failed:', e)
+      }
+    }
+    return () => { delete window.__handleNativeAuth }
+  }, [])
 
   useEffect(() => {
     if (!token) return
