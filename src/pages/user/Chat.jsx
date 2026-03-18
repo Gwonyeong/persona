@@ -119,10 +119,21 @@ export default function Chat() {
           case 'done': {
             // 스트리밍 완료 - 최종 메시지로 교체
             const { responseMessages } = data
+
+            // 미션 완료 메시지 생성
+            const missionMessages = (data.completedMissions || []).map((m) => ({
+              id: `mission-${m.id}`,
+              role: 'MISSION',
+              content: m.title,
+              imageUrl: m.imageUrl,
+              rewardAffinity: m.rewardAffinity,
+            }))
+
             setMessages((prev) => [
               ...prev.filter((m) => m.id !== tempUserMsg.id),
               { role: 'USER', content: text, createdAt: new Date().toISOString() },
               ...responseMessages,
+              ...missionMessages,
             ])
             setStreamingSegments([])
             streamingRef.current = { segments: [], currentType: null, currentContent: '' }
@@ -132,7 +143,6 @@ export default function Chat() {
             if (lastCharMsg?.suggestedReplies?.length) {
               setSuggestedReplies(lastCharMsg.suggestedReplies)
             }
-            // 미션 달성 토스트
             if (data.completedMissions?.length) {
               setCompletedMissions(data.completedMissions)
             }
@@ -228,6 +238,52 @@ export default function Chat() {
                 <p className="text-gray-500 text-xs leading-relaxed pt-1">
                   {msg.content}
                 </p>
+              </div>
+            )
+          }
+
+          // 미션 달성 메시지 — 캐릭터가 말하는 형태
+          if (msg.role === 'MISSION') {
+            return (
+              <div key={msg.id} className="flex justify-start">
+                <div
+                  className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-1 cursor-pointer"
+                  onClick={() => profileUrl && setLightboxUrl(profileUrl)}
+                >
+                  {profileUrl ? (
+                    <img src={profileUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>
+                  )}
+                </div>
+                <div className="max-w-[75%]">
+                  <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
+                  {msg.imageUrl && (
+                    <div
+                      className="rounded-2xl overflow-hidden mb-1.5 cursor-pointer"
+                      onClick={() => setLightboxUrl(msg.imageUrl)}
+                    >
+                      <img src={msg.imageUrl} alt="" className="w-full aspect-[9/16] object-cover" />
+                    </div>
+                  )}
+                  <div className="bg-gray-800/80 rounded-2xl rounded-tl-none px-3.5 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400 flex-shrink-0">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span className="text-xs text-indigo-400 font-semibold">미션 달성!</span>
+                    </div>
+                    <p className="text-sm text-gray-100 leading-relaxed">{msg.content}</p>
+                    {msg.rewardAffinity > 0 && (
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-pink-400">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                        </svg>
+                        <span className="text-xs font-bold text-pink-400">+{msg.rewardAffinity}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )
           }

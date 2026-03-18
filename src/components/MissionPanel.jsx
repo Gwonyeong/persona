@@ -78,11 +78,11 @@ export default function MissionPanel({ conversationId, onClose }) {
                 }`}>
                   ACT {act}
                 </p>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   {actMissions.map((m) => (
                     <div
                       key={m.id}
-                      className={`rounded-lg px-3.5 py-2.5 border ${
+                      className={`rounded-lg overflow-hidden border ${
                         m.completed
                           ? 'bg-indigo-950/30 border-indigo-500/30'
                           : m.locked
@@ -90,39 +90,56 @@ export default function MissionPanel({ conversationId, onClose }) {
                           : 'bg-gray-800/50 border-gray-700'
                       }`}
                     >
-                      <div className="flex items-start gap-2.5">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                          m.completed ? 'bg-indigo-600' : m.locked ? 'bg-gray-700' : 'bg-gray-700'
-                        }`}>
-                          {m.completed ? (
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          ) : m.locked ? (
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500">
-                              <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-9H9V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2z" />
-                            </svg>
-                          ) : (
-                            <div className="w-2 h-2 rounded-full bg-gray-500" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${
+                      {/* 미션 이미지 9:16 */}
+                      <div className="aspect-[9/16] bg-gray-800 flex items-center justify-center overflow-hidden">
+                        {m.completed && m.imageUrl ? (
+                          <img src={m.imageUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 text-gray-600">
+                            {m.locked ? (
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-9H9V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2z" />
+                              </svg>
+                            ) : (
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                              </svg>
+                            )}
+                            <span className="text-[10px]">{m.locked ? '' : '미션 달성 시 해금'}</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* 미션 정보 */}
+                      <div className="px-2.5 py-2">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            m.completed ? 'bg-indigo-600' : 'bg-gray-700'
+                          }`}>
+                            {m.completed ? (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : m.locked ? (
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500">
+                                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM12 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-9H9V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2z" />
+                              </svg>
+                            ) : (
+                              <div className="w-1.5 h-1.5 rounded-full bg-gray-500" />
+                            )}
+                          </div>
+                          <p className={`text-xs font-medium truncate ${
                             m.completed ? 'text-indigo-300' : m.locked ? 'text-gray-500' : 'text-gray-400'
                           }`}>
                             {m.completed ? m.title : '???'}
                           </p>
-                          {m.completed && m.description && (
-                            <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
-                          )}
-                          {!m.locked && !m.completed && m.hint && (
-                            <p className="text-xs text-yellow-500/70 mt-1">힌트: {m.hint}</p>
-                          )}
                         </div>
-                        {m.rewardMasks > 0 && !m.locked && m.completed && (
-                          <span className="text-xs flex-shrink-0 text-pink-400">
-                            +{m.rewardMasks}
-                          </span>
+                        {!m.locked && !m.completed && m.hint && (
+                          <p className="text-[10px] text-yellow-500/70 leading-tight ml-5.5">힌트: {m.hint}</p>
+                        )}
+                        {m.rewardMasks > 0 && m.completed && (
+                          <p className="text-[10px] text-pink-400 ml-5.5">+{m.rewardMasks}</p>
                         )}
                       </div>
                     </div>

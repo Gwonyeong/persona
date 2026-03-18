@@ -94,7 +94,21 @@ export default function Characters() {
             <tbody>
               {characters.map((c) => (
                 <tr key={c.id} className="border-b border-gray-800/50 text-sm">
-                  <td className="p-3 font-medium">{c.name}</td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
+                        {(() => {
+                          const img = c.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
+                          return img?.filePath ? (
+                            <img src={img.filePath} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
+                          )
+                        })()}
+                      </div>
+                      <span className="font-medium">{c.name}</span>
+                    </div>
+                  </td>
                   <td className="p-3">
                     <div className="flex gap-1 flex-wrap">
                       {c.tags.map((tag) => (
@@ -119,13 +133,6 @@ export default function Characters() {
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
                         수정
-                      </button>
-                      <button
-                        onClick={() => navigate(`/admin/characters/${c.id}/styles`)}
-                        className="text-cyan-400 hover:text-cyan-300 text-xs"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        이미지
                       </button>
                       <button
                         onClick={() => navigate(`/admin/characters/${c.id}/missions`)}

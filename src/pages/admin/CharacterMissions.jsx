@@ -18,6 +18,8 @@ export default function CharacterMissions() {
   const [character, setCharacter] = useState(null)
   const [editing, setEditing] = useState(null) // null | 'new' | mission object
   const [form, setForm] = useState(EMPTY_FORM)
+  const [uploading, setUploading] = useState(null) // missionId being uploaded
+  const [dragOver, setDragOver] = useState(null) // missionId being dragged over
 
   const load = () => {
     api.get(`/admin/characters/${id}/missions`).then(({ missions }) => setMissions(missions))
@@ -72,6 +74,35 @@ export default function CharacterMissions() {
     load()
   }
 
+  const uploadImage = async (missionId, file) => {
+    setUploading(missionId)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/admin/missions/${missionId}/image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: formData,
+      })
+      if (res.ok) load()
+    } catch (e) {
+      console.error('Image upload error:', e)
+    }
+    setUploading(null)
+  }
+
+  const handleDrop = (e, missionId) => {
+    e.preventDefault()
+    setDragOver(null)
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) uploadImage(missionId, file)
+  }
+
+  const deleteImage = async (missionId) => {
+    await api.delete(`/admin/missions/${missionId}/image`)
+    load()
+  }
+
   // ACT별 그룹핑
   const acts = {}
   missions.forEach((m) => {
@@ -118,6 +149,7 @@ export default function CharacterMissions() {
                   <tr className="text-left text-xs text-gray-400 border-b border-gray-800">
                     <th className="p-3 w-12">순서</th>
                     <th className="p-3">제목</th>
+                    <th className="p-3 w-20">이미지</th>
                     <th className="p-3 w-20">보상</th>
                     <th className="p-3 w-24">관리</th>
                   </tr>
@@ -132,6 +164,42 @@ export default function CharacterMissions() {
                           <p className="font-medium">{m.title}</p>
                           <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{m.description}</p>
                         </td>
+                        <td className="p-3">
+                          <label
+                            className={`block w-16 h-16 rounded-lg border-2 border-dashed cursor-pointer transition-colors overflow-hidden ${
+                              dragOver === m.id
+                                ? 'border-indigo-500 bg-indigo-500/10'
+                                : m.imageUrl
+                                ? 'border-transparent'
+                                : 'border-gray-700 hover:border-gray-500'
+                            }`}
+                            onDragOver={(e) => { e.preventDefault(); setDragOver(m.id) }}
+                            onDragLeave={() => setDragOver(null)}
+                            onDrop={(e) => handleDrop(e, m.id)}
+                          >
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files[0]) uploadImage(m.id, e.target.files[0])
+                                e.target.value = ''
+                              }}
+                            />
+                            {uploading === m.id ? (
+                              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">...</div>
+                            ) : m.imageUrl ? (
+                              <img src={m.imageUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center text-gray-600">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="12" y1="5" x2="12" y2="19" />
+                                  <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                              </div>
+                            )}
+                          </label>
+                        </td>
                         <td className="p-3 text-yellow-400">{m.rewardMasks > 0 ? `+${m.rewardMasks}` : '-'}</td>
                         <td className="p-3">
                           <div className="flex gap-2">
@@ -142,6 +210,15 @@ export default function CharacterMissions() {
                             >
                               수정
                             </button>
+                            {m.imageUrl && (
+                              <button
+                                onClick={() => deleteImage(m.id)}
+                                className="text-orange-400 hover:text-orange-300 text-xs"
+                                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                              >
+                                사진삭제
+                              </button>
+                            )}
                             <button
                               onClick={() => remove(m.id)}
                               className="text-red-400 hover:text-red-300 text-xs"
