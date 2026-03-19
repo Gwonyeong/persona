@@ -222,13 +222,12 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* 광고 */}
-      <div className="px-4 py-1 flex-shrink-0">
-        <AdBanner slot="8921302150" />
-      </div>
-
       {/* 메시지 영역 */}
       <div className="flex-1 overflow-auto px-4 py-3 space-y-3">
+        {/* 광고 */}
+        <div className="py-1">
+          <AdBanner slot="8921302150" />
+        </div>
         {messages.map((msg) => {
           // 나레이션 메시지
           if (msg.role === 'NARRATION') {

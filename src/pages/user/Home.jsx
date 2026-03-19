@@ -26,11 +26,18 @@ export default function Home() {
   useEffect(() => {
     const scrollEl = document.querySelector('.user-layout > main')
     if (!scrollEl) return
+    let ticking = false
     const onScroll = () => {
-      const y = scrollEl.scrollTop
-      if (y > lastScrollY.current && y > 50) setHeaderCollapsed(true)
-      else if (y < lastScrollY.current) setHeaderCollapsed(false)
-      lastScrollY.current = y
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        const y = scrollEl.scrollTop
+        const delta = y - lastScrollY.current
+        if (delta > 5 && y > 50) setHeaderCollapsed(true)
+        else if (delta < -5) setHeaderCollapsed(false)
+        lastScrollY.current = y
+        ticking = false
+      })
     }
     scrollEl.addEventListener('scroll', onScroll, { passive: true })
     return () => scrollEl.removeEventListener('scroll', onScroll)
