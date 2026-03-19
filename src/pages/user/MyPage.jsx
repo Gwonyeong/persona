@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
+import LoginModal from '../../components/LoginModal'
 
 function resizeImage(file, maxSize = 512) {
   return new Promise((resolve) => {
@@ -26,8 +28,9 @@ function resizeImage(file, maxSize = 512) {
 }
 
 export default function MyPage() {
-  const { clearAuth } = useStore()
+  const { token, clearAuth } = useStore()
   const navigate = useNavigate()
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -37,8 +40,9 @@ export default function MyPage() {
   const fileInputRef = useRef(null)
 
   useEffect(() => {
+    if (!token) return
     api.get('/auth/me').then(({ user }) => setDbUser(user))
-  }, [])
+  }, [token])
 
   const startEdit = () => {
     setEditName(dbUser?.name || '')
@@ -94,8 +98,27 @@ export default function MyPage() {
 
   return (
     <div className="px-4 pt-4">
+      <Helmet>
+        <title>마이페이지 - Pesona</title>
+        <meta name="description" content="Pesona 프로필 설정 및 계정 관리 페이지입니다." />
+      </Helmet>
       <h1 className="text-xl font-bold mb-6">마이</h1>
 
+      {!token ? (
+        <div className="text-center py-20">
+          <p className="text-gray-300 font-semibold mb-2">로그인이 필요합니다</p>
+          <p className="text-sm text-gray-500 mb-6">로그인하면 프로필 관리, 대화 기록 저장 등 다양한 기능을 이용할 수 있습니다.</p>
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            로그인
+          </button>
+          {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+        </div>
+      ) : (
+      <>
       {/* 프로필 */}
       <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
         {editing ? (
@@ -199,6 +222,8 @@ export default function MyPage() {
           로그아웃
         </button>
       </div>
+      </>
+      )}
     </div>
   )
 }

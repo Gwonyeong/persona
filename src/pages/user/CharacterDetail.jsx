@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
+import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -38,6 +40,12 @@ export default function CharacterDetail() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-950">
+      <Helmet>
+        <title>{character.name} - Pesona</title>
+        <meta name="description" content={character.description} />
+        <meta property="og:title" content={`${character.name} - Pesona`} />
+        <meta property="og:description" content={character.description} />
+      </Helmet>
       {/* 헤더 */}
       <div className="flex items-center p-4">
         <button
@@ -145,6 +153,11 @@ export default function CharacterDetail() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* 광고 */}
+      <div className="px-4 mb-2">
+        <AdBanner slot="CHARACTER_DETAIL" format="auto" responsive={true} />
       </div>
 
       {/* 하단 CTA */}

@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
 
-Sitemap: https://your-domain.com/sitemap.xml
+Sitemap: https://persona-liard.vercel.app/sitemap.xml

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import MaskChargeModal from '../../components/MaskChargeModal'
+import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -39,6 +41,13 @@ export default function Home() {
 
   return (
     <div className="px-4 pt-4 pb-2">
+      <Helmet>
+        <title>Pesona - AI 캐릭터 채팅 플랫폼</title>
+        <meta name="description" content="감정 표현이 가능한 AI 캐릭터와 실시간으로 대화하세요. 다양한 장르의 독창적인 캐릭터를 만나보세요." />
+        <meta property="og:title" content="Pesona - AI 캐릭터 채팅 플랫폼" />
+        <meta property="og:description" content="감정 표현이 가능한 AI 캐릭터와 실시간으로 대화하세요." />
+      </Helmet>
+
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Pesona</h1>
@@ -138,6 +147,13 @@ export default function Home() {
               </button>
             )
           })}
+        </div>
+      )}
+
+      {/* 광고 */}
+      {characters.length > 0 && (
+        <div className="mt-4">
+          <AdBanner slot="HOME_BOTTOM" format="auto" responsive={true} />
         </div>
       )}
 

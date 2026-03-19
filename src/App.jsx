@@ -17,6 +17,8 @@ import CharacterDetail from './pages/user/CharacterDetail'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
 import MyPage from './pages/user/MyPage'
+import About from './pages/user/About'
+import Terms from './pages/user/Terms'
 
 function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
@@ -63,6 +65,8 @@ function App() {
       {/* 유저 - 탭바 없는 전체화면 */}
       <Route path="/characters/:id" element={<CharacterDetail />} />
       <Route path="/chats/:id" element={<Chat />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/terms" element={<Terms />} />
     </Routes>
   )
 }

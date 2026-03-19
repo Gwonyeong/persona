@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, Link } from 'react-router-dom'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 
@@ -43,13 +43,25 @@ export default function UserLayout() {
   const [showLoginModal, setShowLoginModal] = useState(false)
 
   return (
-    <div className="user-layout flex flex-col h-dvh bg-gray-950 text-gray-100">
+    <div className="user-layout flex flex-col h-dvh max-h-dvh bg-gray-950 text-gray-100" style={{ height: '100dvh', overflow: 'hidden' }}>
       <main className="flex-1 overflow-auto">
         <Outlet />
+
+        {/* 푸터 */}
+        <footer className="px-4 py-6 mt-4 border-t border-gray-800">
+          <div className="flex justify-center gap-3 text-xs text-gray-500">
+            <Link to="/about" className="hover:text-gray-300 transition-colors">서비스 소개</Link>
+            <span>·</span>
+            <Link to="/terms" className="hover:text-gray-300 transition-colors">이용약관</Link>
+            <span>·</span>
+            <a href="/privacy-policy.html" className="hover:text-gray-300 transition-colors">개인정보처리방침</a>
+          </div>
+          <p className="text-center text-[10px] text-gray-600 mt-2">© 2026 Pesona. All rights reserved.</p>
+        </footer>
       </main>
 
       {/* 하단 탭바 */}
-      <nav className="flex border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
+      <nav className="flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
         {TABS.map((tab) =>
           tab.requireAuth && !token ? (
             <button
