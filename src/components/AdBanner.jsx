@@ -37,19 +37,18 @@ export default function AdBanner({ slot, format = 'auto', responsive = true }) {
     );
   }
 
+  const maxH = format === 'horizontal' ? 60 : 100;
+
   return (
-    <ins
-      className="adsbygoogle"
-      style={{
-        display: 'block',
-        width: '100%',
-        height: format === 'horizontal' ? 60 : 100,
-        overflow: 'hidden',
-      }}
-      data-ad-client="ca-pub-1541570032678257"
-      data-ad-slot={slot}
-      data-ad-format={format}
-      data-full-width-responsive={responsive}
-    />
+    <div style={{ maxHeight: maxH, overflow: 'hidden' }}>
+      <ins
+        className="adsbygoogle"
+        style={{ display: 'block' }}
+        data-ad-client="ca-pub-1541570032678257"
+        data-ad-slot={slot}
+        data-ad-format={format}
+        data-full-width-responsive={responsive}
+      />
+    </div>
   );
 }
