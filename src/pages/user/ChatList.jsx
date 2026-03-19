@@ -51,7 +51,7 @@ export default function ChatList() {
       </Helmet>
       <h1 className="text-xl font-bold mb-4">대화</h1>
       <div className="mb-3">
-        <AdBanner slot="3193498609" format="horizontal" responsive={true} />
+        <AdBanner slot="3193498609" />
       </div>
 
       {!token ? (

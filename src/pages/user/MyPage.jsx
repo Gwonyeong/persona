@@ -105,7 +105,7 @@ export default function MyPage() {
       </Helmet>
       <h1 className="text-xl font-bold mb-6">마이</h1>
       <div className="mb-4">
-        <AdBanner slot="3193498609" format="horizontal" responsive={true} />
+        <AdBanner slot="3193498609" />
       </div>
 
       {!token ? (

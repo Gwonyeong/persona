@@ -224,7 +224,7 @@ export default function Chat() {
 
       {/* 광고 */}
       <div className="px-4 py-1 flex-shrink-0">
-        <AdBanner slot="8921302150" format="horizontal" responsive={true} />
+        <AdBanner slot="8921302150" />
       </div>
 
       {/* 메시지 영역 */}

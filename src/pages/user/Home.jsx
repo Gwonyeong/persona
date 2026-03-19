@@ -130,7 +130,7 @@ export default function Home() {
         </div>
 
         {/* 광고 */}
-        <AdBanner slot="3193498609" format="horizontal" responsive={true} />
+        <AdBanner slot="3193498609" />
       </div>
 
       {/* 캐릭터 그리드 */}

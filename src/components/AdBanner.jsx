@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 const isDev = import.meta.env.DEV;
 
-export default function AdBanner({ slot, format = 'auto', responsive = true }) {
+export default function AdBanner({ slot, width = 320, height = 100 }) {
   const adRef = useRef(false);
 
   useEffect(() => {
@@ -19,17 +19,10 @@ export default function AdBanner({ slot, format = 'auto', responsive = true }) {
     return (
       <div
         style={{
-          display: 'block',
-          width: '100%',
-          height: format === 'horizontal' ? 60 : 100,
-          background: '#1f2937',
-          border: '1px dashed #4b5563',
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#6b7280',
-          fontSize: 12,
+          width, height, margin: '0 auto',
+          background: '#1f2937', border: '1px dashed #4b5563', borderRadius: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#6b7280', fontSize: 12,
         }}
       >
         AD · {slot}
@@ -37,17 +30,13 @@ export default function AdBanner({ slot, format = 'auto', responsive = true }) {
     );
   }
 
-  const maxH = format === 'horizontal' ? 60 : 100;
-
   return (
-    <div style={{ maxHeight: maxH, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
       <ins
         className="adsbygoogle"
-        style={{ display: 'block' }}
+        style={{ display: 'inline-block', width, height }}
         data-ad-client="ca-pub-1541570032678257"
         data-ad-slot={slot}
-        data-ad-format={format}
-        data-full-width-responsive={responsive}
       />
     </div>
   );
