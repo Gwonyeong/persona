@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
@@ -19,7 +19,22 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [selectedTag, setSelectedTag] = useState(null)
   const [showChargeModal, setShowChargeModal] = useState(false)
+  const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const lastScrollY = useRef(0)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const scrollEl = document.querySelector('.user-layout > main')
+    if (!scrollEl) return
+    const onScroll = () => {
+      const y = scrollEl.scrollTop
+      if (y > lastScrollY.current && y > 50) setHeaderCollapsed(true)
+      else if (y < lastScrollY.current) setHeaderCollapsed(false)
+      lastScrollY.current = y
+    }
+    scrollEl.addEventListener('scroll', onScroll, { passive: true })
+    return () => scrollEl.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     if (token) {
@@ -48,62 +63,74 @@ export default function Home() {
         <meta property="og:description" content="감정 표현이 가능한 AI 캐릭터와 실시간으로 대화하세요." />
       </Helmet>
 
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Pesona</h1>
-        {token && (
-          <button
-            onClick={() => setShowChargeModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full hover:border-gray-600 transition-colors"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <span className="text-sm">🎭</span>
-            <span className="text-sm font-semibold text-gray-100">{masks}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-indigo-400">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="16" />
-              <line x1="8" y1="12" x2="16" y2="12" />
-            </svg>
-          </button>
-        )}
-      </div>
+      {/* 헤더 + 검색 + 필터 + 광고 (sticky) */}
+      <div className="sticky top-0 z-10 bg-gray-950 pb-2">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold">Pesona</h1>
+          {token && (
+            <button
+              onClick={() => setShowChargeModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full hover:border-gray-600 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <span className="text-sm">🎭</span>
+              <span className="text-sm font-semibold text-gray-100">{masks}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-indigo-400">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            </button>
+          )}
+        </div>
 
-      {/* 검색바 */}
-      <div className="relative mb-3">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="캐릭터 검색..."
-          className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
-        />
-      </div>
-
-      {/* 장르 필터 */}
-      <div className="flex gap-1 overflow-x-auto pb-3 scrollbar-hide">
-        <button
-          onClick={() => setSelectedTag(null)}
-          className={`px-2.5 py-1 rounded-full text-xs whitespace-nowrap font-medium transition-colors ${
-            !selectedTag ? 'bg-indigo-600 text-white' : 'text-gray-500'
-          }`}
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        {/* 검색바 + 장르 필터 (스크롤 방향에 따라 접힘) */}
+        <div
+          className="overflow-hidden transition-all duration-300"
+          style={{ maxHeight: headerCollapsed ? 0 : 200, opacity: headerCollapsed ? 0 : 1 }}
         >
-          전체
-        </button>
-        {GENRES.map((genre) => (
-          <button
-            key={genre}
-            onClick={() => setSelectedTag(selectedTag === genre ? null : genre)}
-            className={`px-1 py-1 rounded-full text-xs whitespace-nowrap font-medium transition-colors ${
-              selectedTag === genre ? 'bg-indigo-600 text-white px-2.5' : 'text-gray-500'
-            }`}
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            {genre}
-          </button>
-        ))}
+          {/* 검색바 */}
+          <div className="relative mb-3">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="캐릭터 검색..."
+              className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+
+          {/* 장르 필터 */}
+          <div className="flex gap-1 overflow-x-auto pb-3 scrollbar-hide">
+            <button
+              onClick={() => setSelectedTag(null)}
+              className={`px-2.5 py-1 rounded-full text-xs whitespace-nowrap font-medium transition-colors ${
+                !selectedTag ? 'bg-indigo-600 text-white' : 'text-gray-500'
+              }`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              전체
+            </button>
+            {GENRES.map((genre) => (
+              <button
+                key={genre}
+                onClick={() => setSelectedTag(selectedTag === genre ? null : genre)}
+                className={`px-1 py-1 rounded-full text-xs whitespace-nowrap font-medium transition-colors ${
+                  selectedTag === genre ? 'bg-indigo-600 text-white px-2.5' : 'text-gray-500'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 광고 */}
+        <AdBanner slot="3193498609" format="horizontal" responsive={true} />
       </div>
 
       {/* 캐릭터 그리드 */}
@@ -150,12 +177,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* 광고 */}
-      {characters.length > 0 && (
-        <div className="mt-4">
-          <AdBanner slot="HOME_BOTTOM" format="auto" responsive={true} />
-        </div>
-      )}
 
       {showChargeModal && <MaskChargeModal onClose={() => setShowChargeModal(false)} />}
     </div>

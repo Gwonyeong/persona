@@ -5,6 +5,7 @@ import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import MissionPanel from '../../components/MissionPanel'
 import MissionToast from '../../components/MissionToast'
+import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -220,6 +221,11 @@ export default function Chat() {
           </button>
         </div>
       </header>
+
+      {/* 광고 */}
+      <div className="px-4 py-1 flex-shrink-0">
+        <AdBanner slot="8921302150" format="horizontal" responsive={true} />
+      </div>
 
       {/* 메시지 영역 */}
       <div className="flex-1 overflow-auto px-4 py-3 space-y-3">

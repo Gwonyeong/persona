@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 
+const isDev = import.meta.env.DEV;
+
 export default function AdBanner({ slot, format = 'auto', responsive = true }) {
   const adRef = useRef(false);
 
   useEffect(() => {
-    if (adRef.current) return;
+    if (isDev || adRef.current) return;
     adRef.current = true;
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -12,6 +14,28 @@ export default function AdBanner({ slot, format = 'auto', responsive = true }) {
       console.error('AdSense error:', e);
     }
   }, []);
+
+  if (isDev) {
+    return (
+      <div
+        style={{
+          display: 'block',
+          width: '100%',
+          height: format === 'horizontal' ? 60 : 100,
+          background: '#1f2937',
+          border: '1px dashed #4b5563',
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#6b7280',
+          fontSize: 12,
+        }}
+      >
+        AD · {slot}
+      </div>
+    );
+  }
 
   return (
     <ins

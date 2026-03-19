@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -49,6 +50,9 @@ export default function ChatList() {
         <meta name="description" content="AI 캐릭터와 나눈 대화 목록을 확인하세요." />
       </Helmet>
       <h1 className="text-xl font-bold mb-4">대화</h1>
+      <div className="mb-3">
+        <AdBanner slot="3193498609" format="horizontal" responsive={true} />
+      </div>
 
       {!token ? (
         <div className="text-center py-20">

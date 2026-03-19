@@ -157,7 +157,7 @@ export default function CharacterDetail() {
 
       {/* 광고 */}
       <div className="px-4 mb-2">
-        <AdBanner slot="CHARACTER_DETAIL" format="auto" responsive={true} />
+        <AdBanner slot="3193498609" format="auto" responsive={true} />
       </div>
 
       {/* 하단 CTA */}

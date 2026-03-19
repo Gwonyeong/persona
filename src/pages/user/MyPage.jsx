@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
   return new Promise((resolve) => {
@@ -103,6 +104,9 @@ export default function MyPage() {
         <meta name="description" content="Pesona 프로필 설정 및 계정 관리 페이지입니다." />
       </Helmet>
       <h1 className="text-xl font-bold mb-6">마이</h1>
+      <div className="mb-4">
+        <AdBanner slot="3193498609" format="horizontal" responsive={true} />
+      </div>
 
       {!token ? (
         <div className="text-center py-20">
