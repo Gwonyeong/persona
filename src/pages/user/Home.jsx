@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
@@ -20,24 +20,13 @@ export default function Home() {
   const [selectedTag, setSelectedTag] = useState(null)
   const [showChargeModal, setShowChargeModal] = useState(false)
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
-  const lastScrollY = useRef(0)
   const navigate = useNavigate()
 
   useEffect(() => {
     const scrollEl = document.querySelector('.user-layout > main')
     if (!scrollEl) return
-    let ticking = false
     const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(() => {
-        const y = scrollEl.scrollTop
-        const delta = y - lastScrollY.current
-        if (delta > 5 && y > 50) setHeaderCollapsed(true)
-        else if (delta < -5) setHeaderCollapsed(false)
-        lastScrollY.current = y
-        ticking = false
-      })
+      setHeaderCollapsed(scrollEl.scrollTop > 10)
     }
     scrollEl.addEventListener('scroll', onScroll, { passive: true })
     return () => scrollEl.removeEventListener('scroll', onScroll)
@@ -94,8 +83,7 @@ export default function Home() {
 
         {/* 검색바 + 장르 필터 (스크롤 방향에 따라 접힘) */}
         <div
-          className="overflow-hidden transition-all duration-300"
-          style={{ maxHeight: headerCollapsed ? 0 : 200, opacity: headerCollapsed ? 0 : 1 }}
+          style={{ display: headerCollapsed ? 'none' : 'block' }}
         >
           {/* 검색바 */}
           <div className="relative mb-3">
