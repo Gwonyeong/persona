@@ -3,8 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
-import MissionPanel from '../../components/MissionPanel'
-import MissionToast from '../../components/MissionToast'
 import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -13,18 +11,24 @@ function getImageUrl(filePath) {
   return null
 }
 
-function renderContent(text) {
-  // *텍스트* -> 이탤릭 (행동/상태 묘사)
-  return text.split(/(\*[^*]+\*)/).map((part, i) => {
-    if (part.startsWith('*') && part.endsWith('*')) {
-      return (
-        <em key={i} className="text-gray-400 not-italic text-xs block my-5">
-          {part.slice(1, -1)}
-        </em>
-      )
-    }
-    return <span key={i}>{part}</span>
+function formatTime(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const h = d.getHours()
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const period = h < 12 ? '오전' : '오후'
+  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${period} ${hour12}:${m}`
+}
+
+function getCharacterOnlineStatus(activeHours) {
+  if (!activeHours?.schedule) return 'free'
+  const hour = new Date().getHours()
+  const slot = activeHours.schedule.find((s) => {
+    if (s.start < s.end) return hour >= s.start && hour < s.end
+    return hour >= s.start || hour < s.end
   })
+  return slot?.status || 'free'
 }
 
 export default function Chat() {
@@ -34,24 +38,20 @@ export default function Chat() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [showTyping, setShowTyping] = useState(false)
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [suggestedReplies, setSuggestedReplies] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [streamingSegments, setStreamingSegments] = useState([])
-  const streamingRef = useRef({ segments: [], currentType: null, currentContent: '' })
   const messagesEndRef = useRef(null)
-  const [showMissionPanel, setShowMissionPanel] = useState(false)
-  const [completedMissions, setCompletedMissions] = useState(null)
   const token = useStore((s) => s.token)
   const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
-      setMessages(conv.messages)
-      // 마지막 캐릭터 메시지의 감정
+      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
@@ -63,98 +63,68 @@ export default function Chat() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingSegments])
+  }, [messages, showTyping])
 
   const FREE_CHAT_LIMIT = 3
 
   const send = async () => {
     if (!input.trim() || sending) return
-
-    // 게스트: 유저 메시지가 FREE_CHAT_LIMIT개 이상이면 로그인 유도
     if (!token) {
       const userMsgCount = messages.filter((m) => m.role === 'USER').length
-      if (userMsgCount >= FREE_CHAT_LIMIT) {
-        setShowLoginModal(true)
-        return
-      }
+      if (userMsgCount >= FREE_CHAT_LIMIT) { setShowLoginModal(true); return }
     }
     const text = input.trim()
     setInput('')
     setSending(true)
     setShowSuggestions(false)
     setSuggestedReplies([])
-
-    // 낙관적 UI 업데이트 - 유저 메시지 추가
     const tempUserMsg = { id: Date.now(), role: 'USER', content: text }
     setMessages((prev) => [...prev, tempUserMsg])
 
-    // 스트리밍 상태 초기화
-    streamingRef.current = { segments: [], currentType: null, currentContent: '' }
-    setStreamingSegments([])
-
     try {
       await api.stream(`/conversations/${id}/messages`, { content: text }, (event, data) => {
-        const ref = streamingRef.current
-
         switch (event) {
-          case 'segment_start':
-            ref.currentType = data.segmentType
-            ref.currentContent = ''
-            break
-
-          case 'content_delta':
-            ref.currentContent += data.content
-            // 현재까지의 segments + 진행 중인 segment를 합쳐서 렌더링
-            setStreamingSegments([
-              ...ref.segments,
-              { type: ref.currentType, content: ref.currentContent },
-            ])
-            break
-
-          case 'segment_end':
-            ref.segments.push({ type: ref.currentType, content: ref.currentContent })
-            ref.currentType = null
-            ref.currentContent = ''
-            break
-
           case 'done': {
-            // 스트리밍 완료 - 최종 메시지로 교체
             const { responseMessages } = data
-
-            // 미션 완료 메시지 생성
-            const missionMessages = (data.completedMissions || []).map((m) => ({
-              id: `mission-${m.id}`,
-              role: 'MISSION',
-              content: m.title,
-              imageUrl: m.imageUrl,
-              rewardAffinity: m.rewardAffinity,
-            }))
-
+            const charMsgs = responseMessages.filter((m) => m.role === 'CHARACTER')
             setMessages((prev) => [
               ...prev.filter((m) => m.id !== tempUserMsg.id),
               { role: 'USER', content: text, createdAt: new Date().toISOString() },
-              ...responseMessages,
-              ...missionMessages,
             ])
-            setStreamingSegments([])
-            streamingRef.current = { segments: [], currentType: null, currentContent: '' }
-
-            const lastCharMsg = [...responseMessages].reverse().find((m) => m.role === 'CHARACTER')
-            if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
-            if (lastCharMsg?.suggestedReplies?.length) {
-              setSuggestedReplies(lastCharMsg.suggestedReplies)
+            const initialDelay = data.delay || 0
+            const TYPING_LEAD_TIME = 10000
+            const showSequentially = async () => {
+              if (initialDelay > TYPING_LEAD_TIME) {
+                await new Promise((r) => setTimeout(r, initialDelay - TYPING_LEAD_TIME))
+                setShowTyping(true)
+                await new Promise((r) => setTimeout(r, TYPING_LEAD_TIME))
+              } else {
+                setShowTyping(true)
+                if (initialDelay > 0) {
+                  await new Promise((r) => setTimeout(r, initialDelay))
+                }
+              }
+              const isFree = data.status === 'free'
+              for (let i = 0; i < charMsgs.length; i++) {
+                const typingDelay = isFree
+                  ? 300 + Math.min(charMsgs[i].content.length * 20, 2000)
+                  : 800 + Math.min(charMsgs[i].content.length * 60, 9200)
+                await new Promise((r) => setTimeout(r, typingDelay))
+                setMessages((prev) => [...prev, charMsgs[i]])
+              }
+              const lastCharMsg = charMsgs[charMsgs.length - 1]
+              if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
+              if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
+              setShowTyping(false)
+              setSending(false)
             }
-            if (data.completedMissions?.length) {
-              setCompletedMissions(data.completedMissions)
-            }
-            setSending(false)
+            showSequentially()
             break
           }
-
           case 'error':
             console.error('Stream error:', data)
             setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id))
-            setStreamingSegments([])
+            setShowTyping(false)
             setSending(false)
             break
         }
@@ -162,7 +132,7 @@ export default function Chat() {
     } catch (error) {
       console.error(error)
       setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id))
-      setStreamingSegments([])
+      setShowTyping(false)
       setSending(false)
     }
   }
@@ -172,232 +142,63 @@ export default function Chat() {
   }
 
   const { character } = conversation
-
-  // 현재 감정에 맞는 스프라이트 이미지 찾기
-  const currentStyle =
-    character.styles.find((s) => s.id === conversation.currentStyleId) || character.styles[0]
-  const spriteImage = currentStyle?.images?.find((i) => i.emotion === currentEmotion)
-    || currentStyle?.images?.find((i) => i.emotion === 'NEUTRAL')
-  const spriteUrl = getImageUrl(spriteImage?.filePath)
-
-  // 프로필 이미지 (NEUTRAL)
+  const currentStyle = character.styles.find((s) => s.id === conversation.currentStyleId) || character.styles[0]
   const profileImage = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
   const profileUrl = getImageUrl(profileImage?.filePath)
+  const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   return (
     <div className="flex flex-col h-screen bg-gray-950">
-      {/* 헤더 */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm flex-shrink-0">
-        <button
-          onClick={() => navigate('/')}
-          className="text-gray-400 hover:text-white"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+        <button onClick={() => navigate('/chats')} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
-        <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-          {profileUrl ? (
-            <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
-          )}
+        <div className="relative flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
+            {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>}
+          </div>
+          {onlineStatus === 'free' && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900" />}
         </div>
-        <span className="font-semibold text-sm text-white">{character.name}</span>
-        <div className="ml-auto">
-          <button
-            onClick={() => setShowMissionPanel(true)}
-            className="text-gray-400 hover:text-white"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-          </button>
+        <div>
+          <span className="font-semibold text-sm text-white block">{character.name}</span>
+          {onlineStatus === 'free' && <p className="text-[10px] text-green-400">활동 중</p>}
         </div>
       </header>
 
-      {/* 메시지 영역 */}
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-3">
-        {/* 광고 */}
-        <div className="py-1">
-          <AdBanner slot="8921302150" />
-        </div>
-        {messages.map((msg) => {
-          // 나레이션 메시지
-          if (msg.role === 'NARRATION') {
-            return (
-              <div key={msg.id} className="flex justify-start">
-                <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-0.5 flex items-center justify-center">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="16" x2="12" y2="12" />
-                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                  </svg>
-                </div>
-                <p className="text-gray-500 text-xs leading-relaxed pt-1">
-                  {msg.content}
-                </p>
-              </div>
-            )
-          }
-
-          // 미션 달성 메시지 — 캐릭터가 말하는 형태
-          if (msg.role === 'MISSION') {
-            return (
-              <div key={msg.id} className="flex justify-start">
-                <div
-                  className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-1 cursor-pointer"
-                  onClick={() => profileUrl && setLightboxUrl(profileUrl)}
-                >
-                  {profileUrl ? (
-                    <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>
-                  )}
-                </div>
-                <div className="max-w-[75%]">
-                  <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
-                  {msg.imageUrl && (
-                    <div
-                      className="rounded-2xl overflow-hidden mb-1.5 cursor-pointer"
-                      onClick={() => setLightboxUrl(msg.imageUrl)}
-                    >
-                      <img src={msg.imageUrl} alt="" className="w-full aspect-[9/16] object-cover" />
-                    </div>
-                  )}
-                  <div className="bg-gray-800/80 rounded-2xl rounded-tl-none px-3.5 py-2.5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400 flex-shrink-0">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <span className="text-xs text-indigo-400 font-semibold">미션 달성!</span>
-                    </div>
-                    <p className="text-sm text-gray-100 leading-relaxed">{msg.content}</p>
-                    {msg.rewardAffinity > 0 && (
-                      <div className="flex items-center gap-1 mt-1.5">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-pink-400">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                        </svg>
-                        <span className="text-xs font-bold text-pink-400">+{msg.rewardAffinity}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          }
-
-          // 첫 번째 CHARACTER 메시지에만 이미지 표시
-          const isFirstCharMsg = msg.role === 'CHARACTER' && messages.findIndex((m) => m.role === 'CHARACTER') === messages.indexOf(msg)
-          const msgEmotion = isFirstCharMsg ? (msg.emotion || 'NEUTRAL') : null
-          const msgImage = msgEmotion
-            ? currentStyle?.images?.find((i) => i.emotion === msgEmotion)
-              || currentStyle?.images?.find((i) => i.emotion === 'NEUTRAL')
-            : null
-          const msgImageUrl = getImageUrl(msgImage?.filePath)
-
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+        <div className="py-1"><AdBanner slot="8921302150" /></div>
+        {messages.map((msg, idx) => {
+          const prevMsg = messages[idx - 1]
+          const isConsecutive = prevMsg?.role === msg.role
           return (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'}`}
-            >
+            <div key={msg.id || idx} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'} ${isConsecutive ? '' : 'mt-3'}`}>
               {msg.role === 'CHARACTER' && (
-                <div
-                  className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-1 cursor-pointer"
-                  onClick={() => profileUrl && setLightboxUrl(profileUrl)}
-                >
-                  {profileUrl ? (
-                    <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>
-                  )}
+                <div className="w-7 flex-shrink-0 mr-2">
+                  {!isConsecutive ? (
+                    <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => profileUrl && setLightboxUrl(profileUrl)}>
+                      {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
+                    </div>
+                  ) : null}
                 </div>
               )}
               <div className="max-w-[75%]">
-                {msg.role === 'CHARACTER' && (
-                  <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
-                )}
-                {msg.role === 'USER' && currentUser && (
-                  <p className="text-xs text-gray-400 mb-1 font-medium text-right">{currentUser.name || '나'}</p>
-                )}
-                {/* 첫 캐릭터 메시지에만 감정 이미지 표시 */}
-                {isFirstCharMsg && msgImageUrl && (
-                  <div
-                    className="rounded-2xl overflow-hidden mb-1.5 cursor-pointer"
-                    onClick={() => setLightboxUrl(msgImageUrl)}
-                  >
-                    <img src={msgImageUrl} alt={msgEmotion} className="w-full aspect-[9/16] object-cover" />
-                  </div>
-                )}
-                <div
-                  className={`text-sm leading-relaxed px-3.5 py-2.5 ${
-                    msg.role === 'USER'
-                      ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
-                      : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'
-                  }`}
-                >
-                  {renderContent(msg.content)}
+                {msg.role === 'CHARACTER' && !isConsecutive && <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>}
+                <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
+                  {msg.content}
                 </div>
-                {isFirstCharMsg && (
-                  <p className="text-[11px] text-gray-600 mt-1.5 px-1">AI가 생성한 이야기가 포함되어 있어요</p>
-                )}
+                {msg.createdAt && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatTime(msg.createdAt)}</p>}
               </div>
-              {msg.role === 'USER' && (
-                <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 ml-2 mt-1">
-                  {currentUser?.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">
-                      {currentUser?.name?.[0] || '?'}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )
         })}
-        {sending && streamingSegments.length > 0 && streamingSegments.map((seg, idx) => (
-          seg.type === 'narration' ? (
-            <div key={`stream-${idx}`} className="flex justify-start">
-              <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-0.5 flex items-center justify-center">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-              </div>
-              <p className="text-gray-500 text-xs leading-relaxed pt-1">
-                {seg.content}
-              </p>
-            </div>
-          ) : (
-            <div key={`stream-${idx}`} className="flex justify-start">
-              <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 mr-2 mt-1">
-                {profileUrl ? (
-                  <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>
-                )}
-              </div>
-              <div className="max-w-[75%]">
-                <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
-                <div className="text-sm leading-relaxed px-3.5 py-2.5 bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none">
-                  {renderContent(seg.content)}
-                </div>
+        {showTyping && (
+          <div className="flex justify-start mt-3">
+            <div className="w-7 flex-shrink-0 mr-2">
+              <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden">
+                {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
               </div>
             </div>
-          )
-        ))}
-        {sending && streamingSegments.length === 0 && (
-          <div className="flex justify-start">
-            <div className="w-7 h-7 mr-2" />
-            <div className="bg-gray-800/80 rounded-2xl rounded-bl-md px-4 py-3">
+            <div className="bg-gray-800/80 rounded-2xl rounded-tl-none px-4 py-3">
               <div className="flex gap-1">
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -409,95 +210,32 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 입력 영역 */}
       <div className="p-3 border-t border-gray-800 bg-gray-900/95">
-        {/* 추천 답변 팝오버 */}
         {showSuggestions && suggestedReplies.length > 0 && (
           <div className="mb-2 flex flex-col gap-1.5">
             {suggestedReplies.map((reply, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setInput(reply)
-                  setShowSuggestions(false)
-                }}
-                className="text-left text-sm px-3.5 py-2 bg-gray-800 border border-gray-700 rounded-xl text-gray-200 hover:bg-gray-700 hover:border-indigo-500 transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
+              <button key={i} onClick={() => { setInput(reply); setShowSuggestions(false) }} className="text-left text-sm px-3.5 py-2 bg-gray-800 border border-gray-700 rounded-xl text-gray-200 hover:bg-gray-700 hover:border-indigo-500 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
                 {reply}
               </button>
             ))}
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <textarea
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value)
-              e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                send()
-              }
-            }}
-            placeholder="메시지를 입력하세요..."
-            rows={1}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none"
-          />
+          <textarea value={input} onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder="메시지를 입력하세요..." rows={1} className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
           {suggestedReplies.length > 0 && (
-            <button
-              onClick={() => setShowSuggestions((prev) => !prev)}
-              className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
-                showSuggestions
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'
-              }`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                <line x1="9" y1="10" x2="15" y2="10" />
-              </svg>
+            <button onClick={() => setShowSuggestions((prev) => !prev)} className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${showSuggestions ? 'bg-indigo-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'}`} style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="9" y1="10" x2="15" y2="10" /></svg>
             </button>
           )}
-          <button
-            onClick={send}
-            disabled={!input.trim() || sending}
-            className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-            </svg>
+          <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
           </button>
         </div>
       </div>
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
-      {showMissionPanel && (
-        <MissionPanel
-          conversationId={parseInt(id)}
-          onClose={() => setShowMissionPanel(false)}
-        />
-      )}
-      {completedMissions && (
-        <MissionToast
-          missions={completedMissions}
-          onDone={() => setCompletedMissions(null)}
-        />
-      )}
       {lightboxUrl && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/80"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <img
-            src={lightboxUrl}
-            alt=""
-            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-          />
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>
+          <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 const EMPTY_FORM = {
   name: '',
   description: '',
+  concept: '',
   personality: '',
   firstMessage: '',
   tags: '',
@@ -32,6 +33,7 @@ export default function Characters() {
     setForm({
       name: c.name,
       description: c.description,
+      concept: c.concept || '',
       personality: c.personality,
       firstMessage: c.firstMessage,
       tags: c.tags.join(', '),
@@ -135,13 +137,6 @@ export default function Characters() {
                         수정
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/characters/${c.id}/missions`)}
-                        className="text-emerald-400 hover:text-emerald-300 text-xs"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        미션
-                      </button>
-                      <button
                         onClick={() => remove(c.id)}
                         className="text-red-400 hover:text-red-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -183,6 +178,16 @@ export default function Characters() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-20 resize-none"
                   placeholder="캐릭터 한줄 소개"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">컨셉</label>
+                <input
+                  value={form.concept}
+                  onChange={(e) => setForm({ ...form, concept: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                  placeholder="츤데레 소꿉친구, 차가운 천재 등"
                 />
               </div>
 

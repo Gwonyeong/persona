@@ -8,7 +8,6 @@ import Dashboard from './pages/admin/Dashboard'
 import AdminCharacters from './pages/admin/Characters'
 import CharacterStyles from './pages/admin/CharacterStyles'
 import AdminUsers from './pages/admin/Users'
-import CharacterMissions from './pages/admin/CharacterMissions'
 
 // User
 import UserLayout from './pages/user/UserLayout'
@@ -17,6 +16,7 @@ import CharacterDetail from './pages/user/CharacterDetail'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
 import MyPage from './pages/user/MyPage'
+import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
 
@@ -51,13 +51,13 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="characters" element={<AdminCharacters />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
-        <Route path="characters/:id/missions" element={<CharacterMissions />} />
         <Route path="users" element={<AdminUsers />} />
       </Route>
 
       {/* 유저 - 탭바 레이아웃 */}
       <Route element={<UserLayout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/feed" element={<Feed />} />
         <Route path="/chats" element={<ChatList />} />
         <Route path="/my" element={<MyPage />} />
       </Route>

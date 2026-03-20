@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
+import useStore from '../../store/useStore'
 import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -13,17 +14,46 @@ function getImageUrl(filePath) {
 export default function CharacterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { token } = useStore()
   const [character, setCharacter] = useState(null)
+  const [existingConv, setExistingConv] = useState(null) // { conversationId, affinity }
   const [starting, setStarting] = useState(false)
+  const [showResetModal, setShowResetModal] = useState(false)
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
   }, [id])
 
+  useEffect(() => {
+    if (!token) return
+    api.get(`/conversations/check/${id}`)
+      .then((data) => {
+        if (data.exists) setExistingConv(data)
+        else setExistingConv(null)
+      })
+      .catch(() => setExistingConv(null))
+  }, [id, token])
+
   const startChat = async () => {
     setStarting(true)
     try {
       const { conversation } = await api.post('/conversations', { characterId: parseInt(id) })
+      navigate(`/chats/${conversation.id}`)
+    } catch (error) {
+      console.error(error)
+      setStarting(false)
+    }
+  }
+
+  const resumeChat = () => {
+    if (existingConv) navigate(`/chats/${existingConv.conversationId}`)
+  }
+
+  const resetChat = async () => {
+    setShowResetModal(false)
+    setStarting(true)
+    try {
+      const { conversation } = await api.post(`/conversations/${existingConv.conversationId}/reset`)
       navigate(`/chats/${conversation.id}`)
     } catch (error) {
       console.error(error)
@@ -87,11 +117,9 @@ export default function CharacterDetail() {
           ))}
         </div>
 
-        {/* 스토리 컨셉 */}
-        {character.storyConcept && (
-          <div className="mt-4 pt-4 border-t border-gray-800">
-            <p className="text-sm text-gray-500 leading-relaxed whitespace-pre-wrap">{character.storyConcept}</p>
-          </div>
+        {/* 컨셉 */}
+        {character.concept && (
+          <p className="text-sm text-gray-400 italic mt-1">{character.concept}</p>
         )}
 
         {/* 대화 미리보기 */}
@@ -162,15 +190,64 @@ export default function CharacterDetail() {
 
       {/* 하단 CTA */}
       <div className="p-4 border-t border-gray-800 bg-gray-900/95">
-        <button
-          onClick={startChat}
-          disabled={starting}
-          className="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          {starting ? '시작 중...' : '대화 시작'}
-        </button>
+        {existingConv ? (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowResetModal(true)}
+              disabled={starting}
+              className="flex-1 py-3.5 bg-gray-800 text-gray-200 font-semibold rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors border border-gray-700"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              새로하기
+            </button>
+            <button
+              onClick={resumeChat}
+              disabled={starting}
+              className="flex-1 py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              이어하기
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={startChat}
+            disabled={starting}
+            className="w-full py-3.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {starting ? '시작 중...' : '대화 시작'}
+          </button>
+        )}
       </div>
+
+      {/* 리셋 경고 모달 */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+          <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6">
+            <h3 className="text-lg font-bold text-white mb-2">대화를 새로 시작할까요?</h3>
+            <p className="text-sm text-gray-400 leading-relaxed mb-6">
+              기존 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowResetModal(false)}
+                className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={resetChat}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-colors text-sm font-medium"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                새로 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
