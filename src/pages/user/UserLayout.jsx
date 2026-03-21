@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet, Link } from 'react-router-dom'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
@@ -53,6 +53,13 @@ const TABS = [
 export default function UserLayout() {
   const { token } = useStore()
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [hasUnread, setHasUnread] = useState(false)
+
+  useEffect(() => {
+    const handler = (e) => setHasUnread(e.detail > 0)
+    window.addEventListener('unread-count', handler)
+    return () => window.removeEventListener('unread-count', handler)
+  }, [])
 
   return (
     <div className="user-layout flex flex-col h-dvh max-h-dvh bg-gray-950 text-gray-100" style={{ height: '100dvh', overflow: 'hidden' }}>
@@ -97,7 +104,12 @@ export default function UserLayout() {
               }
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              {tab.icon}
+              <div className="relative">
+                {tab.icon}
+                {tab.to === '/chats' && hasUnread && (
+                  <div className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500" />
+                )}
+              </div>
               <span>{tab.label}</span>
             </NavLink>
           )

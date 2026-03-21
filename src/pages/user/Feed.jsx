@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import useStore from '../../store/useStore'
+import StoryViewer from '../../components/StoryViewer'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -28,14 +30,58 @@ const CAPTIONS = [
 
 export default function Feed() {
   const [characters, setCharacters] = useState([])
+  const [followedIds, setFollowedIds] = useState(null) // null = 로딩중
+  const [viewedStories, setViewedStories] = useState(() => {
+    try { return new Set(JSON.parse(sessionStorage.getItem('viewedStories') || '[]')) }
+    catch { return new Set() }
+  })
+  const [storyModal, setStoryModal] = useState(null) // { character, stories, profileUrl }
+  const [storyIndex, setStoryIndex] = useState(0)
+  const { token } = useStore()
   const navigate = useNavigate()
+
+  const markStoryViewed = (characterId) => {
+    setViewedStories((prev) => {
+      const next = new Set(prev)
+      next.add(characterId)
+      sessionStorage.setItem('viewedStories', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  const openStory = (character) => {
+    const stories = character.stories || []
+    if (stories.length === 0) {
+      navigate(`/characters/${character.id}`)
+      return
+    }
+    const style = character.styles?.[0]
+    const neutralImg = style?.images?.find((img) => img.emotion === 'NEUTRAL')
+    const profileUrl = getImageUrl((neutralImg || style?.images?.[0])?.filePath)
+    setStoryIndex(0)
+    setStoryModal({ character, stories, profileUrl })
+  }
+
+  const closeStory = () => {
+    if (storyModal) markStoryViewed(storyModal.character.id)
+    setStoryModal(null)
+  }
 
   useEffect(() => {
     api.get('/characters').then(({ characters }) => setCharacters(characters))
   }, [])
 
-  // 스토리용: 캐릭터별 대표 이미지
-  const storyCharacters = characters.map((c) => {
+  useEffect(() => {
+    if (!token) { setFollowedIds([]); return }
+    api.get('/follows').then(({ characterIds }) => setFollowedIds(characterIds)).catch(() => setFollowedIds([]))
+  }, [token])
+
+  const followedCharacters = followedIds
+    ? characters.filter((c) => followedIds.includes(c.id))
+    : characters
+
+  // 스토리용: 팔로우한 캐릭터별 대표 이미지
+  const storyCharacters = followedCharacters.map((c) => {
     const style = c.styles?.[0]
     const neutralImg = style?.images?.find((img) => img.emotion === 'NEUTRAL')
     const fallbackImg = style?.images?.[0]
@@ -45,32 +91,26 @@ export default function Feed() {
     }
   })
 
-  // 피드용: 캐릭터별 다양한 감정 이미지를 피드 포스트로 변환
-  const feedPosts = characters.flatMap((c, cIdx) => {
+  // 피드용: DB의 feedPosts를 사용
+  const feedPosts = followedCharacters.flatMap((c, cIdx) => {
+    const posts = c.feedPosts || []
+    if (posts.length === 0) return []
     const style = c.styles?.[0]
-    if (!style?.images?.length) return []
-    // 캐릭터당 감정 이미지를 각각 포스트로
-    return style.images
-      .filter((img) => getImageUrl(img.filePath))
-      .map((img, imgIdx) => ({
-        id: `${c.id}-${img.id}`,
-        character: c,
-        imageUrl: getImageUrl(img.filePath),
-        emotion: img.emotion,
-        caption: CAPTIONS[(cIdx + imgIdx) % CAPTIONS.length],
-        timeAgo: timeAgo(cIdx * 3 + imgIdx),
-        likes: Math.floor(Math.random() * 500 + 50),
-        thumbUrl: getImageUrl(
-          (style.images.find((i) => i.emotion === 'NEUTRAL') || style.images[0])?.filePath
-        ),
-      }))
+    const thumbUrl = getImageUrl(
+      (style?.images?.find((i) => i.emotion === 'NEUTRAL') || style?.images?.[0])?.filePath
+    )
+    return posts.map((post, pIdx) => ({
+      id: `feed-${post.id}`,
+      character: c,
+      imageUrl: post.filePath,
+      caption: post.caption || CAPTIONS[(cIdx + pIdx) % CAPTIONS.length],
+      timeAgo: timeAgo(cIdx * 3 + pIdx),
+      likes: post.likes || ((post.id * 137 + 42) % 500 + 50),
+      thumbUrl,
+    }))
   })
 
-  // likes를 안정적으로 유지하기 위해 seed 기반
-  const stablePosts = feedPosts.map((post, i) => ({
-    ...post,
-    likes: ((i + 1) * 137 + 42) % 500 + 50,
-  }))
+  const stablePosts = feedPosts
 
   return (
     <div className="pb-2">
@@ -82,33 +122,41 @@ export default function Feed() {
       {/* 스토리 */}
       <div className="px-4 py-3">
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-          {storyCharacters.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => navigate(`/characters/${c.id}`)}
-              className="flex flex-col items-center gap-1.5 flex-shrink-0"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400">
-                <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
-                  {c.thumbUrl ? (
-                    <img
-                      src={c.thumbUrl}
-                      alt={c.name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gray-800 flex items-center justify-center">
-                      <span className="text-lg text-gray-500">?</span>
-                    </div>
-                  )}
+          {storyCharacters.map((c) => {
+            const hasStories = (c.stories || []).length > 0
+            const isViewed = viewedStories.has(c.id)
+            return (
+              <button
+                key={c.id}
+                onClick={() => hasStories ? openStory(c) : navigate(`/characters/${c.id}`)}
+                className="flex flex-col items-center gap-1.5 flex-shrink-0"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className={`w-16 h-16 rounded-full p-[2px] ${
+                  hasStories && !isViewed
+                    ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                    : 'bg-gray-600'
+                }`}>
+                  <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
+                    {c.thumbUrl ? (
+                      <img
+                        src={c.thumbUrl}
+                        alt={c.name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-gray-800 flex items-center justify-center">
+                        <span className="text-lg text-gray-500">?</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <span className="text-[11px] text-gray-300 w-16 text-center truncate">
-                {c.name}
-              </span>
-            </button>
-          ))}
+                <span className="text-[11px] text-gray-300 w-16 text-center truncate">
+                  {c.name}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -211,9 +259,22 @@ export default function Feed() {
       </div>
 
       {stablePosts.length === 0 && (
-        <div className="text-center text-gray-500 py-20">
-          <p>아직 피드가 없습니다.</p>
+        <div className="text-center text-gray-500 py-20 px-6">
+          <p className="text-lg mb-2">피드가 비어있어요</p>
+          <p className="text-sm">홈에서 캐릭터를 팔로우하면 피드에 게시물이 나타납니다.</p>
         </div>
+      )}
+
+      {/* 스토리 뷰어 */}
+      {storyModal && (
+        <StoryViewer
+          stories={storyModal.stories}
+          character={storyModal.character}
+          profileUrl={storyModal.profileUrl}
+          currentIndex={storyIndex}
+          onIndexChange={setStoryIndex}
+          onClose={closeStory}
+        />
       )}
     </div>
   )

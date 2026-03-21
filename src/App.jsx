@@ -7,6 +7,7 @@ import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import AdminCharacters from './pages/admin/Characters'
 import CharacterStyles from './pages/admin/CharacterStyles'
+import CharacterFeeds from './pages/admin/CharacterFeeds'
 import AdminUsers from './pages/admin/Users'
 
 // User
@@ -19,6 +20,7 @@ import MyPage from './pages/user/MyPage'
 import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
+import MessageNotification from './components/MessageNotification'
 
 function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
@@ -45,12 +47,15 @@ function App() {
   }, [token])
 
   return (
+    <>
+    <MessageNotification />
     <Routes>
       {/* 어드민 */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="characters" element={<AdminCharacters />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
+        <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
         <Route path="users" element={<AdminUsers />} />
       </Route>
 
@@ -68,6 +73,7 @@ function App() {
       <Route path="/about" element={<About />} />
       <Route path="/terms" element={<Terms />} />
     </Routes>
+    </>
   )
 }
 

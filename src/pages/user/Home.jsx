@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import MaskChargeModal from '../../components/MaskChargeModal'
-import AdBanner from '../../components/AdBanner'
+// import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -17,7 +17,6 @@ export default function Home() {
   const { token, masks, setMasks } = useStore()
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
-  const [selectedTag, setSelectedTag] = useState(null)
   const [showChargeModal, setShowChargeModal] = useState(false)
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const navigate = useNavigate()
@@ -41,14 +40,8 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
-    if (selectedTag) params.set('tag', selectedTag)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
-  }, [search, selectedTag])
-
-  const GENRES = [
-    '일상/로맨스', '미스테리/RPG', '학원물', '현대 판타지',
-    '로맨스 판타지', '무협/시대극', '집착/피폐', 'BL', '철벽/혐관', '다각관계',
-  ]
+  }, [search])
 
   return (
     <div className="px-4 pt-4 pb-2">
@@ -100,32 +93,14 @@ export default function Home() {
 
           {/* 장르 필터 */}
           <div className="flex gap-1 overflow-x-auto pb-3 scrollbar-hide">
-            <button
-              onClick={() => setSelectedTag(null)}
-              className={`px-2.5 py-1 rounded-full text-xs whitespace-nowrap font-medium transition-colors ${
-                !selectedTag ? 'bg-indigo-600 text-white' : 'text-gray-500'
-              }`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
+            <span className="px-2.5 py-1 rounded-full text-xs whitespace-nowrap font-medium bg-indigo-600 text-white">
               전체
-            </button>
-            {GENRES.map((genre) => (
-              <button
-                key={genre}
-                onClick={() => setSelectedTag(selectedTag === genre ? null : genre)}
-                className={`px-1 py-1 rounded-full text-xs whitespace-nowrap font-medium transition-colors ${
-                  selectedTag === genre ? 'bg-indigo-600 text-white px-2.5' : 'text-gray-500'
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {genre}
-              </button>
-            ))}
+            </span>
           </div>
         </div>
 
         {/* 광고 */}
-        <AdBanner slot="3193498609" />
+        {/* <AdBanner slot="3193498609" /> */}
       </div>
 
       {/* 캐릭터 그리드 */}

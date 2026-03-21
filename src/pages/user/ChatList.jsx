@@ -38,6 +38,13 @@ export default function ChatList() {
 
   useEffect(() => { load() }, [token])
 
+  // 폴링 이벤트로 자동 갱신
+  useEffect(() => {
+    const handler = () => load()
+    window.addEventListener('conversations-updated', handler)
+    return () => window.removeEventListener('conversations-updated', handler)
+  }, [token])
+
   const filtered = search.trim()
     ? conversations.filter((c) => c.character.name.toLowerCase().includes(search.toLowerCase()))
     : conversations

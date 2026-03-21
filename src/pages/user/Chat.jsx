@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
-import AdBanner from '../../components/AdBanner'
+// import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -45,24 +45,41 @@ export default function Chat() {
   const [suggestedReplies, setSuggestedReplies] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const messagesEndRef = useRef(null)
+  const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
   const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
+    initialLoadRef.current = true
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
+      // 초기 로드 시 즉시 맨 아래로
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        initialLoadRef.current = false
+      })
     })
     if (token) {
       api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
     }
   }, [id])
 
+  // 채팅 페이지 퇴장 시 읽음 처리 + 최근 나간 채팅방 알림
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    return () => {
+      api.post(`/conversations/${id}/read`).catch(() => {})
+      window.dispatchEvent(new CustomEvent('chat-exited', { detail: { conversationId: parseInt(id), at: Date.now() } }))
+    }
+  }, [id])
+
+  useEffect(() => {
+    if (!initialLoadRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, showTyping])
 
   const FREE_CHAT_LIMIT = 3
@@ -119,6 +136,10 @@ export default function Chat() {
               setSending(false)
             }
             showSequentially()
+            // 호감도 갱신
+            if (data.affinity !== undefined) {
+              setConversation((prev) => ({ ...prev, affinity: data.affinity }))
+            }
             break
           }
           case 'error':
@@ -153,20 +174,29 @@ export default function Chat() {
         <button onClick={() => navigate('/chats')} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
-        <div className="relative flex-shrink-0">
-          <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
-            {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>}
+        <button
+          onClick={() => navigate(`/characters/${conversation.characterId}`)}
+          className="flex items-center gap-3 flex-1 min-w-0"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <div className="relative flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
+              {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>}
+            </div>
+            {onlineStatus === 'free' && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900" />}
           </div>
-          {onlineStatus === 'free' && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900" />}
-        </div>
-        <div>
-          <span className="font-semibold text-sm text-white block">{character.name}</span>
-          {onlineStatus === 'free' && <p className="text-[10px] text-green-400">활동 중</p>}
-        </div>
+          <div>
+            <span className="font-semibold text-sm text-white block">{character.name}</span>
+            {onlineStatus === 'free' && <p className="text-[10px] text-green-400">활동 중</p>}
+          </div>
+        </button>
+        {import.meta.env.DEV && (
+          <span className="text-[11px] text-gray-500 font-mono">❤️ {conversation.affinity ?? 0}</span>
+        )}
       </header>
 
       <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
-        <div className="py-1"><AdBanner slot="8921302150" /></div>
+        {/* <div className="py-1"><AdBanner slot="8921302150" /></div> */}
         {messages.map((msg, idx) => {
           const prevMsg = messages[idx - 1]
           const isConsecutive = prevMsg?.role === msg.role

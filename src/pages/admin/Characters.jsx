@@ -137,6 +137,13 @@ export default function Characters() {
                         수정
                       </button>
                       <button
+                        onClick={() => navigate(`/admin/characters/${c.id}/feeds`)}
+                        className="text-purple-400 hover:text-purple-300 text-xs"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        피드
+                      </button>
+                      <button
                         onClick={() => remove(c.id)}
                         className="text-red-400 hover:text-red-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
