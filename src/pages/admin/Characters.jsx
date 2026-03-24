@@ -10,6 +10,11 @@ const EMPTY_FORM = {
   firstMessage: '',
   tags: '',
   isPublic: false,
+  proactiveEnabled: false,
+  proactiveMinInterval: 60,   // 분 단위로 표시
+  proactiveMaxInterval: 240,  // 분 단위로 표시
+  proactiveProbability: 50,   // % 단위로 표시
+  proactiveMaxCount: 3,
 }
 
 export default function Characters() {
@@ -38,6 +43,11 @@ export default function Characters() {
       firstMessage: c.firstMessage,
       tags: c.tags.join(', '),
       isPublic: c.isPublic,
+      proactiveEnabled: c.proactiveEnabled || false,
+      proactiveMinInterval: Math.round((c.proactiveMinInterval || 3600) / 60),
+      proactiveMaxInterval: Math.round((c.proactiveMaxInterval || 14400) / 60),
+      proactiveProbability: Math.round((c.proactiveProbability || 0.5) * 100),
+      proactiveMaxCount: c.proactiveMaxCount || 3,
     })
     setEditing(c)
   }
@@ -46,6 +56,10 @@ export default function Characters() {
     const data = {
       ...form,
       tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      proactiveMinInterval: form.proactiveMinInterval * 60,  // 분 → 초
+      proactiveMaxInterval: form.proactiveMaxInterval * 60,  // 분 → 초
+      proactiveProbability: form.proactiveProbability / 100, // % → 0~1
+      proactiveMaxCount: form.proactiveMaxCount,
     }
 
     if (editing === 'new') {
@@ -237,6 +251,72 @@ export default function Characters() {
                 />
                 공개
               </label>
+
+              {/* 선제 메시지 설정 */}
+              <div className="border-t border-gray-700 pt-4 mt-2">
+                <label className="flex items-center gap-2 text-sm mb-3">
+                  <input
+                    type="checkbox"
+                    checked={form.proactiveEnabled}
+                    onChange={(e) => setForm({ ...form, proactiveEnabled: e.target.checked })}
+                    className="rounded"
+                  />
+                  선제 메시지 활성화
+                </label>
+
+                {form.proactiveEnabled && (
+                  <div className="space-y-3 pl-1">
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-400 block mb-1">최소 간격 (분)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.proactiveMinInterval}
+                          onChange={(e) => setForm({ ...form, proactiveMinInterval: parseInt(e.target.value) || 1 })}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-400 block mb-1">최대 간격 (분)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.proactiveMaxInterval}
+                          onChange={(e) => setForm({ ...form, proactiveMaxInterval: parseInt(e.target.value) || 1 })}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-400 block mb-1">
+                          발송 확률: {form.proactiveProbability}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={form.proactiveProbability}
+                          onChange={(e) => setForm({ ...form, proactiveProbability: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="w-28">
+                        <label className="text-xs text-gray-400 block mb-1">최대 연속 횟수</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={form.proactiveMaxCount}
+                          onChange={(e) => setForm({ ...form, proactiveMaxCount: parseInt(e.target.value) || 1 })}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 mt-6">

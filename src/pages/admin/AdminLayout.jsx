@@ -21,7 +21,7 @@ export default function AdminLayout() {
       .catch(() => setAuthorized(false))
   }, [token])
 
-  if (!token) return <Navigate to="/login" replace />
+  if (!token) return <Navigate to="/" replace />
   if (authorized === null) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">

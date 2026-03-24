@@ -84,7 +84,7 @@ export default function UserLayout() {
       </main>
 
       {/* 하단 탭바 */}
-      <nav className="flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
+      <nav className={`flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm ${isChatPage ? 'hidden' : ''}`}>
         {TABS.map((tab) =>
           tab.requireAuth && !token ? (
             <button

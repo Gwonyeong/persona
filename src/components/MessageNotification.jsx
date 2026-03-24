@@ -62,16 +62,17 @@ export default function MessageNotification() {
           }
         }
 
-        // 억제된 항목은 prevUnreadRef에서 제외 (억제 해제 후 토스트 가능)
-        for (const sid of suppressedIds) {
-          currentUnreadIds.delete(sid)
-        }
+        // 억제된 항목도 prevUnreadRef에 포함 (재알림 방지)
         prevUnreadRef.current = currentUnreadIds
 
         // ChatList 등 다른 컴포넌트에 갱신 알림
         window.dispatchEvent(new CustomEvent('conversations-updated'))
-        // 탭바 unread 뱃지용 (억제된 항목 제외)
-        const visibleUnreadCount = unread.filter((u) => !suppressedIds.has(u.conversationId)).length
+        // 탭바 unread 뱃지용 (현재 보고 있는 채팅방 + 억제된 항목 제외)
+        const visibleUnreadCount = unread.filter((u) => {
+          if (currentChatId && String(u.conversationId) === currentChatId) return false
+          if (suppressedIds.has(u.conversationId)) return false
+          return true
+        }).length
         window.dispatchEvent(new CustomEvent('unread-count', { detail: visibleUnreadCount }))
       } catch {
         // 에러 무시

@@ -94,10 +94,11 @@ async function streamRequest(path, body, onEvent) {
 
 export const api = {
   get: (path) => request(path),
-  post: (path, body) =>
+  post: (path, body, options = {}) =>
     request(path, {
       method: 'POST',
       body: body instanceof FormData ? body : JSON.stringify(body),
+      ...options,
     }),
   put: (path, body) =>
     request(path, {

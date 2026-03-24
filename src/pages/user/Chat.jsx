@@ -68,10 +68,19 @@ export default function Chat() {
     }
   }, [id])
 
-  // 채팅 페이지 퇴장 시 읽음 처리 + 최근 나간 채팅방 알림
+  // 채팅 페이지에 있는 동안 주기적으로 읽음 처리 (heartbeat)
   useEffect(() => {
-    return () => {
+    // 진입 시 즉시 읽음 처리
+    api.post(`/conversations/${id}/read`).catch(() => {})
+
+    const interval = setInterval(() => {
       api.post(`/conversations/${id}/read`).catch(() => {})
+    }, 5000) // 5초마다
+
+    return () => {
+      clearInterval(interval)
+      // 퇴장 시 keepalive fetch로 확실하게 읽음 처리 (탭 종료에도 전송 보장)
+      api.post(`/conversations/${id}/read`, {}, { keepalive: true }).catch(() => {})
       window.dispatchEvent(new CustomEvent('chat-exited', { detail: { conversationId: parseInt(id), at: Date.now() } }))
     }
   }, [id])
@@ -169,7 +178,7 @@ export default function Chat() {
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   return (
-    <div className="flex flex-col h-full bg-gray-950">
+    <div className="absolute inset-0 flex flex-col bg-gray-950 z-20">
       <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm flex-shrink-0">
         <button onClick={() => navigate('/chats')} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
@@ -240,7 +249,7 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 border-t border-gray-800 bg-gray-900/95">
+      <div className="p-3 border-t border-gray-800 bg-gray-900/95 flex-shrink-0">
         {showSuggestions && suggestedReplies.length > 0 && (
           <div className="mb-2 flex flex-col gap-1.5">
             {suggestedReplies.map((reply, i) => (
