@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import useStore from './store/useStore'
 import { api } from './lib/api'
 import { registerPushNotifications } from './lib/push'
@@ -25,6 +25,19 @@ import MessageNotification from './components/MessageNotification'
 
 function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
+
+  const navigate = useNavigate()
+
+  // SW 푸시 알림 클릭 → SPA 네비게이션
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.data?.type === 'NAVIGATE' && event.data.path) {
+        navigate(event.data.path)
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', handler)
+    return () => navigator.serviceWorker?.removeEventListener('message', handler)
+  }, [navigate])
 
   // 네이티브 앱 딥링크 인증 수신
   useEffect(() => {
