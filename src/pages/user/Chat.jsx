@@ -91,6 +91,17 @@ export default function Chat() {
     }
   }, [messages, showTyping])
 
+  // 모바일 키보드가 열릴 때 마지막 메시지가 보이도록 스크롤
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const handleResize = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+    vv.addEventListener('resize', handleResize)
+    return () => vv.removeEventListener('resize', handleResize)
+  }, [])
+
   const FREE_CHAT_LIMIT = 3
 
   const send = async () => {
