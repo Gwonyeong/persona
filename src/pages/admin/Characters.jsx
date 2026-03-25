@@ -9,6 +9,7 @@ const EMPTY_FORM = {
   personality: '',
   firstMessage: '',
   tags: '',
+  initialAffinity: 0,
   isPublic: false,
   proactiveEnabled: false,
   proactiveMinInterval: 60,   // 분 단위로 표시
@@ -42,6 +43,7 @@ export default function Characters() {
       personality: c.personality,
       firstMessage: c.firstMessage,
       tags: c.tags.join(', '),
+      initialAffinity: c.initialAffinity || 0,
       isPublic: c.isPublic,
       proactiveEnabled: c.proactiveEnabled || false,
       proactiveMinInterval: Math.round((c.proactiveMinInterval || 3600) / 60),
@@ -240,6 +242,25 @@ export default function Characters() {
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
                   placeholder="로맨스, 학원, 츤데레"
                 />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400 block mb-1">
+                  시작 호감도: {form.initialAffinity}
+                </label>
+                <input
+                  type="range"
+                  min="-100"
+                  max="100"
+                  value={form.initialAffinity}
+                  onChange={(e) => setForm({ ...form, initialAffinity: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-[10px] text-gray-500 mt-0.5">
+                  <span>-100 (적대)</span>
+                  <span>0 (중립)</span>
+                  <span>100 (호감)</span>
+                </div>
               </div>
 
               <label className="flex items-center gap-2 text-sm">

@@ -62,7 +62,10 @@ export default function MessageNotification() {
           }
         }
 
-        // 억제된 항목도 prevUnreadRef에 포함 (재알림 방지)
+        // 억제된 항목은 prevUnreadRef에서 제외 (15초 후 토스트 표시 가능하도록)
+        for (const id of suppressedIds) {
+          currentUnreadIds.delete(id)
+        }
         prevUnreadRef.current = currentUnreadIds
 
         // ChatList 등 다른 컴포넌트에 갱신 알림
