@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -38,6 +39,7 @@ export default function MyPage() {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [pushStatus, setPushStatus] = useState(() => getPushPermissionStatus())
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -206,6 +208,26 @@ export default function MyPage() {
 
       {/* 메뉴 */}
       <div className="mt-4 bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">
+        {pushStatus !== 'unsupported' && (
+          <button
+            onClick={async () => {
+              if (pushStatus === 'granted') {
+                await unregisterPushNotifications()
+                setPushStatus('default')
+              } else {
+                const result = await requestPushPermission()
+                setPushStatus(result)
+              }
+            }}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-gray-200">알림</span>
+            <div className={`w-10 h-[22px] rounded-full relative transition-colors ${pushStatus === 'granted' ? 'bg-indigo-600' : 'bg-gray-700'}`}>
+              <div className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white transition-transform ${pushStatus === 'granted' ? 'translate-x-[20px]' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+        )}
         {dbUser?.role === 'ADMIN' && (
           <button
             onClick={() => navigate('/admin')}

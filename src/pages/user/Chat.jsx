@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 // import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -44,6 +45,8 @@ export default function Chat() {
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [suggestedReplies, setSuggestedReplies] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [showPushPrompt, setShowPushPrompt] = useState(false)
+  const pushPromptShownRef = useRef(false)
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
@@ -154,6 +157,11 @@ export default function Chat() {
               if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
               setShowTyping(false)
               setSending(false)
+              // 첫 응답 후 알림 권한이 없으면 유도 프롬프트 표시
+              if (!pushPromptShownRef.current && token && getPushPermissionStatus() === 'default') {
+                pushPromptShownRef.current = true
+                setShowPushPrompt(true)
+              }
             }
             showSequentially()
             // 호감도 갱신
@@ -282,6 +290,36 @@ export default function Chat() {
           </button>
         </div>
       </div>
+      {showPushPrompt && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowPushPrompt(false)}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 bg-gray-700 rounded-full" />
+            </div>
+            <p className="text-white font-semibold text-center mb-1">{character.name}의 답장을 놓치지 마세요</p>
+            <p className="text-gray-400 text-sm text-center mb-5">알림을 켜면 새 메시지를 바로 확인할 수 있어요</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPushPrompt(false)}
+                className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                다음에
+              </button>
+              <button
+                onClick={async () => {
+                  await requestPushPermission()
+                  setShowPushPrompt(false)
+                }}
+                className="flex-1 py-2.5 text-sm text-white bg-indigo-600 rounded-xl font-semibold"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                알림 켜기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
       {lightboxUrl && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>

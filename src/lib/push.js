@@ -3,60 +3,72 @@ import { api } from './api'
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
 /**
- * Service Worker 등록 + 푸시 알림 구독
- * 로그인 상태에서만 호출해야 함
+ * SW 등록 + 이미 권한이 있으면 구독 (자동 호출용)
+ * 권한이 없으면 요청하지 않고 조용히 종료
  */
-function debugToast(msg) {
-  const el = document.createElement('div')
-  el.textContent = msg
-  Object.assign(el.style, {
-    position: 'fixed', top: '40px', left: '8px', right: '8px', zIndex: '99999',
-    background: '#222', color: '#0f0', padding: '8px 12px', borderRadius: '8px',
-    fontSize: '11px', wordBreak: 'break-all',
-  })
-  document.body.appendChild(el)
-  setTimeout(() => el.remove(), 5000)
-}
-
 export async function registerPushNotifications() {
-  debugToast('[Push] Start')
-
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    debugToast(`[Push] Not supported: sw=${'serviceWorker' in navigator}, push=${'PushManager' in window}`)
-    return
-  }
-  if (!VAPID_PUBLIC_KEY) {
-    debugToast('[Push] VAPID_PUBLIC_KEY not set')
-    return
-  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!VAPID_PUBLIC_KEY) return
 
   try {
-    debugToast('[Push] Registering SW...')
     const registration = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
-    debugToast('[Push] SW ready')
 
     let subscription = await registration.pushManager.getSubscription()
-    debugToast(`[Push] Existing sub: ${!!subscription}`)
 
-    if (!subscription) {
-      debugToast('[Push] Requesting permission...')
-      const permission = await Notification.requestPermission()
-      debugToast(`[Push] Permission: ${permission}`)
-      if (permission !== 'granted') return
-
+    // 이미 권한이 granted인 경우에만 자동 구독
+    if (!subscription && Notification.permission === 'granted') {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
-      debugToast('[Push] Subscribed!')
+    }
+
+    if (subscription) {
+      await api.post('/push/subscribe', { subscription: subscription.toJSON() })
+    }
+  } catch (err) {
+    console.error('[Push] Registration failed:', err)
+  }
+}
+
+/**
+ * 사용자 제스처에서 호출 — 권한 요청 + 구독 (iOS 대응)
+ * @returns {'granted'|'denied'|'unsupported'} 결과
+ */
+export async function requestPushPermission() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported'
+  if (!VAPID_PUBLIC_KEY) return 'unsupported'
+
+  try {
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') return permission
+
+    const registration = await navigator.serviceWorker.ready
+    let subscription = await registration.pushManager.getSubscription()
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      })
     }
 
     await api.post('/push/subscribe', { subscription: subscription.toJSON() })
-    debugToast('[Push] Sent to server OK')
+    return 'granted'
   } catch (err) {
-    debugToast(`[Push] Error: ${err.message}`)
+    console.error('[Push] Permission request failed:', err)
+    return 'denied'
   }
+}
+
+/**
+ * 현재 푸시 알림 상태 반환
+ * @returns {'granted'|'denied'|'default'|'unsupported'}
+ */
+export function getPushPermissionStatus() {
+  if (!('Notification' in window)) return 'unsupported'
+  return Notification.permission
 }
 
 /**
