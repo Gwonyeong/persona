@@ -6,31 +6,56 @@ const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
  * Service Worker 등록 + 푸시 알림 구독
  * 로그인 상태에서만 호출해야 함
  */
+function debugToast(msg) {
+  const el = document.createElement('div')
+  el.textContent = msg
+  Object.assign(el.style, {
+    position: 'fixed', top: '40px', left: '8px', right: '8px', zIndex: '99999',
+    background: '#222', color: '#0f0', padding: '8px 12px', borderRadius: '8px',
+    fontSize: '11px', wordBreak: 'break-all',
+  })
+  document.body.appendChild(el)
+  setTimeout(() => el.remove(), 5000)
+}
+
 export async function registerPushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-  if (!VAPID_PUBLIC_KEY) return
+  debugToast('[Push] Start')
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    debugToast(`[Push] Not supported: sw=${'serviceWorker' in navigator}, push=${'PushManager' in window}`)
+    return
+  }
+  if (!VAPID_PUBLIC_KEY) {
+    debugToast('[Push] VAPID_PUBLIC_KEY not set')
+    return
+  }
 
   try {
+    debugToast('[Push] Registering SW...')
     const registration = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
+    debugToast('[Push] SW ready')
 
-    // 이미 구독 중이면 서버에 재등록만
     let subscription = await registration.pushManager.getSubscription()
+    debugToast(`[Push] Existing sub: ${!!subscription}`)
 
     if (!subscription) {
+      debugToast('[Push] Requesting permission...')
       const permission = await Notification.requestPermission()
+      debugToast(`[Push] Permission: ${permission}`)
       if (permission !== 'granted') return
 
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
+      debugToast('[Push] Subscribed!')
     }
 
-    // 서버에 구독 정보 전송
     await api.post('/push/subscribe', { subscription: subscription.toJSON() })
+    debugToast('[Push] Sent to server OK')
   } catch (err) {
-    console.error('[Push] Registration failed:', err)
+    debugToast(`[Push] Error: ${err.message}`)
   }
 }
 
