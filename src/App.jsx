@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import useStore from './store/useStore'
 import { api } from './lib/api'
+import { registerPushNotifications } from './lib/push'
 // Admin
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
@@ -42,7 +43,10 @@ function App() {
     if (!token) return
     api
       .get('/auth/me')
-      .then(({ user }) => setUser(user))
+      .then(({ user }) => {
+        setUser(user)
+        registerPushNotifications()
+      })
       .catch(() => clearAuth())
   }, [token])
 

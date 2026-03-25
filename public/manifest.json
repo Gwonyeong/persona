@@ -1,0 +1,18 @@
+{
+  "name": "Pesona",
+  "short_name": "Pesona",
+  "description": "AI 캐릭터 채팅 플랫폼",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#863bff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
