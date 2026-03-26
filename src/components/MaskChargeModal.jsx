@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
-import { isNativeBillingAvailable, initBilling, purchaseProduct, getPendingPurchases } from '../lib/billing'
+import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, getPendingPurchases } from '../lib/billing'
 
 const PACKAGES = [
   { amount: 30, price: '₩1,000', label: '30개', productId: 'masks_30' },
@@ -22,6 +22,7 @@ export default function MaskChargeModal({ onClose }) {
   const [errorMsg, setErrorMsg] = useState('')
   const [billingReady, setBillingReady] = useState(false)
   const [isNative, setIsNative] = useState(false)
+  const [debugInfo, setDebugInfo] = useState('')
 
   useEffect(() => {
     const init = async () => {
@@ -31,6 +32,8 @@ export default function MaskChargeModal({ onClose }) {
         const ready = await initBilling()
         setBillingReady(ready)
         if (ready) {
+          const products = await getProducts()
+          setDebugInfo(`products: ${JSON.stringify(products?.map(p => p.productIdentifier || p.productId) || null)}`)
           // 미완료 구매 복구
           const pending = await getPendingPurchases()
           for (const purchase of pending) {
@@ -93,6 +96,8 @@ export default function MaskChargeModal({ onClose }) {
             현재 보유: <span className="text-indigo-400 font-semibold">{masks}개</span>
           </p>
         </div>
+
+        {debugInfo && <p className="text-xs text-yellow-400 text-center mb-2 break-all">{debugInfo}</p>}
 
         {/* 패키지 선택 */}
         <div className="flex flex-col gap-2.5 mb-5">
