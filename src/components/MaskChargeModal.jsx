@@ -66,10 +66,24 @@ export default function MaskChargeModal({ onClose }) {
 
       // Google Play 결제
       const result = await purchaseProduct(pkg.productId)
+      setDebugInfo(`purchaseResult: ${JSON.stringify(result).slice(0, 500)}`)
 
       // 서버에서 검증 + 마스크 지급
-      await verifyOnServer(pkg.productId, result.purchaseToken)
+      const token = result?.purchaseToken || result?.transactionReceipt?.purchaseToken || result?.receipt
+      if (!token) {
+        setErrorMsg(`[DEBUG] No purchaseToken found in result: ${JSON.stringify(result).slice(0, 300)}`)
+        setLoading(false)
+        return
+      }
 
+      const serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken: token })
+      if (serverRes.error) {
+        setErrorMsg(`[DEBUG] Server: ${serverRes.error}`)
+        setLoading(false)
+        return
+      }
+
+      useStore.getState().setMasks(serverRes.masks)
       onClose()
     } catch (err) {
       const msg = err?.message || ''
