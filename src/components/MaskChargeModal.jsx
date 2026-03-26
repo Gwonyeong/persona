@@ -1,31 +1,82 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
+import { isNativeBillingAvailable, initBilling, purchaseProduct, getPendingPurchases } from '../lib/billing'
 
 const PACKAGES = [
-  { amount: 30, price: '₩1,000', label: '30개' },
-  { amount: 100, price: '₩3,000', label: '100개', badge: '인기' },
-  { amount: 300, price: '₩8,000', label: '300개', badge: '할인' },
+  { amount: 30, price: '₩1,000', label: '30개', productId: 'masks_30' },
+  { amount: 100, price: '₩3,000', label: '100개', badge: '인기', productId: 'masks_100' },
+  { amount: 300, price: '₩8,000', label: '300개', badge: '할인', productId: 'masks_300' },
 ]
+
+async function verifyOnServer(productId, purchaseToken) {
+  const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
+  useStore.getState().setMasks(result.masks)
+  return result
+}
 
 export default function MaskChargeModal({ onClose }) {
   const { masks } = useStore()
   const [selected, setSelected] = useState(1)
   const [loading, setLoading] = useState(false)
-
   const [errorMsg, setErrorMsg] = useState('')
+  const [billingReady, setBillingReady] = useState(false)
+  const [isNative, setIsNative] = useState(false)
+
+  useEffect(() => {
+    const init = async () => {
+      const native = isNativeBillingAvailable()
+      setIsNative(native)
+      if (native) {
+        const ready = await initBilling()
+        setBillingReady(ready)
+        if (ready) {
+          // 미완료 구매 복구
+          const pending = await getPendingPurchases()
+          for (const purchase of pending) {
+            try {
+              await verifyOnServer(purchase.productIdentifier || purchase.productId, purchase.purchaseToken)
+            } catch {}
+          }
+        }
+      }
+    }
+    init()
+  }, [])
 
   const handlePurchase = async () => {
     setLoading(true)
     setErrorMsg('')
+
     try {
       const pkg = PACKAGES[selected]
-      await api.post('/masks/purchase-attempt', {
-        package: `${pkg.label}_${pkg.price}`,
-      })
-    } catch {}
+
+      // 구매 시도 기록
+      api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
+
+      if (!isNative || !billingReady) {
+        setErrorMsg('앱에서만 구매할 수 있습니다.')
+        setLoading(false)
+        return
+      }
+
+      // Google Play 결제
+      const result = await purchaseProduct(pkg.productId)
+
+      // 서버에서 검증 + 마스크 지급
+      await verifyOnServer(pkg.productId, result.purchaseToken)
+
+      onClose()
+    } catch (err) {
+      const msg = err?.message || ''
+      if (msg.includes('USER_CANCELED') || msg.includes('userCancelled')) {
+        // 사용자 취소 — 에러 표시 안 함
+      } else {
+        setErrorMsg('결제 중 오류가 발생했습니다. 다시 시도해주세요.')
+      }
+    }
+
     setLoading(false)
-    setErrorMsg('죄송합니다. 시스템 에러가 발생했습니다.')
   }
 
   return (
