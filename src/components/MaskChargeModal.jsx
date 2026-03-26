@@ -55,7 +55,8 @@ export default function MaskChargeModal({ onClose }) {
       api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
 
       if (!isNative || !billingReady) {
-        setErrorMsg('앱에서만 구매할 수 있습니다.')
+        const cap = window.Capacitor
+        setErrorMsg(`[DEBUG] isNative=${isNative}, billingReady=${billingReady}, window.Capacitor=${!!cap}, platform=${cap?.getPlatform?.()}, isNative=${cap?.isNativePlatform?.()}`)
         setLoading(false)
         return
       }
