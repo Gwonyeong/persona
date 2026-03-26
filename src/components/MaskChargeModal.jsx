@@ -72,7 +72,7 @@ export default function MaskChargeModal({ onClose }) {
       if (msg.includes('USER_CANCELED') || msg.includes('userCancelled')) {
         // 사용자 취소 — 에러 표시 안 함
       } else {
-        setErrorMsg('결제 중 오류가 발생했습니다. 다시 시도해주세요.')
+        setErrorMsg(`[DEBUG] ${msg || JSON.stringify(err)}`)
       }
     }
 
