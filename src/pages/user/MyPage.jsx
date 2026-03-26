@@ -247,6 +247,13 @@ export default function MyPage() {
         >
           로그아웃
         </button>
+        <button
+          onClick={() => navigate('/account/delete')}
+          className="w-full flex items-center px-4 py-3.5 text-sm text-gray-500 hover:bg-gray-800/50 transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          회원 탈퇴
+        </button>
       </div>
       </>
       )}

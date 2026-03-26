@@ -21,6 +21,7 @@ import MyPage from './pages/user/MyPage'
 import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
+import DeleteAccount from './pages/user/DeleteAccount'
 import MessageNotification from './components/MessageNotification'
 
 function App() {
@@ -89,6 +90,7 @@ function App() {
       <Route path="/chats/:id" element={<Chat />} />
       <Route path="/about" element={<About />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/account/delete" element={<DeleteAccount />} />
     </Routes>
     </>
   )

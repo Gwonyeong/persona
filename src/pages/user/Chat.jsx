@@ -268,7 +268,7 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 border-t border-gray-800 bg-gray-900/95 flex-shrink-0">
+      <div className="p-3 border-t border-gray-800 bg-gray-900/95 flex-shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
         {showSuggestions && suggestedReplies.length > 0 && (
           <div className="mb-2 flex flex-col gap-1.5">
             {suggestedReplies.map((reply, i) => (
