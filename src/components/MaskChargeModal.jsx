@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
-import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, getPendingPurchases } from '../lib/billing'
+import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../lib/billing'
 
 const PACKAGES = [
   { amount: 30, price: '₩1,000', label: '30개', productId: 'masks_30' },
@@ -44,6 +44,8 @@ export default function MaskChargeModal({ onClose }) {
             } catch {
               try { await api.post('/masks/consume-purchase', { productId: pid, purchaseToken: pt }) } catch {}
             }
+            // 서버 검증 성공/실패 무관하게 클라이언트 측 consume 처리
+            await consumePurchase(pt)
           }
         }
       }
@@ -86,6 +88,9 @@ export default function MaskChargeModal({ onClose }) {
         setLoading(false)
         return
       }
+
+      // 클라이언트 측에서도 consume 처리 (재구매 가능하게)
+      await consumePurchase(token)
 
       useStore.getState().setMasks(serverRes.masks)
       onClose()

@@ -52,6 +52,18 @@ export async function purchaseProduct(productId) {
   return result
 }
 
+export async function consumePurchase(purchaseToken) {
+  if (!NativePurchases) return false
+
+  try {
+    await NativePurchases.consumePurchase({ purchaseToken })
+    return true
+  } catch (e) {
+    console.error('Consume purchase failed:', e)
+    return false
+  }
+}
+
 export async function getPendingPurchases() {
   if (!NativePurchases) return []
 
