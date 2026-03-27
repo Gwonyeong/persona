@@ -34,12 +34,16 @@ export default function MaskChargeModal({ onClose }) {
         if (ready) {
           const products = await getProducts()
           setDebugInfo(`products: ${JSON.stringify(products?.map(p => p.productIdentifier || p.productId) || null)}`)
-          // 미완료 구매 복구
+          // 미완료 구매 복구 — 검증 시도 후 실패하면 강제 소비
           const pending = await getPendingPurchases()
           for (const purchase of pending) {
+            const pid = purchase.productIdentifier || purchase.productId
+            const pt = purchase.purchaseToken
             try {
-              await verifyOnServer(purchase.productIdentifier || purchase.productId, purchase.purchaseToken)
-            } catch {}
+              await verifyOnServer(pid, pt)
+            } catch {
+              try { await api.post('/masks/consume-purchase', { productId: pid, purchaseToken: pt }) } catch {}
+            }
           }
         }
       }
