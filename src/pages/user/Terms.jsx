@@ -131,7 +131,7 @@ export default function Terms() {
             <h2 className="text-base font-semibold text-gray-100 mb-2">제11조 (개인정보보호)</h2>
             <p>
               이용자의 개인정보 처리에 관한 사항은 별도의{' '}
-              <a href="/privacy-policy.html" className="text-indigo-400 hover:underline">개인정보처리방침</a>에 따릅니다.
+              <a href="/privacy" className="text-indigo-400 hover:underline">개인정보처리방침</a>에 따릅니다.
             </p>
           </section>
 

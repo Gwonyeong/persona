@@ -76,7 +76,7 @@ export default function UserLayout() {
               <span>·</span>
               <Link to="/terms" className="hover:text-gray-300 transition-colors">이용약관</Link>
               <span>·</span>
-              <a href="/privacy-policy.html" className="hover:text-gray-300 transition-colors">개인정보처리방침</a>
+              <Link to="/privacy" className="hover:text-gray-300 transition-colors">개인정보처리방침</Link>
             </div>
             <p className="text-center text-[10px] text-gray-600 mt-2">© 2026 Pesona. All rights reserved.</p>
           </footer>

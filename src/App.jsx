@@ -22,6 +22,7 @@ import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
 import DeleteAccount from './pages/user/DeleteAccount'
+import PrivacyPolicy from './pages/user/PrivacyPolicy'
 import MessageNotification from './components/MessageNotification'
 
 function App() {
@@ -91,6 +92,7 @@ function App() {
       <Route path="/about" element={<About />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/account/delete" element={<DeleteAccount />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
     </Routes>
     </>
   )

@@ -1,12 +1,132 @@
+import { Capacitor } from '@capacitor/core'
 import { api } from './api'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
 /**
- * SW 등록 + 이미 권한이 있으면 구독 (자동 호출용)
- * 권한이 없으면 요청하지 않고 조용히 종료
+ * 푸시 알림 등록 (네이티브: FCM, 웹: Web Push)
  */
 export async function registerPushNotifications() {
+  if (Capacitor.isNativePlatform()) {
+    await registerNativePush()
+  } else {
+    await registerWebPush()
+  }
+}
+
+/**
+ * 사용자 제스처에서 호출 — 권한 요청 + 구독
+ */
+export async function requestPushPermission() {
+  if (Capacitor.isNativePlatform()) {
+    return await requestNativePushPermission()
+  }
+  return await requestWebPushPermission()
+}
+
+/**
+ * 현재 푸시 알림 상태 반환
+ */
+export function getPushPermissionStatus() {
+  if (!('Notification' in window)) return 'unsupported'
+  return Notification.permission
+}
+
+/**
+ * 푸시 알림 구독 해제
+ */
+export async function unregisterPushNotifications() {
+  if (Capacitor.isNativePlatform()) {
+    await unregisterNativePush()
+  } else {
+    await unregisterWebPush()
+  }
+}
+
+// ========== 네이티브 (FCM) ==========
+
+async function registerNativePush() {
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications')
+
+    const permStatus = await PushNotifications.checkPermissions()
+    if (permStatus.receive !== 'granted') return
+
+    await PushNotifications.register()
+
+    PushNotifications.addListener('registration', async ({ value: token }) => {
+      try {
+        await api.post('/push/fcm-register', { token })
+      } catch (err) {
+        console.error('[FCM] Token registration failed:', err)
+      }
+    })
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('[FCM] Registration error:', err)
+    })
+
+    PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+      const path = notification.notification?.data?.path
+      if (path) {
+        window.location.hash = ''
+        window.location.pathname = path
+      }
+    })
+  } catch (err) {
+    console.error('[FCM] Init failed:', err)
+  }
+}
+
+async function requestNativePushPermission() {
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications')
+
+    const permStatus = await PushNotifications.requestPermissions()
+    if (permStatus.receive !== 'granted') return 'denied'
+
+    await PushNotifications.register()
+
+    return new Promise((resolve) => {
+      PushNotifications.addListener('registration', async ({ value: token }) => {
+        try {
+          await api.post('/push/fcm-register', { token })
+        } catch (err) {
+          console.error('[FCM] Token registration failed:', err)
+        }
+        resolve('granted')
+      })
+
+      PushNotifications.addListener('registrationError', () => {
+        resolve('denied')
+      })
+
+      PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+        const path = notification.notification?.data?.path
+        if (path) {
+          window.location.hash = ''
+          window.location.pathname = path
+        }
+      })
+    })
+  } catch (err) {
+    console.error('[FCM] Permission request failed:', err)
+    return 'denied'
+  }
+}
+
+async function unregisterNativePush() {
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications')
+    await PushNotifications.removeAllListeners()
+  } catch (err) {
+    console.error('[FCM] Unregister failed:', err)
+  }
+}
+
+// ========== 웹 (Web Push / VAPID) ==========
+
+async function registerWebPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
   if (!VAPID_PUBLIC_KEY) return
 
@@ -16,7 +136,6 @@ export async function registerPushNotifications() {
 
     let subscription = await registration.pushManager.getSubscription()
 
-    // 이미 권한이 granted인 경우에만 자동 구독
     if (!subscription && Notification.permission === 'granted') {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -32,11 +151,7 @@ export async function registerPushNotifications() {
   }
 }
 
-/**
- * 사용자 제스처에서 호출 — 권한 요청 + 구독 (iOS 대응)
- * @returns {'granted'|'denied'|'unsupported'} 결과
- */
-export async function requestPushPermission() {
+async function requestWebPushPermission() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported'
   if (!VAPID_PUBLIC_KEY) return 'unsupported'
 
@@ -62,19 +177,7 @@ export async function requestPushPermission() {
   }
 }
 
-/**
- * 현재 푸시 알림 상태 반환
- * @returns {'granted'|'denied'|'default'|'unsupported'}
- */
-export function getPushPermissionStatus() {
-  if (!('Notification' in window)) return 'unsupported'
-  return Notification.permission
-}
-
-/**
- * 푸시 알림 구독 해제
- */
-export async function unregisterPushNotifications() {
+async function unregisterWebPush() {
   if (!('serviceWorker' in navigator)) return
 
   try {
