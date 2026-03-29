@@ -232,6 +232,23 @@ export default function MyPage() {
             </div>
           </button>
         )}
+        {pushStatus === 'granted' && (
+          <button
+            onClick={async () => {
+              try {
+                const result = await api.post('/push/test')
+                alert(`알림 전송 완료 (Web: ${result.webSubs}, FCM: ${result.fcmTokens})`)
+              } catch (err) {
+                alert(`알림 전송 실패: ${err.message}`)
+              }
+            }}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-gray-200">알림 테스트</span>
+            <span className="text-xs text-gray-500">탭하여 테스트 알림 보내기</span>
+          </button>
+        )}
         {dbUser?.role === 'ADMIN' && (
           <button
             onClick={() => navigate('/admin')}
