@@ -27,8 +27,16 @@ export async function requestPushPermission() {
 /**
  * 현재 푸시 알림 상태 반환
  */
-export function getPushPermissionStatus() {
-  if (Capacitor.isNativePlatform()) return 'default'
+export async function getPushPermissionStatus() {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications')
+      const status = await PushNotifications.checkPermissions()
+      return status.receive === 'granted' ? 'granted' : 'default'
+    } catch {
+      return 'default'
+    }
+  }
   if (!('Notification' in window)) return 'unsupported'
   return Notification.permission
 }

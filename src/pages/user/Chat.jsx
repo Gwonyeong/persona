@@ -158,9 +158,13 @@ export default function Chat() {
               setShowTyping(false)
               setSending(false)
               // 첫 응답 후 알림 권한이 없으면 유도 프롬프트 표시
-              if (!pushPromptShownRef.current && token && getPushPermissionStatus() === 'default') {
-                pushPromptShownRef.current = true
-                setShowPushPrompt(true)
+              if (!pushPromptShownRef.current && token) {
+                getPushPermissionStatus().then((status) => {
+                  if (status === 'default') {
+                    pushPromptShownRef.current = true
+                    setShowPushPrompt(true)
+                  }
+                })
               }
             }
             showSequentially()

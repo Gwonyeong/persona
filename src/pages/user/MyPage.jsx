@@ -39,8 +39,12 @@ export default function MyPage() {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [pushStatus, setPushStatus] = useState(() => getPushPermissionStatus())
+  const [pushStatus, setPushStatus] = useState('default')
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    getPushPermissionStatus().then(setPushStatus)
+  }, [])
 
   useEffect(() => {
     if (!token) return
