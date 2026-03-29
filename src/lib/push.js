@@ -28,6 +28,7 @@ export async function requestPushPermission() {
  * 현재 푸시 알림 상태 반환
  */
 export function getPushPermissionStatus() {
+  if (Capacitor.isNativePlatform()) return 'default'
   if (!('Notification' in window)) return 'unsupported'
   return Notification.permission
 }
