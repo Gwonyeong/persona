@@ -179,11 +179,11 @@ export default function CharacterDetail() {
                 <p className="text-xs text-gray-400">게시물</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-bold">{((character.id * 137 + 42) % 900 + 100).toLocaleString()}</p>
+                <p className="text-lg font-bold">{(character.followerCount || 0).toLocaleString()}</p>
                 <p className="text-xs text-gray-400">팔로워</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-bold">{((character.id * 37 + 11) % 200 + 30)}</p>
+                <p className="text-lg font-bold">{(character.followingCount || 0).toLocaleString()}</p>
                 <p className="text-xs text-gray-400">팔로잉</p>
               </div>
             </div>

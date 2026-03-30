@@ -10,6 +10,8 @@ const EMPTY_FORM = {
   firstMessage: '',
   tags: '',
   initialAffinity: 0,
+  followerCount: 0,
+  followingCount: 0,
   isPublic: false,
   proactiveEnabled: false,
   proactiveMinInterval: 60,   // 분 단위로 표시
@@ -44,6 +46,8 @@ export default function Characters() {
       firstMessage: c.firstMessage,
       tags: c.tags.join(', '),
       initialAffinity: c.initialAffinity || 0,
+      followerCount: c.followerCount || 0,
+      followingCount: c.followingCount || 0,
       isPublic: c.isPublic,
       proactiveEnabled: c.proactiveEnabled || false,
       proactiveMinInterval: Math.round((c.proactiveMinInterval || 3600) / 60),
@@ -260,6 +264,29 @@ export default function Characters() {
                   <span>-100 (적대)</span>
                   <span>0 (중립)</span>
                   <span>100 (호감)</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-sm text-gray-400 block mb-1">팔로워 수</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.followerCount}
+                    onChange={(e) => setForm({ ...form, followerCount: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm text-gray-400 block mb-1">팔로잉 수</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.followingCount}
+                    onChange={(e) => setForm({ ...form, followingCount: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                  />
                 </div>
               </div>
 
