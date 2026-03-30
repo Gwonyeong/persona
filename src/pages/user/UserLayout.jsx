@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NavLink, Outlet, Link, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 
@@ -53,6 +53,7 @@ const TABS = [
 export default function UserLayout() {
   const { token } = useStore()
   const location = useLocation()
+  const navigate = useNavigate()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
   const isChatPage = location.pathname.startsWith('/chats/')
@@ -100,6 +101,7 @@ export default function UserLayout() {
             <NavLink
               key={tab.to}
               to={tab.to}
+              replace
               end={tab.to === '/'}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs transition-colors ${

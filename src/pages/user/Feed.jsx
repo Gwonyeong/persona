@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import StoryViewer from '../../components/StoryViewer'
+import useBackHandler from '../../hooks/useBackHandler'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -66,6 +67,9 @@ export default function Feed() {
     if (storyModal) markStoryViewed(storyModal.character.id)
     setStoryModal(null)
   }
+
+  // 스토리 뷰어 뒤로가기 처리
+  useBackHandler(!!storyModal, closeStory)
 
   useEffect(() => {
     api.get('/characters').then(({ characters }) => setCharacters(characters))

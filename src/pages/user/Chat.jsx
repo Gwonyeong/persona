@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
+import useBackHandler from '../../hooks/useBackHandler'
 // import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -51,6 +52,11 @@ export default function Chat() {
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
   const [currentUser, setCurrentUser] = useState(null)
+
+  // 모달/오버레이 뒤로가기 처리
+  useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
+  useBackHandler(showLoginModal, () => setShowLoginModal(false))
+  useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
 
   useEffect(() => {
     initialLoadRef.current = true
@@ -203,7 +209,7 @@ export default function Chat() {
   return (
     <div className="absolute inset-0 flex flex-col bg-gray-950 z-20">
       <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm flex-shrink-0">
-        <button onClick={() => navigate('/chats')} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
         <button

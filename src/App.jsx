@@ -34,7 +34,14 @@ function App() {
   useEffect(() => {
     const handler = (event) => {
       if (event.data?.type === 'NAVIGATE' && event.data.path) {
-        navigate(event.data.path)
+        const path = event.data.path
+        // 채팅 딥링크일 때 뒤로가기가 가능하도록 홈을 먼저 history에 넣음
+        if (path.startsWith('/chats/') && window.history.length <= 1) {
+          navigate('/', { replace: true })
+          setTimeout(() => navigate(path), 0)
+        } else {
+          navigate(path)
+        }
       }
     }
     navigator.serviceWorker?.addEventListener('message', handler)

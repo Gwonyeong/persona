@@ -21,6 +21,7 @@ function getCharacterOnlineStatus(activeHours) {
 }
 
 import StoryViewer from '../../components/StoryViewer'
+import useBackHandler from '../../hooks/useBackHandler'
 
 export default function CharacterDetail() {
   const { id } = useParams()
@@ -42,6 +43,19 @@ export default function CharacterDetail() {
 
   const stories = character?.stories || []
   const hasStories = stories.length > 0
+
+  // 모달/오버레이 뒤로가기 처리
+  useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
+  useBackHandler(showStory, () => {
+    setShowStory(false)
+    setStoryViewed(true)
+    try {
+      const viewed = new Set(JSON.parse(sessionStorage.getItem('viewedStories') || '[]'))
+      viewed.add(parseInt(id))
+      sessionStorage.setItem('viewedStories', JSON.stringify([...viewed]))
+    } catch {}
+  })
+  useBackHandler(showResetModal, () => setShowResetModal(false))
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
