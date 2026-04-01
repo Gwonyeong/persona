@@ -54,10 +54,6 @@ export default function MessageNotification() {
             continue
           }
           if (!prevUnreadRef.current.has(item.conversationId)) {
-            setToast(item)
-            // 5초 후 자동 닫기
-            if (timerRef.current) clearTimeout(timerRef.current)
-            timerRef.current = setTimeout(() => setToast(null), 5000)
             break
           }
         }

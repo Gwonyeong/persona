@@ -127,54 +127,54 @@ export default function Chat() {
     const tempUserMsg = { id: Date.now(), role: 'USER', content: text }
     setMessages((prev) => [...prev, tempUserMsg])
 
+    setShowTyping(true)
+    const confirmedUserMsg = { role: 'USER', content: text, createdAt: new Date().toISOString() }
     try {
       await api.stream(`/conversations/${id}/messages`, { content: text }, (event, data) => {
         switch (event) {
+          case 'message': {
+            setShowTyping(false)
+            setMessages((prev) => {
+              const withoutTemp = prev.some((m) => m.id === tempUserMsg.id)
+                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
+                : prev
+              return [...withoutTemp, { role: 'CHARACTER', content: data.content, streaming: true }]
+            })
+            // 다음 메시지를 위해 다시 typing 표시
+            setTimeout(() => setShowTyping(true), 0)
+            break
+          }
           case 'done': {
             const { responseMessages } = data
             const charMsgs = responseMessages.filter((m) => m.role === 'CHARACTER')
-            setMessages((prev) => [
-              ...prev.filter((m) => m.id !== tempUserMsg.id),
-              { role: 'USER', content: text, createdAt: new Date().toISOString() },
-            ])
-            const initialDelay = data.delay || 0
-            const TYPING_LEAD_TIME = 10000
-            const showSequentially = async () => {
-              if (initialDelay > TYPING_LEAD_TIME) {
-                await new Promise((r) => setTimeout(r, initialDelay - TYPING_LEAD_TIME))
-                setShowTyping(true)
-                await new Promise((r) => setTimeout(r, TYPING_LEAD_TIME))
-              } else {
-                setShowTyping(true)
-                if (initialDelay > 0) {
-                  await new Promise((r) => setTimeout(r, initialDelay))
-                }
-              }
-              const isFree = data.status === 'free'
-              for (let i = 0; i < charMsgs.length; i++) {
-                const typingDelay = isFree
-                  ? 300 + Math.min(charMsgs[i].content.length * 20, 2000)
-                  : 800 + Math.min(charMsgs[i].content.length * 60, 9200)
-                await new Promise((r) => setTimeout(r, typingDelay))
-                setMessages((prev) => [...prev, charMsgs[i]])
-              }
-              const lastCharMsg = charMsgs[charMsgs.length - 1]
-              if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
-              if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
-              setShowTyping(false)
-              setSending(false)
-              // 첫 응답 후 알림 권한이 없으면 유도 프롬프트 표시
-              if (!pushPromptShownRef.current && token) {
-                getPushPermissionStatus().then((status) => {
-                  if (status === 'default') {
-                    pushPromptShownRef.current = true
-                    setShowPushPrompt(true)
-                  }
-                })
-              }
+            // 호감도가 오른 경우 마지막 캐릭터 메시지에 표시
+            if (data.affinityChange > 0 && charMsgs.length > 0) {
+              charMsgs[charMsgs.length - 1] = { ...charMsgs[charMsgs.length - 1], affinityUp: true }
             }
-            showSequentially()
-            // 호감도 갱신
+            setMessages((prev) => {
+              // streaming 버블과 tempUserMsg 제거, confirmedUserMsg는 유지
+              const cleaned = prev.filter((m) => !m.streaming && m.id !== tempUserMsg.id)
+              // confirmedUserMsg가 아직 없으면 추가
+              const hasUser = cleaned.some((m) => m === confirmedUserMsg || (m.role === 'USER' && m.content === text && m.createdAt === confirmedUserMsg.createdAt))
+              return [
+                ...cleaned,
+                ...(!hasUser ? [confirmedUserMsg] : []),
+                ...charMsgs,
+              ]
+            })
+            const lastCharMsg = charMsgs[charMsgs.length - 1]
+            if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
+            if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
+            setShowTyping(false)
+            setSending(false)
+            if (!pushPromptShownRef.current && token) {
+              getPushPermissionStatus().then((status) => {
+                if (status === 'default') {
+                  pushPromptShownRef.current = true
+                  setShowPushPrompt(true)
+                }
+              })
+            }
             if (data.affinity !== undefined) {
               setConversation((prev) => ({ ...prev, affinity: data.affinity }))
             }
@@ -182,7 +182,7 @@ export default function Chat() {
           }
           case 'error':
             console.error('Stream error:', data)
-            setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id))
+            setMessages((prev) => prev.filter((m) => !m.streaming && m.id !== tempUserMsg.id))
             setShowTyping(false)
             setSending(false)
             break
@@ -228,9 +228,7 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">활동 중</p>}
           </div>
         </button>
-        {import.meta.env.DEV && (
-          <span className="text-[11px] text-gray-500 font-mono">❤️ {conversation.affinity ?? 0}</span>
-        )}
+        <span className="text-[11px] text-gray-500 font-mono">❤️ {conversation.affinity ?? 0}</span>
       </header>
 
       <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
@@ -255,6 +253,7 @@ export default function Chat() {
                   {msg.content}
                 </div>
                 {msg.createdAt && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatTime(msg.createdAt)}</p>}
+                {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{character.name}의 호감도가 올랐어요!</p>}
               </div>
             </div>
           )
