@@ -121,7 +121,7 @@ export default function CharacterDetail() {
   const feedPosts = character.feedPosts || []
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
+    <div className="flex flex-col h-screen bg-gray-950 text-gray-100" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <Helmet>
         <title>{character.name} - Pesona</title>
         <meta name="description" content={character.description} />
