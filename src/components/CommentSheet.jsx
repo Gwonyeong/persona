@@ -94,10 +94,16 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
+  const [mounted, setMounted] = useState(false)
   const [viewportStyle, setViewportStyle] = useState({})
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const { token, user } = useStore()
+
+  // 마운트 애니메이션 트리거
+  useEffect(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)))
+  }, [])
 
   // visualViewport로 컨테이너를 보이는 영역에 맞춤 (키보드 열림 시 헤더/댓글이 화면 밖으로 벗어나지 않도록)
   useEffect(() => {
@@ -125,10 +131,6 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [postId])
-
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
 
   // 답글 대상 변경 시 포커스
   useEffect(() => {
@@ -227,15 +229,27 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   return (
     <div
       className="absolute inset-x-0 z-50 flex flex-col justify-end"
-      style={{ top: viewportStyle.top || '0px', height: viewportStyle.height || '100%' }}
+      style={{
+        top: viewportStyle.top || '0px',
+        height: viewportStyle.height || '100%',
+        transition: 'height 0.15s ease-out, top 0.15s ease-out',
+      }}
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/60" />
+      <div
+        className="absolute inset-0 bg-black/60"
+        style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
+      />
 
       {/* 바텀시트 본체 (댓글 영역) */}
       <div
-        className="relative bg-gray-900 rounded-t-xl flex flex-col animate-slide-up"
-        style={{ flex: '1 1 0%', marginTop: 40 }}
+        className="relative bg-gray-900 rounded-t-xl flex flex-col"
+        style={{
+          maxHeight: '65vh',
+          flex: '1 1 0%',
+          transform: mounted ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.3s ease-out',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
@@ -292,7 +306,11 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
       {/* 인풋 영역 (바텀시트와 독립적으로 애니메이션) */}
       <div
-        className="relative flex-shrink-0 bg-gray-900 animate-slide-up-input"
+        className="relative flex-shrink-0 bg-gray-900"
+        style={{
+          transform: mounted ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'transform 0.25s ease-out',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 답글 대상 표시 */}
