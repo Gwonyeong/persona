@@ -94,23 +94,29 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [viewportStyle, setViewportStyle] = useState({})
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const { token, user } = useStore()
 
-  // visualViewport로 키보드 높이 감지
+  // visualViewport로 컨테이너를 보이는 영역에 맞춤 (키보드 열림 시 헤더/댓글이 화면 밖으로 벗어나지 않도록)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
 
     const onResize = () => {
-      const kbH = window.innerHeight - vv.height
-      setKeyboardHeight(kbH > 100 ? kbH : 0)
+      setViewportStyle({
+        height: `${vv.height}px`,
+        top: `${vv.offsetTop}px`,
+      })
     }
 
     vv.addEventListener('resize', onResize)
-    return () => vv.removeEventListener('resize', onResize)
+    vv.addEventListener('scroll', onResize)
+    return () => {
+      vv.removeEventListener('resize', onResize)
+      vv.removeEventListener('scroll', onResize)
+    }
   }, [])
 
   useEffect(() => {
@@ -220,14 +226,15 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col justify-end"
+      className="absolute inset-x-0 z-50 flex flex-col justify-end"
+      style={{ top: viewportStyle.top || '0px', height: viewportStyle.height || '100%' }}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/60" />
 
       <div
         className="relative bg-gray-900 rounded-t-xl flex flex-col animate-slide-up"
-        style={{ height: 'calc(100% - 40px)', marginBottom: keyboardHeight }}
+        style={{ height: 'calc(100% - 40px)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
@@ -303,7 +310,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
         )}
 
         {/* 입력 영역 */}
-        <div className="flex-shrink-0 border-t border-gray-800 px-4 py-3 flex items-center gap-3 bg-gray-900" style={{ paddingBottom: keyboardHeight > 0 ? 12 : 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="flex-shrink-0 border-t border-gray-800 px-4 py-3 flex items-center gap-3 bg-gray-900" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           <input
             ref={inputRef}
             value={input}
