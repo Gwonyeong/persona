@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import useStore from './store/useStore'
 import { api } from './lib/api'
 import { registerPushNotifications } from './lib/push'
@@ -15,6 +16,7 @@ import AdminUsers from './pages/admin/Users'
 import UserLayout from './pages/user/UserLayout'
 import Home from './pages/user/Home'
 import CharacterDetail from './pages/user/CharacterDetail'
+import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
 import MyPage from './pages/user/MyPage'
@@ -29,6 +31,28 @@ function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
 
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Capacitor 네이티브 뒤로가기 버튼 처리
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    let appPlugin
+    import('@capacitor/app').then(({ App }) => {
+      appPlugin = App
+      App.addListener('backButton', ({ canGoBack }) => {
+        if (canGoBack) {
+          window.history.back()
+        } else {
+          App.minimizeApp()
+        }
+      })
+    })
+
+    return () => {
+      appPlugin?.removeAllListeners()
+    }
+  }, [])
 
   // SW 푸시 알림 클릭 → SPA 네비게이션
   useEffect(() => {
@@ -95,6 +119,7 @@ function App() {
 
       {/* 유저 - 탭바 없는 전체화면 */}
       <Route path="/characters/:id" element={<CharacterDetail />} />
+      <Route path="/characters/:id/feed" element={<CharacterFeed />} />
       <Route path="/chats/:id" element={<Chat />} />
       <Route path="/about" element={<About />} />
       <Route path="/terms" element={<Terms />} />

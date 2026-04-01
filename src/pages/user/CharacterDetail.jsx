@@ -31,7 +31,6 @@ export default function CharacterDetail() {
   const [existingConv, setExistingConv] = useState(null)
   const [starting, setStarting] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
-  const [lightboxUrl, setLightboxUrl] = useState(null)
   const [showStory, setShowStory] = useState(false)
   const [storyIndex, setStoryIndex] = useState(0)
   const [storyViewed, setStoryViewed] = useState(() => {
@@ -45,7 +44,6 @@ export default function CharacterDetail() {
   const hasStories = stories.length > 0
 
   // 모달/오버레이 뒤로가기 처리
-  useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(showStory, () => {
     setShowStory(false)
     setStoryViewed(true)
@@ -194,7 +192,9 @@ export default function CharacterDetail() {
             <div className="flex items-center gap-2">
               <p className="font-bold text-sm">{character.name}</p>
               {(existingConv?.affinity ?? 0) >= 20 && (
-                <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/20 text-indigo-400 rounded-full">맞팔로우</span>
+                <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/20 text-indigo-400 rounded-full">
+                  {isFollowing ? '서로 팔로우 합니다' : '당신을 팔로우 합니다'}
+                </span>
               )}
             </div>
             {character.concept && (
@@ -215,38 +215,9 @@ export default function CharacterDetail() {
           {/* 액션 버튼 */}
           <div className="mt-4 flex flex-col gap-2">
             <div className="flex gap-2">
-              {existingConv ? (
-                <>
-                  <button
-                    onClick={resumeChat}
-                    disabled={starting}
-                    className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    메시지 보내기
-                  </button>
-                  <button
-                    onClick={() => setShowResetModal(true)}
-                    disabled={starting}
-                    className="py-2 px-4 bg-gray-800 text-gray-200 text-sm font-semibold rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors border border-gray-700"
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    새로하기
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={startChat}
-                  disabled={starting}
-                  className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {starting ? '시작 중...' : '메시지 보내기'}
-              </button>
-            )}
               <button
                 onClick={toggleFollow}
-                className={`py-2 px-4 text-sm font-semibold rounded-lg transition-colors ${
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isFollowing
                     ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
                     : 'bg-gray-800 text-white border border-gray-700 hover:bg-gray-700'
@@ -255,7 +226,27 @@ export default function CharacterDetail() {
               >
                 {isFollowing ? '팔로잉' : '팔로우'}
               </button>
+              <button
+                onClick={existingConv ? resumeChat : startChat}
+                disabled={starting}
+                className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {starting ? '시작 중...' : '메시지 보내기'}
+              </button>
             </div>
+            {existingConv && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowResetModal(true)}
+                  disabled={starting}
+                  className="py-1.5 px-4 text-xs text-red-400 font-semibold rounded-lg border border-red-400/30 hover:bg-red-400/10 disabled:opacity-50 transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  새로하기
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -276,7 +267,7 @@ export default function CharacterDetail() {
           {feedPosts.map((post) => (
             <button
               key={post.id}
-              onClick={() => setLightboxUrl(post.filePath)}
+              onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
               className="aspect-square overflow-hidden"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
@@ -296,30 +287,6 @@ export default function CharacterDetail() {
           </div>
         )}
       </div>
-
-      {/* 라이트박스 */}
-      {lightboxUrl && (
-        <div
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <button
-            onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 text-white/70 hover:text-white"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-          <img
-            src={lightboxUrl}
-            alt=""
-            className="max-w-full max-h-[85vh] object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
 
       {/* 스토리 뷰어 */}
       {showStory && hasStories && (
