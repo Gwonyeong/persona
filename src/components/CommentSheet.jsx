@@ -95,7 +95,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [loading, setLoading] = useState(true)
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
   const [mounted, setMounted] = useState(false)
-  const [viewportStyle, setViewportStyle] = useState({})
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const { token, user } = useStore()
@@ -105,16 +105,14 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
     requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)))
   }, [])
 
-  // visualViewport로 컨테이너를 보이는 영역에 맞춤 (키보드 열림 시 헤더/댓글이 화면 밖으로 벗어나지 않도록)
+  // 키보드 높이 감지
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
 
     const onResize = () => {
-      setViewportStyle({
-        height: `${vv.height}px`,
-        top: `${vv.offsetTop}px`,
-      })
+      const kbH = window.innerHeight - vv.height - vv.offsetTop
+      setKeyboardHeight(kbH > 50 ? kbH : 0)
     }
 
     vv.addEventListener('resize', onResize)
@@ -228,25 +226,23 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   return (
     <div
-      className="absolute inset-x-0 z-50 flex flex-col justify-end"
-      style={{
-        top: viewportStyle.top || '0px',
-        height: viewportStyle.height || '100%',
-        transition: 'height 0.15s ease-out, top 0.15s ease-out',
-      }}
+      className="absolute inset-0 z-50 flex flex-col"
       onClick={onClose}
     >
+      {/* 백드롭 */}
       <div
         className="absolute inset-0 bg-black/60"
         style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.3s ease-out' }}
       />
 
-      {/* 바텀시트 본체 (댓글 영역) */}
+      {/* 상단 여백 (시트를 하단에 배치) */}
+      <div className="flex-1 min-h-[40px]" />
+
+      {/* 시트 + 인풋 wrapper */}
       <div
         className="relative bg-gray-900 rounded-t-xl flex flex-col"
         style={{
           maxHeight: '65vh',
-          flex: '1 1 0%',
           transform: mounted ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.3s ease-out',
         }}
@@ -302,20 +298,10 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
             </div>
           ))}
         </div>
-      </div>
 
-      {/* 인풋 영역 (바텀시트와 독립적으로 애니메이션) */}
-      <div
-        className="relative flex-shrink-0 bg-gray-900"
-        style={{
-          transform: mounted ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.25s ease-out',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
         {/* 답글 대상 표시 */}
         {replyTarget && (
-          <div className="px-4 py-2 bg-gray-800/50 flex items-center justify-between">
+          <div className="flex-shrink-0 px-4 py-2 bg-gray-800/50 flex items-center justify-between">
             <span className="text-[12px] text-gray-400">
               {characterName}에게 답글 남기는 중
             </span>
@@ -329,7 +315,11 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           </div>
         )}
 
-        <div className="border-t border-gray-800 px-4 py-3 flex items-center gap-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        {/* 입력 영역 */}
+        <div
+          className="flex-shrink-0 border-t border-gray-800 px-4 py-3 flex items-center gap-3"
+          style={{ paddingBottom: keyboardHeight > 0 ? 12 : 'max(12px, env(safe-area-inset-bottom))' }}
+        >
           <input
             ref={inputRef}
             value={input}
@@ -350,6 +340,13 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           </button>
         </div>
       </div>
+
+      {/* 키보드 스페이서 — 시트와 키보드 사이 빈틈 방지 */}
+      <div
+        className="flex-shrink-0 bg-gray-900"
+        style={{ height: keyboardHeight, transition: 'height 0.15s ease-out' }}
+        onClick={(e) => e.stopPropagation()}
+      />
     </div>
   )
 }
