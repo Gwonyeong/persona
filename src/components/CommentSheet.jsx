@@ -263,7 +263,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
       <div
         className="relative bg-gray-900 rounded-t-xl flex flex-col"
         style={{
-          maxHeight: '65vh',
+          maxHeight: '90%',
           transform: mounted ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.3s ease-out',
         }}
