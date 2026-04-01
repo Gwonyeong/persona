@@ -100,15 +100,26 @@ export default function Chat() {
     }
   }, [messages, showTyping])
 
-  // 모바일 키보드가 열릴 때 마지막 메시지가 보이도록 스크롤
+  // 모바일 키보드가 열릴 때 컨테이너를 visualViewport에 맞춤 (헤더/버블이 화면 밖으로 벗어나지 않도록)
+  const [viewportStyle, setViewportStyle] = useState({})
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
     const handleResize = () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      setViewportStyle({
+        height: `${vv.height}px`,
+        top: `${vv.offsetTop}px`,
+      })
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      })
     }
     vv.addEventListener('resize', handleResize)
-    return () => vv.removeEventListener('resize', handleResize)
+    vv.addEventListener('scroll', handleResize)
+    return () => {
+      vv.removeEventListener('resize', handleResize)
+      vv.removeEventListener('scroll', handleResize)
+    }
   }, [])
 
   const FREE_CHAT_LIMIT = 3
@@ -207,7 +218,7 @@ export default function Chat() {
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-gray-950 z-20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="absolute inset-x-0 flex flex-col bg-gray-950 z-20" style={{ paddingTop: 'env(safe-area-inset-top)', top: viewportStyle.top || '0px', height: viewportStyle.height || '100%' }}>
       <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm flex-shrink-0">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
