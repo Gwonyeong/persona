@@ -94,6 +94,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
+  const [sheetHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const { token, user } = useStore()
@@ -205,14 +206,15 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end max-w-[480px] mx-auto"
+      className="fixed left-0 right-0 top-0 z-50 flex flex-col justify-end max-w-[480px] mx-auto"
+      style={{ height: sheetHeight }}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/60" />
 
       <div
         className="relative bg-gray-900 rounded-t-xl flex flex-col animate-slide-up"
-        style={{ height: 'calc(100% - 40px)' }}
+        style={{ height: sheetHeight - 40 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
