@@ -232,9 +232,10 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
     >
       <div className="absolute inset-0 bg-black/60" />
 
+      {/* 바텀시트 본체 (댓글 영역) */}
       <div
         className="relative bg-gray-900 rounded-t-xl flex flex-col animate-slide-up"
-        style={{ height: 'calc(100% - 40px)' }}
+        style={{ flex: '1 1 0%', marginTop: 40 }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
@@ -273,15 +274,10 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           )}
           {comments.map((c, cIdx) => (
             <div key={c.id} className="mb-5">
-              {/* 최상위 유저 댓글 */}
               <CommentItem item={c} />
-
-              {/* 스레드 (대댓글들) */}
               {c.thread?.map((t) => (
                 <CommentItem key={t.id} item={t} isReply />
               ))}
-
-              {/* 답글 달기 버튼 */}
               <button
                 onClick={() => startReply(cIdx)}
                 className="ml-12 mt-1.5 text-[12px] text-gray-500 hover:text-gray-300 transition-colors"
@@ -292,10 +288,16 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
             </div>
           ))}
         </div>
+      </div>
 
+      {/* 인풋 영역 (바텀시트와 독립적으로 애니메이션) */}
+      <div
+        className="relative flex-shrink-0 bg-gray-900 animate-slide-up-input"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* 답글 대상 표시 */}
         {replyTarget && (
-          <div className="flex-shrink-0 px-4 py-2 bg-gray-800/50 flex items-center justify-between">
+          <div className="px-4 py-2 bg-gray-800/50 flex items-center justify-between">
             <span className="text-[12px] text-gray-400">
               {characterName}에게 답글 남기는 중
             </span>
@@ -309,8 +311,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           </div>
         )}
 
-        {/* 입력 영역 */}
-        <div className="flex-shrink-0 border-t border-gray-800 px-4 py-3 flex items-center gap-3 bg-gray-900" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <div className="border-t border-gray-800 px-4 py-3 flex items-center gap-3" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
           <input
             ref={inputRef}
             value={input}
