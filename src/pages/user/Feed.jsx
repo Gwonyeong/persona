@@ -157,18 +157,20 @@ export default function Feed() {
       {/* 헤더 */}
       <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2 flex items-center justify-between">
         <h1 className="text-xl font-bold">피드</h1>
-        <label
-          className="flex items-center gap-1.5 cursor-pointer"
-          style={{ WebkitTapHighlightColor: 'transparent' }}
+        <button
+          onClick={() => setFollowOnly((v) => !v)}
+          className="flex items-center gap-1.5"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          <input
-            type="checkbox"
-            checked={followOnly}
-            onChange={(e) => setFollowOnly(e.target.checked)}
-            className="w-3.5 h-3.5 rounded accent-indigo-500"
-          />
+          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${followOnly ? 'bg-indigo-500 border-indigo-500' : 'bg-gray-800 border-gray-600'}`}>
+            {followOnly && (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
           <span className="text-[12px] text-gray-400">팔로우만</span>
-        </label>
+        </button>
       </div>
 
       {/* 스토리 */}
