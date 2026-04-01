@@ -39,6 +39,7 @@ export default function Feed() {
   const [storyIndex, setStoryIndex] = useState(0)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [commentPostId, setCommentPostId] = useState(null)
+  const [followOnly, setFollowOnly] = useState(false)
   const { token } = useStore()
   const navigate = useNavigate()
 
@@ -84,7 +85,9 @@ export default function Feed() {
 
   const followedCharacters = followedIds
     ? characters.filter((c) => followedIds.includes(c.id))
-    : characters
+    : []
+
+  const displayCharacters = followOnly ? followedCharacters : characters
 
   const storyCharacters = followedCharacters.map((c) => {
     const style = c.styles?.[0]
@@ -96,7 +99,7 @@ export default function Feed() {
     }
   })
 
-  const feedPosts = followedCharacters.flatMap((c, cIdx) => {
+  const feedPosts = displayCharacters.flatMap((c, cIdx) => {
     const posts = c.feedPosts || []
     if (posts.length === 0) return []
     const style = c.styles?.[0]
@@ -152,8 +155,20 @@ export default function Feed() {
       `}</style>
 
       {/* 헤더 */}
-      <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2">
+      <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2 flex items-center justify-between">
         <h1 className="text-xl font-bold">피드</h1>
+        <label
+          className="flex items-center gap-1.5 cursor-pointer"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+        >
+          <input
+            type="checkbox"
+            checked={followOnly}
+            onChange={(e) => setFollowOnly(e.target.checked)}
+            className="w-3.5 h-3.5 rounded accent-indigo-500"
+          />
+          <span className="text-[12px] text-gray-400">팔로우만</span>
+        </label>
       </div>
 
       {/* 스토리 */}
@@ -227,7 +242,7 @@ export default function Feed() {
 
       {feedPosts.length === 0 && (
         <div className="text-center text-gray-500 py-20 px-6">
-          <p className="text-lg mb-2">피드가 비어있어요</p>
+          <p className="text-lg mb-2">{followOnly ? '팔로우한 피드가 비어있어요' : '피드가 비어있어요'}</p>
           <p className="text-sm">홈에서 캐릭터를 팔로우하면 피드에 게시물이 나타납니다.</p>
         </div>
       )}
