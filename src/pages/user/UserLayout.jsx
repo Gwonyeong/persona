@@ -65,7 +65,7 @@ export default function UserLayout() {
   }, [])
 
   return (
-    <div className="user-layout flex flex-col h-dvh max-h-dvh bg-gray-950 text-gray-100" style={{ height: '100dvh', overflow: 'hidden', overscrollBehavior: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="user-layout relative flex flex-col h-dvh max-h-dvh bg-gray-950 text-gray-100" style={{ height: '100dvh', overflow: 'hidden', overscrollBehavior: 'none', paddingTop: 'env(safe-area-inset-top)' }}>
       <main className={`flex-1 ${isChatPage ? 'overflow-hidden' : 'overflow-auto'}`}>
         <Outlet />
 

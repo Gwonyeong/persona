@@ -94,10 +94,38 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
-  const [sheetHeight] = useState(() => window.visualViewport?.height || window.innerHeight)
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
   const listRef = useRef(null)
   const inputRef = useRef(null)
+  const sheetRef = useRef(null)
   const { token, user } = useStore()
+
+  // visualViewport로 키보드 감지 및 시트 높이 조정
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    const onResize = () => {
+      const fullHeight = window.innerHeight
+      const vpHeight = vv.height
+      const isKb = fullHeight - vpHeight > 100
+      setKeyboardOpen(isKb)
+
+      if (sheetRef.current) {
+        // 키보드가 열리면 시트를 뷰포트 높이에 맞춤
+        if (isKb) {
+          sheetRef.current.style.height = `${vpHeight}px`
+          sheetRef.current.style.top = `${vv.offsetTop}px`
+        } else {
+          sheetRef.current.style.height = '100%'
+          sheetRef.current.style.top = '0'
+        }
+      }
+    }
+
+    vv.addEventListener('resize', onResize)
+    return () => vv.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     api.get(`/feed-comments/${postId}`)
@@ -206,15 +234,15 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   return (
     <div
-      className="fixed left-0 right-0 top-0 z-50 flex flex-col justify-end max-w-[480px] mx-auto"
-      style={{ height: sheetHeight }}
+      ref={sheetRef}
+      className="absolute inset-0 z-50 flex flex-col justify-end"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/60" />
 
       <div
         className="relative bg-gray-900 rounded-t-xl flex flex-col animate-slide-up"
-        style={{ height: sheetHeight - 40 }}
+        style={{ height: 'calc(100% - 40px)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
@@ -290,7 +318,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
         )}
 
         {/* 입력 영역 */}
-        <div className="flex-shrink-0 border-t border-gray-800 px-4 py-3 flex items-center gap-3 bg-gray-900">
+        <div className="flex-shrink-0 border-t border-gray-800 px-4 py-3 flex items-center gap-3 bg-gray-900" style={{ paddingBottom: keyboardOpen ? 12 : 'max(12px, env(safe-area-inset-bottom))' }}>
           <input
             ref={inputRef}
             value={input}
