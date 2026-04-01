@@ -98,11 +98,31 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const listRef = useRef(null)
   const inputRef = useRef(null)
+  const overlayRef = useRef(null)
   const { token, user } = useStore()
 
   // 마운트 애니메이션 트리거
   useEffect(() => {
     requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)))
+  }, [])
+
+  // 바텀시트가 열려 있는 동안 배경 스크롤 방지
+  useEffect(() => {
+    const locked = []
+    let el = overlayRef.current?.parentElement
+    while (el) {
+      const { overflow, overflowY } = getComputedStyle(el)
+      if (overflow === 'auto' || overflow === 'scroll' || overflowY === 'auto' || overflowY === 'scroll') {
+        el.dataset.prevOverflow = el.style.overflow
+        el.style.overflow = 'hidden'
+        locked.push(el)
+      }
+      el = el.parentElement
+    }
+    return () => locked.forEach((el) => {
+      el.style.overflow = el.dataset.prevOverflow || ''
+      delete el.dataset.prevOverflow
+    })
   }, [])
 
   // 키보드 높이 감지
@@ -226,6 +246,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   return (
     <div
+      ref={overlayRef}
       className="absolute inset-0 z-50 flex flex-col"
       onClick={onClose}
     >
@@ -339,14 +360,13 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
             {sending ? '...' : '게시'}
           </button>
         </div>
-      </div>
 
-      {/* 키보드 스페이서 — 시트와 키보드 사이 빈틈 방지 */}
-      <div
-        className="flex-shrink-0 bg-gray-900"
-        style={{ height: keyboardHeight, transition: 'height 0.15s ease-out' }}
-        onClick={(e) => e.stopPropagation()}
-      />
+        {/* 키보드 스페이서 — 시트 안에서 댓글 리스트만 축소시킴 */}
+        <div
+          className="flex-shrink-0 bg-gray-900"
+          style={{ height: keyboardHeight }}
+        />
+      </div>
     </div>
   )
 }
