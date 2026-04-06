@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import GalleryBottomSheet from '../../components/GalleryBottomSheet'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 // import AdBanner from '../../components/AdBanner'
@@ -47,6 +48,7 @@ export default function Chat() {
   const [suggestedReplies, setSuggestedReplies] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
   const pushPromptShownRef = useRef(false)
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
@@ -57,6 +59,7 @@ export default function Chat() {
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(showLoginModal, () => setShowLoginModal(false))
   useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
+  useBackHandler(showGallery, () => setShowGallery(false))
 
   useEffect(() => {
     initialLoadRef.current = true
@@ -204,6 +207,9 @@ export default function Chat() {
       setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id))
       setShowTyping(false)
       setSending(false)
+      if (error.message?.includes('Insufficient masks')) {
+        navigate('/my')
+      }
     }
   }
 
@@ -218,7 +224,7 @@ export default function Chat() {
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   return (
-    <div className="absolute inset-x-0 flex flex-col bg-gray-950 z-20" style={{ paddingTop: 'env(safe-area-inset-top)', top: viewportStyle.top || '0px', height: viewportStyle.height || '100%' }}>
+    <div className="absolute inset-0 flex flex-col bg-gray-950 z-20" style={{ top: viewportStyle.top || '0px', height: viewportStyle.height || '100%' }}>
       <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm flex-shrink-0">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
@@ -288,7 +294,20 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 border-t border-gray-800 bg-gray-900/95 flex-shrink-0" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+      {/* 갤러리 플로팅 버튼 */}
+      <button
+        onClick={() => setShowGallery(true)}
+        className="absolute z-10 w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', right: 16, bottom: 80 }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
+        </svg>
+      </button>
+
+      <div className="p-3 border-t border-gray-800 bg-gray-900/95 flex-shrink-0">
         {showSuggestions && suggestedReplies.length > 0 && (
           <div className="mb-2 flex flex-col gap-1.5">
             {suggestedReplies.map((reply, i) => (
@@ -341,6 +360,14 @@ export default function Chat() {
         </div>
       )}
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+      {showGallery && (
+        <GalleryBottomSheet
+          characterId={conversation.characterId}
+          characterName={character.name}
+          affinity={conversation.affinity ?? 0}
+          onClose={() => setShowGallery(false)}
+        />
+      )}
       {lightboxUrl && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>
           <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />

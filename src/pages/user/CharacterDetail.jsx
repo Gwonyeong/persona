@@ -21,6 +21,8 @@ function getCharacterOnlineStatus(activeHours) {
 }
 
 import StoryViewer from '../../components/StoryViewer'
+import GalleryGrid from '../../components/GalleryGrid'
+import GalleryUnlockModal from '../../components/GalleryUnlockModal'
 import useBackHandler from '../../hooks/useBackHandler'
 
 export default function CharacterDetail() {
@@ -38,6 +40,10 @@ export default function CharacterDetail() {
     catch { return false }
   })
   const [isFollowing, setIsFollowing] = useState(false)
+  const [activeTab, setActiveTab] = useState('feed')
+  const [galleryImages, setGalleryImages] = useState([])
+  const [galleryLightbox, setGalleryLightbox] = useState(null)
+  const [unlockTarget, setUnlockTarget] = useState(null)
   const storyTimerRef = useRef(null)
 
   const stories = character?.stories || []
@@ -54,9 +60,14 @@ export default function CharacterDetail() {
     } catch {}
   })
   useBackHandler(showResetModal, () => setShowResetModal(false))
+  useBackHandler(!!galleryLightbox, () => setGalleryLightbox(null))
+  useBackHandler(!!unlockTarget, () => setUnlockTarget(null))
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
+    api.get(`/characters/${id}/gallery`)
+      .then(({ galleryImages }) => setGalleryImages(galleryImages || []))
+      .catch(() => setGalleryImages([]))
   }, [id])
 
   useEffect(() => {
@@ -121,7 +132,7 @@ export default function CharacterDetail() {
   const feedPosts = character.feedPosts || []
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-gray-100" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="flex flex-col h-full bg-gray-950 text-gray-100">
       <Helmet>
         <title>{character.name} - Pesona</title>
         <meta name="description" content={character.description} />
@@ -250,41 +261,88 @@ export default function CharacterDetail() {
           </div>
         </div>
 
-        {/* 구분선 + 그리드 탭 */}
+        {/* 탭 바 */}
         <div className="border-t border-gray-800 mt-2">
-          <div className="flex justify-center py-2.5">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-            </svg>
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('feed')}
+              className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'feed' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setActiveTab('affinity')}
+              className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'affinity' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setActiveTab('mission')}
+              className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'mission' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+            </button>
           </div>
         </div>
 
         {/* 피드 그리드 (3열) */}
-        <div className="grid grid-cols-3 gap-[1px]">
-          {feedPosts.map((post) => (
-            <button
-              key={post.id}
-              onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
-              className="aspect-square overflow-hidden"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <img
-                src={post.filePath}
-                alt={post.caption || ''}
-                className="w-full h-full object-cover hover:opacity-80 transition-opacity"
-                loading="lazy"
-              />
-            </button>
-          ))}
-        </div>
+        {activeTab === 'feed' && (
+          <>
+            <div className="grid grid-cols-3 gap-[1px]">
+              {feedPosts.map((post) => (
+                <button
+                  key={post.id}
+                  onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
+                  className="aspect-square overflow-hidden"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <img
+                    src={post.filePath}
+                    alt={post.caption || ''}
+                    className="w-full h-full object-cover hover:opacity-80 transition-opacity"
+                    loading="lazy"
+                  />
+                </button>
+              ))}
+            </div>
+            {feedPosts.length === 0 && (
+              <div className="text-center text-gray-500 py-16">
+                <p className="text-sm">게시물이 없습니다.</p>
+              </div>
+            )}
+          </>
+        )}
 
-        {feedPosts.length === 0 && (
-          <div className="text-center text-gray-500 py-16">
-            <p className="text-sm">게시물이 없습니다.</p>
-          </div>
+        {/* 호감도 갤러리 */}
+        {activeTab === 'affinity' && (
+          <GalleryGrid
+            images={galleryImages.filter((img) => img.unlockType === 'AFFINITY')}
+            affinity={existingConv?.affinity ?? 0}
+            onImageClick={(img) => setGalleryLightbox(img.filePath)}
+            onLockedClick={(img) => setUnlockTarget(img)}
+          />
+        )}
+
+        {/* 미션 갤러리 */}
+        {activeTab === 'mission' && (
+          <GalleryGrid
+            images={galleryImages.filter((img) => img.unlockType === 'MISSION')}
+            affinity={existingConv?.affinity ?? 0}
+            onImageClick={(img) => setGalleryLightbox(img.filePath)}
+            onLockedClick={(img) => setUnlockTarget(img)}
+          />
         )}
       </div>
 
@@ -305,6 +363,31 @@ export default function CharacterDetail() {
               viewed.add(character.id)
               sessionStorage.setItem('viewedStories', JSON.stringify([...viewed]))
             } catch {}
+          }}
+        />
+      )}
+
+      {/* 갤러리 라이트박스 */}
+      {galleryLightbox && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/90"
+          onClick={() => setGalleryLightbox(null)}
+        >
+          <img src={galleryLightbox} alt="" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+
+      {/* 갤러리 해금 모달 */}
+      {unlockTarget && (
+        <GalleryUnlockModal
+          image={unlockTarget}
+          characterId={parseInt(id)}
+          onClose={() => setUnlockTarget(null)}
+          onUnlocked={(imageId) => {
+            setGalleryImages((prev) =>
+              prev.map((img) => img.id === imageId ? { ...img, unlocked: true } : img)
+            )
+            setUnlockTarget(null)
           }}
         />
       )}

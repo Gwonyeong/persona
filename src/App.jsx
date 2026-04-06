@@ -10,6 +10,7 @@ import Dashboard from './pages/admin/Dashboard'
 import AdminCharacters from './pages/admin/Characters'
 import CharacterStyles from './pages/admin/CharacterStyles'
 import CharacterFeeds from './pages/admin/CharacterFeeds'
+import CharacterGallery from './pages/admin/CharacterGallery'
 import AdminUsers from './pages/admin/Users'
 
 // User
@@ -106,6 +107,7 @@ function App() {
         <Route path="characters" element={<AdminCharacters />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
+        <Route path="characters/:id/gallery" element={<CharacterGallery />} />
         <Route path="users" element={<AdminUsers />} />
       </Route>
 
@@ -115,16 +117,14 @@ function App() {
         <Route path="/feed" element={<Feed />} />
         <Route path="/chats" element={<ChatList />} />
         <Route path="/my" element={<MyPage />} />
+        <Route path="/characters/:id" element={<CharacterDetail />} />
+        <Route path="/characters/:id/feed" element={<CharacterFeed />} />
+        <Route path="/chats/:id" element={<Chat />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/account/delete" element={<DeleteAccount />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
       </Route>
-
-      {/* 유저 - 탭바 없는 전체화면 */}
-      <Route path="/characters/:id" element={<CharacterDetail />} />
-      <Route path="/characters/:id/feed" element={<CharacterFeed />} />
-      <Route path="/chats/:id" element={<Chat />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/account/delete" element={<DeleteAccount />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
     </Routes>
     </>
   )

@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
+import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../../lib/billing'
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -29,8 +30,20 @@ function resizeImage(file, maxSize = 512) {
   })
 }
 
+const PACKAGES = [
+  { amount: 30, price: '₩1,000', label: '30개', productId: 'masks_30' },
+  { amount: 100, price: '₩3,000', label: '100개', badge: '인기', productId: 'masks_100' },
+  { amount: 300, price: '₩8,000', label: '300개', badge: '할인', productId: 'masks_300' },
+]
+
+async function verifyOnServer(productId, purchaseToken) {
+  const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
+  useStore.getState().setMasks(result.masks)
+  return result
+}
+
 export default function MyPage() {
-  const { token, clearAuth } = useStore()
+  const { token, masks, setMasks, clearAuth } = useStore()
   const navigate = useNavigate()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
@@ -42,13 +55,40 @@ export default function MyPage() {
   const [pushStatus, setPushStatus] = useState('default')
   const fileInputRef = useRef(null)
 
+  // 마스크 충전
+  const [selectedPkg, setSelectedPkg] = useState(1)
+  const [purchasing, setPurchasing] = useState(false)
+  const [purchaseError, setPurchaseError] = useState('')
+  const [billingReady, setBillingReady] = useState(false)
+  const [isNative, setIsNative] = useState(false)
+
   useEffect(() => {
     getPushPermissionStatus().then(setPushStatus)
+    const native = isNativeBillingAvailable()
+    setIsNative(native)
+    if (native) {
+      initBilling().then(async (ready) => {
+        setBillingReady(ready)
+        if (ready) {
+          await getProducts()
+          const pending = await getPendingPurchases()
+          for (const purchase of pending) {
+            const pid = purchase.productIdentifier || purchase.productId
+            const pt = purchase.purchaseToken
+            try { await verifyOnServer(pid, pt) } catch {
+              try { await api.post('/masks/consume-purchase', { productId: pid, purchaseToken: pt }) } catch {}
+            }
+            await consumePurchase(pt)
+          }
+        }
+      })
+    }
   }, [])
 
   useEffect(() => {
     if (!token) return
     api.get('/auth/me').then(({ user }) => setDbUser(user))
+    api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
   }, [token])
 
   const startEdit = () => {
@@ -99,6 +139,45 @@ export default function MyPage() {
   const handleLogout = () => {
     clearAuth()
     navigate('/')
+  }
+
+  const handlePurchase = async () => {
+    setPurchasing(true)
+    setPurchaseError('')
+    try {
+      const pkg = PACKAGES[selectedPkg]
+      api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
+
+      if (!isNative || !billingReady) {
+        setPurchaseError(`결제 환경을 확인할 수 없습니다`)
+        setPurchasing(false)
+        return
+      }
+
+      const result = await purchaseProduct(pkg.productId)
+      const purchaseToken = result?.purchaseToken || result?.transactionReceipt?.purchaseToken || result?.receipt
+      if (!purchaseToken) {
+        setPurchaseError('결제 정보를 확인할 수 없습니다')
+        setPurchasing(false)
+        return
+      }
+
+      const serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken })
+      if (serverRes.error) {
+        setPurchaseError(serverRes.error)
+        setPurchasing(false)
+        return
+      }
+
+      await consumePurchase(purchaseToken)
+      setMasks(serverRes.masks)
+    } catch (err) {
+      const msg = err?.message || ''
+      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
+        setPurchaseError(msg || '결제에 실패했습니다')
+      }
+    }
+    setPurchasing(false)
   }
 
   const avatarDisplay = previewUrl || dbUser?.avatarUrl
@@ -208,6 +287,63 @@ export default function MyPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* 마스크 충전 */}
+      <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🎭</span>
+            <div>
+              <p className="text-sm font-bold text-gray-100">가면</p>
+              <p className="text-xs text-gray-400">캐릭터와 대화하고 이미지를 해금하세요</p>
+            </div>
+          </div>
+          <span className="text-lg font-bold text-indigo-400">{masks}개</span>
+        </div>
+
+        <div className="flex flex-col gap-2 mb-3">
+          {PACKAGES.map((pkg, i) => (
+            <button
+              key={pkg.amount}
+              onClick={() => setSelectedPkg(i)}
+              className={`relative flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                selectedPkg === i
+                  ? 'border-indigo-500 bg-indigo-500/10'
+                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+              }`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎭</span>
+                <span className="font-semibold text-sm text-gray-100">{pkg.label}</span>
+                {pkg.badge && (
+                  <span className="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold text-white">
+                    {pkg.badge}
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-medium text-gray-300">{pkg.price}</span>
+            </button>
+          ))}
+        </div>
+
+        <p className="text-xs text-gray-500 text-center mb-3">
+          가면 1개로 캐릭터와 1회 대화할 수 있어요
+        </p>
+
+        {purchaseError && (
+          <p className="text-sm text-red-400 text-center mb-3">{purchaseError}</p>
+        )}
+
+        <button
+          onClick={handlePurchase}
+          disabled={purchasing}
+          className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          {purchasing ? '처리 중...' : `${PACKAGES[selectedPkg].price} 결제하기`}
+        </button>
       </div>
 
       {/* 메뉴 */}

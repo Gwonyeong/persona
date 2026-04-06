@@ -56,7 +56,8 @@ export default function UserLayout() {
   const navigate = useNavigate()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
-  const isChatPage = location.pathname.startsWith('/chats/')
+  const isChatPage = location.pathname.match(/^\/chats\/\d/)
+  const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
 
   useEffect(() => {
     const handler = (e) => setHasUnread(e.detail > 0)
@@ -70,7 +71,7 @@ export default function UserLayout() {
         <Outlet />
 
         {/* 푸터 */}
-        {!isChatPage && (
+        {!isFullscreenPage && (
           <footer className="px-4 py-6 mt-4 border-t border-gray-800">
             <div className="flex justify-center gap-3 text-xs text-gray-500">
               <Link to="/about" className="hover:text-gray-300 transition-colors">서비스 소개</Link>
@@ -85,7 +86,7 @@ export default function UserLayout() {
       </main>
 
       {/* 하단 탭바 */}
-      <nav className={`flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm ${isChatPage ? 'hidden' : ''}`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <nav className="flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {TABS.map((tab) =>
           tab.requireAuth && !token ? (
             <button

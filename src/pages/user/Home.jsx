@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import MaskChargeModal from '../../components/MaskChargeModal'
 // import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -17,7 +16,6 @@ export default function Home() {
   const { token, masks, setMasks } = useStore()
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
-  const [showChargeModal, setShowChargeModal] = useState(false)
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const navigate = useNavigate()
 
@@ -59,7 +57,7 @@ export default function Home() {
           <h1 className="text-xl font-bold">Pesona</h1>
           {token && (
             <button
-              onClick={() => setShowChargeModal(true)}
+              onClick={() => navigate('/my')}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full hover:border-gray-600 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
@@ -147,8 +145,6 @@ export default function Home() {
         </div>
       )}
 
-
-      {showChargeModal && <MaskChargeModal onClose={() => setShowChargeModal(false)} />}
     </div>
   )
 }
