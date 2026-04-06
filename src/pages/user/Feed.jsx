@@ -109,7 +109,8 @@ export default function Feed() {
     return posts.map((post, pIdx) => ({
       id: post.id,
       character: c,
-      imageUrl: post.filePath,
+      images: post.images || [],
+      imageUrl: post.images?.[0]?.filePath || post.filePath,
       caption: post.caption || CAPTIONS[(cIdx + pIdx) % CAPTIONS.length],
       publishAt: post.publishAt,
       likesCount: post.likesCount || 0,
@@ -224,6 +225,7 @@ export default function Feed() {
             <FeedPostCard
               key={post.id}
               postId={post.id}
+              images={post.images}
               imageUrl={post.imageUrl}
               caption={post.caption}
               publishAt={post.publishAt}
@@ -235,7 +237,7 @@ export default function Feed() {
               affinityUp={ls?.affinityUp}
               onLike={() => toggleLike(post.id)}
               onComment={() => setCommentPostId(post.id)}
-              onImageClick={() => setLightboxUrl(post.imageUrl)}
+              onImageClick={(url) => setLightboxUrl(url || post.imageUrl)}
               showChatLink
             />
           )

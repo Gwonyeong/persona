@@ -23,6 +23,7 @@ function getCharacterOnlineStatus(activeHours) {
 import StoryViewer from '../../components/StoryViewer'
 import GalleryGrid from '../../components/GalleryGrid'
 import GalleryUnlockModal from '../../components/GalleryUnlockModal'
+import ImageSlideViewer from '../../components/ImageSlideViewer'
 import useBackHandler from '../../hooks/useBackHandler'
 
 export default function CharacterDetail() {
@@ -41,8 +42,8 @@ export default function CharacterDetail() {
   })
   const [isFollowing, setIsFollowing] = useState(false)
   const [activeTab, setActiveTab] = useState('feed')
-  const [galleryImages, setGalleryImages] = useState([])
-  const [galleryLightbox, setGalleryLightbox] = useState(null)
+  const [galleryContents, setGalleryContents] = useState([])
+  const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const storyTimerRef = useRef(null)
 
@@ -60,14 +61,14 @@ export default function CharacterDetail() {
     } catch {}
   })
   useBackHandler(showResetModal, () => setShowResetModal(false))
-  useBackHandler(!!galleryLightbox, () => setGalleryLightbox(null))
+  useBackHandler(!!gallerySlideViewer, () => setGallerySlideViewer(null))
   useBackHandler(!!unlockTarget, () => setUnlockTarget(null))
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
     api.get(`/characters/${id}/gallery`)
-      .then(({ galleryImages }) => setGalleryImages(galleryImages || []))
-      .catch(() => setGalleryImages([]))
+      .then(({ galleryContents }) => setGalleryContents(galleryContents || []))
+      .catch(() => setGalleryContents([]))
   }, [id])
 
   useEffect(() => {
@@ -305,15 +306,23 @@ export default function CharacterDetail() {
                 <button
                   key={post.id}
                   onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
-                  className="aspect-square overflow-hidden"
+                  className="aspect-square overflow-hidden relative"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <img
-                    src={post.filePath}
+                    src={post.images?.[0]?.filePath || post.filePath}
                     alt={post.caption || ''}
                     className="w-full h-full object-cover hover:opacity-80 transition-opacity"
                     loading="lazy"
                   />
+                  {post.images?.length > 1 && (
+                    <div className="absolute top-1.5 right-1.5">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="drop-shadow">
+                        <rect x="3" y="3" width="15" height="15" rx="2" />
+                        <rect x="6" y="6" width="15" height="15" rx="2" />
+                      </svg>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -328,20 +337,30 @@ export default function CharacterDetail() {
         {/* 호감도 갤러리 */}
         {activeTab === 'affinity' && (
           <GalleryGrid
-            images={galleryImages.filter((img) => img.unlockType === 'AFFINITY')}
+            contents={galleryContents.filter((c) => c.unlockType === 'AFFINITY')}
             affinity={existingConv?.affinity ?? 0}
-            onImageClick={(img) => setGalleryLightbox(img.filePath)}
-            onLockedClick={(img) => setUnlockTarget(img)}
+            onContentClick={(content) => setGallerySlideViewer({
+              images: content.images,
+              title: content.title,
+              description: content.description,
+              initialIndex: 0,
+            })}
+            onLockedClick={(content) => setUnlockTarget(content)}
           />
         )}
 
         {/* 미션 갤러리 */}
         {activeTab === 'mission' && (
           <GalleryGrid
-            images={galleryImages.filter((img) => img.unlockType === 'MISSION')}
+            contents={galleryContents.filter((c) => c.unlockType === 'MISSION')}
             affinity={existingConv?.affinity ?? 0}
-            onImageClick={(img) => setGalleryLightbox(img.filePath)}
-            onLockedClick={(img) => setUnlockTarget(img)}
+            onContentClick={(content) => setGallerySlideViewer({
+              images: content.images,
+              title: content.title,
+              description: content.description,
+              initialIndex: 0,
+            })}
+            onLockedClick={(content) => setUnlockTarget(content)}
           />
         )}
       </div>
@@ -367,25 +386,26 @@ export default function CharacterDetail() {
         />
       )}
 
-      {/* 갤러리 라이트박스 */}
-      {galleryLightbox && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/90"
-          onClick={() => setGalleryLightbox(null)}
-        >
-          <img src={galleryLightbox} alt="" className="max-w-full max-h-full object-contain" />
-        </div>
+      {/* 갤러리 슬라이드 뷰어 */}
+      {gallerySlideViewer && (
+        <ImageSlideViewer
+          images={gallerySlideViewer.images}
+          initialIndex={gallerySlideViewer.initialIndex}
+          title={gallerySlideViewer.title}
+          description={gallerySlideViewer.description}
+          onClose={() => setGallerySlideViewer(null)}
+        />
       )}
 
       {/* 갤러리 해금 모달 */}
       {unlockTarget && (
         <GalleryUnlockModal
-          image={unlockTarget}
+          content={unlockTarget}
           characterId={parseInt(id)}
           onClose={() => setUnlockTarget(null)}
-          onUnlocked={(imageId) => {
-            setGalleryImages((prev) =>
-              prev.map((img) => img.id === imageId ? { ...img, unlocked: true } : img)
+          onUnlocked={(contentId) => {
+            setGalleryContents((prev) =>
+              prev.map((c) => c.id === contentId ? { ...c, unlocked: true } : c)
             )
             setUnlockTarget(null)
           }}

@@ -38,7 +38,7 @@ export default function CharacterFeed() {
     scrolledRef.current = true
     requestAnimationFrame(() => {
       const el = document.getElementById(`feed-post-${targetPostId}`)
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' })
     })
   }, [character, targetPostId])
 
@@ -106,7 +106,8 @@ export default function CharacterFeed() {
             <FeedPostCard
               key={post.id}
               postId={post.id}
-              imageUrl={post.filePath}
+              images={post.images}
+              imageUrl={post.images?.[0]?.filePath || post.filePath}
               caption={post.caption}
               publishAt={post.publishAt}
               characterName={character.name}
@@ -117,7 +118,7 @@ export default function CharacterFeed() {
               affinityUp={ls?.affinityUp}
               onLike={() => toggleLike(post.id)}
               onComment={() => setCommentPostId(post.id)}
-              onImageClick={() => setLightboxUrl(post.filePath)}
+              onImageClick={(url) => setLightboxUrl(url || post.images?.[0]?.filePath || post.filePath)}
             />
           )
         })}

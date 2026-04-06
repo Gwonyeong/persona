@@ -2,14 +2,15 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import GalleryGrid from './GalleryGrid'
+import ImageSlideViewer from './ImageSlideViewer'
 
 export default function GalleryBottomSheet({ characterId, characterName, affinity, onClose }) {
   const navigate = useNavigate()
-  const [images, setImages] = useState([])
+  const [contents, setContents] = useState([])
   const [feedPosts, setFeedPosts] = useState([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [lightbox, setLightbox] = useState(null)
+  const [slideViewer, setSlideViewer] = useState(null) // { images, title, description, initialIndex }
   const [tab, setTab] = useState('FEED')
   const overlayRef = useRef(null)
 
@@ -18,7 +19,7 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
     requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)))
   }, [])
 
-  // 배경 스크롤 방지
+  // 배경 스크롤 방��
   useEffect(() => {
     const locked = []
     let el = overlayRef.current?.parentElement
@@ -40,15 +41,24 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
   // 데이터 로드
   useEffect(() => {
     Promise.all([
-      api.get(`/characters/${characterId}/gallery`).catch(() => ({ galleryImages: [] })),
+      api.get(`/characters/${characterId}/gallery`).catch(() => ({ galleryContents: [] })),
       api.get(`/characters/${characterId}`).catch(() => ({ character: { feedPosts: [] } })),
     ]).then(([galleryRes, charRes]) => {
-      setImages(galleryRes.galleryImages || [])
+      setContents(galleryRes.galleryContents || [])
       setFeedPosts(charRes.character?.feedPosts || [])
     }).finally(() => setLoading(false))
   }, [characterId])
 
-  const filtered = images.filter((img) => img.unlockType === tab)
+  const filtered = contents.filter((item) => item.unlockType === tab)
+
+  const handleContentClick = (content) => {
+    setSlideViewer({
+      images: content.images,
+      title: content.title,
+      description: content.description,
+      initialIndex: 0,
+    })
+  }
 
   return (
     <div
@@ -144,15 +154,23 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
                       <button
                         key={post.id}
                         onClick={() => navigate(`/characters/${characterId}/feed?postId=${post.id}`)}
-                        className="aspect-square overflow-hidden"
+                        className="aspect-square overflow-hidden relative"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
                         <img
-                          src={post.filePath}
+                          src={post.images?.[0]?.filePath || post.filePath}
                           alt={post.caption || ''}
                           className="w-full h-full object-cover hover:opacity-80 transition-opacity"
                           loading="lazy"
                         />
+                        {post.images?.length > 1 && (
+                          <div className="absolute top-1.5 right-1.5">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="none" className="drop-shadow">
+                              <rect x="3" y="3" width="15" height="15" rx="2" fill="none" stroke="white" strokeWidth="2" />
+                              <rect x="6" y="6" width="15" height="15" rx="2" fill="none" stroke="white" strokeWidth="2" />
+                            </svg>
+                          </div>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -165,9 +183,9 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
               )}
               {(tab === 'AFFINITY' || tab === 'MISSION') && (
                 <GalleryGrid
-                  images={filtered}
+                  contents={filtered}
                   affinity={affinity}
-                  onImageClick={(img) => setLightbox(img.filePath)}
+                  onContentClick={handleContentClick}
                 />
               )}
             </>
@@ -175,14 +193,15 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
         </div>
       </div>
 
-      {/* 라이트박스 */}
-      {lightbox && (
-        <div
-          className="absolute inset-0 z-[60] bg-black/90 flex items-center justify-center"
-          onClick={() => setLightbox(null)}
-        >
-          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain" />
-        </div>
+      {/* 슬라이드 이미지 뷰어 */}
+      {slideViewer && (
+        <ImageSlideViewer
+          images={slideViewer.images}
+          initialIndex={slideViewer.initialIndex}
+          title={slideViewer.title}
+          description={slideViewer.description}
+          onClose={() => setSlideViewer(null)}
+        />
       )}
     </div>
   )
