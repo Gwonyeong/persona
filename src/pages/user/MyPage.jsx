@@ -6,6 +6,7 @@ import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../../lib/billing'
+import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -62,6 +63,11 @@ export default function MyPage() {
   const [billingReady, setBillingReady] = useState(false)
   const [isNative, setIsNative] = useState(false)
 
+  // 리워드 광고
+  const [adRewardAvailable, setAdRewardAvailable] = useState(false)
+  const [adLoading, setAdLoading] = useState(false)
+  const [adMobReady, setAdMobReady] = useState(false)
+
   useEffect(() => {
     getPushPermissionStatus().then(setPushStatus)
     const native = isNativeBillingAvailable()
@@ -83,12 +89,16 @@ export default function MyPage() {
         }
       })
     }
+    if (isAdMobAvailable()) {
+      initAdMob().then(setAdMobReady)
+    }
   }, [])
 
   useEffect(() => {
     if (!token) return
     api.get('/auth/me').then(({ user }) => setDbUser(user))
     api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
+    api.get('/masks/ad-reward/available').then(({ available }) => setAdRewardAvailable(available)).catch(() => {})
   }, [token])
 
   const startEdit = () => {
@@ -345,6 +355,50 @@ export default function MyPage() {
           {purchasing ? '처리 중...' : `${PACKAGES[selectedPkg].price} 결제하기`}
         </button>
       </div>
+
+      {/* 마스크 얻기 (리워드 광고) */}
+      {adMobReady && (
+        <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎬</span>
+              <div>
+                <p className="text-sm font-bold text-gray-100">마스크 얻기</p>
+                <p className="text-xs text-gray-400">광고를 시청하고 가면 5개를 받으세요</p>
+              </div>
+            </div>
+            <span className="text-xs text-gray-500">하루 1회</span>
+          </div>
+          <button
+            onClick={async () => {
+              if (!adRewardAvailable || adLoading) return
+              setAdLoading(true)
+              try {
+                await showRewardedAd()
+                const result = await api.post('/masks/ad-reward')
+                setMasks(result.masks)
+                setAdRewardAvailable(false)
+              } catch (e) {
+                if (e.message === 'AD_DISMISSED') {
+                  // 광고를 끝까지 시청하지 않음
+                } else if (e.message !== 'AD_FAILED') {
+                  console.error('Ad reward error:', e)
+                }
+              }
+              setAdLoading(false)
+            }}
+            disabled={!adRewardAvailable || adLoading}
+            className={`w-full mt-3 py-3 font-semibold rounded-xl transition-colors ${
+              adRewardAvailable
+                ? 'bg-amber-500 text-white hover:bg-amber-400'
+                : 'bg-gray-800 text-gray-500'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {adLoading ? '광고 로딩 중...' : adRewardAvailable ? '광고 보고 가면 5개 받기' : '오늘 이미 받았어요'}
+          </button>
+        </div>
+      )}
 
       {/* 메뉴 */}
       <div className="mt-4 bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">
