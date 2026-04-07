@@ -67,6 +67,7 @@ export default function MyPage() {
   const [adRewardAvailable, setAdRewardAvailable] = useState(false)
   const [adLoading, setAdLoading] = useState(false)
   const [adMobReady, setAdMobReady] = useState(false)
+  const [showMaskModal, setShowMaskModal] = useState(false)
 
   useEffect(() => {
     getPushPermissionStatus().then(setPushStatus)
@@ -356,47 +357,86 @@ export default function MyPage() {
         </button>
       </div>
 
-      {/* 마스크 얻기 (리워드 광고) */}
-      {adMobReady && (
-        <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🎬</span>
-              <div>
-                <p className="text-sm font-bold text-gray-100">마스크 얻기</p>
-                <p className="text-xs text-gray-400">광고를 시청하고 가면 5개를 받으세요</p>
-              </div>
-            </div>
-            <span className="text-xs text-gray-500">하루 1회</span>
-          </div>
-          <button
-            onClick={async () => {
-              if (!adRewardAvailable || adLoading) return
-              setAdLoading(true)
-              try {
-                await showRewardedAd()
-                const result = await api.post('/masks/ad-reward')
-                setMasks(result.masks)
-                setAdRewardAvailable(false)
-              } catch (e) {
-                if (e.message === 'AD_DISMISSED') {
-                  // 광고를 끝까지 시청하지 않음
-                } else if (e.message !== 'AD_FAILED') {
-                  console.error('Ad reward error:', e)
-                }
-              }
-              setAdLoading(false)
-            }}
-            disabled={!adRewardAvailable || adLoading}
-            className={`w-full mt-3 py-3 font-semibold rounded-xl transition-colors ${
-              adRewardAvailable
-                ? 'bg-amber-500 text-white hover:bg-amber-400'
-                : 'bg-gray-800 text-gray-500'
-            }`}
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+      {/* 마스크 얻기 버튼 */}
+      <button
+        onClick={() => setShowMaskModal(true)}
+        className="w-full mt-4 py-3 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-400 transition-colors"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+      >
+        마스크 얻기
+      </button>
+
+      {/* 마스크 얻기 모달 */}
+      {showMaskModal && (
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowMaskModal(false)}>
+          <div
+            className="w-full max-w-[480px] bg-gray-900 rounded-t-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+            onClick={(e) => e.stopPropagation()}
           >
-            {adLoading ? '광고 로딩 중...' : adRewardAvailable ? '광고 보고 가면 5개 받기' : '오늘 이미 받았어요'}
-          </button>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-white">마스크 얻기</h2>
+              <button
+                onClick={() => setShowMaskModal(false)}
+                className="w-8 h-8 flex items-center justify-center text-gray-400"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 광고보고 마스크 얻기 */}
+            {adMobReady && (
+              <button
+                onClick={async () => {
+                  if (!adRewardAvailable || adLoading) return
+                  setAdLoading(true)
+                  try {
+                    await showRewardedAd()
+                    const result = await api.post('/masks/ad-reward')
+                    setMasks(result.masks)
+                    setAdRewardAvailable(false)
+                  } catch (e) {
+                    if (e.message === 'AD_DISMISSED') {
+                      // 광고를 끝까지 시청하지 않음
+                    } else if (e.message !== 'AD_FAILED') {
+                      console.error('Ad reward error:', e)
+                    }
+                  }
+                  setAdLoading(false)
+                }}
+                disabled={!adRewardAvailable || adLoading}
+                className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
+                  adRewardAvailable
+                    ? 'border-amber-500/50 bg-amber-500/10'
+                    : 'border-gray-700 bg-gray-800/50'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🎬</span>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-gray-100">광고보고 마스크 얻기</p>
+                    <p className="text-xs text-gray-400">
+                      {adRewardAvailable ? '광고를 시청하고 가면 5개를 받으세요' : '오늘 이미 받았어요'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {adRewardAvailable && (
+                    <>
+                      <span className="text-sm">🎭</span>
+                      <span className="text-sm font-bold text-amber-400">+5</span>
+                    </>
+                  )}
+                  {!adRewardAvailable && <span className="text-xs text-gray-500">하루 1회</span>}
+                </div>
+              </button>
+            )}
+
+            <p className="text-xs text-gray-600 text-center mt-2">더 많은 방법이 곧 추가됩니다</p>
+          </div>
         </div>
       )}
 
