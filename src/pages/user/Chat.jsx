@@ -294,20 +294,21 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 갤러리 플로팅 버튼 */}
-      <button
-        onClick={() => setShowGallery(true)}
-        className="absolute z-10 w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
-        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', right: 16, bottom: 80 }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
-        </svg>
-      </button>
+      <div className="relative flex-shrink-0">
+        {/* 갤러리 플로팅 버튼 */}
+        <button
+          onClick={() => setShowGallery(true)}
+          className="absolute z-10 w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', right: 16, bottom: '100%', marginBottom: 12 }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+        </button>
 
-      <div className="p-3 border-t border-gray-800 bg-gray-900/95 flex-shrink-0" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+      <div className="p-3 border-t border-gray-800 bg-gray-900/95" style={{ paddingBottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 8px)' }}>
         {showSuggestions && suggestedReplies.length > 0 && (
           <div className="mb-2 flex flex-col gap-1.5">
             {suggestedReplies.map((reply, i) => (
@@ -328,6 +329,7 @@ export default function Chat() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
           </button>
         </div>
+      </div>
       </div>
       {showPushPrompt && (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowPushPrompt(false)}>
