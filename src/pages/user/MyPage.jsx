@@ -7,6 +7,7 @@ import LoginModal from '../../components/LoginModal'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../../lib/billing'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
+import { requestInAppReview } from '../../lib/review'
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -477,6 +478,23 @@ export default function MyPage() {
           >
             <span className="text-gray-200">알림 테스트</span>
             <span className="text-xs text-gray-500">탭하여 테스트 알림 보내기</span>
+          </button>
+        )}
+        {dbUser?.role === 'ADMIN' && (
+          <button
+            onClick={async () => {
+              try {
+                await requestInAppReview()
+                alert('리뷰 다이얼로그 호출 완료')
+              } catch (e) {
+                alert(`리뷰 호출 실패: ${e.message}`)
+              }
+            }}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-amber-400">후기 다이얼로그 테스트</span>
+            <span className="text-xs text-gray-500">In-App Review</span>
           </button>
         )}
         {dbUser?.role === 'ADMIN' && (
