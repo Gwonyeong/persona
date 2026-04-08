@@ -25,6 +25,7 @@ import GalleryGrid from '../../components/GalleryGrid'
 import GalleryUnlockModal from '../../components/GalleryUnlockModal'
 import ImageSlideViewer from '../../components/ImageSlideViewer'
 import useBackHandler from '../../hooks/useBackHandler'
+import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib/review'
 
 export default function CharacterDetail() {
   const { id } = useParams()
@@ -45,6 +46,7 @@ export default function CharacterDetail() {
   const [galleryContents, setGalleryContents] = useState([])
   const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
+  const [showReviewModal, setShowReviewModal] = useState(false)
   const storyTimerRef = useRef(null)
 
   const stories = character?.stories || []
@@ -97,8 +99,14 @@ export default function CharacterDetail() {
   const startChat = async () => {
     setStarting(true)
     try {
-      const { conversation } = await api.post('/conversations', { characterId: parseInt(id) })
-      navigate(`/chats/${conversation.id}`)
+      const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id) })
+      if (shouldShowReview(conversationCount)) {
+        setShowReviewModal(true)
+        // 리뷰 모달 후 채팅으로 이동
+        window.__pendingChatId = conversation.id
+      } else {
+        navigate(`/chats/${conversation.id}`)
+      }
     } catch (error) {
       console.error(error)
       setStarting(false)
@@ -410,6 +418,55 @@ export default function CharacterDetail() {
             setUnlockTarget(null)
           }}
         />
+      )}
+
+      {/* 후기 유도 모달 */}
+      {showReviewModal && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+          <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6 text-center">
+            <p className="text-4xl mb-4">🎭</p>
+            <h3 className="text-lg font-bold text-white mb-2">Pesona를 즐기고 계신가요?</h3>
+            <p className="text-sm text-gray-400 leading-relaxed mb-2">
+              벌써 {character?.name}까지 3명의 캐릭터와 대화를 시작하셨네요!<br />
+              짧은 후기를 남겨주시면 큰 힘이 됩니다.
+            </p>
+            <p className="text-sm text-amber-400 font-semibold mb-6">
+              후기 작성 시 가면 10개를 드려요!
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={async () => {
+                  setShowReviewModal(false)
+                  await requestInAppReview()
+                  try {
+                    const result = await api.post('/masks/review-reward')
+                    if (result.masks) useStore.getState().setMasks(result.masks)
+                  } catch {}
+                  const chatId = window.__pendingChatId
+                  delete window.__pendingChatId
+                  if (chatId) navigate(`/chats/${chatId}`)
+                }}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-500 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                후기 남기기
+              </button>
+              <button
+                onClick={() => {
+                  setShowReviewModal(false)
+                  markReviewShown()
+                  const chatId = window.__pendingChatId
+                  delete window.__pendingChatId
+                  if (chatId) navigate(`/chats/${chatId}`)
+                }}
+                className="w-full py-2.5 text-gray-500 text-sm hover:text-gray-300 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                다음에 할게요
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 리셋 경고 모달 */}
