@@ -26,6 +26,7 @@ import About from './pages/user/About'
 import Terms from './pages/user/Terms'
 import DeleteAccount from './pages/user/DeleteAccount'
 import PrivacyPolicy from './pages/user/PrivacyPolicy'
+import Subscription from './pages/user/Subscription'
 import MessageNotification from './components/MessageNotification'
 
 function App() {
@@ -124,6 +125,7 @@ function App() {
         <Route path="/terms" element={<Terms />} />
         <Route path="/account/delete" element={<DeleteAccount />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/subscription" element={<Subscription />} />
       </Route>
     </Routes>
     </>

@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 
 const PRODUCT_IDS = ['masks_30', 'masks_100', 'masks_300']
+const SUBSCRIPTION_IDS = ['light_plan']
 
 let NativePurchases = null
 let PURCHASE_TYPE = null
@@ -74,6 +75,49 @@ export async function getPendingPurchases() {
     return purchases.filter((p) => ['PURCHASED', '1'].includes(p.purchaseState ?? ''))
   } catch (e) {
     console.error('Get pending purchases failed:', e)
+    return []
+  }
+}
+
+// === 구독 (Subscription) ===
+
+export async function getSubscriptionProducts() {
+  if (!NativePurchases) return null
+
+  try {
+    const { products } = await NativePurchases.getProducts({
+      productIdentifiers: SUBSCRIPTION_IDS,
+      productType: PURCHASE_TYPE.SUBS,
+    })
+    return products
+  } catch (e) {
+    console.error('Get subscription products failed:', e)
+    return null
+  }
+}
+
+export async function purchaseSubscription(productId) {
+  if (!NativePurchases) throw new Error('Billing not available')
+
+  const result = await NativePurchases.purchaseProduct({
+    productIdentifier: productId,
+    productType: PURCHASE_TYPE.SUBS,
+    isConsumable: false,
+  })
+
+  return result
+}
+
+export async function getActiveSubscriptions() {
+  if (!NativePurchases) return []
+
+  try {
+    const { purchases } = await NativePurchases.getPurchases({
+      productType: PURCHASE_TYPE.SUBS,
+    })
+    return purchases
+  } catch (e) {
+    console.error('Get active subscriptions failed:', e)
     return []
   }
 }

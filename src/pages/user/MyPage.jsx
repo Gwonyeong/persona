@@ -45,7 +45,7 @@ async function verifyOnServer(productId, purchaseToken) {
 }
 
 export default function MyPage() {
-  const { token, masks, setMasks, clearAuth } = useStore()
+  const { token, masks, setMasks, clearAuth, subscription } = useStore()
   const navigate = useNavigate()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
@@ -299,6 +299,32 @@ export default function MyPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* 구독 플랜 */}
+      <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-bold text-gray-100">구독 플랜</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {subscription?.tier === 'LIGHT' ? '라이트' : '무료'}
+              {subscription?.tier === 'LIGHT' && subscription?.expiresAt && (
+                <span className="text-gray-500"> · {new Date(subscription.expiresAt).toLocaleDateString('ko-KR')}까지</span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/subscription')}
+            className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+              subscription?.tier === 'LIGHT'
+                ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                : 'bg-indigo-600 text-white hover:bg-indigo-500'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {subscription?.tier === 'LIGHT' ? '관리' : '구독하기'}
+          </button>
+        </div>
       </div>
 
       {/* 마스크 충전 */}
