@@ -8,7 +8,9 @@ const useStore = create((set) => ({
   setUser: (user) => set({
     user,
     masks: user?.masks ?? 0,
-    subscription: user?.subscription || null,
+    subscription: user?.subscription
+      ? { ...user.subscription, tier: user.subscriptionTier || 'FREE' }
+      : null,
   }),
   setToken: (token) => {
     localStorage.setItem('token', token)
