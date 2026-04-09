@@ -96,11 +96,12 @@ export async function getSubscriptionProducts() {
   }
 }
 
-export async function purchaseSubscription(productId) {
+export async function purchaseSubscription(productId, planIdentifier = 'light') {
   if (!NativePurchases) throw new Error('Billing not available')
 
   const result = await NativePurchases.purchaseProduct({
     productIdentifier: productId,
+    planIdentifier,
     productType: PURCHASE_TYPE.SUBS,
     isConsumable: false,
   })
