@@ -19,10 +19,18 @@ export default function CharacterGallery() {
   const [modalDragging, setModalDragging] = useState(false)
   const [editingDetail, setEditingDetail] = useState(false)
   const [detailEditForm, setDetailEditForm] = useState({})
+  // 기준 이미지
+  const [baseImages, setBaseImages] = useState([])
+  const [baseUploading, setBaseUploading] = useState(false)
+  const [baseDragging, setBaseDragging] = useState(false)
+  const [editingBaseId, setEditingBaseId] = useState(null)
+  const [editingBaseConcept, setEditingBaseConcept] = useState('')
   const fileRef = useRef(null)
   const modalFileRef = useRef(null)
+  const baseFileRef = useRef(null)
   const dragCounter = useRef(0)
   const modalDragCounter = useRef(0)
+  const baseDragCounter = useRef(0)
 
   useEffect(() => {
     api.get('/admin/characters').then(({ characters }) => {
@@ -30,10 +38,14 @@ export default function CharacterGallery() {
       setCharacter(c)
     })
     loadGallery()
+    loadBaseImages()
   }, [id])
 
   const loadGallery = () =>
     api.get(`/admin/characters/${id}/gallery`).then(({ galleryContents }) => setGalleryContents(galleryContents || []))
+
+  const loadBaseImages = () =>
+    api.get(`/admin/characters/${id}/base-images`).then(({ baseImages }) => setBaseImages(baseImages || []))
 
   const refreshDetail = async (contentId) => {
     const { galleryContents: all } = await api.get(`/admin/characters/${id}/gallery`)
@@ -142,6 +154,50 @@ export default function CharacterGallery() {
     await refreshDetail(detailContent.id)
   }
 
+  // --- 기준 이미지 ---
+  const handleBaseUpload = async (files) => {
+    if (files.length === 0) return
+    setBaseUploading(true)
+    try {
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('image', file)
+        formData.append('concept', '')
+        await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/admin/characters/${id}/base-images`,
+          { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }, body: formData }
+        )
+      }
+      await loadBaseImages()
+    } catch (error) {
+      console.error('Base image upload error:', error)
+    } finally {
+      setBaseUploading(false)
+      if (baseFileRef.current) baseFileRef.current.value = ''
+    }
+  }
+
+  const handleBaseConceptSave = async (imageId) => {
+    await api.put(`/admin/characters/${id}/base-images/${imageId}`, { concept: editingBaseConcept })
+    setEditingBaseId(null)
+    await loadBaseImages()
+  }
+
+  const handleBaseDelete = async (imageId) => {
+    if (!confirm('이 기준 이미지를 삭제하시겠습니까?')) return
+    await api.delete(`/admin/characters/${id}/base-images/${imageId}`)
+    await loadBaseImages()
+  }
+
+  // --- 드래그 앤 드롭 (기준 이미지) ---
+  const handleBaseDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); baseDragCounter.current++; if (baseDragCounter.current === 1) setBaseDragging(true) }
+  const handleBaseDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); baseDragCounter.current--; if (baseDragCounter.current === 0) setBaseDragging(false) }
+  const handleBaseDragOver = (e) => { e.preventDefault(); e.stopPropagation() }
+  const handleBaseDrop = (e) => {
+    e.preventDefault(); e.stopPropagation(); setBaseDragging(false); baseDragCounter.current = 0
+    handleBaseUpload(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/')))
+  }
+
   // --- 드래그 앤 드롭 (메인) ---
   const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); dragCounter.current++; if (dragCounter.current === 1) setDragging(true) }
   const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); dragCounter.current--; if (dragCounter.current === 0) setDragging(false) }
@@ -175,7 +231,7 @@ export default function CharacterGallery() {
 
       {/* 탭 */}
       <div className="flex gap-1 mb-6 bg-gray-800 rounded-lg p-1 w-fit">
-        {['AFFINITY', 'MISSION'].map((t) => (
+        {['AFFINITY', 'MISSION', 'BASE'].map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); setShowForm(false) }}
@@ -184,15 +240,116 @@ export default function CharacterGallery() {
             }`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {t === 'AFFINITY' ? '호감도 이미지' : '미션 이미지'}
+            {t === 'AFFINITY' ? '호감도 이미지' : t === 'MISSION' ? '미션 이미지' : '기준 이미지'}
             <span className="ml-1.5 text-xs opacity-70">
-              ({galleryContents.filter((c) => c.unlockType === t).length})
+              ({t === 'BASE' ? baseImages.length : galleryContents.filter((c) => c.unlockType === t).length})
             </span>
           </button>
         ))}
       </div>
 
-      {/* 업로드 영역 */}
+      {/* 기준 이미지 탭 */}
+      {tab === 'BASE' && (
+        <div>
+          {/* 업로드 영역 */}
+          <div className="mb-6">
+            <input
+              ref={baseFileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => handleBaseUpload(Array.from(e.target.files || []))}
+              className="hidden"
+            />
+            <div
+              onDragEnter={handleBaseDragEnter}
+              onDragLeave={handleBaseDragLeave}
+              onDragOver={handleBaseDragOver}
+              onDrop={handleBaseDrop}
+              onClick={() => !baseUploading && baseFileRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+                baseDragging ? 'border-indigo-400 bg-indigo-500/10' : 'border-gray-700 hover:border-gray-500 bg-gray-800/50'
+              } ${baseUploading ? 'pointer-events-none opacity-50' : ''}`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {baseUploading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-6 h-6 text-indigo-400" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="opacity-75" />
+                  </svg>
+                  <span className="text-sm text-indigo-300">업로드 중...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <svg className="w-10 h-10 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  <p className="text-sm text-gray-300 font-medium">기준 이미지를 드래그하거나 클릭하여 업로드</p>
+                  <p className="text-xs text-gray-500">AI 이미지 생성에 사용할 기준 이미지를 등록합니다.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 기준 이미지 그리드 */}
+          {baseImages.length === 0 ? (
+            <div className="text-center text-gray-500 py-12">등록된 기준 이미지가 없습니다.</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {baseImages.map((img) => (
+                <div key={img.id} className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
+                  <div className="aspect-square relative group">
+                    <img src={img.filePath} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => handleBaseDelete(img.id)}
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-3">
+                    {editingBaseId === img.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editingBaseConcept}
+                          onChange={(e) => setEditingBaseConcept(e.target.value)}
+                          placeholder="컨셉 설명 입력..."
+                          rows={2}
+                          className="w-full bg-gray-700 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-indigo-500 focus:outline-none resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleBaseConceptSave(img.id)} className="text-xs text-indigo-400 hover:text-indigo-300 font-medium" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>저장</button>
+                          <button onClick={() => setEditingBaseId(null)} className="text-xs text-gray-400 hover:text-gray-300" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>취소</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => { setEditingBaseId(img.id); setEditingBaseConcept(img.concept || '') }}
+                        className="cursor-pointer"
+                      >
+                        {img.concept ? (
+                          <p className="text-sm text-gray-300 line-clamp-2">{img.concept}</p>
+                        ) : (
+                          <p className="text-xs text-gray-500 italic">클릭하여 컨셉 입력...</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 업로드 영역 (호감도/미션) */}
+      {tab !== 'BASE' && <>
       <div className="mb-6">
         <input
           ref={fileRef}
@@ -311,6 +468,7 @@ export default function CharacterGallery() {
           ))}
         </div>
       )}
+      </>}
 
       {/* 상세 모달 */}
       {detailContent && (

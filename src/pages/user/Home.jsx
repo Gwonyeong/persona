@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
+import TagFilterBar from '../../components/TagFilterBar'
+import useTagFilter from '../../hooks/useTagFilter'
+import { getTagLabel } from '../../lib/tagLabel'
 // import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -17,6 +20,7 @@ export default function Home() {
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -89,11 +93,13 @@ export default function Home() {
             />
           </div>
 
-          {/* 장르 필터 */}
-          <div className="flex gap-1 overflow-x-auto pb-3 scrollbar-hide">
-            <span className="px-2.5 py-1 rounded-full text-xs whitespace-nowrap font-medium bg-indigo-600 text-white">
-              전체
-            </span>
+          {/* 태그 필터 */}
+          <div className="pb-3">
+            <TagFilterBar
+              selectedTags={selectedTags}
+              tagCategories={tagCategories}
+              onApply={applyTags}
+            />
           </div>
         </div>
 
@@ -102,15 +108,18 @@ export default function Home() {
       </div>
 
       {/* 캐릭터 그리드 */}
-      {characters.length === 0 ? (
+      {filterByTags(characters).length === 0 ? (
         <div className="text-center text-gray-500 py-20">
           <p>등록된 캐릭터가 없습니다.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {characters.map((c) => {
+          {filterByTags(characters).map((c) => {
             const thumb = c.styles?.[0]?.images?.[0]
             const thumbUrl = getImageUrl(thumb?.filePath)
+
+            const flagTag = c.tags.find((t) => t.startsWith('nationality:'))
+            const flagCode = flagTag?.split(':')[1]
 
             return (
               <button
@@ -119,6 +128,16 @@ export default function Home() {
                 className="relative rounded-xl overflow-hidden text-left hover:ring-1 hover:ring-gray-700 transition-all"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
+                {/* 국기 배지 */}
+                {flagCode && (
+                  <div className="absolute top-2 right-2 z-[1] w-6 h-6 rounded-full overflow-hidden shadow-lg ring-1 ring-black/20">
+                    <img
+                      src={`https://flagcdn.com/w80/${flagCode}.png`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 {/* 이미지 */}
                 <div className="aspect-[2/3] bg-gray-800 flex items-center justify-center">
                   {thumbUrl ? (
@@ -132,9 +151,9 @@ export default function Home() {
                   <p className="font-semibold text-sm truncate text-white">{c.name}</p>
                   <p className="text-xs text-gray-300 mt-0.5 line-clamp-2">{c.description}</p>
                   <div className="flex gap-1 mt-1.5 flex-wrap">
-                    {c.tags.slice(0, 2).map((tag) => (
+                    {c.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0])).map((tag) => (
                       <span key={tag} className="px-1.5 py-0.5 bg-white/15 rounded text-[10px] text-gray-200">
-                        {tag}
+                        {getTagLabel(tag, tagCategories)}
                       </span>
                     ))}
                   </div>

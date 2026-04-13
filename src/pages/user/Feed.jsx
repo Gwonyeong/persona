@@ -6,7 +6,9 @@ import StoryViewer from '../../components/StoryViewer'
 import FeedPostCard from '../../components/FeedPostCard'
 import CommentSheet from '../../components/CommentSheet'
 import Lightbox from '../../components/Lightbox'
+import TagFilterBar from '../../components/TagFilterBar'
 import useBackHandler from '../../hooks/useBackHandler'
+import useTagFilter from '../../hooks/useTagFilter'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -39,7 +41,11 @@ export default function Feed() {
   const [storyIndex, setStoryIndex] = useState(0)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [commentPostId, setCommentPostId] = useState(null)
-  const [followOnly, setFollowOnly] = useState(false)
+  const [followOnly, setFollowOnly] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('feedFilter_followOnly')) === true }
+    catch { return false }
+  })
+  const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('feedFilter')
   const { token } = useStore()
   const navigate = useNavigate()
 
@@ -73,7 +79,6 @@ export default function Feed() {
   useBackHandler(!!storyModal, closeStory)
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(!!commentPostId, () => setCommentPostId(null))
-
   useEffect(() => {
     api.get('/characters').then(({ characters }) => setCharacters(characters))
   }, [])
@@ -87,7 +92,7 @@ export default function Feed() {
     ? characters.filter((c) => followedIds.includes(c.id))
     : []
 
-  const displayCharacters = followOnly ? followedCharacters : characters
+  const displayCharacters = filterByTags(followOnly ? followedCharacters : characters)
 
   const storyCharacters = followedCharacters.map((c) => {
     const style = c.styles?.[0]
@@ -156,22 +161,8 @@ export default function Feed() {
       `}</style>
 
       {/* 헤더 */}
-      <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2 flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2">
         <h1 className="text-xl font-bold">피드</h1>
-        <button
-          onClick={() => setFollowOnly((v) => !v)}
-          className="flex items-center gap-1.5"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${followOnly ? 'bg-indigo-500 border-indigo-500' : 'bg-gray-800 border-gray-600'}`}>
-            {followOnly && (
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </div>
-          <span className="text-[12px] text-gray-400">팔로우만</span>
-        </button>
       </div>
 
       {/* 스토리 */}
@@ -216,6 +207,21 @@ export default function Feed() {
       </div>
 
       <div className="border-t border-gray-800" />
+
+      {/* 필터 */}
+      <div className="px-4 py-2">
+        <TagFilterBar
+          selectedTags={selectedTags}
+          tagCategories={tagCategories}
+          onApply={applyTags}
+          followOnly={followOnly}
+          onFollowOnlyChange={(v) => {
+            setFollowOnly(v)
+            localStorage.setItem('feedFilter_followOnly', JSON.stringify(v))
+          }}
+          showFollowFilter
+        />
+      </div>
 
       {/* 피드 포스트 */}
       <div>
@@ -275,6 +281,7 @@ export default function Feed() {
           onClose={() => setCommentPostId(null)}
         />
       )}
+
     </div>
   )
 }

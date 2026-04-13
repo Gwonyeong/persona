@@ -1,6 +1,61 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+
+function TagSelector({ tags, onChange }) {
+  const [categories, setCategories] = useState([])
+  const selectedTags = new Set(tags)
+
+  useEffect(() => {
+    api.get('/characters/tags').then(({ categories }) => setCategories(categories)).catch(() => {})
+  }, [])
+
+  const toggle = useCallback((value) => {
+    const next = new Set(selectedTags)
+    if (next.has(value)) {
+      next.delete(value)
+    } else {
+      // 같은 카테고리의 단일 선택 (age, nationality, imageType)
+      const prefix = value.split(':')[0]
+      if (['age', 'nationality', 'imageType'].includes(prefix)) {
+        for (const t of next) {
+          if (t.startsWith(prefix + ':')) next.delete(t)
+        }
+      }
+      next.add(value)
+    }
+    onChange([...next])
+  }, [tags])
+
+  if (categories.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      {categories.map((cat) => (
+        <div key={cat.key}>
+          <p className="text-xs text-gray-500 mb-1.5">{cat.label}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {cat.options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => toggle(opt.value)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  selectedTags.has(opt.value)
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const EMPTY_FORM = {
   name: '',
@@ -8,7 +63,8 @@ const EMPTY_FORM = {
   concept: '',
   personality: '',
   firstMessage: '',
-  tags: '',
+  tags: [],
+  customTags: '',
   initialAffinity: 0,
   followerCount: 0,
   followingCount: 0,
@@ -44,7 +100,8 @@ export default function Characters() {
       concept: c.concept || '',
       personality: c.personality,
       firstMessage: c.firstMessage,
-      tags: c.tags.join(', '),
+      tags: c.tags.filter((t) => t.includes(':')),
+      customTags: c.tags.filter((t) => !t.includes(':')).join(', '),
       initialAffinity: c.initialAffinity || 0,
       followerCount: c.followerCount || 0,
       followingCount: c.followingCount || 0,
@@ -61,7 +118,10 @@ export default function Characters() {
   const save = async () => {
     const data = {
       ...form,
-      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      tags: [
+        ...form.tags,
+        ...form.customTags.split(',').map((t) => t.trim()).filter(Boolean),
+      ],
       proactiveMinInterval: form.proactiveMinInterval * 60,  // 분 → 초
       proactiveMaxInterval: form.proactiveMaxInterval * 60,  // 분 → 초
       proactiveProbability: form.proactiveProbability / 100, // % → 0~1
@@ -246,12 +306,16 @@ export default function Characters() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 block mb-1">태그 (쉼표 구분)</label>
+                <label className="text-sm text-gray-400 block mb-2">캐릭터 태그</label>
+                <TagSelector
+                  tags={form.tags}
+                  onChange={(tags) => setForm({ ...form, tags })}
+                />
                 <input
-                  value={form.tags}
-                  onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                  placeholder="로맨스, 학원, 츤데레"
+                  value={form.customTags}
+                  onChange={(e) => setForm({ ...form, customTags: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm mt-3"
+                  placeholder="기타 태그 (쉼표 구분)"
                 />
               </div>
 
