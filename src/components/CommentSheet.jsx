@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
+import LoginModal from './LoginModal'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -96,10 +97,11 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
   const [mounted, setMounted] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const overlayRef = useRef(null)
-  const { token, user } = useStore()
+  const { token, user, masks, setMasks } = useStore()
 
   // 마운트 애니메이션 트리거
   useEffect(() => {
@@ -157,6 +159,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   const submit = async () => {
     if (!input.trim() || sending) return
+    if (!token) { setShowLoginModal(true); return }
     const text = input.trim()
     setSending(true)
     setInput('')
@@ -189,6 +192,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           `/feed-comments/${postId}/reply/${lastReplyId}`,
           { content: text }
         )
+        if (res.masks !== undefined) setMasks(res.masks)
         const taggedCharReply = { ...res.charReply, _affinityChange: res.affinityChange || 0 }
         setComments((prev) => prev.map((c, i) =>
           i === commentIdx
@@ -197,6 +201,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
         ))
       } catch (error) {
         console.error('Comment error:', error)
+        if (error.status === 402) setMasks(error.data?.masks ?? 0)
         // 실패 시 낙관적 항목 제거
         setComments((prev) => prev.map((c, i) =>
           i === commentIdx
@@ -211,6 +216,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
       try {
         const res = await api.post(`/feed-comments/${postId}`, { content: text })
+        if (res.masks !== undefined) setMasks(res.masks)
         const taggedComment = {
           ...res.comment,
           thread: res.comment.thread?.map((t) =>
@@ -222,6 +228,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
         ))
       } catch (error) {
         console.error('Comment error:', error)
+        if (error.status === 402) setMasks(error.data?.masks ?? 0)
         setComments((prev) => prev.filter((c) => c.id !== tempId))
       }
     }
@@ -346,14 +353,14 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit() }}
-            placeholder={token ? (replyTarget ? `${characterName}에게 답글 달기...` : '댓글 달기...') : '로그인 후 댓글을 남길 수 있어요'}
-            disabled={!token || sending}
+            placeholder={replyTarget ? `${characterName}에게 답글 달기...` : '댓글 달기...'}
+            disabled={sending}
             className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder-gray-500 disabled:opacity-50"
             style={{ outline: 'none' }}
           />
           <button
             onClick={submit}
-            disabled={!input.trim() || sending || !token}
+            disabled={!input.trim() || sending}
             className="text-indigo-400 font-semibold text-[14px] disabled:opacity-30 transition-opacity"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
@@ -367,6 +374,8 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           style={{ height: keyboardHeight }}
         />
       </div>
+
+      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
   )
 }

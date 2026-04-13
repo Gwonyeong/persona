@@ -2,7 +2,9 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
+import { getTagInfo } from '../../lib/tagLabel'
 import useStore from '../../store/useStore'
+import LoginModal from '../../components/LoginModal'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -42,11 +44,13 @@ export default function CharacterDetail() {
     catch { return false }
   })
   const [isFollowing, setIsFollowing] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const [activeTab, setActiveTab] = useState('feed')
   const [galleryContents, setGalleryContents] = useState([])
   const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [tagCategories, setTagCategories] = useState([])
   const storyTimerRef = useRef(null)
 
   const stories = character?.stories || []
@@ -68,6 +72,7 @@ export default function CharacterDetail() {
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
+    api.get('/characters/tags').then(({ categories }) => setTagCategories(categories)).catch(() => {})
     api.get(`/characters/${id}/gallery`)
       .then(({ galleryContents }) => setGalleryContents(galleryContents || []))
       .catch(() => setGalleryContents([]))
@@ -87,10 +92,14 @@ export default function CharacterDetail() {
   }, [id, token])
 
   const toggleFollow = async () => {
-    if (!token) return
+    if (!token) { setShowLoginModal(true); return }
     try {
       const { following } = await api.post(`/follows/${id}`)
       setIsFollowing(following)
+      setCharacter(prev => ({
+        ...prev,
+        followerCount: (prev.followerCount || 0) + (following ? 1 : -1)
+      }))
     } catch (error) {
       console.error('Toggle follow error:', error)
     }
@@ -225,9 +234,21 @@ export default function CharacterDetail() {
             )}
             {character.tags?.length > 0 && (
               <div className="flex gap-1.5 mt-2 flex-wrap">
-                {character.tags.map((tag) => (
-                  <span key={tag} className="text-xs text-indigo-400">#{tag}</span>
-                ))}
+                {character.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0])).map((tag) => {
+                  const info = getTagInfo(tag, tagCategories)
+                  return (
+                    <span key={tag} className="inline-flex items-center gap-1 text-xs text-indigo-400">
+                      {info.flag && (
+                        <img
+                          src={`https://flagcdn.com/w40/${info.flag}.png`}
+                          alt={info.label}
+                          className="w-4 h-4 rounded-full object-cover"
+                        />
+                      )}
+                      #{info.label}
+                    </span>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -496,6 +517,8 @@ export default function CharacterDetail() {
           </div>
         </div>
       )}
+
+      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
   )
 }

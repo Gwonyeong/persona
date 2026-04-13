@@ -32,7 +32,10 @@ async function request(path, options = {}) {
     if (res.status === 401 && token) {
       useStore.getState().clearAuth()
     }
-    throw new Error(data.error || 'Request failed')
+    const err = new Error(data.error || 'Request failed')
+    err.status = res.status
+    err.data = data
+    throw err
   }
 
   return data
