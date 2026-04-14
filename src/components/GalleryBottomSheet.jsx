@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import GalleryGrid from './GalleryGrid'
 import ImageSlideViewer from './ImageSlideViewer'
 
-export default function GalleryBottomSheet({ characterId, characterName, affinity, onClose }) {
+export default function GalleryBottomSheet({ characterId, characterName, affinity, onClose, onAttachFeed }) {
   const navigate = useNavigate()
   const [contents, setContents] = useState([])
   const [feedPosts, setFeedPosts] = useState([])
@@ -12,6 +12,7 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
   const [mounted, setMounted] = useState(false)
   const [slideViewer, setSlideViewer] = useState(null) // { images, title, description, initialIndex }
   const [tab, setTab] = useState('FEED')
+  const [selectedFeed, setSelectedFeed] = useState(null)
   const overlayRef = useRef(null)
 
   // 마운트 애니메이션
@@ -153,16 +154,25 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
                     {feedPosts.map((post) => (
                       <button
                         key={post.id}
-                        onClick={() => navigate(`/characters/${characterId}/feed?postId=${post.id}`)}
+                        onClick={() => setSelectedFeed(selectedFeed?.id === post.id ? null : post)}
                         className="aspect-square overflow-hidden relative"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
                         <img
                           src={post.images?.[0]?.filePath || post.filePath}
                           alt={post.caption || ''}
-                          className="w-full h-full object-cover hover:opacity-80 transition-opacity"
+                          className={`w-full h-full object-cover transition-opacity ${selectedFeed?.id === post.id ? 'opacity-60' : 'hover:opacity-80'}`}
                           loading="lazy"
                         />
+                        {selectedFeed?.id === post.id && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
                         {post.images?.length > 1 && (
                           <div className="absolute top-1.5 right-1.5">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="white" stroke="none" className="drop-shadow">
@@ -192,6 +202,38 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
           )}
         </div>
       </div>
+
+      {/* 피드 선택 액션 버튼 */}
+      {selectedFeed && (
+        <div
+          className="absolute bottom-0 left-0 right-0 z-[51] bg-gray-900 border-t border-gray-800"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex gap-2 p-3">
+            <button
+              onClick={() => {
+                onAttachFeed?.(selectedFeed)
+                setSelectedFeed(null)
+                onClose()
+              }}
+              className="flex-1 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              피드 첨부하기
+            </button>
+            <button
+              onClick={() => {
+                navigate(`/characters/${characterId}/feed?postId=${selectedFeed.id}`)
+              }}
+              className="flex-1 py-2.5 text-sm font-semibold text-gray-300 bg-gray-800 rounded-xl"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              더 보기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 슬라이드 이미지 뷰어 */}
       {slideViewer && (

@@ -49,6 +49,9 @@ export default function Chat() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
+  const [attachedFeed, setAttachedFeed] = useState(null)
+  const [generatingImage, setGeneratingImage] = useState(false)
+  const [showImageGenModal, setShowImageGenModal] = useState(false)
   const pushPromptShownRef = useRef(false)
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
@@ -60,12 +63,13 @@ export default function Chat() {
   useBackHandler(showLoginModal, () => setShowLoginModal(false))
   useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
   useBackHandler(showGallery, () => setShowGallery(false))
+  useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
 
   useEffect(() => {
     initialLoadRef.current = true
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
-      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER'))
+      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
@@ -134,17 +138,22 @@ export default function Chat() {
       if (userMsgCount >= FREE_CHAT_LIMIT) { setShowLoginModal(true); return }
     }
     const text = input.trim()
+    const feedToSend = attachedFeed
     setInput('')
     setSending(true)
     setShowSuggestions(false)
     setSuggestedReplies([])
-    const tempUserMsg = { id: Date.now(), role: 'USER', content: text }
+    setAttachedFeed(null)
+    const feedImage = feedToSend?.images?.[0]?.filePath || null
+    const tempUserMsg = { id: Date.now(), role: 'USER', content: text, feedImage }
     setMessages((prev) => [...prev, tempUserMsg])
 
     setShowTyping(true)
-    const confirmedUserMsg = { role: 'USER', content: text, createdAt: new Date().toISOString() }
+    const confirmedUserMsg = { role: 'USER', content: text, createdAt: new Date().toISOString(), feedImage }
+    const body = { content: text }
+    if (feedToSend) body.feedPostId = feedToSend.id
     try {
-      await api.stream(`/conversations/${id}/messages`, { content: text }, (event, data) => {
+      await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
           case 'message': {
             setShowTyping(false)
@@ -213,6 +222,28 @@ export default function Chat() {
     }
   }
 
+  const handleGenerateImage = async () => {
+    if (generatingImage || !token) return
+    setShowImageGenModal(false)
+    setGeneratingImage(true)
+    try {
+      const { generatedImage } = await api.post(`/conversations/${id}/generate-image`)
+      setMessages((prev) => [...prev, {
+        role: 'GENERATED_IMAGE',
+        content: generatedImage.filePath,
+        createdAt: new Date().toISOString(),
+        generatedImageId: generatedImage.id,
+      }])
+    } catch (error) {
+      console.error('Image generation error:', error)
+      if (error.message?.includes('Insufficient masks')) {
+        navigate('/my')
+      }
+    } finally {
+      setGeneratingImage(false)
+    }
+  }
+
   if (!conversation) {
     return <div className="flex items-center justify-center h-screen text-gray-400">로딩 중...</div>
   }
@@ -251,6 +282,21 @@ export default function Chat() {
       <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
         {/* <div className="py-1"><AdBanner slot="8921302150" /></div> */}
         {messages.map((msg, idx) => {
+          if (msg.role === 'GENERATED_IMAGE') {
+            return (
+              <div key={msg.id || idx} className="flex justify-center mt-3">
+                <div className="max-w-[75%] rounded-2xl overflow-hidden" onClick={() => setLightboxUrl(msg.content)}>
+                  <img src={msg.content} alt="" className="w-full object-cover cursor-pointer" loading="lazy" />
+                  <div className="bg-gray-800/80 px-3 py-1.5 flex items-center justify-center gap-1">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                    </svg>
+                    <span className="text-[11px] text-purple-400">AI 생성 이미지</span>
+                  </div>
+                </div>
+              </div>
+            )
+          }
           const prevMsg = messages[idx - 1]
           const isConsecutive = prevMsg?.role === msg.role
           return (
@@ -266,6 +312,16 @@ export default function Chat() {
               )}
               <div className="max-w-[75%]">
                 {msg.role === 'CHARACTER' && !isConsecutive && <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>}
+                {msg.feedImage && (
+                  <div className="mb-1.5 rounded-2xl rounded-tr-none overflow-hidden">
+                    <img
+                      src={msg.feedImage}
+                      alt=""
+                      className="w-full aspect-square object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
                 <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
                   {msg.content}
                 </div>
@@ -275,6 +331,16 @@ export default function Chat() {
             </div>
           )
         })}
+        {generatingImage && (
+          <div className="flex justify-center mt-3">
+            <div className="bg-gray-800/80 rounded-2xl px-4 py-3 flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" className="animate-spin">
+                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+              </svg>
+              <span className="text-sm text-purple-400">이미지 생성 중...</span>
+            </div>
+          </div>
+        )}
         {showTyping && (
           <div className="flex justify-start mt-3">
             <div className="w-7 flex-shrink-0 mr-2">
@@ -295,20 +361,60 @@ export default function Chat() {
       </div>
 
       <div className="relative flex-shrink-0">
-        {/* 갤러리 플로팅 버튼 */}
-        <button
-          onClick={() => setShowGallery(true)}
-          className="absolute z-10 w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', right: 16, bottom: '100%', marginBottom: 12 }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <circle cx="8.5" cy="8.5" r="1.5" />
-            <polyline points="21 15 16 10 5 21" />
-          </svg>
-        </button>
+        {/* 플로팅 버튼들 */}
+        <div className="absolute z-10 flex gap-2" style={{ right: 16, bottom: '100%', marginBottom: 12 }}>
+          <button
+            onClick={() => setShowImageGenModal(true)}
+            disabled={generatingImage || !token}
+            className="w-11 h-11 rounded-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 flex items-center justify-center shadow-lg transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {generatingImage ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
+                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={() => setShowGallery(true)}
+            className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
+        </div>
 
       <div className="p-3 border-t border-gray-800 bg-gray-900/95" style={{ paddingBottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 8px)' }}>
+        {attachedFeed && (
+          <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
+            <img
+              src={attachedFeed.images?.[0]?.filePath}
+              alt=""
+              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-indigo-400 font-medium">피드 첨부됨</p>
+              <p className="text-xs text-gray-400 truncate">{attachedFeed.caption || '피드 게시물'}</p>
+            </div>
+            <button
+              onClick={() => setAttachedFeed(null)}
+              className="text-gray-500 hover:text-white flex-shrink-0"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
         {showSuggestions && suggestedReplies.length > 0 && (
           <div className="mb-2 flex flex-col gap-1.5">
             {suggestedReplies.map((reply, i) => (
@@ -331,6 +437,44 @@ export default function Chat() {
         </div>
       </div>
       </div>
+      {showImageGenModal && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowImageGenModal(false)}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 bg-gray-700 rounded-full" />
+            </div>
+            <div className="flex justify-center mb-3">
+              <div className="w-12 h-12 rounded-full bg-purple-600/20 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-white font-semibold text-center mb-1">이미지 생성하기</p>
+            <p className="text-gray-400 text-sm text-center mb-5">
+              현재 대화 상황에 맞는 {character.name}의 이미지를 AI가 생성합니다.
+              <br />
+              <span className="text-purple-400 font-medium">마스크 5개</span>가 사용됩니다.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowImageGenModal(false)}
+                className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleGenerateImage}
+                className="flex-1 py-2.5 text-sm text-white bg-purple-600 rounded-xl font-semibold"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                생성하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPushPrompt && (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowPushPrompt(false)}>
           <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
@@ -368,6 +512,7 @@ export default function Chat() {
           characterName={character.name}
           affinity={conversation.affinity ?? 0}
           onClose={() => setShowGallery(false)}
+          onAttachFeed={(feed) => setAttachedFeed(feed)}
         />
       )}
       {lightboxUrl && (

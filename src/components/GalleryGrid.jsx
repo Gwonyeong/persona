@@ -17,14 +17,14 @@ export default function GalleryGrid({ contents, affinity, onContentClick, onLock
           <button
             key={item.id}
             onClick={() => item.unlocked ? onContentClick?.(item) : onLockedClick?.(item)}
-            className="aspect-square overflow-hidden relative"
+            className="aspect-[9/16] overflow-hidden relative"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             <img
               src={thumbImage.filePath}
               alt={item.title || ''}
               className="w-full h-full object-cover"
-              style={item.unlocked ? {} : { filter: 'blur(12px) brightness(0.5)' }}
+              style={item.unlocked ? {} : { filter: 'blur(1.5px) brightness(0.8)' }}
               loading="lazy"
             />
 

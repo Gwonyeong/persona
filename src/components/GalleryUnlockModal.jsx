@@ -45,7 +45,7 @@ export default function GalleryUnlockModal({ content, characterId, onClose, onUn
               src={thumbImage.filePath}
               alt=""
               className="w-full h-full object-cover"
-              style={{ filter: 'blur(16px) brightness(0.4)' }}
+              style={{ filter: 'blur(2.5px) brightness(0.7)' }}
             />
           )}
         </div>

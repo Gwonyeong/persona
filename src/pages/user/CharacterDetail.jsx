@@ -335,7 +335,7 @@ export default function CharacterDetail() {
                 <button
                   key={post.id}
                   onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
-                  className="aspect-square overflow-hidden relative"
+                  className="aspect-[9/16] overflow-hidden relative"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <img
