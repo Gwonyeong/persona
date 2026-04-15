@@ -250,8 +250,8 @@ export default function Chat() {
 
   const { character } = conversation
   const currentStyle = character.styles.find((s) => s.id === conversation.currentStyleId) || character.styles[0]
-  const profileImage = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
-  const profileUrl = getImageUrl(profileImage?.filePath)
+  const profileImg = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
+  const profileUrl = getImageUrl(character.profileImage) || getImageUrl(profileImg?.filePath)
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   return (

@@ -80,6 +80,7 @@ export default function Characters() {
   const [characters, setCharacters] = useState([])
   const [editing, setEditing] = useState(null) // null | 'new' | character object
   const [form, setForm] = useState(EMPTY_FORM)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const navigate = useNavigate()
 
   const load = () => {
@@ -144,6 +145,36 @@ export default function Characters() {
     load()
   }
 
+  const uploadProfileImage = async (file) => {
+    if (!editing || editing === 'new') return
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const { character } = await api.put(`/admin/characters/${editing.id}/profile-image`, formData)
+      setEditing({ ...editing, profileImage: character.profileImage })
+      load()
+    } catch (e) {
+      alert('이미지 업로드 실패')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const removeProfileImage = async () => {
+    if (!editing || editing === 'new') return
+    setUploadingImage(true)
+    try {
+      await api.delete(`/admin/characters/${editing.id}/profile-image`)
+      setEditing({ ...editing, profileImage: null })
+      load()
+    } catch (e) {
+      alert('이미지 삭제 실패')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
@@ -180,9 +211,9 @@ export default function Characters() {
                     <div className="flex items-center gap-2.5">
                       <div className="w-9 h-9 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
                         {(() => {
-                          const img = c.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
-                          return img?.filePath ? (
-                            <img src={img.filePath} alt="" className="w-full h-full object-cover" />
+                          const src = c.profileImage || c.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')?.filePath
+                          return src ? (
+                            <img src={src} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
                           )
@@ -253,6 +284,59 @@ export default function Characters() {
             <h3 className="text-lg font-bold mb-4">
               {editing === 'new' ? '새 캐릭터' : '캐릭터 수정'}
             </h3>
+
+            {/* 프로필 이미지 */}
+            {editing !== 'new' && (
+              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700">
+                <div className="w-16 h-16 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
+                  {editing.profileImage ? (
+                    <img src={editing.profileImage} alt="" className="w-full h-full object-cover" />
+                  ) : (() => {
+                    const img = editing.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
+                    return img?.filePath ? (
+                      <img src={img.filePath} alt="" className="w-full h-full object-cover opacity-50" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">?</div>
+                    )
+                  })()}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs text-gray-400">
+                    {editing.profileImage ? '프로필 이미지' : '프로필 이미지 (스프라이트 사용 중)'}
+                  </p>
+                  <div className="flex gap-2">
+                    <label
+                      className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer ${
+                        uploadingImage ? 'bg-gray-700 text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                      }`}
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {uploadingImage ? '업로드 중...' : '이미지 변경'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingImage}
+                        onChange={(e) => {
+                          if (e.target.files[0]) uploadProfileImage(e.target.files[0])
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                    {editing.profileImage && (
+                      <button
+                        onClick={removeProfileImage}
+                        disabled={uploadingImage}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-red-400 hover:text-red-300 border border-gray-700"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>

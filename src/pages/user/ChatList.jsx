@@ -149,7 +149,7 @@ export default function ChatList() {
             <div>
               {filtered.map((conv) => {
                 const thumb = conv.character.styles?.[0]?.images?.[0]
-                const thumbUrl = getImageUrl(thumb?.filePath)
+                const thumbUrl = getImageUrl(conv.character.profileImage) || getImageUrl(thumb?.filePath)
                 const previewMsg = conv.lastCharMessage || conv.messages?.[0]
                 const isUnread = conv.updatedAt && (!conv.lastReadAt || new Date(conv.updatedAt) > new Date(conv.lastReadAt))
 

@@ -144,7 +144,7 @@ export default function CharacterDetail() {
 
   const mainStyle = character.styles?.[0]
   const mainImage = mainStyle?.images?.find((i) => i.emotion === 'NEUTRAL') || mainStyle?.images?.[0]
-  const profileUrl = getImageUrl(mainImage?.filePath)
+  const profileUrl = getImageUrl(character.profileImage) || getImageUrl(mainImage?.filePath)
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   const feedPosts = character.feedPosts || []

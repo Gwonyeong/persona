@@ -116,7 +116,7 @@ export default function Home() {
         <div className="grid grid-cols-2 gap-3">
           {filterByTags(characters).map((c) => {
             const thumb = c.styles?.[0]?.images?.[0]
-            const thumbUrl = getImageUrl(thumb?.filePath)
+            const thumbUrl = getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
 
             const flagTag = c.tags.find((t) => t.startsWith('nationality:'))
             const flagCode = flagTag?.split(':')[1]

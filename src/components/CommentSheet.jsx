@@ -19,6 +19,7 @@ function timeAgo(dateStr) {
 }
 
 function getCharacterThumb(comment) {
+  if (comment.character?.profileImage) return getImageUrl(comment.character.profileImage)
   const img = comment.character?.styles?.[0]?.images?.[0]
   return img ? getImageUrl(img.filePath) : null
 }
