@@ -210,7 +210,24 @@
   },
   "character": {
     "posts": "投稿",
-    "emptyPosts": "投稿がありません。"
+    "emptyPosts": "投稿がありません。",
+    "followers": "フォロワー",
+    "following": "フォロー中",
+    "follow": "フォローする",
+    "unfollow": "フォロー中",
+    "mutualFollow": "相互フォロー中",
+    "followsYou": "あなたをフォローしています",
+    "sendMessage": "メッセージ",
+    "starting": "開始中...",
+    "restart": "やり直す",
+    "restartTitle": "会話をやり直しますか？",
+    "restartDesc": "すべての会話履歴と好感度がリセットされます。この操作は元に戻せません。",
+    "restartConfirm": "やり直す",
+    "reviewTitle": "Pesonaを楽しんでいますか？",
+    "reviewDesc": "{{name}}を含め3人のキャラクターと会話を始めましたね！\n短いレビューを残していただけると励みになります。",
+    "reviewReward": "レビュー投稿でマスク10個プレゼント！",
+    "reviewButton": "レビューを書く",
+    "reviewLater": "後で"
   },
   "masks": {
     "pkg30": "30個",

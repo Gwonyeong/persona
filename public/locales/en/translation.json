@@ -210,7 +210,24 @@
   },
   "character": {
     "posts": "Posts",
-    "emptyPosts": "No posts."
+    "emptyPosts": "No posts.",
+    "followers": "Followers",
+    "following": "Following",
+    "follow": "Follow",
+    "unfollow": "Following",
+    "mutualFollow": "You follow each other",
+    "followsYou": "Follows you",
+    "sendMessage": "Message",
+    "starting": "Starting...",
+    "restart": "Reset",
+    "restartTitle": "Start a new conversation?",
+    "restartDesc": "All chat history and affinity will be reset. This cannot be undone.",
+    "restartConfirm": "Reset",
+    "reviewTitle": "Enjoying Pesona?",
+    "reviewDesc": "You've started chatting with 3 characters including {{name}}!\nA quick review would mean a lot to us.",
+    "reviewReward": "Leave a review and get 10 masks!",
+    "reviewButton": "Leave a Review",
+    "reviewLater": "Maybe later"
   },
   "masks": {
     "pkg30": "30",

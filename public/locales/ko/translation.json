@@ -210,7 +210,24 @@
   },
   "character": {
     "posts": "게시물",
-    "emptyPosts": "게시물이 없습니다."
+    "emptyPosts": "게시물이 없습니다.",
+    "followers": "팔로워",
+    "following": "팔로잉",
+    "follow": "팔로우",
+    "unfollow": "팔로잉",
+    "mutualFollow": "서로 팔로우 합니다",
+    "followsYou": "당신을 팔로우 합니다",
+    "sendMessage": "메시지 보내기",
+    "starting": "시작 중...",
+    "restart": "새로하기",
+    "restartTitle": "대화를 새로 시작할까요?",
+    "restartDesc": "기존 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "restartConfirm": "새로 시작",
+    "reviewTitle": "Pesona를 즐기고 계신가요?",
+    "reviewDesc": "벌써 {{name}}까지 3명의 캐릭터와 대화를 시작하셨네요!\n짧은 후기를 남겨주시면 큰 힘이 됩니다.",
+    "reviewReward": "후기 작성 시 가면 10개를 드려요!",
+    "reviewButton": "후기 남기기",
+    "reviewLater": "다음에 할게요"
   },
   "masks": {
     "pkg30": "30개",

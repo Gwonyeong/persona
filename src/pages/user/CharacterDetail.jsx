@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import { getTagInfo } from '../../lib/tagLabel'
 import useStore from '../../store/useStore'
@@ -32,6 +33,7 @@ import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib
 export default function CharacterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { token } = useStore()
   const [character, setCharacter] = useState(null)
   const [existingConv, setExistingConv] = useState(null)
@@ -139,7 +141,7 @@ export default function CharacterDetail() {
   }
 
   if (!character) {
-    return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">로딩 중...</div>
+    return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">{t('common.loading')}</div>
   }
 
   const mainStyle = character.styles?.[0]
@@ -203,15 +205,15 @@ export default function CharacterDetail() {
             <div className="flex flex-1 justify-around">
               <div className="text-center">
                 <p className="text-lg font-bold">{feedPosts.length}</p>
-                <p className="text-xs text-gray-400">게시물</p>
+                <p className="text-xs text-gray-400">{t('character.posts')}</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold">{(character.followerCount || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-400">팔로워</p>
+                <p className="text-xs text-gray-400">{t('character.followers')}</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-bold">{(character.followingCount || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-400">팔로잉</p>
+                <p className="text-xs text-gray-400">{t('character.following')}</p>
               </div>
             </div>
           </div>
@@ -222,7 +224,7 @@ export default function CharacterDetail() {
               <p className="font-bold text-sm">{character.name}</p>
               {(existingConv?.affinity ?? 0) >= 20 && (
                 <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/20 text-indigo-400 rounded-full">
-                  {isFollowing ? '서로 팔로우 합니다' : '당신을 팔로우 합니다'}
+                  {isFollowing ? t('character.mutualFollow') : t('character.followsYou')}
                 </span>
               )}
             </div>
@@ -265,7 +267,7 @@ export default function CharacterDetail() {
                 }`}
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {isFollowing ? '팔로잉' : '팔로우'}
+                {isFollowing ? t('character.unfollow') : t('character.follow')}
               </button>
               <button
                 onClick={existingConv ? resumeChat : startChat}
@@ -273,7 +275,7 @@ export default function CharacterDetail() {
                 className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {starting ? '시작 중...' : '메시지 보내기'}
+                {starting ? t('character.starting') : t('character.sendMessage')}
               </button>
             </div>
             {existingConv && (
@@ -284,7 +286,7 @@ export default function CharacterDetail() {
                   className="py-1.5 px-4 text-xs text-red-400 font-semibold rounded-lg border border-red-400/30 hover:bg-red-400/10 disabled:opacity-50 transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  새로하기
+                  {t('character.restart')}
                 </button>
               </div>
             )}
@@ -357,7 +359,7 @@ export default function CharacterDetail() {
             </div>
             {feedPosts.length === 0 && (
               <div className="text-center text-gray-500 py-16">
-                <p className="text-sm">게시물이 없습니다.</p>
+                <p className="text-sm">{t('character.emptyPosts')}</p>
               </div>
             )}
           </>
@@ -446,13 +448,12 @@ export default function CharacterDetail() {
         <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
           <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6 text-center">
             <p className="text-4xl mb-4">🎭</p>
-            <h3 className="text-lg font-bold text-white mb-2">Pesona를 즐기고 계신가요?</h3>
-            <p className="text-sm text-gray-400 leading-relaxed mb-2">
-              벌써 {character?.name}까지 3명의 캐릭터와 대화를 시작하셨네요!<br />
-              짧은 후기를 남겨주시면 큰 힘이 됩니다.
+            <h3 className="text-lg font-bold text-white mb-2">{t('character.reviewTitle')}</h3>
+            <p className="text-sm text-gray-400 leading-relaxed mb-2 whitespace-pre-line">
+              {t('character.reviewDesc', { name: character?.name })}
             </p>
             <p className="text-sm text-amber-400 font-semibold mb-6">
-              후기 작성 시 가면 10개를 드려요!
+              {t('character.reviewReward')}
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -470,7 +471,7 @@ export default function CharacterDetail() {
                 className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-500 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                후기 남기기
+                {t('character.reviewButton')}
               </button>
               <button
                 onClick={() => {
@@ -483,7 +484,7 @@ export default function CharacterDetail() {
                 className="w-full py-2.5 text-gray-500 text-sm hover:text-gray-300 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                다음에 할게요
+                {t('character.reviewLater')}
               </button>
             </div>
           </div>
@@ -494,9 +495,9 @@ export default function CharacterDetail() {
       {showResetModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
           <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-white mb-2">대화를 새로 시작할까요?</h3>
+            <h3 className="text-lg font-bold text-white mb-2">{t('character.restartTitle')}</h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-6">
-              기존 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다.
+              {t('character.restartDesc')}
             </p>
             <div className="flex gap-2">
               <button
@@ -504,14 +505,14 @@ export default function CharacterDetail() {
                 className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={resetChat}
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-colors text-sm font-medium"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                새로 시작
+                {t('character.restartConfirm')}
               </button>
             </div>
           </div>
