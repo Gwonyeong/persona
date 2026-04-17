@@ -217,6 +217,21 @@
     "pkg100": "100",
     "pkg300": "300",
     "badgePopular": "Popular",
-    "badgeDiscount": "Discount"
+    "badgeDiscount": "Discount",
+    "chargeTitle": "Get Masks",
+    "currentBalance": "Balance: {{count}}",
+    "hint": "1 mask = 1 conversation with a character",
+    "purchaseButton": "Buy for {{price}}"
+  },
+  "nav": {
+    "home": "Home",
+    "feed": "Feed",
+    "chats": "Chats",
+    "my": "My"
+  },
+  "footer": {
+    "about": "About",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy"
   }
 }

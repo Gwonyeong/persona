@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 
 const TABS = [
   {
     to: '/',
-    label: '홈',
+    labelKey: 'nav.home',
     requireAuth: false,
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -17,7 +18,7 @@ const TABS = [
   },
   {
     to: '/feed',
-    label: '피드',
+    labelKey: 'nav.feed',
     requireAuth: false,
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,7 +30,7 @@ const TABS = [
   },
   {
     to: '/chats',
-    label: '대화',
+    labelKey: 'nav.chats',
     requireAuth: true,
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -39,7 +40,7 @@ const TABS = [
   },
   {
     to: '/my',
-    label: '마이',
+    labelKey: 'nav.my',
     requireAuth: true,
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -51,6 +52,7 @@ const TABS = [
 ]
 
 export default function UserLayout() {
+  const { t } = useTranslation()
   const { token } = useStore()
   const location = useLocation()
   const navigate = useNavigate()
@@ -74,11 +76,11 @@ export default function UserLayout() {
         {!isFullscreenPage && (
           <footer className="px-4 py-6 mt-4 border-t border-gray-800">
             <div className="flex justify-center gap-3 text-xs text-gray-500">
-              <Link to="/about" className="hover:text-gray-300 transition-colors">서비스 소개</Link>
+              <Link to="/about" className="hover:text-gray-300 transition-colors">{t('footer.about')}</Link>
               <span>·</span>
-              <Link to="/terms" className="hover:text-gray-300 transition-colors">이용약관</Link>
+              <Link to="/terms" className="hover:text-gray-300 transition-colors">{t('footer.terms')}</Link>
               <span>·</span>
-              <Link to="/privacy" className="hover:text-gray-300 transition-colors">개인정보처리방침</Link>
+              <Link to="/privacy" className="hover:text-gray-300 transition-colors">{t('footer.privacy')}</Link>
             </div>
             <p className="text-center text-[10px] text-gray-600 mt-2">© 2026 Pesona. All rights reserved.</p>
           </footer>
@@ -96,7 +98,7 @@ export default function UserLayout() {
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
               {tab.icon}
-              <span>{tab.label}</span>
+              <span>{t(tab.labelKey)}</span>
             </button>
           ) : (
             <NavLink
@@ -117,7 +119,7 @@ export default function UserLayout() {
                   <div className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500" />
                 )}
               </div>
-              <span>{tab.label}</span>
+              <span>{t(tab.labelKey)}</span>
             </NavLink>
           )
         )}

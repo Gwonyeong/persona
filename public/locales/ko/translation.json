@@ -217,6 +217,21 @@
     "pkg100": "100개",
     "pkg300": "300개",
     "badgePopular": "인기",
-    "badgeDiscount": "할인"
+    "badgeDiscount": "할인",
+    "chargeTitle": "가면 충전",
+    "currentBalance": "현재 보유: {{count}}개",
+    "hint": "가면 1개로 캐릭터와 1회 대화할 수 있어요",
+    "purchaseButton": "{{price}} 결제하기"
+  },
+  "nav": {
+    "home": "홈",
+    "feed": "피드",
+    "chats": "대화",
+    "my": "마이"
+  },
+  "footer": {
+    "about": "서비스 소개",
+    "terms": "이용약관",
+    "privacy": "개인정보처리방침"
   }
 }

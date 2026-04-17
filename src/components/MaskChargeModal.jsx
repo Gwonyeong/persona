@@ -1,13 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../lib/billing'
-
-const PACKAGES = [
-  { amount: 30, price: '₩1,000', label: '30개', productId: 'masks_30' },
-  { amount: 100, price: '₩3,000', label: '100개', badge: '인기', productId: 'masks_100' },
-  { amount: 300, price: '₩8,000', label: '300개', badge: '할인', productId: 'masks_300' },
-]
 
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
@@ -16,7 +11,14 @@ async function verifyOnServer(productId, purchaseToken) {
 }
 
 export default function MaskChargeModal({ onClose }) {
+  const { t } = useTranslation()
   const { masks } = useStore()
+
+  const PACKAGES = [
+    { amount: 30, price: '₩1,000', label: t('masks.pkg30'), productId: 'masks_30' },
+    { amount: 100, price: '₩3,000', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
+    { amount: 300, price: '₩8,000', label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
+  ]
   const [selected, setSelected] = useState(1)
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -114,9 +116,9 @@ export default function MaskChargeModal({ onClose }) {
         {/* 헤더 */}
         <div className="text-center mb-5">
           <div className="text-3xl mb-2">🎭</div>
-          <p className="text-lg font-bold text-gray-100">가면 충전</p>
+          <p className="text-lg font-bold text-gray-100">{t('masks.chargeTitle')}</p>
           <p className="text-sm text-gray-400 mt-1">
-            현재 보유: <span className="text-indigo-400 font-semibold">{masks}개</span>
+            {t('masks.currentBalance', { count: masks })}
           </p>
         </div>
 
@@ -151,7 +153,7 @@ export default function MaskChargeModal({ onClose }) {
 
         {/* 안내 */}
         <p className="text-xs text-gray-500 text-center mb-4">
-          가면 1개로 캐릭터와 1회 대화할 수 있어요
+          {t('masks.hint')}
         </p>
 
         {errorMsg && (
@@ -166,14 +168,14 @@ export default function MaskChargeModal({ onClose }) {
             className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {loading ? '처리 중...' : `${PACKAGES[selected].price} 결제하기`}
+            {loading ? t('common.processing') : t('masks.purchaseButton', { price: PACKAGES[selected].price })}
           </button>
           <button
             onClick={onClose}
             className="w-full py-3 bg-gray-800 text-gray-300 font-medium rounded-xl hover:bg-gray-700 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            닫기
+            {t('common.close')}
           </button>
         </div>
       </div>

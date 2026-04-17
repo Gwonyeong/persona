@@ -217,6 +217,21 @@
     "pkg100": "100個",
     "pkg300": "300個",
     "badgePopular": "人気",
-    "badgeDiscount": "割引"
+    "badgeDiscount": "割引",
+    "chargeTitle": "マスクチャージ",
+    "currentBalance": "残高: {{count}}個",
+    "hint": "マスク1個でキャラクターと1回会話できます",
+    "purchaseButton": "{{price}}で購入"
+  },
+  "nav": {
+    "home": "ホーム",
+    "feed": "フィード",
+    "chats": "チャット",
+    "my": "マイ"
+  },
+  "footer": {
+    "about": "サービス紹介",
+    "terms": "利用規約",
+    "privacy": "プライバシーポリシー"
   }
 }
