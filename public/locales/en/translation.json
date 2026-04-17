@@ -233,5 +233,23 @@
     "about": "About",
     "terms": "Terms of Service",
     "privacy": "Privacy Policy"
+  },
+  "about": {
+    "title": "About",
+    "metaDescription": "Pesona is an interactive chat platform where you can talk with emotion-based AI characters in real-time.",
+    "hero": "Experience immersive conversations\nwith expressive AI characters",
+    "feature1Title": "Emotion-Based Characters",
+    "feature1Desc": "Each character reacts with 10 different emotions (happy, sad, angry, surprised, shy, etc.) — their expressions and sprites change dynamically based on your conversation.",
+    "feature2Title": "Diverse Character Genres",
+    "feature2Desc": "Discover unique AI characters across romance, mystery/RPG, school life, modern fantasy, and more. Each character has their own personality and storyline.",
+    "feature3Title": "Real-Time AI Chat",
+    "feature3Desc": "Enjoy natural, immersive conversations through real-time streaming AI chat. Characters stay true to their personality and setting throughout every conversation.",
+    "feature4Title": "Missions & Rewards",
+    "feature4Desc": "Complete character-specific missions to earn masks. Follow story arcs across ACTs to deepen your relationship with each character.",
+    "howToUse": "How to Use",
+    "step1": "Browse characters on the Home screen",
+    "step2": "Check a character's profile and opening message",
+    "step3": "Tap 'Start Chat' to begin chatting with an AI character",
+    "contact": "Contact & Feedback:"
   }
 }
