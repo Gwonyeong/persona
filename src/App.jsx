@@ -25,6 +25,7 @@ import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
 import DeleteAccount from './pages/user/DeleteAccount'
+import DeleteAccountInfo from './pages/user/DeleteAccountInfo'
 import PrivacyPolicy from './pages/user/PrivacyPolicy'
 import Subscription from './pages/user/Subscription'
 import MessageNotification from './components/MessageNotification'
@@ -111,6 +112,9 @@ function App() {
         <Route path="characters/:id/gallery" element={<CharacterGallery />} />
         <Route path="users" element={<AdminUsers />} />
       </Route>
+
+      {/* 공개 페이지 (인증 불필요) */}
+      <Route path="/account/delete-info" element={<DeleteAccountInfo />} />
 
       {/* 유저 - 탭바 레이아웃 */}
       <Route element={<UserLayout />}>
