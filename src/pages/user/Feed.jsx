@@ -18,7 +18,7 @@ function getImageUrl(filePath) {
 }
 
 export default function Feed() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const CAPTIONS = t('feed.defaultCaptions', { returnObjects: true }) || []
   const [characters, setCharacters] = useState([])
   const [followedIds, setFollowedIds] = useState(null)
@@ -71,7 +71,7 @@ export default function Feed() {
   useBackHandler(!!commentPostId, () => setCommentPostId(null))
   useEffect(() => {
     api.get('/characters').then(({ characters }) => setCharacters(characters))
-  }, [])
+  }, [i18n.language])
 
   useEffect(() => {
     if (!token) { setFollowedIds([]); return }

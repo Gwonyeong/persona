@@ -24,7 +24,7 @@ function getImageUrl(filePath) {
 }
 
 export default function Home() {
-  const { t } = useTranslation()
+  const { t, i18n: i18nInstance } = useTranslation()
   const { token, masks, setMasks } = useStore()
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
@@ -63,7 +63,7 @@ export default function Home() {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
-  }, [search])
+  }, [search, i18nInstance.language])
 
   return (
     <div className="px-4 pt-4 pb-2">

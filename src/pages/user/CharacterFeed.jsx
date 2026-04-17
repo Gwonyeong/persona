@@ -16,7 +16,7 @@ function getImageUrl(filePath) {
 }
 
 export default function CharacterFeed() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -30,7 +30,7 @@ export default function CharacterFeed() {
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
-  }, [id])
+  }, [id, i18n.language])
 
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(!!commentPostId, () => setCommentPostId(null))

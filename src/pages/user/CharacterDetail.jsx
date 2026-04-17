@@ -33,7 +33,7 @@ import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib
 export default function CharacterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { token } = useStore()
   const [character, setCharacter] = useState(null)
   const [existingConv, setExistingConv] = useState(null)
@@ -78,7 +78,7 @@ export default function CharacterDetail() {
     api.get(`/characters/${id}/gallery`)
       .then(({ galleryContents }) => setGalleryContents(galleryContents || []))
       .catch(() => setGalleryContents([]))
-  }, [id])
+  }, [id, i18n.language])
 
   useEffect(() => {
     if (!token) return
