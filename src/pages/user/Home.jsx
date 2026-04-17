@@ -2,12 +2,19 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
+import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import TagFilterBar from '../../components/TagFilterBar'
 import useTagFilter from '../../hooks/useTagFilter'
 import { getTagLabel } from '../../lib/tagLabel'
 // import AdBanner from '../../components/AdBanner'
+
+const LANGUAGES = [
+  { code: 'ko', flag: 'kr', label: '한국어' },
+  { code: 'en', flag: 'us', label: 'English' },
+  { code: 'ja', flag: 'jp', label: '日本語' },
+]
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -22,8 +29,19 @@ export default function Home() {
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
+  const [showLangModal, setShowLangModal] = useState(false)
   const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
   const navigate = useNavigate()
+
+  const currentLang = LANGUAGES.find((l) => l.code === i18n.language?.split('-')[0]) || LANGUAGES[1]
+
+  const changeLanguage = async (code) => {
+    await i18n.changeLanguage(code)
+    setShowLangModal(false)
+    if (token) {
+      api.put('/auth/language', { language: code }).catch(() => {})
+    }
+  }
 
   useEffect(() => {
     const scrollEl = document.querySelector('.user-layout > main')
@@ -61,21 +79,34 @@ export default function Home() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold">Pesona</h1>
-          {token && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/my')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full hover:border-gray-600 transition-colors"
+              onClick={() => setShowLangModal(true)}
+              className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-gray-700 hover:ring-gray-500 transition-all"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              <span className="text-sm">🎭</span>
-              <span className="text-sm font-semibold text-gray-100">{masks}</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-indigo-400">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="16" />
-                <line x1="8" y1="12" x2="16" y2="12" />
-              </svg>
+              <img
+                src={`https://flagcdn.com/w80/${currentLang.flag}.png`}
+                alt={currentLang.label}
+                className="w-full h-full object-cover"
+              />
             </button>
-          )}
+            {token && (
+              <button
+                onClick={() => navigate('/my')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-full hover:border-gray-600 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <span className="text-sm">🎭</span>
+                <span className="text-sm font-semibold text-gray-100">{masks}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="text-indigo-400">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="16" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 검색바 + 장르 필터 (스크롤 방향에 따라 접힘) */}
@@ -166,6 +197,45 @@ export default function Home() {
         </div>
       )}
 
+      {/* 언어 선택 모달 */}
+      {showLangModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowLangModal(false)} />
+          <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-5 w-full max-w-xs">
+            <h2 className="text-base font-bold text-white text-center mb-4">Language</h2>
+            <div className="flex flex-col gap-1.5">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => changeLanguage(lang.code)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    currentLang.code === lang.code
+                      ? 'bg-indigo-600/15 border border-indigo-500/50'
+                      : 'bg-gray-800/50 border border-gray-700 hover:border-gray-600'
+                  }`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-black/20 flex-shrink-0">
+                    <img
+                      src={`https://flagcdn.com/w80/${lang.flag}.png`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className={`text-sm font-medium ${currentLang.code === lang.code ? 'text-indigo-300' : 'text-gray-200'}`}>
+                    {lang.label}
+                  </span>
+                  {currentLang.code === lang.code && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-indigo-400">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
