@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import GalleryGrid from './GalleryGrid'
 import ImageSlideViewer from './ImageSlideViewer'
 
 export default function GalleryBottomSheet({ characterId, characterName, affinity, onClose, onAttachFeed }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [contents, setContents] = useState([])
   const [feedPosts, setFeedPosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -144,7 +146,7 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
         <div className="flex-1 overflow-auto" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
           {loading ? (
             <div className="text-center text-gray-500 py-16">
-              <p className="text-sm">불러오는 중...</p>
+              <p className="text-sm">{t('gallery.loading')}</p>
             </div>
           ) : (
             <>
@@ -186,7 +188,7 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
                   </div>
                   {feedPosts.length === 0 && (
                     <div className="text-center text-gray-500 py-16">
-                      <p className="text-sm">게시물이 없습니다.</p>
+                      <p className="text-sm">{t('gallery.emptyPosts')}</p>
                     </div>
                   )}
                 </>
@@ -220,7 +222,7 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
               className="flex-1 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              피드 첨부하기
+              {t('gallery.attachFeed')}
             </button>
             <button
               onClick={() => {
@@ -229,7 +231,7 @@ export default function GalleryBottomSheet({ characterId, characterName, affinit
               className="flex-1 py-2.5 text-sm font-semibold text-gray-300 bg-gray-800 rounded-xl"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              더 보기
+              {t('gallery.loadMore')}
             </button>
           </div>
         </div>

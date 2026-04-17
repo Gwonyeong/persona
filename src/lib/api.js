@@ -1,4 +1,5 @@
 import useStore from '../store/useStore'
+import i18n from '../i18n'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
@@ -14,6 +15,8 @@ function getGuestId() {
 async function request(path, options = {}) {
   const token = useStore.getState().token
   const headers = { ...options.headers }
+
+  headers['Accept-Language'] = i18n.language || 'en'
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
@@ -46,6 +49,7 @@ async function streamRequest(path, body, onEvent) {
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
+    'Accept-Language': i18n.language || 'en',
   }
 
   if (token) {

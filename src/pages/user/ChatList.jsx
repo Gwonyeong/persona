@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
+import { timeAgo } from '../../lib/timeFormat'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -11,20 +13,8 @@ function getImageUrl(filePath) {
   return null
 }
 
-function timeAgo(dateStr) {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return '방금'
-  if (mins < 60) return `${mins}분`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}시간`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}일`
-  const weeks = Math.floor(days / 7)
-  return `${weeks}주`
-}
-
 export default function ChatList() {
+  const { t } = useTranslation()
   const { token } = useStore()
   const [conversations, setConversations] = useState([])
   const [search, setSearch] = useState('')
@@ -69,13 +59,13 @@ export default function ChatList() {
   return (
     <div className="pt-2 pb-2">
       <Helmet>
-        <title>메시지 - Pesona</title>
-        <meta name="description" content="AI 캐릭터와 나눈 대화 목록을 확인하세요." />
+        <title>{t('chatList.title')}</title>
+        <meta name="description" content={t('chatList.metaDescription')} />
       </Helmet>
 
       {/* 헤더 */}
       <div className="px-4 pt-2 pb-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold">메시지</h1>
+        <h1 className="text-xl font-bold">{t('chatList.heading')}</h1>
         {token && conversations.length > 0 && (
           <button
             onClick={() => setEditMode((prev) => !prev)}
@@ -103,14 +93,14 @@ export default function ChatList() {
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </div>
-          <p className="text-gray-300 font-semibold mb-1">내 메시지</p>
-          <p className="text-sm text-gray-500 mb-5">로그인하고 캐릭터와 대화를 시작하세요</p>
+          <p className="text-gray-300 font-semibold mb-1">{t('chatList.myMessages')}</p>
+          <p className="text-sm text-gray-500 mb-5">{t('chatList.loginPrompt')}</p>
           <button
             onClick={() => setShowLoginModal(true)}
             className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            로그인
+            {t('common.login')}
           </button>
           {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
         </div>
@@ -125,7 +115,7 @@ export default function ChatList() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="검색"
+                placeholder={t('chatList.searchPlaceholder')}
                 className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2 text-sm placeholder-gray-500 focus:border-gray-600 focus:outline-none"
               />
             </div>
@@ -139,10 +129,10 @@ export default function ChatList() {
                 </svg>
               </div>
               <p className="text-gray-400 text-sm">
-                {search ? '검색 결과가 없습니다' : '아직 대화가 없습니다'}
+                {search ? t('chatList.noSearchResults') : t('chatList.noChats')}
               </p>
               {!search && (
-                <p className="text-gray-500 text-xs mt-1">홈에서 캐릭터를 선택해 대화를 시작해보세요</p>
+                <p className="text-gray-500 text-xs mt-1">{t('chatList.noChatsHint')}</p>
               )}
             </div>
           ) : (
@@ -177,7 +167,7 @@ export default function ChatList() {
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <p className={`text-sm truncate flex-1 ${isUnread ? 'text-gray-300' : 'text-gray-500'}`}>
-                            {previewMsg?.content || '대화를 시작해보세요'}
+                            {previewMsg?.content || t('chatList.startChat')}
                           </p>
                           {isUnread && (
                             <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
@@ -208,9 +198,9 @@ export default function ChatList() {
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
           <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-white mb-2">대화를 삭제할까요?</h3>
+            <h3 className="text-lg font-bold text-white mb-2">{t('chatList.deleteTitle')}</h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-6">
-              <span className="text-white font-medium">{deleteTarget.character.name}</span>과의 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다.
+              {t('chatList.deleteDescription', { name: deleteTarget.character.name })}
             </p>
             <div className="flex gap-2">
               <button
@@ -219,7 +209,7 @@ export default function ChatList() {
                 className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleDelete}
@@ -227,7 +217,7 @@ export default function ChatList() {
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-colors text-sm font-medium disabled:opacity-50"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {deleting ? '삭제 중...' : '삭제'}
+                {deleting ? t('common.deleting') : t('common.delete')}
               </button>
             </div>
           </div>

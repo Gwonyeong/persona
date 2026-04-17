@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
 import useBackHandler from '../hooks/useBackHandler'
 
 export default function TagFilterBar({
@@ -10,6 +11,7 @@ export default function TagFilterBar({
   onFollowOnlyChange,
   showFollowFilter = false,
 }) {
+  const { t } = useTranslation()
   const [showModal, setShowModal] = useState(false)
   const [draftTags, setDraftTags] = useState([])
   const [draftFollowOnly, setDraftFollowOnly] = useState(false)
@@ -37,7 +39,7 @@ export default function TagFilterBar({
           <div className="flex gap-1.5">
             {followOnly && (
               <span className="flex-shrink-0 px-2.5 py-1 rounded-full bg-indigo-600/20 text-indigo-400 text-[11px] font-medium">
-                팔로우만
+                {t('filter.followOnly')}
               </span>
             )}
             {selectedTags.map((tag) => {
@@ -81,14 +83,14 @@ export default function TagFilterBar({
             className="w-full max-w-sm bg-gray-900 border border-gray-800 rounded-2xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-bold text-white mb-5">필터</h2>
+            <h2 className="text-lg font-bold text-white mb-5">{t('filter.title')}</h2>
 
             <div className="space-y-4 max-h-[50vh] overflow-y-auto">
               {showFollowFilter && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 mb-2">노출</p>
+                  <p className="text-xs font-semibold text-gray-400 mb-2">{t('filter.exposure')}</p>
                   <div className="flex gap-2">
-                    {[{ label: '전체', value: false }, { label: '팔로우만', value: true }].map((opt) => (
+                    {[{ label: t('filter.all'), value: false }, { label: t('filter.followOnly'), value: true }].map((opt) => (
                       <button
                         key={opt.label}
                         onClick={() => setDraftFollowOnly(opt.value)}
@@ -151,14 +153,14 @@ export default function TagFilterBar({
                 className="flex-1 py-3 bg-gray-800 text-gray-300 font-medium rounded-xl hover:bg-gray-700 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={applyFilter}
                 className="flex-1 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                확인
+                {t('common.confirm')}
               </button>
             </div>
           </div>

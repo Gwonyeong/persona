@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export default function StoryViewer({ stories, character, profileUrl, currentIndex, onIndexChange, onClose }) {
+  const { t } = useTranslation()
   const [progress, setProgress] = useState(0)
   const timerRef = useRef(null)
   const STORY_DURATION = 5000
@@ -93,7 +95,7 @@ export default function StoryViewer({ stories, character, profileUrl, currentInd
             className="w-full h-full object-contain"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-500">이미지 없음</div>
+          <div className="w-full h-full flex items-center justify-center text-gray-500">{t('gallery.noImage')}</div>
         )}
 
         {story?.caption && (

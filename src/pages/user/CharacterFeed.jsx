@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
@@ -15,6 +16,7 @@ function getImageUrl(filePath) {
 }
 
 export default function CharacterFeed() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -61,7 +63,7 @@ export default function CharacterFeed() {
   }
 
   if (!character) {
-    return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">로딩 중...</div>
+    return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">{t('common.loading')}</div>
   }
 
   const mainStyle = character.styles?.[0]
@@ -96,7 +98,7 @@ export default function CharacterFeed() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <span className="font-bold text-base">게시물</span>
+        <span className="font-bold text-base">{t('character.posts')}</span>
       </header>
 
       <div className="flex-1 overflow-auto">
@@ -125,7 +127,7 @@ export default function CharacterFeed() {
 
         {feedPosts.length === 0 && (
           <div className="text-center text-gray-500 py-16">
-            <p className="text-sm">게시물이 없습니다.</p>
+            <p className="text-sm">{t('character.emptyPosts')}</p>
           </div>
         )}
       </div>

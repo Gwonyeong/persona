@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import {
@@ -10,48 +11,49 @@ import {
   getActiveSubscriptions,
 } from '../../lib/billing'
 
-const FEATURES = [
-  { key: 'chat', label: '채팅' },
-  { key: 'dailyMasks', label: '일일 가면 지급' },
-  { key: 'characters', label: '대화 캐릭터' },
-  { key: 'contentLevel', label: '콘텐츠 수위' },
-  { key: 'imageGen', label: '이미지 생성' },
-  { key: 'adFree', label: '광고 제거' },
-]
-
-const PLANS = [
-  {
-    id: null,
-    tier: 'FREE',
-    name: '무료',
-    price: '₩0',
-    features: {
-      chat: '가면 소모',
-      dailyMasks: '-',
-      characters: '10명',
-      contentLevel: '기본',
-      imageGen: '가면 소모',
-      adFree: '-',
-    },
-  },
-  {
-    id: 'light_plan',
-    tier: 'LIGHT',
-    name: '라이트',
-    price: '₩9,900',
-    trial: '첫 1주일 무료',
-    features: {
-      chat: '가면 소모',
-      dailyMasks: '30개/일',
-      characters: '무제한',
-      contentLevel: '과감한 이미지',
-      imageGen: '가면 소모',
-      adFree: true,
-    },
-  },
-]
-
 export default function Subscription() {
+  const { t } = useTranslation()
+
+  const FEATURES = [
+    { key: 'chat', label: t('subscription.feature.chat') },
+    { key: 'dailyMasks', label: t('subscription.feature.dailyMasks') },
+    { key: 'characters', label: t('subscription.feature.characters') },
+    { key: 'contentLevel', label: t('subscription.feature.contentLevel') },
+    { key: 'imageGen', label: t('subscription.feature.imageGen') },
+    { key: 'adFree', label: t('subscription.feature.adFree') },
+  ]
+
+  const PLANS = [
+    {
+      id: null,
+      tier: 'FREE',
+      name: t('subscription.free'),
+      price: '₩0',
+      features: {
+        chat: t('subscription.featureValue.maskCost'),
+        dailyMasks: t('subscription.featureValue.none'),
+        characters: t('subscription.featureValue.tenCharacters'),
+        contentLevel: t('subscription.featureValue.basic'),
+        imageGen: t('subscription.featureValue.maskCost'),
+        adFree: t('subscription.featureValue.none'),
+      },
+    },
+    {
+      id: 'light_plan',
+      tier: 'LIGHT',
+      name: t('subscription.light'),
+      price: '₩9,900',
+      trial: t('subscription.trial'),
+      features: {
+        chat: t('subscription.featureValue.maskCost'),
+        dailyMasks: t('subscription.featureValue.thirtyPerDay'),
+        characters: t('subscription.featureValue.unlimited'),
+        contentLevel: t('subscription.featureValue.boldImages'),
+        imageGen: t('subscription.featureValue.maskCost'),
+        adFree: true,
+      },
+    },
+  ]
   const navigate = useNavigate()
   const { subscription } = useStore()
   const [loading, setLoading] = useState(false)
@@ -82,7 +84,7 @@ export default function Subscription() {
 
     try {
       if (!isNative || !billingReady) {
-        setErrorMsg('Google Play 결제를 사용할 수 없습니다.')
+        setErrorMsg(t('subscription.googlePlayError'))
         setLoading(false)
         return
       }
@@ -91,7 +93,7 @@ export default function Subscription() {
       const token = result?.purchaseToken || result?.transactionReceipt?.purchaseToken || result?.receipt
 
       if (!token) {
-        setErrorMsg('구매 토큰을 찾을 수 없습니다.')
+        setErrorMsg(t('subscription.tokenNotFound'))
         setLoading(false)
         return
       }
@@ -115,7 +117,7 @@ export default function Subscription() {
     } catch (err) {
       const msg = err?.message || ''
       if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
-        setErrorMsg(msg || '구독 처리 중 오류가 발생했습니다.')
+        setErrorMsg(msg || t('subscription.subscribeError'))
       }
     }
 
@@ -140,12 +142,12 @@ export default function Subscription() {
         }
       }
       if (!restored) {
-        setErrorMsg('복원할 구독이 없습니다.')
+        setErrorMsg(t('subscription.restoreNone'))
       } else {
         navigate('/my')
       }
     } catch {
-      setErrorMsg('구독 복원에 실패했습니다.')
+      setErrorMsg(t('subscription.restoreFailed'))
     }
     setRestoring(false)
   }
@@ -180,7 +182,7 @@ export default function Subscription() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold">구독 플랜</h1>
+        <h1 className="text-xl font-bold">{t('subscription.title')}</h1>
       </div>
 
       {/* 비교 테이블 */}
@@ -198,7 +200,7 @@ export default function Subscription() {
               >
                 {isCurrent && (
                   <span className="inline-block px-1.5 py-0.5 bg-green-600/80 rounded text-[9px] font-bold text-white mb-1">
-                    현재
+                    {t('subscription.current')}
                   </span>
                 )}
                 <p className={`text-sm font-bold ${isLight ? 'text-indigo-300' : 'text-gray-100'}`}>
@@ -206,7 +208,7 @@ export default function Subscription() {
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {plan.price}
-                  {plan.id && <span className="text-gray-600">/월</span>}
+                  {plan.id && <span className="text-gray-600">{t('subscription.perMonth')}</span>}
                 </p>
                 {plan.trial && !isCurrent && (
                   <p className="text-[10px] text-green-400 font-semibold mt-1">{plan.trial}</p>
@@ -249,7 +251,7 @@ export default function Subscription() {
               className="py-2.5 text-xs font-medium text-gray-400 bg-gray-800 rounded-lg border border-gray-700"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              구독 관리
+              {t('subscription.manageSubscription')}
             </button>
           ) : (
             <button
@@ -258,7 +260,7 @@ export default function Subscription() {
               className="py-2.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              {loading ? '처리중...' : '무료로 시작하기'}
+              {loading ? t('common.processing') : t('subscription.startFree')}
             </button>
           )}
         </div>
@@ -271,27 +273,27 @@ export default function Subscription() {
 
       {/* 라이트 하이라이트 */}
       <div className="mt-5 p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
-        <p className="text-sm font-bold text-indigo-300 mb-2">라이트 플랜의 혜택</p>
+        <p className="text-sm font-bold text-indigo-300 mb-2">{t('subscription.lightBenefitsTitle')}</p>
         <ul className="space-y-1.5">
           <li className="text-xs text-gray-400 flex items-start gap-2">
             <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>매일 가면 30개 지급 — 매일 꾸준히 대화하세요</span>
+            <span>{t('subscription.lightBenefit1')}</span>
           </li>
           <li className="text-xs text-gray-400 flex items-start gap-2">
             <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>모든 캐릭터와 자유롭게 대화</span>
+            <span>{t('subscription.lightBenefit2')}</span>
           </li>
           <li className="text-xs text-gray-400 flex items-start gap-2">
             <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>더 과감한 이미지 콘텐츠 잠금 해제</span>
+            <span>{t('subscription.lightBenefit3')}</span>
           </li>
           <li className="text-xs text-gray-400 flex items-start gap-2">
             <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>광고 없이 깔끔한 경험</span>
+            <span>{t('subscription.lightBenefit4')}</span>
           </li>
         </ul>
         <p className="text-xs text-green-400/80 mt-3">
-          첫 1주일은 무료! 체험 기간 내 해지하면 요금이 청구되지 않아요.
+          {t('subscription.lightTrialNote')}
         </p>
       </div>
 
@@ -303,11 +305,11 @@ export default function Subscription() {
           className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          {restoring ? '복원 중...' : '이전 구독 복원'}
+          {restoring ? t('subscription.restoring') : t('subscription.restoreLink')}
         </button>
         <p className="text-[10px] text-gray-600 text-center leading-relaxed">
-          구독은 Google Play를 통해 관리됩니다.<br />
-          언제든 Play Store에서 해지할 수 있습니다.
+          {t('subscription.managedByGoogle')}<br />
+          {t('subscription.cancelAnytime')}
         </p>
       </div>
     </div>

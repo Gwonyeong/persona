@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import StoryViewer from '../../components/StoryViewer'
@@ -16,20 +17,9 @@ function getImageUrl(filePath) {
   return null
 }
 
-const CAPTIONS = [
-  '오늘도 좋은 하루 보내세요 ☀️',
-  '이런 날엔 산책이 최고야 🌿',
-  '새로운 하루, 새로운 시작 ✨',
-  '오늘의 기분은 이 정도? 😊',
-  '혼자만의 시간도 소중하니까 💭',
-  '이 순간을 기억하고 싶어 📸',
-  '당신과 함께라면 어디든 좋아 💕',
-  '오늘은 특별한 날이 될 거야 🎉',
-  '가끔은 멈춰서 하늘을 올려다봐 🌙',
-  '맛있는 거 먹으면 기분이 좋아지지 🍰',
-]
-
 export default function Feed() {
+  const { t } = useTranslation()
+  const CAPTIONS = t('feed.defaultCaptions', { returnObjects: true }) || []
   const [characters, setCharacters] = useState([])
   const [followedIds, setFollowedIds] = useState(null)
   const [viewedStories, setViewedStories] = useState(() => {
@@ -162,7 +152,7 @@ export default function Feed() {
 
       {/* 헤더 */}
       <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2">
-        <h1 className="text-xl font-bold">피드</h1>
+        <h1 className="text-xl font-bold">{t('feed.title')}</h1>
       </div>
 
       {/* 스토리 */}
@@ -252,8 +242,8 @@ export default function Feed() {
 
       {feedPosts.length === 0 && (
         <div className="text-center text-gray-500 py-20 px-6">
-          <p className="text-lg mb-2">{followOnly ? '팔로우한 피드가 비어있어요' : '피드가 비어있어요'}</p>
-          <p className="text-sm">홈에서 캐릭터를 팔로우하면 피드에 게시물이 나타납니다.</p>
+          <p className="text-lg mb-2">{followOnly ? t('feed.emptyFollowed') : t('feed.empty')}</p>
+          <p className="text-sm">{t('feed.emptyHint')}</p>
         </div>
       )}
 

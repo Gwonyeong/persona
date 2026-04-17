@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import TagFilterBar from '../../components/TagFilterBar'
@@ -16,6 +17,7 @@ function getImageUrl(filePath) {
 }
 
 export default function Home() {
+  const { t } = useTranslation()
   const { token, masks, setMasks } = useStore()
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
@@ -48,10 +50,10 @@ export default function Home() {
   return (
     <div className="px-4 pt-4 pb-2">
       <Helmet>
-        <title>Pesona - AI 캐릭터 채팅 플랫폼</title>
-        <meta name="description" content="감정 표현이 가능한 AI 캐릭터와 실시간으로 대화하세요. 다양한 장르의 독창적인 캐릭터를 만나보세요." />
-        <meta property="og:title" content="Pesona - AI 캐릭터 채팅 플랫폼" />
-        <meta property="og:description" content="감정 표현이 가능한 AI 캐릭터와 실시간으로 대화하세요." />
+        <title>{t('home.title')}</title>
+        <meta name="description" content={t('home.metaDescription')} />
+        <meta property="og:title" content={t('home.ogTitle')} />
+        <meta property="og:description" content={t('home.ogDescription')} />
       </Helmet>
 
       {/* 헤더 + 검색 + 필터 + 광고 (sticky) */}
@@ -88,7 +90,7 @@ export default function Home() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="캐릭터 검색..."
+              placeholder={t('home.searchPlaceholder')}
               className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
             />
           </div>
@@ -110,7 +112,7 @@ export default function Home() {
       {/* 캐릭터 그리드 */}
       {filterByTags(characters).length === 0 ? (
         <div className="text-center text-gray-500 py-20">
-          <p>등록된 캐릭터가 없습니다.</p>
+          <p>{t('home.emptyCharacters')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">

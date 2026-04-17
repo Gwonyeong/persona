@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
+import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
@@ -32,12 +34,6 @@ function resizeImage(file, maxSize = 512) {
   })
 }
 
-const PACKAGES = [
-  { amount: 30, price: '₩1,000', label: '30개', productId: 'masks_30' },
-  { amount: 100, price: '₩3,000', label: '100개', badge: '인기', productId: 'masks_100' },
-  { amount: 300, price: '₩8,000', label: '300개', badge: '할인', productId: 'masks_300' },
-]
-
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
   useStore.getState().setMasks(result.masks)
@@ -45,8 +41,15 @@ async function verifyOnServer(productId, purchaseToken) {
 }
 
 export default function MyPage() {
+  const { t } = useTranslation()
   const { token, masks, setMasks, clearAuth, subscription } = useStore()
   const navigate = useNavigate()
+
+  const PACKAGES = [
+    { amount: 30, price: '₩1,000', label: t('masks.pkg30'), productId: 'masks_30' },
+    { amount: 100, price: '₩3,000', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
+    { amount: 300, price: '₩8,000', label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
+  ]
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -161,7 +164,7 @@ export default function MyPage() {
       api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
 
       if (!isNative || !billingReady) {
-        setPurchaseError(`결제 환경을 확인할 수 없습니다`)
+        setPurchaseError(t('myPage.purchaseEnvError'))
         setPurchasing(false)
         return
       }
@@ -169,7 +172,7 @@ export default function MyPage() {
       const result = await purchaseProduct(pkg.productId)
       const purchaseToken = result?.purchaseToken || result?.transactionReceipt?.purchaseToken || result?.receipt
       if (!purchaseToken) {
-        setPurchaseError('결제 정보를 확인할 수 없습니다')
+        setPurchaseError(t('myPage.purchaseInfoError'))
         setPurchasing(false)
         return
       }
@@ -186,7 +189,7 @@ export default function MyPage() {
     } catch (err) {
       const msg = err?.message || ''
       if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
-        setPurchaseError(msg || '결제에 실패했습니다')
+        setPurchaseError(msg || t('myPage.purchaseFailed'))
       }
     }
     setPurchasing(false)
@@ -197,24 +200,24 @@ export default function MyPage() {
   return (
     <div className="px-4 pt-4">
       <Helmet>
-        <title>마이페이지 - Pesona</title>
-        <meta name="description" content="Pesona 프로필 설정 및 계정 관리 페이지입니다." />
+        <title>{t('myPage.title')}</title>
+        <meta name="description" content={t('myPage.metaDescription')} />
       </Helmet>
-      <h1 className="text-xl font-bold mb-6">마이</h1>
+      <h1 className="text-xl font-bold mb-6">{t('myPage.heading')}</h1>
       {/* <div className="mb-4">
         <AdBanner slot="3193498609" />
       </div> */}
 
       {!token ? (
         <div className="text-center py-20">
-          <p className="text-gray-300 font-semibold mb-2">로그인이 필요합니다</p>
-          <p className="text-sm text-gray-500 mb-6">로그인하면 프로필 관리, 대화 기록 저장 등 다양한 기능을 이용할 수 있습니다.</p>
+          <p className="text-gray-300 font-semibold mb-2">{t('myPage.loginRequired')}</p>
+          <p className="text-sm text-gray-500 mb-6">{t('myPage.loginRequiredDesc')}</p>
           <button
             onClick={() => setShowLoginModal(true)}
             className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            로그인
+            {t('common.login')}
           </button>
           {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
         </div>
@@ -254,7 +257,7 @@ export default function MyPage() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               maxLength={20}
-              placeholder="닉네임"
+              placeholder={t('myPage.nickname')}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none text-center"
             />
             <div className="flex gap-2 w-full">
@@ -263,7 +266,7 @@ export default function MyPage() {
                 className="flex-1 py-2 text-sm text-gray-400 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
@@ -271,7 +274,7 @@ export default function MyPage() {
                 className="flex-1 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 disabled:opacity-40 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {saving ? '저장 중...' : '저장'}
+                {saving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>
@@ -287,7 +290,7 @@ export default function MyPage() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold">{dbUser?.name || '사용자'}</p>
+              <p className="font-semibold">{dbUser?.name || t('common.user')}</p>
               <p className="text-sm text-gray-400">{dbUser?.email}</p>
             </div>
             <button
@@ -295,7 +298,7 @@ export default function MyPage() {
               className="px-3 py-1.5 text-xs text-gray-300 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              수정
+              {t('common.edit')}
             </button>
           </div>
         )}
@@ -305,11 +308,11 @@ export default function MyPage() {
       <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold text-gray-100">구독 플랜</p>
+            <p className="text-sm font-bold text-gray-100">{t('myPage.subscriptionPlan')}</p>
             <p className="text-xs text-gray-400 mt-0.5">
-              {subscription?.tier === 'LIGHT' ? '라이트' : '무료'}
+              {subscription?.tier === 'LIGHT' ? t('myPage.light') : t('myPage.free')}
               {subscription?.tier === 'LIGHT' && subscription?.expiresAt && (
-                <span className="text-gray-500"> · {new Date(subscription.expiresAt).toLocaleDateString('ko-KR')}까지</span>
+                <span className="text-gray-500"> · {t('myPage.until', { date: new Date(subscription.expiresAt).toLocaleDateString(i18n.language) })}</span>
               )}
             </p>
           </div>
@@ -322,7 +325,7 @@ export default function MyPage() {
             }`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {subscription?.tier === 'LIGHT' ? '관리' : '구독하기'}
+            {subscription?.tier === 'LIGHT' ? t('myPage.manage') : t('myPage.subscribe')}
           </button>
         </div>
       </div>
@@ -333,11 +336,11 @@ export default function MyPage() {
           <div className="flex items-center gap-2">
             <span className="text-2xl">🎭</span>
             <div>
-              <p className="text-sm font-bold text-gray-100">가면</p>
-              <p className="text-xs text-gray-400">캐릭터와 대화하고 이미지를 해금하세요</p>
+              <p className="text-sm font-bold text-gray-100">{t('myPage.masks')}</p>
+              <p className="text-xs text-gray-400">{t('myPage.masksDesc')}</p>
             </div>
           </div>
-          <span className="text-lg font-bold text-indigo-400">{masks}개</span>
+          <span className="text-lg font-bold text-indigo-400">{t('myPage.masksCount', { count: masks })}</span>
         </div>
 
         <div className="flex flex-col gap-2 mb-3">
@@ -367,7 +370,7 @@ export default function MyPage() {
         </div>
 
         <p className="text-xs text-gray-500 text-center mb-3">
-          가면 1개로 캐릭터와 1회 대화할 수 있어요
+          {t('myPage.masksHint')}
         </p>
 
         {purchaseError && (
@@ -380,7 +383,7 @@ export default function MyPage() {
           className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          {purchasing ? '처리 중...' : `${PACKAGES[selectedPkg].price} 결제하기`}
+          {purchasing ? t('common.processing') : t('myPage.purchase', { price: PACKAGES[selectedPkg].price })}
         </button>
       </div>
 
@@ -390,7 +393,7 @@ export default function MyPage() {
         className="w-full mt-4 py-3 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-400 transition-colors"
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
       >
-        마스크 얻기
+        {t('myPage.earnMasks')}
       </button>
 
       {/* 마스크 얻기 모달 */}
@@ -401,7 +404,7 @@ export default function MyPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-white">마스크 얻기</h2>
+              <h2 className="text-lg font-bold text-white">{t('myPage.earnMasks')}</h2>
               <button
                 onClick={() => setShowMaskModal(false)}
                 className="w-8 h-8 flex items-center justify-center text-gray-400"
@@ -444,9 +447,9 @@ export default function MyPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">🎬</span>
                   <div className="text-left">
-                    <p className="text-sm font-bold text-gray-100">광고보고 마스크 얻기</p>
+                    <p className="text-sm font-bold text-gray-100">{t('myPage.watchAd')}</p>
                     <p className="text-xs text-gray-400">
-                      {adRewardAvailable ? '광고를 시청하고 가면 5개를 받으세요' : '오늘 이미 받았어요'}
+                      {adRewardAvailable ? t('myPage.watchAdAvailable') : t('myPage.watchAdClaimed')}
                     </p>
                   </div>
                 </div>
@@ -457,12 +460,12 @@ export default function MyPage() {
                       <span className="text-sm font-bold text-amber-400">+5</span>
                     </>
                   )}
-                  {!adRewardAvailable && <span className="text-xs text-gray-500">하루 1회</span>}
+                  {!adRewardAvailable && <span className="text-xs text-gray-500">{t('myPage.watchAdLimit')}</span>}
                 </div>
               </button>
             )}
 
-            <p className="text-xs text-gray-600 text-center mt-2">더 많은 방법이 곧 추가됩니다</p>
+            <p className="text-xs text-gray-600 text-center mt-2">{t('myPage.comingSoon')}</p>
           </div>
         </div>
       )}
@@ -483,7 +486,7 @@ export default function MyPage() {
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            <span className="text-gray-200">알림</span>
+            <span className="text-gray-200">{t('myPage.notifications')}</span>
             <div className={`w-10 h-[22px] rounded-full relative transition-colors ${pushStatus === 'granted' ? 'bg-indigo-600' : 'bg-gray-700'}`}>
               <div className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white transition-transform ${pushStatus === 'granted' ? 'translate-x-[20px]' : 'translate-x-0.5'}`} />
             </div>
@@ -502,8 +505,8 @@ export default function MyPage() {
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            <span className="text-gray-200">알림 테스트</span>
-            <span className="text-xs text-gray-500">탭하여 테스트 알림 보내기</span>
+            <span className="text-gray-200">{t('myPage.testNotification')}</span>
+            <span className="text-xs text-gray-500">{t('myPage.testNotificationDesc')}</span>
           </button>
         )}
         {dbUser?.role === 'ADMIN' && (
@@ -519,7 +522,7 @@ export default function MyPage() {
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            <span className="text-amber-400">후기 다이얼로그 테스트</span>
+            <span className="text-amber-400">{t('myPage.reviewTest')}</span>
             <span className="text-xs text-gray-500">In-App Review</span>
           </button>
         )}
@@ -529,7 +532,7 @@ export default function MyPage() {
             className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            <span className="text-indigo-400">어드민 페이지</span>
+            <span className="text-indigo-400">{t('myPage.adminPage')}</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
               <polyline points="9 18 15 12 9 6" />
             </svg>
@@ -540,14 +543,14 @@ export default function MyPage() {
           className="w-full flex items-center px-4 py-3.5 text-sm text-red-400 hover:bg-gray-800/50 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          로그아웃
+          {t('common.logout')}
         </button>
         <button
           onClick={() => navigate('/account/delete')}
           className="w-full flex items-center px-4 py-3.5 text-sm text-gray-500 hover:bg-gray-800/50 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          회원 탈퇴
+          {t('myPage.deleteAccount')}
         </button>
       </div>
       </>

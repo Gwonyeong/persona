@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
 
@@ -10,6 +11,7 @@ function getImageUrl(filePath) {
 }
 
 export default function MessageNotification() {
+  const { t } = useTranslation()
   const { token } = useStore()
   const navigate = useNavigate()
   const location = useLocation()
@@ -120,7 +122,7 @@ export default function MessageNotification() {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-white">{toast.characterName}</p>
-          <p className="text-xs text-gray-400">새로운 메시지가 도착했어요</p>
+          <p className="text-xs text-gray-400">{t('notification.newMessage')}</p>
         </div>
       </button>
     </div>

@@ -1,14 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-
-function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60) return "방금 전";
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
-  if (diff < 2592000) return `${Math.floor(diff / 86400)}일 전`;
-  return `${Math.floor(diff / 2592000)}달 전`;
-}
+import { useTranslation } from "react-i18next";
+import { timeAgo } from "../lib/timeFormat";
 
 /**
  * @param {object} props
@@ -45,6 +38,7 @@ export default function FeedPostCard({
   onImageClick,
   showChatLink,
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const allImages =
     images?.length > 0 ? images : imageUrl ? [{ filePath: imageUrl }] : [];
@@ -286,11 +280,11 @@ export default function FeedPostCard({
         {/* 좋아요 수 */}
         <div className="flex items-center gap-2 mt-2">
           <p className="text-sm font-semibold text-white">
-            좋아요 {likesCount.toLocaleString()}개
+            {t('feedPost.likes', { count: likesCount.toLocaleString() })}
           </p>
           {affinityUp && (
             <span className="text-[11px] text-pink-400">
-              호감도가 올랐어요!
+              {t('feedPost.affinityUp')}
             </span>
           )}
         </div>
@@ -310,7 +304,7 @@ export default function FeedPostCard({
             className="text-xs text-indigo-400 mt-1.5 hover:text-indigo-300 transition-colors"
             style={{ outline: "none", WebkitTapHighlightColor: "transparent" }}
           >
-            대화하러 가기 →
+            {t('feedPost.goChat')}
           </button>
         )}
 

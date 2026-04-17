@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
+import { timeAgo } from '../lib/timeFormat'
 import useStore from '../store/useStore'
 import LoginModal from './LoginModal'
 
@@ -7,15 +9,6 @@ function getImageUrl(filePath) {
   if (!filePath) return null
   if (filePath.startsWith('http')) return filePath
   return null
-}
-
-function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
-  if (diff < 60) return '방금 전'
-  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`
-  if (diff < 2592000) return `${Math.floor(diff / 86400)}일 전`
-  return `${Math.floor(diff / 2592000)}달 전`
 }
 
 function getCharacterThumb(comment) {
@@ -43,7 +36,7 @@ function TypingIndicator({ thumbUrl }) {
   )
 }
 
-function CommentItem({ item, isReply }) {
+function CommentItem({ item, isReply, t }) {
   if (item._typing) return <TypingIndicator thumbUrl={item._characterThumbUrl} />
 
   const isCharacter = !!item.characterId
@@ -74,16 +67,16 @@ function CommentItem({ item, isReply }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-1.5">
           <span className={`text-[13px] font-semibold ${isCharacter ? 'text-indigo-400' : ''}`}>
-            {isCharacter ? item.character?.name : (item.user?.name || '게스트')}
+            {isCharacter ? item.character?.name : (item.user?.name || t('comment.guest'))}
           </span>
           <span className="text-[11px] text-gray-500">{timeAgo(item.createdAt)}</span>
         </div>
         <p className="text-[14px] text-gray-200 mt-0.5 leading-[1.4]">{item.content}</p>
         {item._affinityChange > 0 && (
-          <p className="text-[11px] text-pink-400 mt-1">호감도가 올랐어요! (+{item._affinityChange})</p>
+          <p className="text-[11px] text-pink-400 mt-1">{t('comment.affinityUp', { change: item._affinityChange })}</p>
         )}
         {item._affinityChange < 0 && (
-          <p className="text-[11px] text-blue-400 mt-1">호감도가 내려갔어요... ({item._affinityChange})</p>
+          <p className="text-[11px] text-blue-400 mt-1">{t('comment.affinityDown', { change: item._affinityChange })}</p>
         )}
       </div>
     </div>
@@ -91,6 +84,7 @@ function CommentItem({ item, isReply }) {
 }
 
 export default function CommentSheet({ postId, characterName, characterThumbUrl, onClose }) {
+  const { t } = useTranslation()
   const [comments, setComments] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -284,7 +278,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           </div>
           <div className="flex items-center justify-between px-4 pb-3">
             <div className="w-6" />
-            <p className="text-[15px] font-bold text-center">댓글</p>
+            <p className="text-[15px] font-bold text-center">{t('comment.title')}</p>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white"
@@ -302,27 +296,27 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
         <div ref={listRef} className="flex-1 overflow-auto px-4 py-3">
           {loading && (
             <div className="text-center text-gray-500 py-16">
-              <p className="text-sm">불러오는 중...</p>
+              <p className="text-sm">{t('comment.loading')}</p>
             </div>
           )}
           {!loading && comments.length === 0 && (
             <div className="text-center text-gray-500 py-16">
-              <p className="text-sm">아직 댓글이 없어요</p>
-              <p className="text-xs text-gray-600 mt-1">댓글을 남기면 {characterName}이(가) 답해줄 거예요</p>
+              <p className="text-sm">{t('comment.empty')}</p>
+              <p className="text-xs text-gray-600 mt-1">{t('comment.emptyHint', { name: characterName })}</p>
             </div>
           )}
           {comments.map((c, cIdx) => (
             <div key={c.id} className="mb-5">
-              <CommentItem item={c} />
-              {c.thread?.map((t) => (
-                <CommentItem key={t.id} item={t} isReply />
+              <CommentItem item={c} t={t} />
+              {c.thread?.map((tr) => (
+                <CommentItem key={tr.id} item={tr} isReply t={t} />
               ))}
               <button
                 onClick={() => startReply(cIdx)}
                 className="ml-12 mt-1.5 text-[12px] text-gray-500 hover:text-gray-300 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                답글 달기
+                {t('comment.reply')}
               </button>
             </div>
           ))}
@@ -332,14 +326,14 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
         {replyTarget && (
           <div className="flex-shrink-0 px-4 py-2 bg-gray-800/50 flex items-center justify-between">
             <span className="text-[12px] text-gray-400">
-              {characterName}에게 답글 남기는 중
+              {t('comment.replyingTo', { name: characterName })}
             </span>
             <button
               onClick={cancelReply}
               className="text-[12px] text-gray-500 hover:text-gray-300"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              취소
+              {t('common.cancel')}
             </button>
           </div>
         )}
@@ -354,7 +348,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit() }}
-            placeholder={replyTarget ? `${characterName}에게 답글 달기...` : '댓글 달기...'}
+            placeholder={replyTarget ? t('comment.replyPlaceholder', { name: characterName }) : t('comment.placeholder')}
             disabled={sending}
             className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder-gray-500 disabled:opacity-50"
             style={{ outline: 'none' }}
@@ -365,7 +359,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
             className="text-indigo-400 font-semibold text-[14px] disabled:opacity-30 transition-opacity"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {sending ? '...' : '게시'}
+            {sending ? '...' : t('comment.submit')}
           </button>
         </div>
 

@@ -1,11 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
+import { formatChatTime } from '../../lib/timeFormat'
 // import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -14,15 +16,6 @@ function getImageUrl(filePath) {
   return null
 }
 
-function formatTime(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const h = d.getHours()
-  const m = String(d.getMinutes()).padStart(2, '0')
-  const period = h < 12 ? '오전' : '오후'
-  const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
-  return `${period} ${hour12}:${m}`
-}
 
 function getCharacterOnlineStatus(activeHours) {
   if (!activeHours?.schedule) return 'free'
@@ -57,6 +50,7 @@ export default function Chat() {
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
   const [currentUser, setCurrentUser] = useState(null)
+  const { t } = useTranslation()
 
   // 모달/오버레이 뒤로가기 처리
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
@@ -245,7 +239,7 @@ export default function Chat() {
   }
 
   if (!conversation) {
-    return <div className="flex items-center justify-center h-screen text-gray-400">로딩 중...</div>
+    return <div className="flex items-center justify-center h-screen text-gray-400">{t('common.loading')}</div>
   }
 
   const { character } = conversation
@@ -273,7 +267,7 @@ export default function Chat() {
           </div>
           <div>
             <span className="font-semibold text-sm text-white block">{character.name}</span>
-            {onlineStatus === 'free' && <p className="text-[10px] text-green-400">활동 중</p>}
+            {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
         <span className="text-[11px] text-gray-500 font-mono">❤️ {conversation.affinity ?? 0}</span>
@@ -291,7 +285,7 @@ export default function Chat() {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
                     </svg>
-                    <span className="text-[11px] text-purple-400">AI 생성 이미지</span>
+                    <span className="text-[11px] text-purple-400">{t('chat.aiGeneratedImage')}</span>
                   </div>
                 </div>
               </div>
@@ -325,8 +319,8 @@ export default function Chat() {
                 <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
                   {msg.content}
                 </div>
-                {msg.createdAt && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatTime(msg.createdAt)}</p>}
-                {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{character.name}의 호감도가 올랐어요!</p>}
+                {msg.createdAt && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatChatTime(msg.createdAt)}</p>}
+                {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{t('chat.affinityUp', { name: character.name })}</p>}
               </div>
             </div>
           )
@@ -337,7 +331,7 @@ export default function Chat() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" className="animate-spin">
                 <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
               </svg>
-              <span className="text-sm text-purple-400">이미지 생성 중...</span>
+              <span className="text-sm text-purple-400">{t('chat.generatingImage')}</span>
             </div>
           </div>
         )}
@@ -401,8 +395,8 @@ export default function Chat() {
               className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-indigo-400 font-medium">피드 첨부됨</p>
-              <p className="text-xs text-gray-400 truncate">{attachedFeed.caption || '피드 게시물'}</p>
+              <p className="text-xs text-indigo-400 font-medium">{t('chat.feedAttached')}</p>
+              <p className="text-xs text-gray-400 truncate">{attachedFeed.caption || t('chat.feedPost')}</p>
             </div>
             <button
               onClick={() => setAttachedFeed(null)}
@@ -425,7 +419,7 @@ export default function Chat() {
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <textarea value={input} onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder="메시지를 입력하세요..." rows={1} className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+          <textarea value={input} onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
           {suggestedReplies.length > 0 && (
             <button onClick={() => setShowSuggestions((prev) => !prev)} className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${showSuggestions ? 'bg-indigo-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'}`} style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="9" y1="10" x2="15" y2="10" /></svg>
@@ -450,11 +444,11 @@ export default function Chat() {
                 </svg>
               </div>
             </div>
-            <p className="text-white font-semibold text-center mb-1">이미지 생성하기</p>
+            <p className="text-white font-semibold text-center mb-1">{t('chat.imageGenTitle')}</p>
             <p className="text-gray-400 text-sm text-center mb-5">
-              현재 대화 상황에 맞는 {character.name}의 이미지를 AI가 생성합니다.
+              {t('chat.imageGenDesc', { name: character.name })}
               <br />
-              <span className="text-purple-400 font-medium">마스크 5개</span>가 사용됩니다.
+              <span className="text-purple-400 font-medium">{t('chat.imageGenCost', { count: 5 })}</span>
             </p>
             <div className="flex gap-2">
               <button
@@ -462,14 +456,14 @@ export default function Chat() {
                 className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleGenerateImage}
                 className="flex-1 py-2.5 text-sm text-white bg-purple-600 rounded-xl font-semibold"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                생성하기
+                {t('common.generate')}
               </button>
             </div>
           </div>
@@ -481,15 +475,15 @@ export default function Chat() {
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 bg-gray-700 rounded-full" />
             </div>
-            <p className="text-white font-semibold text-center mb-1">{character.name}의 답장을 놓치지 마세요</p>
-            <p className="text-gray-400 text-sm text-center mb-5">알림을 켜면 새 메시지를 바로 확인할 수 있어요</p>
+            <p className="text-white font-semibold text-center mb-1">{t('chat.pushTitle', { name: character.name })}</p>
+            <p className="text-gray-400 text-sm text-center mb-5">{t('chat.pushDesc')}</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowPushPrompt(false)}
                 className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                다음에
+                {t('chat.pushLater')}
               </button>
               <button
                 onClick={async () => {
@@ -499,7 +493,7 @@ export default function Chat() {
                 className="flex-1 py-2.5 text-sm text-white bg-indigo-600 rounded-xl font-semibold"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                알림 켜기
+                {t('chat.pushEnable')}
               </button>
             </div>
           </div>

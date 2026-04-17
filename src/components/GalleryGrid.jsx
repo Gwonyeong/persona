@@ -1,8 +1,12 @@
+import { useTranslation } from 'react-i18next'
+
 export default function GalleryGrid({ contents, affinity, onContentClick, onLockedClick }) {
+  const { t } = useTranslation()
+
   if (!contents || contents.length === 0) {
     return (
       <div className="text-center text-gray-500 py-16">
-        <p className="text-sm">등록된 갤러리가 없습니다.</p>
+        <p className="text-sm">{t('gallery.empty')}</p>
       </div>
     )
   }
