@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 
 export default function useTagFilter(storagePrefix = 'feedFilter') {
+  const { i18n } = useTranslation()
   const [selectedTags, setSelectedTags] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`${storagePrefix}_tags`)) || [] }
     catch { return [] }
@@ -10,7 +12,7 @@ export default function useTagFilter(storagePrefix = 'feedFilter') {
 
   useEffect(() => {
     api.get('/characters/tags').then(({ categories }) => setTagCategories(categories)).catch(() => {})
-  }, [])
+  }, [i18n.language])
 
   const applyTags = (tags) => {
     setSelectedTags(tags)
