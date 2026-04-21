@@ -12,11 +12,20 @@ const isWebView = () => {
   return /wv|WebView/i.test(ua) || (ua.includes('Android') && ua.includes('Version/'))
 }
 
-export default function LoginModal({ onClose }) {
+export default function LoginModal({ onClose, onLoginSuccess }) {
   const { t } = useTranslation()
-  const { setToken, setUser } = useStore()
+  const { setToken, setUser, token } = useStore()
   const googleBtnRef = useRef(null)
   const inWebView = isWebView()
+  const hadTokenRef = useRef(!!token)
+
+  // WebView: __handleNativeAuth로 token이 설정되면 로그인 성공 처리
+  useEffect(() => {
+    if (!hadTokenRef.current && token) {
+      if (onLoginSuccess) onLoginSuccess()
+      else onClose()
+    }
+  }, [token])
 
   useEffect(() => {
     if (inWebView) return
@@ -53,7 +62,8 @@ export default function LoginModal({ onClose }) {
       })
       setToken(token)
       setUser(user)
-      onClose()
+      if (onLoginSuccess) onLoginSuccess()
+      else onClose()
     } catch (error) {
       console.error('Login failed:', error)
     }
