@@ -39,6 +39,15 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // GA4 SPA 페이지뷰 트래킹
+  useEffect(() => {
+    if (window.gtag) {
+      window.gtag('event', 'page_view', {
+        page_path: location.pathname,
+      })
+    }
+  }, [location.pathname])
+
   // Capacitor 네이티브 뒤로가기 버튼 처리
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
