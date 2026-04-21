@@ -74,7 +74,10 @@ export default function CharacterDetail() {
   useBackHandler(!!unlockTarget, () => setUnlockTarget(null))
 
   useEffect(() => {
-    api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
+    api.get(`/characters/${id}`).then(({ character }) => {
+      setCharacter(character)
+      window.gtag?.('event', 'character_view', { character_id: id, character_name: character.name })
+    })
     api.get('/characters/tags').then(({ categories }) => setTagCategories(categories)).catch(() => {})
     api.get(`/characters/${id}/gallery`)
       .then(({ galleryContents }) => setGalleryContents(galleryContents || []))
@@ -113,6 +116,7 @@ export default function CharacterDetail() {
     setStarting(true)
     try {
       const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id) })
+      window.gtag?.('event', 'chat_start', { character_id: id, conversation_id: conversation.id })
       if (shouldShowReview(conversationCount)) {
         setShowReviewModal(true)
         // 리뷰 모달 후 채팅으로 이동

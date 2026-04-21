@@ -75,6 +75,7 @@ export default function Subscription() {
       }
     }
     init()
+    window.gtag?.('event', 'subscription_view')
   }, [])
 
   const handleSubscribe = async () => {
@@ -110,6 +111,7 @@ export default function Subscription() {
       }
 
       useStore.getState().setSubscription(serverRes.subscription)
+      window.gtag?.('event', 'subscription_purchase', { plan: 'light_plan' })
       const meRes = await api.get('/auth/me')
       if (meRes.user) useStore.getState().setUser(meRes.user)
 

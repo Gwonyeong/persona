@@ -22,6 +22,7 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
   // WebView: __handleNativeAuth로 token이 설정되면 로그인 성공 처리
   useEffect(() => {
     if (!hadTokenRef.current && token) {
+      window.gtag?.('event', 'login', { method: 'google_webview' })
       if (onLoginSuccess) onLoginSuccess()
       else onClose()
     }
@@ -62,6 +63,7 @@ export default function LoginModal({ onClose, onLoginSuccess }) {
       })
       setToken(token)
       setUser(user)
+      window.gtag?.('event', 'login', { method: 'google' })
       if (onLoginSuccess) onLoginSuccess()
       else onClose()
     } catch (error) {

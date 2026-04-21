@@ -188,6 +188,7 @@ export default function Chat() {
             if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
             setShowTyping(false)
             setSending(false)
+            window.gtag?.('event', 'chat_message', { conversation_id: id })
             if (!pushPromptShownRef.current && token) {
               getPushPermissionStatus().then((status) => {
                 if (status === 'default') {
@@ -216,6 +217,7 @@ export default function Chat() {
       setShowTyping(false)
       setSending(false)
       if (error.message?.includes('Insufficient masks')) {
+        window.gtag?.('event', 'mask_depleted', { conversation_id: id })
         navigate('/my')
       } else {
         showError(t('chat.errorSend'))
