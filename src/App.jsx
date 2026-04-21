@@ -39,6 +39,19 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // GA4 설정: 앱/웹 구분 + 로그인 유저 식별
+  useEffect(() => {
+    if (!window.gtag) return
+    const isApp = Capacitor.isNativePlatform()
+    window.gtag('set', { traffic_type: isApp ? 'app' : 'web' })
+  }, [])
+
+  useEffect(() => {
+    if (!window.gtag) return
+    const user = useStore.getState().user
+    window.gtag('set', { user_id: user?.id || undefined })
+  }, [token])
+
   // GA4 SPA 페이지뷰 트래킹
   useEffect(() => {
     if (window.gtag) {
