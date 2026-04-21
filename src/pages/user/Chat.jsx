@@ -43,6 +43,7 @@ export default function Chat() {
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
+  const [backgroundImage, setBackgroundImage] = useState(null)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [showImageGenModal, setShowImageGenModal] = useState(false)
   const pushPromptShownRef = useRef(false)
@@ -63,6 +64,7 @@ export default function Chat() {
     initialLoadRef.current = true
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
+      setBackgroundImage(conv.backgroundImage || null)
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
@@ -273,7 +275,7 @@ export default function Chat() {
         <span className="text-[11px] text-gray-500 font-mono">❤️ {conversation.affinity ?? 0}</span>
       </header>
 
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-2">
+      <div className="flex-1 overflow-auto px-4 py-3 space-y-2 relative" style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
         {/* <div className="py-1"><AdBanner slot="8921302150" /></div> */}
         {messages.map((msg, idx) => {
           if (msg.role === 'GENERATED_IMAGE') {
@@ -504,9 +506,11 @@ export default function Chat() {
         <GalleryBottomSheet
           characterId={conversation.characterId}
           characterName={character.name}
+          conversationId={conversation.id}
           affinity={conversation.affinity ?? 0}
           onClose={() => setShowGallery(false)}
           onAttachFeed={(feed) => setAttachedFeed(feed)}
+          onBackgroundChange={(url) => setBackgroundImage(url)}
         />
       )}
       {lightboxUrl && (

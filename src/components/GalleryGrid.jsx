@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-export default function GalleryGrid({ contents, affinity, onContentClick, onLockedClick }) {
+export default function GalleryGrid({ contents, affinity, onContentClick, onLockedClick, bgPickMode, bgSelected }) {
   const { t } = useTranslation()
 
   if (!contents || contents.length === 0) {
@@ -17,23 +17,44 @@ export default function GalleryGrid({ contents, affinity, onContentClick, onLock
         const thumbImage = item.images?.[0]
         if (!thumbImage) return null
 
+        const handleClick = () => {
+          if (!item.unlocked) {
+            if (!bgPickMode) onLockedClick?.(item)
+            return
+          }
+          onContentClick?.(item)
+        }
+
+        const isSelected = bgPickMode && item.unlocked && bgSelected === thumbImage.filePath
+
         return (
           <button
             key={item.id}
-            onClick={() => item.unlocked ? onContentClick?.(item) : onLockedClick?.(item)}
+            onClick={handleClick}
             className="aspect-[9/16] overflow-hidden relative"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             <img
               src={thumbImage.filePath}
               alt={item.title || ''}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${isSelected ? 'opacity-60' : ''}`}
               style={item.unlocked ? {} : { filter: 'blur(1.5px) brightness(0.8)' }}
               loading="lazy"
             />
 
+            {/* 선택 표시 (배경 선택 모드) */}
+            {isSelected && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+              </div>
+            )}
+
             {/* 다중 이미지 표시 */}
-            {item.unlocked && item.images.length > 1 && (
+            {item.unlocked && item.images.length > 1 && !isSelected && (
               <div className="absolute top-1.5 right-1.5">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="drop-shadow">
                   <rect x="3" y="3" width="15" height="15" rx="2" />

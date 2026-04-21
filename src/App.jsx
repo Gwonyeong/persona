@@ -28,6 +28,9 @@ import DeleteAccount from './pages/user/DeleteAccount'
 import DeleteAccountInfo from './pages/user/DeleteAccountInfo'
 import PrivacyPolicy from './pages/user/PrivacyPolicy'
 import Subscription from './pages/user/Subscription'
+import FeedbackList from './pages/user/FeedbackList'
+import FeedbackDetail from './pages/user/FeedbackDetail'
+import FeedbackWrite from './pages/user/FeedbackWrite'
 import MessageNotification from './components/MessageNotification'
 
 function App() {
@@ -130,6 +133,9 @@ function App() {
         <Route path="/account/delete" element={<DeleteAccount />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/subscription" element={<Subscription />} />
+        <Route path="/feedback" element={<FeedbackList />} />
+        <Route path="/feedback/:id" element={<FeedbackDetail />} />
+        <Route path="/feedback/write" element={<FeedbackWrite />} />
       </Route>
     </Routes>
     </>

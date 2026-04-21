@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import StoryViewer from '../../components/StoryViewer'
 import FeedPostCard from '../../components/FeedPostCard'
 import CommentSheet from '../../components/CommentSheet'
 import Lightbox from '../../components/Lightbox'
@@ -22,13 +21,7 @@ export default function Feed() {
   const CAPTIONS = t('feed.defaultCaptions', { returnObjects: true }) || []
   const [characters, setCharacters] = useState([])
   const [followedIds, setFollowedIds] = useState(null)
-  const [viewedStories, setViewedStories] = useState(() => {
-    try { return new Set(JSON.parse(sessionStorage.getItem('viewedStories') || '[]')) }
-    catch { return new Set() }
-  })
   const [likeState, setLikeState] = useState({})
-  const [storyModal, setStoryModal] = useState(null)
-  const [storyIndex, setStoryIndex] = useState(0)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [commentPostId, setCommentPostId] = useState(null)
   const [followOnly, setFollowOnly] = useState(() => {
@@ -39,36 +32,29 @@ export default function Feed() {
   const { token } = useStore()
   const navigate = useNavigate()
 
-  const markStoryViewed = (characterId) => {
-    setViewedStories((prev) => {
-      const next = new Set(prev)
-      next.add(characterId)
-      sessionStorage.setItem('viewedStories', JSON.stringify([...next]))
-      return next
-    })
-  }
+  // 무한스크롤 상태
+  const [feedPosts, setFeedPosts] = useState([])
+  const [nextCursor, setNextCursor] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [initialLoaded, setInitialLoaded] = useState(false)
+  const observerRef = useRef(null)
+  const sentinelRef = useRef(null)
 
-  const openStory = (character) => {
-    const stories = character.stories || []
-    if (stories.length === 0) {
+  const goToChat = async (character) => {
+    try {
+      const { conversation } = await api.post('/conversations', { characterId: character.id })
+      navigate(`/chats/${conversation.id}`)
+    } catch (error) {
+      console.error('Start chat error:', error)
       navigate(`/characters/${character.id}`)
-      return
     }
-    const style = character.styles?.[0]
-    const neutralImg = style?.images?.find((img) => img.emotion === 'NEUTRAL')
-    const profileUrl = getImageUrl((neutralImg || style?.images?.[0])?.filePath)
-    setStoryIndex(0)
-    setStoryModal({ character, stories, profileUrl })
   }
 
-  const closeStory = () => {
-    if (storyModal) markStoryViewed(storyModal.character.id)
-    setStoryModal(null)
-  }
-
-  useBackHandler(!!storyModal, closeStory)
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(!!commentPostId, () => setCommentPostId(null))
+
+  // 캐릭터 목록 (스토리용)
   useEffect(() => {
     api.get('/characters').then(({ characters }) => setCharacters(characters))
   }, [i18n.language])
@@ -78,11 +64,77 @@ export default function Feed() {
     api.get('/follows').then(({ characterIds }) => setFollowedIds(characterIds)).catch(() => setFollowedIds([]))
   }, [token])
 
+  // 피드 포스트 fetch
+  const fetchPosts = useCallback(async (cursor = null, reset = false) => {
+    if (loading) return
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ limit: '10' })
+      if (cursor) params.set('cursor', cursor)
+      if (followOnly) params.set('followOnly', 'true')
+      if (selectedTags.length > 0) {
+        selectedTags.forEach((t) => params.append('tags', t))
+      }
+
+      const data = await api.get(`/feed-posts?${params.toString()}`)
+      const posts = (data.feedPosts || []).map((post, idx) => ({
+        ...post,
+        caption: post.caption || CAPTIONS[(cursor ? feedPosts.length + idx : idx) % CAPTIONS.length],
+      }))
+
+      if (reset) {
+        setFeedPosts(posts)
+      } else {
+        setFeedPosts((prev) => [...prev, ...posts])
+      }
+      setNextCursor(data.nextCursor)
+      setHasMore(!!data.nextCursor)
+    } catch (err) {
+      console.error('Feed fetch error:', err)
+    } finally {
+      setLoading(false)
+      setInitialLoaded(true)
+    }
+  }, [loading, followOnly, selectedTags, CAPTIONS, feedPosts.length])
+
+  // 필터 변경 시 리셋
+  useEffect(() => {
+    setFeedPosts([])
+    setNextCursor(null)
+    setHasMore(true)
+    setInitialLoaded(false)
+  }, [followOnly, selectedTags, i18n.language])
+
+  // 초기 로딩 + 리셋 후 로딩
+  useEffect(() => {
+    if (!initialLoaded && hasMore) {
+      fetchPosts(null, true)
+    }
+  }, [initialLoaded, hasMore])
+
+  // IntersectionObserver로 무한스크롤
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect()
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          fetchPosts(nextCursor)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (sentinelRef.current) {
+      observerRef.current.observe(sentinelRef.current)
+    }
+
+    return () => observerRef.current?.disconnect()
+  }, [hasMore, loading, nextCursor])
+
   const followedCharacters = followedIds
     ? characters.filter((c) => followedIds.includes(c.id))
     : []
-
-  const displayCharacters = filterByTags(followOnly ? followedCharacters : characters)
 
   const storyCharacters = followedCharacters.map((c) => {
     const style = c.styles?.[0]
@@ -93,26 +145,6 @@ export default function Feed() {
       thumbUrl: getImageUrl((neutralImg || fallbackImg)?.filePath),
     }
   })
-
-  const feedPosts = displayCharacters.flatMap((c, cIdx) => {
-    const posts = c.feedPosts || []
-    if (posts.length === 0) return []
-    const style = c.styles?.[0]
-    const thumbUrl = getImageUrl(
-      (style?.images?.find((i) => i.emotion === 'NEUTRAL') || style?.images?.[0])?.filePath
-    )
-    return posts.map((post, pIdx) => ({
-      id: post.id,
-      character: c,
-      images: post.images || [],
-      imageUrl: post.images?.[0]?.filePath || post.filePath,
-      caption: post.caption || CAPTIONS[(cIdx + pIdx) % CAPTIONS.length],
-      publishAt: post.publishAt,
-      likesCount: post.likesCount || 0,
-      liked: post.liked || false,
-      thumbUrl,
-    }))
-  }).sort((a, b) => new Date(b.publishAt) - new Date(a.publishAt))
 
   const toggleLike = async (postId) => {
     if (!token) return
@@ -159,20 +191,14 @@ export default function Feed() {
       <div className="px-4 py-3">
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
           {storyCharacters.map((c) => {
-            const hasStories = (c.stories || []).length > 0
-            const isViewed = viewedStories.has(c.id)
             return (
               <button
                 key={c.id}
-                onClick={() => hasStories ? openStory(c) : navigate(`/characters/${c.id}`)}
+                onClick={() => token ? goToChat(c) : navigate(`/characters/${c.id}`)}
                 className="flex flex-col items-center gap-1.5 flex-shrink-0"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                <div className={`w-16 h-16 rounded-full p-[2px] ${
-                  hasStories && !isViewed
-                    ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
-                    : 'bg-gray-600'
-                }`}>
+                <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400">
                   <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
                     {c.thumbUrl ? (
                       <img
@@ -240,23 +266,21 @@ export default function Feed() {
         })}
       </div>
 
-      {feedPosts.length === 0 && (
+      {/* 무한스크롤 센티넬 */}
+      <div ref={sentinelRef} className="h-1" />
+
+      {/* 로딩 */}
+      {loading && (
+        <div className="flex justify-center py-6">
+          <div className="w-6 h-6 border-2 border-gray-600 border-t-white rounded-full animate-spin" />
+        </div>
+      )}
+
+      {initialLoaded && feedPosts.length === 0 && !loading && (
         <div className="text-center text-gray-500 py-20 px-6">
           <p className="text-lg mb-2">{followOnly ? t('feed.emptyFollowed') : t('feed.empty')}</p>
           <p className="text-sm">{t('feed.emptyHint')}</p>
         </div>
-      )}
-
-      {/* 스토리 뷰어 */}
-      {storyModal && (
-        <StoryViewer
-          stories={storyModal.stories}
-          character={storyModal.character}
-          profileUrl={storyModal.profileUrl}
-          currentIndex={storyIndex}
-          onIndexChange={setStoryIndex}
-          onClose={closeStory}
-        />
       )}
 
       {/* 라이트박스 */}
