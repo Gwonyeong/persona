@@ -61,7 +61,8 @@ export default function LoginModal({ onClose }) {
 
   const handleWebViewLogin = () => {
     // 시스템 브라우저에서 OAuth를 열어야 Google이 차단하지 않음
-    const authUrl = `${API_URL}/auth/google/redirect`
+    const guestId = localStorage.getItem('guestId')
+    const authUrl = `${API_URL}/auth/google/redirect${guestId ? `?guestId=${guestId}` : ''}`
     if (window.Android?.openInBrowser) {
       window.Android.openInBrowser(authUrl)
     } else {

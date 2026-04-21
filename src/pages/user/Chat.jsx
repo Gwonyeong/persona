@@ -86,7 +86,7 @@ export default function Chat() {
     if (token) {
       api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
     }
-  }, [id])
+  }, [id, token])
 
   // 채팅 페이지에 있는 동안 주기적으로 읽음 처리 (heartbeat)
   useEffect(() => {
