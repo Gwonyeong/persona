@@ -52,7 +52,10 @@
     "pushTitle": "{{name}}の返信を見逃さないで",
     "pushDesc": "通知をオンにすると新しいメッセージをすぐ確認できます",
     "pushLater": "後で",
-    "pushEnable": "通知をオンにする"
+    "pushEnable": "通知をオンにする",
+    "errorSend": "メッセージの送信に失敗しました",
+    "errorRefunded": "メッセージの送信に失敗したため、マスクが返還されました",
+    "errorImageGen": "画像生成に失敗したため、マスクが返還されました"
   },
   "myPage": {
     "title": "マイページ - Pesona",

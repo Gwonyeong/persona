@@ -52,7 +52,10 @@
     "pushTitle": "Don't miss {{name}}'s replies",
     "pushDesc": "Turn on notifications to see new messages instantly",
     "pushLater": "Later",
-    "pushEnable": "Enable Notifications"
+    "pushEnable": "Enable Notifications",
+    "errorSend": "Failed to send message",
+    "errorRefunded": "Message failed — masks have been refunded",
+    "errorImageGen": "Image generation failed — masks have been refunded"
   },
   "myPage": {
     "title": "My Page - Pesona",

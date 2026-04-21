@@ -46,6 +46,8 @@ export default function Chat() {
   const [backgroundImage, setBackgroundImage] = useState(null)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [showImageGenModal, setShowImageGenModal] = useState(false)
+  const [errorToast, setErrorToast] = useState(null)
+  const errorTimerRef = useRef(null)
   const pushPromptShownRef = useRef(false)
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
@@ -59,6 +61,12 @@ export default function Chat() {
   useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
   useBackHandler(showGallery, () => setShowGallery(false))
   useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
+
+  const showError = (msg) => {
+    setErrorToast(msg)
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    errorTimerRef.current = setTimeout(() => setErrorToast(null), 3000)
+  }
 
   useEffect(() => {
     initialLoadRef.current = true
@@ -204,6 +212,7 @@ export default function Chat() {
             setMessages((prev) => prev.filter((m) => !m.streaming && m.id !== tempUserMsg.id))
             setShowTyping(false)
             setSending(false)
+            showError(data?.refunded ? t('chat.errorRefunded') : t('chat.errorSend'))
             break
         }
       })
@@ -214,6 +223,8 @@ export default function Chat() {
       setSending(false)
       if (error.message?.includes('Insufficient masks')) {
         navigate('/my')
+      } else {
+        showError(t('chat.errorSend'))
       }
     }
   }
@@ -234,6 +245,8 @@ export default function Chat() {
       console.error('Image generation error:', error)
       if (error.message?.includes('Insufficient masks')) {
         navigate('/my')
+      } else {
+        showError(t('chat.errorImageGen'))
       }
     } finally {
       setGeneratingImage(false)
@@ -516,6 +529,17 @@ export default function Chat() {
       {lightboxUrl && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>
           <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
+        </div>
+      )}
+      {errorToast && (
+        <div className="absolute top-16 left-4 right-4 z-50 flex justify-center" style={{ pointerEvents: 'none' }}>
+          <div
+            className="bg-red-600/90 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg backdrop-blur-sm"
+            style={{ pointerEvents: 'auto' }}
+            onClick={() => setErrorToast(null)}
+          >
+            {errorToast}
+          </div>
         </div>
       )}
     </div>
