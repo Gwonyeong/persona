@@ -108,6 +108,7 @@ export default function CharacterDetail() {
   }
 
   const startChat = async () => {
+    if (!token) { setShowLoginModal(true); return }
     setStarting(true)
     try {
       const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id) })
@@ -125,6 +126,7 @@ export default function CharacterDetail() {
   }
 
   const resumeChat = () => {
+    if (!token) { setShowLoginModal(true); return }
     if (existingConv) navigate(`/chats/${existingConv.conversationId}`)
   }
 

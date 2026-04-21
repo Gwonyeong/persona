@@ -133,14 +133,8 @@ export default function Chat() {
     }
   }, [])
 
-  const FREE_CHAT_LIMIT = 3
-
   const send = async () => {
     if (!input.trim() || sending) return
-    if (!token) {
-      const userMsgCount = messages.filter((m) => m.role === 'USER').length
-      if (userMsgCount >= FREE_CHAT_LIMIT) { setShowLoginModal(true); return }
-    }
     const text = input.trim()
     const feedToSend = attachedFeed
     setInput('')
