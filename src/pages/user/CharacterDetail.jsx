@@ -27,6 +27,7 @@ import StoryViewer from '../../components/StoryViewer'
 import GalleryGrid from '../../components/GalleryGrid'
 import GalleryUnlockModal from '../../components/GalleryUnlockModal'
 import ImageSlideViewer from '../../components/ImageSlideViewer'
+import ReportModal from '../../components/ReportModal'
 import useBackHandler from '../../hooks/useBackHandler'
 import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib/review'
 
@@ -53,6 +54,7 @@ export default function CharacterDetail() {
   const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [showReport, setShowReport] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
   const storyTimerRef = useRef(null)
 
@@ -72,6 +74,7 @@ export default function CharacterDetail() {
   useBackHandler(showResetModal, () => setShowResetModal(false))
   useBackHandler(!!gallerySlideViewer, () => setGallerySlideViewer(null))
   useBackHandler(!!unlockTarget, () => setUnlockTarget(null))
+  useBackHandler(showReport, () => setShowReport(false))
 
   useEffect(() => {
     api.get(`/characters/${id}`).then(({ character }) => {
@@ -176,12 +179,23 @@ export default function CharacterDetail() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-1">
           <span className="font-bold text-base">{character.name}</span>
           {onlineStatus === 'free' && (
             <div className="w-2 h-2 rounded-full bg-green-500" />
           )}
         </div>
+        <button
+          onClick={() => setShowReport(true)}
+          className="text-gray-500 hover:text-red-400 transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          title={t('report.title')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        </button>
       </header>
 
       {/* 스크롤 영역 */}
@@ -524,6 +538,14 @@ export default function CharacterDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {showReport && (
+        <ReportModal
+          targetType={existingConv ? 'CONVERSATION' : 'FEED_POST'}
+          targetId={existingConv ? existingConv.conversationId : parseInt(id)}
+          onClose={() => setShowReport(false)}
+        />
       )}
 
       {showLoginModal && <LoginModal onClose={() => { setShowLoginModal(false); pendingActionRef.current = null }} onLoginSuccess={() => {
