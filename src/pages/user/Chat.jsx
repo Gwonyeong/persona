@@ -28,6 +28,22 @@ function getCharacterOnlineStatus(activeHours) {
   return slot?.status || 'free'
 }
 
+function getDefaultStatus(activeHours) {
+  const hour = new Date().getHours()
+  if (!activeHours?.schedule) {
+    return { emoji: '💬', mood: '-', location: '-', activity: '-' }
+  }
+  const slot = activeHours.schedule.find((s) => {
+    if (s.start < s.end) return hour >= s.start && hour < s.end
+    return hour >= s.start || hour < s.end
+  })
+  const status = slot?.status || 'free'
+  const label = slot?.label || null
+  if (status === 'sleep') return { emoji: '😴', mood: '수면 중', location: '-', activity: label || '잠자는 중' }
+  if (status === 'busy') return { emoji: '🔒', mood: '바쁨', location: '-', activity: label || '바쁜 중' }
+  return { emoji: '🟢', mood: '여유', location: '-', activity: label || '자유 시간' }
+}
+
 export default function Chat() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -47,6 +63,9 @@ export default function Chat() {
   const [backgroundImage, setBackgroundImage] = useState(null)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [showImageGenModal, setShowImageGenModal] = useState(false)
+  const [showSelfieModal, setShowSelfieModal] = useState(false)
+  const [characterStatus, setCharacterStatus] = useState(null)
+  const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [errorToast, setErrorToast] = useState(null)
   const errorTimerRef = useRef(null)
@@ -63,6 +82,7 @@ export default function Chat() {
   useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
   useBackHandler(showGallery, () => setShowGallery(false))
   useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
+  useBackHandler(showSelfieModal, () => setShowSelfieModal(false))
   useBackHandler(showReport, () => setShowReport(false))
 
   const showError = (msg) => {
@@ -76,7 +96,8 @@ export default function Chat() {
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
       setBackgroundImage(conv.backgroundImage || null)
-      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE'))
+      if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
+      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
@@ -156,6 +177,15 @@ export default function Chat() {
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
+          case 'narration': {
+            setMessages((prev) => {
+              const withoutTemp = prev.some((m) => m.id === tempUserMsg.id)
+                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
+                : prev
+              return [...withoutTemp, { role: 'NARRATION', content: data.content, streaming: true }]
+            })
+            break
+          }
           case 'message': {
             setShowTyping(false)
             setMessages((prev) => {
@@ -170,10 +200,12 @@ export default function Chat() {
           }
           case 'done': {
             const { responseMessages } = data
-            const charMsgs = responseMessages.filter((m) => m.role === 'CHARACTER')
+            const charMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
             // 호감도가 오른 경우 마지막 캐릭터 메시지에 표시
-            if (data.affinityChange > 0 && charMsgs.length > 0) {
-              charMsgs[charMsgs.length - 1] = { ...charMsgs[charMsgs.length - 1], affinityUp: true }
+            const lastChar = [...charMsgs].reverse().find((m) => m.role === 'CHARACTER')
+            if (data.affinityChange > 0 && lastChar) {
+              const lastIdx = charMsgs.lastIndexOf(lastChar)
+              charMsgs[lastIdx] = { ...charMsgs[lastIdx], affinityUp: true }
             }
             setMessages((prev) => {
               // streaming 버블과 tempUserMsg 제거, confirmedUserMsg는 유지
@@ -203,6 +235,12 @@ export default function Chat() {
             if (data.affinity !== undefined) {
               setConversation((prev) => ({ ...prev, affinity: data.affinity }))
             }
+            if (data.characterStatus) {
+              setCharacterStatus(data.characterStatus)
+            }
+            if (data.wantsPhoto) {
+              setShowSelfieModal(true)
+            }
             break
           }
           case 'error':
@@ -228,12 +266,12 @@ export default function Chat() {
     }
   }
 
-  const handleGenerateImage = async () => {
+  const handleGenerateImage = async ({ selfie } = {}) => {
     if (generatingImage || !token) return
     setShowImageGenModal(false)
     setGeneratingImage(true)
     try {
-      const { generatedImage } = await api.post(`/conversations/${id}/generate-image`)
+      const { generatedImage } = await api.post(`/conversations/${id}/generate-image`, { selfie: !!selfie })
       setMessages((prev) => [...prev, {
         role: 'GENERATED_IMAGE',
         content: generatedImage.filePath,
@@ -298,9 +336,65 @@ export default function Chat() {
         </button>
       </header>
 
-      <div className="flex-1 overflow-auto px-4 py-3 space-y-2 relative" style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+      <div className="relative flex-1 min-h-0">
+        {/* 캐릭터 상태 버튼 */}
+        <button
+          onClick={() => setShowStatusPanel(true)}
+          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 flex items-center justify-center shadow-lg hover:bg-gray-800/90 transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+        </button>
+
+        {/* 캐릭터 상태 시트 */}
+        {showStatusPanel && (
+          <div className="absolute top-0 left-0 right-0 z-20">
+            <div className="bg-gray-900/95 backdrop-blur-md border-b border-gray-700/50 rounded-b-2xl px-4 pt-3 pb-4 shadow-xl animate-slide-down" onClick={(e) => e.stopPropagation()}>
+              {(() => {
+                const status = characterStatus || getDefaultStatus(character.activeHours)
+                return (
+                  <div className="flex items-start gap-3">
+                    <span className="text-3xl leading-none">{status.emoji}</span>
+                    <div className="flex-1 min-w-0 grid grid-cols-3 gap-2">
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusMood')}</p>
+                        <p className="text-xs text-gray-200 truncate">{status.mood}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusLocation')}</p>
+                        <p className="text-xs text-gray-200 truncate">{status.location}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusActivity')}</p>
+                        <p className="text-xs text-gray-200 truncate">{status.activity}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              <div className="flex justify-center mt-2">
+                <button onClick={() => setShowStatusPanel(false)} className="text-gray-600" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      <div className="h-full overflow-auto px-4 py-3 space-y-2" style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
         {/* <div className="py-1"><AdBanner slot="8921302150" /></div> */}
         {messages.map((msg, idx) => {
+          if (msg.role === 'NARRATION') {
+            return (
+              <div key={msg.id || idx} className="flex justify-center my-4">
+                <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
+                  <p className="text-xs text-gray-400 text-center italic leading-relaxed">{msg.content}</p>
+                </div>
+              </div>
+            )
+          }
           if (msg.role === 'GENERATED_IMAGE') {
             return (
               <div key={msg.id || idx} className="flex justify-center mt-3">
@@ -377,6 +471,7 @@ export default function Chat() {
           </div>
         )}
         <div ref={messagesEndRef} />
+      </div>
       </div>
 
       <div className="relative flex-shrink-0">
@@ -486,6 +581,45 @@ export default function Chat() {
               <button
                 onClick={handleGenerateImage}
                 className="flex-1 py-2.5 text-sm text-white bg-purple-600 rounded-xl font-semibold"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('common.generate')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showSelfieModal && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowSelfieModal(false)}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 bg-gray-700 rounded-full" />
+            </div>
+            <div className="flex justify-center mb-3">
+              <div className="w-12 h-12 rounded-full bg-pink-600/20 flex items-center justify-center">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-white font-semibold text-center mb-1">{t('chat.selfieTitle', { name: character.name })}</p>
+            <p className="text-gray-400 text-sm text-center mb-5">
+              {t('chat.selfieDesc')}
+              <br />
+              <span className="text-pink-400 font-medium">{t('chat.imageGenCost', { count: 5 })}</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSelfieModal(false)}
+                className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={() => { setShowSelfieModal(false); handleGenerateImage({ selfie: true }) }}
+                className="flex-1 py-2.5 text-sm text-white bg-pink-600 rounded-xl font-semibold"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
                 {t('common.generate')}

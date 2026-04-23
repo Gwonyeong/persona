@@ -334,7 +334,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                         <button
                           key={post.id}
                           onClick={() => handleBgFeedClick(post)}
-                          className="aspect-square overflow-hidden relative"
+                          className="aspect-[9/16] overflow-hidden relative"
                           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                         >
                           <img
@@ -389,7 +389,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                         <button
                           key={img.id}
                           onClick={() => handleBgGeneratedClick(img)}
-                          className="aspect-square overflow-hidden relative"
+                          className="aspect-[9/16] overflow-hidden relative"
                           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                         >
                           <img
