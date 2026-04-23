@@ -9,6 +9,7 @@ import Lightbox from '../../components/Lightbox'
 import TagFilterBar from '../../components/TagFilterBar'
 import useBackHandler from '../../hooks/useBackHandler'
 import useTagFilter from '../../hooks/useTagFilter'
+import ReportModal from '../../components/ReportModal'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -24,6 +25,7 @@ export default function Feed() {
   const [likeState, setLikeState] = useState({})
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [commentPostId, setCommentPostId] = useState(null)
+  const [reportPostId, setReportPostId] = useState(null)
   const [followOnly, setFollowOnly] = useState(() => {
     try { return JSON.parse(localStorage.getItem('feedFilter_followOnly')) === true }
     catch { return false }
@@ -53,6 +55,7 @@ export default function Feed() {
 
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(!!commentPostId, () => setCommentPostId(null))
+  useBackHandler(!!reportPostId, () => setReportPostId(null))
 
   // 캐릭터 목록 (스토리용)
   useEffect(() => {
@@ -260,6 +263,7 @@ export default function Feed() {
               onLike={() => toggleLike(post.id)}
               onComment={() => setCommentPostId(post.id)}
               onImageClick={(url) => setLightboxUrl(url || post.imageUrl)}
+              onReport={() => setReportPostId(post.id)}
               showChatLink
             />
           )
@@ -293,6 +297,15 @@ export default function Feed() {
           characterName={commentCharacterName}
           characterThumbUrl={commentCharacterThumbUrl}
           onClose={() => setCommentPostId(null)}
+        />
+      )}
+
+      {/* 신고 모달 */}
+      {reportPostId && (
+        <ReportModal
+          targetType="FEED_POST"
+          targetId={reportPostId}
+          onClose={() => setReportPostId(null)}
         />
       )}
 

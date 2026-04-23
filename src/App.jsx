@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
 import useStore from './store/useStore'
 import { api } from './lib/api'
@@ -35,9 +36,15 @@ import MessageNotification from './components/MessageNotification'
 
 function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
+  const { i18n } = useTranslation()
 
   const navigate = useNavigate()
   const location = useLocation()
+
+  // html lang 속성을 i18n 언어와 동기화
+  useEffect(() => {
+    document.documentElement.lang = i18n.language
+  }, [i18n.language])
 
   // GA4 설정: 앱/웹 구분 + 로그인 유저 식별
   useEffect(() => {

@@ -28,7 +28,7 @@ export default function Subscription() {
       id: null,
       tier: 'FREE',
       name: t('subscription.free'),
-      price: '₩0',
+      price: t('pricing.free'),
       features: {
         chat: t('subscription.featureValue.maskCost'),
         dailyMasks: t('subscription.featureValue.none'),
@@ -42,7 +42,7 @@ export default function Subscription() {
       id: 'light_plan',
       tier: 'LIGHT',
       name: t('subscription.light'),
-      price: '₩9,900',
+      price: t('pricing.light'),
       trial: t('subscription.trial'),
       features: {
         chat: t('subscription.featureValue.maskCost'),

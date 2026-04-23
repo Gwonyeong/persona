@@ -46,9 +46,9 @@ export default function MyPage() {
   const navigate = useNavigate()
 
   const PACKAGES = [
-    { amount: 30, price: '₩1,000', originalPrice: '₩2,000', discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
-    { amount: 100, price: '₩3,000', originalPrice: '₩5,000', discount: '40%', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
-    { amount: 300, price: '₩8,000', originalPrice: '₩10,000', discount: '20%', label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
+    { amount: 30, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
+    { amount: 100, price: t('pricing.masks100'), originalPrice: t('pricing.masks100Original'), discount: '40%', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
+    { amount: 300, price: t('pricing.masks300'), originalPrice: t('pricing.masks300Original'), discount: '20%', label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
   ]
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
