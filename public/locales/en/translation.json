@@ -41,8 +41,11 @@
   "chat": {
     "online": "Online",
     "aiGeneratedImage": "AI Generated Image",
-    "affinityUp": "{{name}}'s affinity increased!",
     "generatingImage": "Generating image...",
+    "retryingImage": "Regenerating image...",
+    "galleryTooltip": "Generated images can be found in the gallery!",
+    "affinityUnlocked": "Affinity image unlocked!",
+    "affinityUp": "{{name}}'s affinity increased!",
     "feedAttached": "Feed attached",
     "feedPost": "Feed post",
     "inputPlaceholder": "Type a message...",
@@ -86,8 +89,9 @@
     "earnMasks": "Earn Masks",
     "watchAd": "Watch Ad for Masks",
     "watchAdAvailable": "Watch an ad and get 5 masks",
-    "watchAdClaimed": "Already claimed today",
-    "watchAdLimit": "Once per day",
+    "watchAdRemaining": "{{count}} left today",
+    "watchAdClaimed": "All claimed today",
+    "watchAdLimit": "3 per day",
     "comingSoon": "More ways coming soon",
     "dailyCheckin": "Daily Check-in",
     "dailyCheckinDesc": "Get free masks once a day",
@@ -103,6 +107,7 @@
     "missionClaim": "Claim",
     "missionReview": "Write App Review",
     "missionReviewDesc": "Leave a review on the Play Store",
+    "missionReviewButton": "Write a review & get 10 masks",
     "notifications": "Notifications",
     "testNotification": "Test Notification",
     "testNotificationDesc": "Tap to send a test notification",
@@ -204,7 +209,7 @@
     "tabFeed": "Feed",
     "tabAffinity": "Affinity",
     "tabMission": "Mission",
-    "tabGenerated": "Generated",
+    "tabMemories": "Memories",
     "emptyGenerated": "No generated images.",
     "changeBg": "Change background",
     "resetBg": "Reset",
@@ -223,8 +228,7 @@
     "replyPlaceholder": "Reply to {{name}}...",
     "submit": "Post",
     "affinityUp": "Affinity increased! (+{{change}})",
-    "affinityDown": "Affinity decreased... ({{change}})",
-    "guest": "Guest"
+    "affinityDown": "Affinity decreased... ({{change}})"
   },
   "feedPost": {
     "likes": "{{count}} likes",
@@ -317,7 +321,7 @@
     "s3Items": ["These Terms become effective when posted on the Service or otherwise made available to users.", "The Service may amend these Terms to the extent permitted by applicable law, and will notify users of any changes along with the effective date and reasons."],
     "s4Title": "Article 4 (Provision of Service)",
     "s4Items": ["The Service provides the following features:", "The Service may modify its offerings as necessary for operational or technical reasons."],
-    "s4Features": ["Chat with AI characters", "Character browsing and search", "Mission and reward system", "Guest access (limited)"],
+    "s4Features": ["Chat with AI characters", "Character browsing and search", "Mission and reward system"],
     "s5Title": "Article 5 (Registration and Accounts)",
     "s5Items": ["Registration is completed via Google OAuth 2.0.", "Users must provide accurate information upon registration.", "Users under the age of 14 may not use the Service."],
     "s6Title": "Article 6 (Masks and Virtual Currency)",
@@ -421,5 +425,12 @@
     "comments": "Comments",
     "deleteConfirm": "Are you sure you want to delete?",
     "loginRequired": "Login required"
+  },
+  "maskShop": {
+    "title": "Mask Shop",
+    "heading": "Mask Shop",
+    "tabSubscription": "Subscribe",
+    "tabShop": "Shop",
+    "tabFree": "Free"
   }
 }

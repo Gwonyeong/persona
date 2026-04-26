@@ -5,7 +5,7 @@ import { api } from '../lib/api'
 import GalleryGrid from './GalleryGrid'
 import ImageSlideViewer from './ImageSlideViewer'
 
-export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange }) {
+export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange, affinityBadge, onAffinityBadgeClear }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [contents, setContents] = useState([])
@@ -18,6 +18,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const [selectedFeed, setSelectedFeed] = useState(null)
   const [bgPickMode, setBgPickMode] = useState(false)
   const [bgPickImages, setBgPickImages] = useState(null) // 다중 이미지 선택용 { images: [] }
+  const [showAffinityBadge, setShowAffinityBadge] = useState(!!affinityBadge)
   const [bgSelected, setBgSelected] = useState(null) // 선택된 이미지 URL
   const overlayRef = useRef(null)
 
@@ -64,7 +65,9 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     }).finally(() => setLoading(false))
   }, [characterId, conversationId])
 
-  const filtered = contents.filter((item) => item.unlockType === tab)
+  const filtered = contents
+    .filter((item) => item.unlockType === tab)
+    .sort((a, b) => (b.affinityThreshold ?? 0) - (a.affinityThreshold ?? 0))
 
   const handleContentClick = (content) => {
     if (bgPickMode) {
@@ -167,15 +170,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
       label: t('gallery.tabAffinity'),
     },
     {
-      key: 'MISSION',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      ),
-      label: t('gallery.tabMission'),
-    },
-    {
       key: 'GENERATED',
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -184,7 +178,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           <path d="M3 21l9-9" /><path d="M12.2 6.2L11 5" />
         </svg>
       ),
-      label: t('gallery.tabGenerated'),
+      label: t('gallery.tabMemories'),
     },
   ]
 
@@ -236,8 +230,14 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
               {tabs.map((t) => (
                 <button
                   key={t.key}
-                  onClick={() => { setTab(t.key); setBgPickImages(null); setBgSelected(null) }}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  onClick={() => {
+                    setTab(t.key); setBgPickImages(null); setBgSelected(null)
+                    if (t.key === 'AFFINITY' && showAffinityBadge) {
+                      setShowAffinityBadge(false)
+                      onAffinityBadgeClear?.()
+                    }
+                  }}
+                  className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                     tab === t.key
                       ? 'bg-white/10 text-white'
                       : 'bg-gray-800/50 text-gray-500'
@@ -246,6 +246,9 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 >
                   {t.icon}
                   <span>{t.label}</span>
+                  {t.key === 'AFFINITY' && showAffinityBadge && (
+                    <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
                 </button>
               ))}
             </div>

@@ -62,6 +62,10 @@ export default function Chat() {
   const [attachedFeed, setAttachedFeed] = useState(null)
   const [backgroundImage, setBackgroundImage] = useState(null)
   const [generatingImage, setGeneratingImage] = useState(false)
+  const [showGalleryTooltip, setShowGalleryTooltip] = useState(false)
+  const [galleryTooltipText, setGalleryTooltipText] = useState('')
+  const [showGalleryBadge, setShowGalleryBadge] = useState(false)
+  const affinityThresholdsRef = useRef([])
   const [showImageGenModal, setShowImageGenModal] = useState(false)
   const [showSelfieModal, setShowSelfieModal] = useState(false)
   const [characterStatus, setCharacterStatus] = useState(null)
@@ -101,6 +105,12 @@ export default function Chat() {
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
+      // 호감도 해금 임계치 로드
+      api.get(`/characters/${conv.characterId}/gallery`).then(({ galleryContents }) => {
+        affinityThresholdsRef.current = (galleryContents || [])
+          .filter((c) => c.unlockType === 'AFFINITY')
+          .map((c) => c.affinityThreshold)
+      }).catch(() => {})
       // 초기 로드 시 즉시 맨 아래로
       requestAnimationFrame(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -166,6 +176,7 @@ export default function Chat() {
     setShowSuggestions(false)
     setSuggestedReplies([])
     setAttachedFeed(null)
+    setShowGalleryTooltip(false)
     const feedImage = feedToSend?.images?.[0]?.filePath || null
     const tempUserMsg = { id: Date.now(), role: 'USER', content: text, feedImage }
     setMessages((prev) => [...prev, tempUserMsg])
@@ -233,7 +244,19 @@ export default function Chat() {
               })
             }
             if (data.affinity !== undefined) {
-              setConversation((prev) => ({ ...prev, affinity: data.affinity }))
+              setConversation((prev) => {
+                const oldAffinity = prev.affinity || 0
+                const newAffinity = data.affinity
+                const crossed = affinityThresholdsRef.current.some(
+                  (th) => oldAffinity < th && newAffinity >= th
+                )
+                if (crossed) {
+                  setGalleryTooltipText(t('chat.affinityUnlocked'))
+                  setShowGalleryTooltip(true)
+                  setShowGalleryBadge(true)
+                }
+                return { ...prev, affinity: newAffinity }
+              })
             }
             if (data.characterStatus) {
               setCharacterStatus(data.characterStatus)
@@ -272,12 +295,53 @@ export default function Chat() {
     setGeneratingImage(true)
     try {
       const { generatedImage } = await api.post(`/conversations/${id}/generate-image`, { selfie: !!selfie })
+      const imageId = generatedImage.id
+
+      // PENDING 메시지를 먼저 표시
       setMessages((prev) => [...prev, {
         role: 'GENERATED_IMAGE',
-        content: generatedImage.filePath,
+        content: null,
         createdAt: new Date().toISOString(),
-        generatedImageId: generatedImage.id,
+        generatedImageId: imageId,
+        status: 'PENDING',
       }])
+
+      // 폴링으로 완료 대기
+      const poll = setInterval(async () => {
+        try {
+          const { generatedImage: img } = await api.get(`/conversations/${id}/generated-images/${imageId}/status`)
+          if (img.status === 'COMPLETED') {
+            clearInterval(poll)
+            setMessages((prev) => prev.map((m) =>
+              m.generatedImageId === imageId
+                ? { ...m, content: img.filePath, status: 'COMPLETED' }
+                : m
+            ))
+            setGeneratingImage(false)
+            setGalleryTooltipText(t('chat.galleryTooltip'))
+            setShowGalleryTooltip(true)
+          } else if (img.status === 'RETRYING') {
+            setMessages((prev) => prev.map((m) =>
+              m.generatedImageId === imageId
+                ? { ...m, status: 'RETRYING' }
+                : m
+            ))
+          } else if (img.status === 'FAILED') {
+            clearInterval(poll)
+            setMessages((prev) => prev.filter((m) => m.generatedImageId !== imageId))
+            showError(t('chat.errorImageGen'))
+            setGeneratingImage(false)
+          }
+        } catch {
+          // 폴링 실패는 무시하고 재시도
+        }
+      }, 3000)
+
+      // 2분 타임아웃
+      setTimeout(() => {
+        clearInterval(poll)
+        setGeneratingImage(false)
+      }, 120000)
     } catch (error) {
       console.error('Image generation error:', error)
       if (error.message?.includes('Insufficient masks')) {
@@ -285,7 +349,6 @@ export default function Chat() {
       } else {
         showError(t('chat.errorImageGen'))
       }
-    } finally {
       setGeneratingImage(false)
     }
   }
@@ -396,22 +459,39 @@ export default function Chat() {
             )
           }
           if (msg.role === 'GENERATED_IMAGE') {
+            if (msg.status === 'PENDING' || msg.status === 'RETRYING' || !msg.content) {
+              return (
+                <div key={msg.id || idx} className="flex justify-center mt-3">
+                  <div className="max-w-[75%] rounded-2xl overflow-hidden bg-gray-800/60 flex flex-col items-center justify-center py-10 px-6">
+                    <div className="animate-spin w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full mb-3" />
+                    <span className="text-[13px] text-gray-400">{msg.status === 'RETRYING' ? t('chat.retryingImage') : t('chat.generatingImage')}</span>
+                  </div>
+                </div>
+              )
+            }
             return (
               <div key={msg.id || idx} className="flex justify-center mt-3">
-                <div className="max-w-[75%] rounded-2xl overflow-hidden" onClick={() => setLightboxUrl(msg.content)}>
+                <div className="max-w-[75%] rounded-2xl overflow-hidden relative" onClick={() => setLightboxUrl(msg.content)}>
                   <img src={msg.content} alt="" className="w-full object-cover cursor-pointer" loading="lazy" />
-                  <div className="bg-gray-800/80 px-3 py-1.5 flex items-center justify-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      <line x1="11" y1="8" x2="11" y2="14" />
+                      <line x1="8" y1="11" x2="14" y2="11" />
                     </svg>
-                    <span className="text-[11px] text-purple-400">{t('chat.aiGeneratedImage')}</span>
                   </div>
                 </div>
               </div>
             )
           }
           const prevMsg = messages[idx - 1]
+          const nextMsg = messages[idx + 1]
           const isConsecutive = prevMsg?.role === msg.role
+          const showTime = msg.createdAt && (
+            !nextMsg || nextMsg.role !== msg.role || nextMsg.role === 'NARRATION' || nextMsg.role === 'GENERATED_IMAGE' ||
+            formatChatTime(msg.createdAt) !== formatChatTime(nextMsg.createdAt)
+          )
           return (
             <div key={msg.id || idx} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'} ${isConsecutive ? '' : 'mt-3'}`}>
               {msg.role === 'CHARACTER' && (
@@ -438,7 +518,7 @@ export default function Chat() {
                 <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
                   {msg.content}
                 </div>
-                {msg.createdAt && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatChatTime(msg.createdAt)}</p>}
+                {showTime && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatChatTime(msg.createdAt)}</p>}
                 {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{t('chat.affinityUp', { name: character.name })}</p>}
               </div>
             </div>
@@ -493,17 +573,28 @@ export default function Chat() {
               </svg>
             )}
           </button>
-          <button
-            onClick={() => setShowGallery(true)}
-            className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-          </button>
+          <div className="relative">
+            {showGalleryTooltip && (
+              <div className="absolute bottom-full right-0 mb-2 whitespace-nowrap pointer-events-none animate-fade-in">
+                <div className="relative bg-white text-gray-900 text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg">
+                  {galleryTooltipText}
+                  <div className="absolute top-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white" />
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => { setShowGallery(true); setShowGalleryTooltip(false); setShowGalleryBadge(false) }}
+              className="relative w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              {showGalleryBadge && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full" />}
+            </button>
+          </div>
         </div>
 
       <div className="p-3 border-t border-gray-800 bg-gray-900/95" style={{ paddingBottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 8px)' }}>
@@ -675,6 +766,8 @@ export default function Chat() {
           onClose={() => setShowGallery(false)}
           onAttachFeed={(feed) => setAttachedFeed(feed)}
           onBackgroundChange={(url) => setBackgroundImage(url)}
+          affinityBadge={showGalleryBadge}
+          onAffinityBadgeClear={() => setShowGalleryBadge(false)}
         />
       )}
       {lightboxUrl && (

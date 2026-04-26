@@ -41,8 +41,11 @@
   "chat": {
     "online": "オンライン",
     "aiGeneratedImage": "AI生成画像",
+    "generatingImage": "画像生成中...",
+    "retryingImage": "画像を再生成しています...",
+    "galleryTooltip": "生成された画像はギャラリーで確認できます！",
+    "affinityUnlocked": "好感度画像が解放されました！",
     "affinityUp": "{{name}}の好感度が上がりました！",
-    "generatingImage": "画像を生成中...",
     "feedAttached": "フィード添付済み",
     "feedPost": "フィード投稿",
     "inputPlaceholder": "メッセージを入力...",
@@ -86,8 +89,9 @@
     "earnMasks": "マスクを獲得",
     "watchAd": "広告を見てマスクをゲット",
     "watchAdAvailable": "広告を視聴してマスク5個をもらえます",
-    "watchAdClaimed": "本日受け取り済み",
-    "watchAdLimit": "1日1回",
+    "watchAdRemaining": "本日あと{{count}}回",
+    "watchAdClaimed": "本日すべて受け取り済み",
+    "watchAdLimit": "1日3回",
     "comingSoon": "他の方法も近日追加予定",
     "dailyCheckin": "出席チェック",
     "dailyCheckinDesc": "1日1回無料マスクをもらえます",
@@ -103,6 +107,7 @@
     "missionClaim": "報酬を受け取る",
     "missionReview": "アプリレビュー作成",
     "missionReviewDesc": "Play Storeでレビューを書いてください",
+    "missionReviewButton": "レビューを書いてマスク10個ゲット",
     "notifications": "通知",
     "testNotification": "通知テスト",
     "testNotificationDesc": "タップしてテスト通知を送信",
@@ -204,7 +209,7 @@
     "tabFeed": "フィード",
     "tabAffinity": "好感度",
     "tabMission": "ミッション",
-    "tabGenerated": "生成画像",
+    "tabMemories": "思い出",
     "emptyGenerated": "生成された画像がありません。",
     "changeBg": "背景画像を変更",
     "resetBg": "リセット",
@@ -223,8 +228,7 @@
     "replyPlaceholder": "{{name}}に返信...",
     "submit": "投稿",
     "affinityUp": "好感度が上がりました！(+{{change}})",
-    "affinityDown": "好感度が下がりました... ({{change}})",
-    "guest": "ゲスト"
+    "affinityDown": "好感度が下がりました... ({{change}})"
   },
   "feedPost": {
     "likes": "いいね{{count}}件",
@@ -317,7 +321,7 @@
     "s3Items": ["本規約は、サービス画面への掲示またはその他の方法でユーザーに通知することにより効力が発生します。", "サービスは、関連法令に違反しない範囲で本規約を変更することができ、変更時は適用日と変更理由を明示して通知します。"],
     "s4Title": "第4条（サービスの提供）",
     "s4Items": ["サービスは以下の機能を提供します。", "サービスは運営上・技術上の必要に応じて提供するサービスを変更することがあります。"],
-    "s4Features": ["AIキャラクターとのチャットサービス", "キャラクター閲覧・検索機能", "ミッション遂行および報酬システム", "ゲスト利用（制限付き）"],
+    "s4Features": ["AIキャラクターとのチャットサービス", "キャラクター閲覧・検索機能", "ミッション遂行および報酬システム"],
     "s5Title": "第5条（会員登録およびアカウント）",
     "s5Items": ["会員登録はGoogle OAuth 2.0を通じて行われます。", "ユーザーは登録時に正確な情報を提供する必要があります。", "14歳未満の方はサービスを利用できません。"],
     "s6Title": "第6条（マスクおよび仮想通貨）",
@@ -421,5 +425,12 @@
     "comments": "コメント",
     "deleteConfirm": "本当に削除しますか？",
     "loginRequired": "ログインが必要です"
+  },
+  "maskShop": {
+    "title": "マスクショップ",
+    "heading": "マスクショップ",
+    "tabSubscription": "購読",
+    "tabShop": "ショップ",
+    "tabFree": "無料"
   }
 }
