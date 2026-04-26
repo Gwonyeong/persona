@@ -22,7 +22,12 @@
     "ogTitle": "Pesona - AI 캐릭터 채팅 플랫폼",
     "ogDescription": "감정 표현이 가능한 AI 캐릭터와 실시간으로 대화하세요.",
     "searchPlaceholder": "캐릭터 검색...",
-    "emptyCharacters": "등록된 캐릭터가 없습니다."
+    "emptyCharacters": "등록된 캐릭터가 없습니다.",
+    "sort": {
+      "default": "기본",
+      "popular": "인기",
+      "follow": "팔로우"
+    }
   },
   "chatList": {
     "title": "메시지 - Pesona",

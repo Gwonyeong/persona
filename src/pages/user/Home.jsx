@@ -28,6 +28,7 @@ export default function Home() {
   const { token, masks, setMasks } = useStore()
   const [characters, setCharacters] = useState([])
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('default')
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
@@ -62,8 +63,9 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
+    if (sort !== 'default') params.set('sort', sort)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
-  }, [search, i18nInstance.language])
+  }, [search, sort, i18nInstance.language])
 
   return (
     <div className="px-4 pt-4 pb-2">
@@ -134,6 +136,24 @@ export default function Home() {
               onApply={applyTags}
             />
           </div>
+        </div>
+
+        {/* 정렬 탭 */}
+        <div className="flex gap-1.5 pb-2">
+          {['default', 'popular', 'follow'].map((key) => (
+            <button
+              key={key}
+              onClick={() => setSort(key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                sort === key
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+              }`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {t(`home.sort.${key}`)}
+            </button>
+          ))}
         </div>
 
         {/* 광고 */}

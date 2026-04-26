@@ -22,7 +22,12 @@
     "ogTitle": "Pesona - AI Character Chat",
     "ogDescription": "Chat with expressive AI characters in real-time.",
     "searchPlaceholder": "Search characters...",
-    "emptyCharacters": "No characters available."
+    "emptyCharacters": "No characters available.",
+    "sort": {
+      "default": "Default",
+      "popular": "Popular",
+      "follow": "Following"
+    }
   },
   "chatList": {
     "title": "Messages - Pesona",

@@ -22,7 +22,12 @@
     "ogTitle": "Pesona - AIキャラクターチャット",
     "ogDescription": "感情表現豊かなAIキャラクターとリアルタイムで会話しましょう。",
     "searchPlaceholder": "キャラクターを検索...",
-    "emptyCharacters": "キャラクターがありません。"
+    "emptyCharacters": "キャラクターがありません。",
+    "sort": {
+      "default": "おすすめ",
+      "popular": "人気",
+      "follow": "フォロー中"
+    }
   },
   "chatList": {
     "title": "メッセージ - Pesona",
