@@ -2,14 +2,10 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
-import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
-import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../../lib/billing'
-import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
-import { requestInAppReview } from '../../lib/review'
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -34,22 +30,11 @@ function resizeImage(file, maxSize = 512) {
   })
 }
 
-async function verifyOnServer(productId, purchaseToken) {
-  const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
-  useStore.getState().setMasks(result.masks)
-  return result
-}
-
 export default function MyPage() {
   const { t } = useTranslation()
-  const { token, masks, setMasks, clearAuth, subscription } = useStore()
+  const { token, masks, setMasks, clearAuth } = useStore()
   const navigate = useNavigate()
 
-  const PACKAGES = [
-    { amount: 30, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
-    { amount: 100, price: t('pricing.masks100'), originalPrice: t('pricing.masks100Original'), discount: '40%', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
-    { amount: 300, price: t('pricing.masks300'), originalPrice: t('pricing.masks300Original'), discount: '20%', label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
-  ]
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
   const [editing, setEditing] = useState(false)
@@ -60,59 +45,14 @@ export default function MyPage() {
   const [pushStatus, setPushStatus] = useState('default')
   const fileInputRef = useRef(null)
 
-  // 마스크 충전
-  const [selectedPkg, setSelectedPkg] = useState(1)
-  const [purchasing, setPurchasing] = useState(false)
-  const [purchaseError, setPurchaseError] = useState('')
-  const [billingReady, setBillingReady] = useState(false)
-  const [isNative, setIsNative] = useState(false)
-
-  // 리워드 광고
-  const [adRewardAvailable, setAdRewardAvailable] = useState(false)
-  const [adLoading, setAdLoading] = useState(false)
-  const [adMobReady, setAdMobReady] = useState(false)
-  const [showMaskModal, setShowMaskModal] = useState(false)
-  const [maskModalTab, setMaskModalTab] = useState('daily')
-  const [missions, setMissions] = useState(null)
-  const [claimingMission, setClaimingMission] = useState(null)
-  const [feedLikeReward, setFeedLikeReward] = useState(null)
-  const [checkinClaimed, setCheckinClaimed] = useState(null)
-  const [claimingCheckin, setClaimingCheckin] = useState(false)
-
   useEffect(() => {
     getPushPermissionStatus().then(setPushStatus)
-    const native = isNativeBillingAvailable()
-    setIsNative(native)
-    if (native) {
-      initBilling().then(async (ready) => {
-        setBillingReady(ready)
-        if (ready) {
-          await getProducts()
-          const pending = await getPendingPurchases()
-          for (const purchase of pending) {
-            const pid = purchase.productIdentifier || purchase.productId
-            const pt = purchase.purchaseToken
-            try { await verifyOnServer(pid, pt) } catch {
-              try { await api.post('/masks/consume-purchase', { productId: pid, purchaseToken: pt }) } catch {}
-            }
-            await consumePurchase(pt)
-          }
-        }
-      })
-    }
-    if (isAdMobAvailable()) {
-      initAdMob().then(setAdMobReady)
-    }
   }, [])
 
   useEffect(() => {
     if (!token) return
     api.get('/auth/me').then(({ user }) => setDbUser(user))
     api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
-    api.get('/masks/ad-reward/available').then(({ available }) => setAdRewardAvailable(available)).catch(() => {})
-    api.get('/masks/missions').then(({ missions }) => setMissions(missions)).catch(() => {})
-    api.get('/masks/feed-like-reward/available').then((data) => setFeedLikeReward(data)).catch(() => {})
-    api.get('/masks/checkin/available').then(({ claimed }) => setCheckinClaimed(claimed)).catch(() => {})
   }, [token])
 
   const startEdit = () => {
@@ -163,45 +103,6 @@ export default function MyPage() {
   const handleLogout = () => {
     clearAuth()
     navigate('/')
-  }
-
-  const handlePurchase = async () => {
-    setPurchasing(true)
-    setPurchaseError('')
-    try {
-      const pkg = PACKAGES[selectedPkg]
-      api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
-
-      if (!isNative || !billingReady) {
-        setPurchaseError(t('myPage.purchaseEnvError'))
-        setPurchasing(false)
-        return
-      }
-
-      const result = await purchaseProduct(pkg.productId)
-      const purchaseToken = result?.purchaseToken || result?.transactionReceipt?.purchaseToken || result?.receipt
-      if (!purchaseToken) {
-        setPurchaseError(t('myPage.purchaseInfoError'))
-        setPurchasing(false)
-        return
-      }
-
-      const serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken })
-      if (serverRes.error) {
-        setPurchaseError(serverRes.error)
-        setPurchasing(false)
-        return
-      }
-
-      await consumePurchase(purchaseToken)
-      setMasks(serverRes.masks)
-    } catch (err) {
-      const msg = err?.message || ''
-      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
-        setPurchaseError(msg || t('myPage.purchaseFailed'))
-      }
-    }
-    setPurchasing(false)
   }
 
   const avatarDisplay = previewUrl || dbUser?.avatarUrl
@@ -313,394 +214,23 @@ export default function MyPage() {
         )}
       </div>
 
-      {/* 구독 플랜 */}
-      <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-gray-100">{t('myPage.subscriptionPlan')}</p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {subscription?.tier === 'LIGHT' ? t('myPage.light') : t('myPage.free')}
-              {subscription?.tier === 'LIGHT' && subscription?.expiresAt && (
-                <span className="text-gray-500"> · {t('myPage.until', { date: new Date(subscription.expiresAt).toLocaleDateString(i18n.language) })}</span>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/subscription')}
-            className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
-              subscription?.tier === 'LIGHT'
-                ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
-                : 'bg-indigo-600 text-white hover:bg-indigo-500'
-            }`}
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            {subscription?.tier === 'LIGHT' ? t('myPage.manage') : t('myPage.subscribe')}
-          </button>
-        </div>
-      </div>
-
-      {/* 마스크 충전 */}
-      <div className="mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🎭</span>
-            <div>
-              <p className="text-sm font-bold text-gray-100">{t('myPage.masks')}</p>
-              <p className="text-xs text-gray-400">{t('myPage.masksDesc')}</p>
-            </div>
-          </div>
-          <span className="text-lg font-bold text-indigo-400">{t('myPage.masksCount', { count: masks })}</span>
-        </div>
-
-        <div className="flex flex-col gap-2 mb-3">
-          {PACKAGES.map((pkg, i) => (
-            <button
-              key={pkg.amount}
-              onClick={() => setSelectedPkg(i)}
-              className={`relative flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
-                selectedPkg === i
-                  ? 'border-indigo-500 bg-indigo-500/10'
-                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-              }`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-base">🎭</span>
-                <span className="font-semibold text-sm text-gray-100">{pkg.label}</span>
-                {pkg.discount && (
-                  <span className="px-1.5 py-0.5 bg-red-500 rounded text-[10px] font-bold text-white">
-                    {pkg.discount}
-                  </span>
-                )}
-                {pkg.badge && (
-                  <span className="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold text-white">
-                    {pkg.badge}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5">
-                {pkg.originalPrice && (
-                  <span className="text-xs text-gray-500 line-through">{pkg.originalPrice}</span>
-                )}
-                <span className="text-sm font-medium text-gray-300">{pkg.price}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <p className="text-xs text-gray-500 text-center mb-3">
-          {t('myPage.masksHint')}
-        </p>
-
-        {purchaseError && (
-          <p className="text-sm text-red-400 text-center mb-3">{purchaseError}</p>
-        )}
-
-        <button
-          onClick={handlePurchase}
-          disabled={purchasing}
-          className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors disabled:opacity-50"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          {purchasing ? t('common.processing') : t('myPage.purchase', { price: PACKAGES[selectedPkg].price })}
-        </button>
-      </div>
-
-      {/* 마스크 얻기 버튼 */}
+      {/* 마스크 상점 */}
       <button
-        onClick={() => setShowMaskModal(true)}
-        className="w-full mt-4 py-3 bg-amber-500 text-white font-semibold rounded-xl hover:bg-amber-400 transition-colors"
+        onClick={() => navigate('/mask-shop')}
+        className="w-full mt-4 p-4 bg-gray-900 rounded-xl border border-gray-800 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
       >
-        {t('myPage.earnMasks')}
-      </button>
-
-      {/* 마스크 얻기 모달 */}
-      {showMaskModal && (
-        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowMaskModal(false)}>
-          <div
-            className="w-full max-w-[480px] bg-gray-900 rounded-t-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">{t('myPage.earnMasks')}</h2>
-              <button
-                onClick={() => setShowMaskModal(false)}
-                className="w-8 h-8 flex items-center justify-center text-gray-400"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            {/* 탭 */}
-            <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1">
-              {['daily', 'mission'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setMaskModalTab(tab)}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                    maskModalTab === tab
-                      ? 'bg-gray-700 text-white'
-                      : 'text-gray-400'
-                  }`}
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {t(`myPage.tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`)}
-                </button>
-              ))}
-            </div>
-
-            {/* 데일리 탭 */}
-            {maskModalTab === 'daily' && (
-              <>
-                {/* 출석체크 */}
-                <button
-                  onClick={async () => {
-                    if (checkinClaimed || claimingCheckin) return
-                    setClaimingCheckin(true)
-                    try {
-                      const result = await api.post('/masks/checkin')
-                      if (!result.alreadyClaimed) setMasks(result.masks)
-                      setCheckinClaimed(true)
-                    } catch (e) {
-                      console.error('Checkin error:', e)
-                    }
-                    setClaimingCheckin(false)
-                  }}
-                  disabled={checkinClaimed}
-                  className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
-                    checkinClaimed
-                      ? 'border-gray-700 bg-gray-800/50'
-                      : 'border-amber-500/50 bg-amber-500/10'
-                  }`}
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">📅</span>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-gray-100">{t('myPage.dailyCheckin')}</p>
-                      <p className="text-xs text-gray-400">{t('myPage.dailyCheckinDesc')}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {checkinClaimed ? (
-                      <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
-                    ) : (
-                      <>
-                        <span className="text-sm">🎭</span>
-                        <span className="text-sm font-bold text-amber-400">+3</span>
-                      </>
-                    )}
-                  </div>
-                </button>
-
-                {adMobReady && (
-                  <button
-                    onClick={async () => {
-                      if (!adRewardAvailable || adLoading) return
-                      setAdLoading(true)
-                      try {
-                        await showRewardedAd()
-                        const result = await api.post('/masks/ad-reward')
-                        setMasks(result.masks)
-                        setAdRewardAvailable(false)
-                      } catch (e) {
-                        if (e.message === 'AD_DISMISSED') {
-                          // 광고를 끝까지 시청하지 않음
-                        } else if (e.message !== 'AD_FAILED') {
-                          console.error('Ad reward error:', e)
-                        }
-                      }
-                      setAdLoading(false)
-                    }}
-                    disabled={!adRewardAvailable || adLoading}
-                    className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
-                      adRewardAvailable
-                        ? 'border-amber-500/50 bg-amber-500/10'
-                        : 'border-gray-700 bg-gray-800/50'
-                    }`}
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">🎬</span>
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-gray-100">{t('myPage.watchAd')}</p>
-                        <p className="text-xs text-gray-400">
-                          {adRewardAvailable ? t('myPage.watchAdAvailable') : t('myPage.watchAdClaimed')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {adRewardAvailable && (
-                        <>
-                          <span className="text-sm">🎭</span>
-                          <span className="text-sm font-bold text-amber-400">+5</span>
-                        </>
-                      )}
-                      {!adRewardAvailable && <span className="text-xs text-gray-500">{t('myPage.watchAdLimit')}</span>}
-                    </div>
-                  </button>
-                )}
-                {/* 피드 좋아요 3개 데일리 */}
-                <button
-                  onClick={async () => {
-                    if (!feedLikeReward || feedLikeReward.claimed || feedLikeReward.likeCount < 3) {
-                      if (!feedLikeReward?.claimed && (!feedLikeReward || feedLikeReward.likeCount < 3)) {
-                        setShowMaskModal(false)
-                        navigate('/feed')
-                      }
-                      return
-                    }
-                    try {
-                      const result = await api.post('/masks/feed-like-reward')
-                      if (!result.alreadyClaimed) setMasks(result.masks)
-                      setFeedLikeReward((prev) => ({ ...prev, claimed: true }))
-                    } catch (e) {
-                      console.error('Feed like reward error:', e)
-                    }
-                  }}
-                  disabled={feedLikeReward?.claimed}
-                  className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
-                    feedLikeReward?.claimed
-                      ? 'border-gray-700 bg-gray-800/50'
-                      : feedLikeReward?.likeCount >= 3
-                        ? 'border-amber-500/50 bg-amber-500/10'
-                        : 'border-gray-700 bg-gray-800/50'
-                  }`}
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">❤️</span>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-gray-100">{t('myPage.dailyFeedLike')}</p>
-                      <p className="text-xs text-gray-400">{t('myPage.dailyFeedLikeDesc')}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {feedLikeReward?.claimed ? (
-                      <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
-                    ) : feedLikeReward?.likeCount >= 3 ? (
-                      <>
-                        <span className="text-sm">🎭</span>
-                        <span className="text-sm font-bold text-amber-400">+3</span>
-                      </>
-                    ) : (
-                      <span className="text-xs text-gray-400">{t('myPage.dailyFeedLikeProgress', { count: feedLikeReward?.likeCount ?? 0 })}</span>
-                    )}
-                  </div>
-                </button>
-
-                <p className="text-xs text-gray-600 text-center mt-2">{t('myPage.comingSoon')}</p>
-              </>
-            )}
-
-            {/* 미션 탭 */}
-            {maskModalTab === 'mission' && (
-              <div className="flex flex-col gap-2">
-                {/* 첫 피드백 작성 미션 */}
-                <div className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border transition-all ${
-                  missions?.feedback?.claimed
-                    ? 'border-gray-700 bg-gray-800/50'
-                    : missions?.feedback?.completed
-                      ? 'border-amber-500/50 bg-amber-500/10'
-                      : 'border-gray-700 bg-gray-800/50'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">📝</span>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-gray-100">{t('myPage.missionFeedback')}</p>
-                      <p className="text-xs text-gray-400">{t('myPage.missionFeedbackDesc')}</p>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0 ml-2">
-                    {missions?.feedback?.claimed ? (
-                      <span className="text-xs text-gray-500">{t('myPage.missionClaimed')}</span>
-                    ) : missions?.feedback?.completed ? (
-                      <button
-                        onClick={async () => {
-                          if (claimingMission) return
-                          setClaimingMission('feedback')
-                          try {
-                            const result = await api.post('/masks/feedback-reward')
-                            if (!result.alreadyClaimed) {
-                              setMasks(result.masks)
-                            }
-                            setMissions((prev) => ({ ...prev, feedback: { ...prev.feedback, claimed: true } }))
-                          } catch (e) {
-                            console.error('Feedback reward error:', e)
-                          }
-                          setClaimingMission(null)
-                        }}
-                        disabled={claimingMission === 'feedback'}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-400 transition-colors"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        <span>🎭</span>
-                        <span>+{missions.feedback.reward}</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => { setShowMaskModal(false); navigate('/feedback') }}
-                        className="px-3 py-1.5 bg-gray-700 text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-600 transition-colors"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        {t('myPage.missionFeedbackNotYet')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 앱 후기 작성 미션 */}
-                <div className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border transition-all ${
-                  missions?.review?.claimed
-                    ? 'border-gray-700 bg-gray-800/50'
-                    : 'border-gray-700 bg-gray-800/50'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">⭐</span>
-                    <div className="text-left">
-                      <p className="text-sm font-bold text-gray-100">{t('myPage.missionReview')}</p>
-                      <p className="text-xs text-gray-400">{t('myPage.missionReviewDesc')}</p>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0 ml-2">
-                    {missions?.review?.claimed ? (
-                      <span className="text-xs text-gray-500">{t('myPage.missionClaimed')}</span>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          if (claimingMission) return
-                          setClaimingMission('review')
-                          try {
-                            await requestInAppReview()
-                            const result = await api.post('/masks/review-reward')
-                            if (!result.alreadyClaimed) {
-                              setMasks(result.masks)
-                            }
-                            setMissions((prev) => ({ ...prev, review: { ...prev.review, claimed: true } }))
-                          } catch (e) {
-                            console.error('Review reward error:', e)
-                          }
-                          setClaimingMission(null)
-                        }}
-                        disabled={claimingMission === 'review'}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-400 transition-colors"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        <span>🎭</span>
-                        <span>+{missions?.review?.reward}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🎭</span>
+          <div className="text-left">
+            <p className="text-sm font-bold text-gray-100">{t('maskShop.heading')}</p>
+            <p className="text-xs text-gray-400">{t('myPage.masksCount', { count: masks })}</p>
           </div>
         </div>
-      )}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
 
       {/* 메뉴 */}
       <div className="mt-4 bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">

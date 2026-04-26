@@ -3,15 +3,6 @@ import i18n from '../i18n'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
-function getGuestId() {
-  let id = localStorage.getItem('guestId')
-  if (!id) {
-    id = crypto.randomUUID()
-    localStorage.setItem('guestId', id)
-  }
-  return id
-}
-
 async function request(path, options = {}) {
   const token = useStore.getState().token
   const headers = { ...options.headers }
@@ -20,8 +11,6 @@ async function request(path, options = {}) {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
-  } else {
-    headers['X-Guest-Id'] = getGuestId()
   }
 
   if (!(options.body instanceof FormData)) {
@@ -54,8 +43,6 @@ async function streamRequest(path, body, onEvent) {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
-  } else {
-    headers['X-Guest-Id'] = getGuestId()
   }
 
   const res = await fetch(`${API_URL}${path}`, {

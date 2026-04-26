@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
@@ -54,7 +54,7 @@ const TABS = [
 
 export default function UserLayout() {
   const { t } = useTranslation()
-  const { token } = useStore()
+  const { token, subscription } = useStore()
   const location = useLocation()
   const navigate = useNavigate()
   const [showLoginModal, setShowLoginModal] = useState(false)
@@ -93,41 +93,57 @@ export default function UserLayout() {
       {showFeedback && <FeedbackButton />}
 
       {/* 하단 탭바 */}
-      <nav className="flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {TABS.map((tab) =>
-          tab.requireAuth && !token ? (
-            <button
-              key={tab.to}
-              onClick={() => setShowLoginModal(true)}
-              className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs text-gray-500 transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              {tab.icon}
-              <span>{t(tab.labelKey)}</span>
-            </button>
-          ) : (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              replace
-              end={tab.to === '/'}
-              className={({ isActive }) =>
-                `flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs transition-colors ${
-                  isActive ? 'text-indigo-400' : 'text-gray-500'
-                }`
-              }
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <div className="relative">
-                {tab.icon}
-                {tab.to === '/chats' && hasUnread && (
-                  <div className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500" />
-                )}
+      <nav className="relative flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {TABS.map((tab, i) => (
+          <React.Fragment key={tab.to}>
+            {i === 2 && (
+              <div className="flex-1 flex items-center justify-center">
+                <button
+                  onClick={() => navigate('/mask-shop')}
+                  className="absolute -top-5 w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 32 20" fill="white" fillRule="evenodd" style={{ transform: 'scaleY(-1)' }}>
+                    <path d="M0 10C0 5 3.5 0 8.5 0c2.5 0 4.5 1.2 7.5 4 3-2.8 5-4 7.5-4C28.5 0 32 5 32 10c0 2.5-1 4.5-2.8 6-1.2 1-2.8 1.8-4.2 2.2-1.5.4-2.8.3-3.8-.2-1.2-.6-2.2-1.8-3.5-3.8L16 11l-1.7 3.2c-1.3 2-2.3 3.2-3.5 3.8-1 .5-2.3.6-3.8.2C5.6 17.8 4 17 2.8 16 1 14.5 0 12.5 0 10zM7 7.5C5.5 7.5 4.2 8.5 3.8 10c-.3 1 .2 1.8 1 2.2 1 .5 2.3.3 3.4-.3 1.2-.7 2-1.7 2.3-2.8.3-1-.1-1.8-1-2.2-.5-.2-1.2-.2-1.8-.1l-.7.2zM25 7.5l-.7-.2c-.6-.1-1.3-.1-1.8.1-.9.4-1.3 1.2-1 2.2.3 1.1 1.1 2.1 2.3 2.8 1.1.6 2.4.8 3.4.3.8-.4 1.3-1.2 1-2.2-.4-1.5-1.7-2.5-3.2-2.5z" />
+                  </svg>
+                  {subscription?.tier !== 'LIGHT' && (
+                    <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900" />
+                  )}
+                </button>
               </div>
-              <span>{t(tab.labelKey)}</span>
-            </NavLink>
-          )
-        )}
+            )}
+            {tab.requireAuth && !token ? (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs text-gray-500 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {tab.icon}
+                <span>{t(tab.labelKey)}</span>
+              </button>
+            ) : (
+              <NavLink
+                to={tab.to}
+                replace
+                end={tab.to === '/'}
+                className={({ isActive }) =>
+                  `flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs transition-colors ${
+                    isActive ? 'text-indigo-400' : 'text-gray-500'
+                  }`
+                }
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="relative">
+                  {tab.icon}
+                  {tab.to === '/chats' && hasUnread && (
+                    <div className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-red-500" />
+                  )}
+                </div>
+                <span>{t(tab.labelKey)}</span>
+              </NavLink>
+            )}
+          </React.Fragment>
+        ))}
       </nav>
 
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}

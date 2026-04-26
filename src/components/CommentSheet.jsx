@@ -67,7 +67,7 @@ function CommentItem({ item, isReply, t }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-1.5">
           <span className={`text-[13px] font-semibold ${isCharacter ? 'text-indigo-400' : ''}`}>
-            {isCharacter ? item.character?.name : (item.user?.name || t('comment.guest'))}
+            {isCharacter ? item.character?.name : item.user?.name}
           </span>
           <span className="text-[11px] text-gray-500">{timeAgo(item.createdAt)}</span>
         </div>

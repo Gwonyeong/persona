@@ -12,8 +12,12 @@ export function shouldShowReview(conversationCount) {
 
 export async function requestInAppReview() {
   try {
-    const { InAppReview } = await import('@capgo/capacitor-in-app-review')
-    await InAppReview.requestReview()
+    const url = 'https://play.google.com/store/apps/details?id=com.pesona.app'
+    if (window.Android?.openInBrowser) {
+      window.Android.openInBrowser(url)
+    } else {
+      window.open(url, '_system')
+    }
     localStorage.setItem(REVIEW_SHOWN_KEY, Date.now().toString())
   } catch (e) {
     console.error('In-app review error:', e)
