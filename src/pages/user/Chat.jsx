@@ -282,7 +282,7 @@ export default function Chat() {
       setSending(false)
       if (error.message?.includes('Insufficient masks')) {
         window.gtag?.('event', 'mask_depleted', { conversation_id: id })
-        navigate('/my')
+        navigate('/mask-shop')
       } else {
         showError(t('chat.errorSend'))
       }
@@ -345,7 +345,7 @@ export default function Chat() {
     } catch (error) {
       console.error('Image generation error:', error)
       if (error.message?.includes('Insufficient masks')) {
-        navigate('/my')
+        navigate('/mask-shop')
       } else {
         showError(t('chat.errorImageGen'))
       }

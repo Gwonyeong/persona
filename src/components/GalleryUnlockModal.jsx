@@ -97,7 +97,7 @@ export default function GalleryUnlockModal({ content, characterId, onClose, onUn
             </button>
           ) : (
             <button
-              onClick={() => { onClose(); navigate('/my') }}
+              onClick={() => { onClose(); navigate('/mask-shop') }}
               className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
