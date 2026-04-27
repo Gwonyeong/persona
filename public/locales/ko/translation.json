@@ -279,7 +279,11 @@
     "chargeTitle": "가면 충전",
     "currentBalance": "현재 보유: {{count}}개",
     "hint": "가면 1개로 캐릭터와 1회 대화할 수 있어요",
-    "purchaseButton": "{{price}} 결제하기"
+    "purchaseButton": "{{price}} 결제하기",
+    "firstPurchaseBanner": "첫 결제 2배 보너스!",
+    "firstPurchaseBadge": "x2",
+    "firstPurchaseDesc": "처음 구매하시면 2배로 드려요",
+    "firstPurchaseBonus": "첫 구매 보너스 +{{count}}개 추가 지급!"
   },
   "nav": {
     "home": "홈",

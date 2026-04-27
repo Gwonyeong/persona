@@ -25,6 +25,11 @@ export default function MaskChargeModal({ onClose }) {
   const [billingReady, setBillingReady] = useState(false)
   const [isNative, setIsNative] = useState(false)
   const [debugInfo, setDebugInfo] = useState('')
+  const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
+
+  useEffect(() => {
+    api.get('/masks/first-purchase-eligible').then(({ eligible }) => setFirstPurchaseEligible(eligible)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const init = async () => {
@@ -124,6 +129,16 @@ export default function MaskChargeModal({ onClose }) {
 
         {debugInfo && <p className="text-xs text-yellow-400 text-center mb-2 break-all">{debugInfo}</p>}
 
+        {firstPurchaseEligible && (
+          <div className="mb-4 p-2.5 bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 rounded-xl flex items-center gap-2.5">
+            <span className="text-xl">🎉</span>
+            <div>
+              <p className="text-xs font-bold text-amber-300">{t('masks.firstPurchaseBanner')}</p>
+              <p className="text-[10px] text-amber-400/70">{t('masks.firstPurchaseDesc')}</p>
+            </div>
+          </div>
+        )}
+
         {/* 패키지 선택 */}
         <div className="flex flex-col gap-2.5 mb-5">
           {PACKAGES.map((pkg, i) => (
@@ -140,13 +155,23 @@ export default function MaskChargeModal({ onClose }) {
               <div className="flex items-center gap-2.5">
                 <span className="text-lg">🎭</span>
                 <span className="font-semibold text-gray-100">{pkg.label}</span>
+                {firstPurchaseEligible && (
+                  <span className="px-1.5 py-0.5 bg-amber-500 rounded text-[10px] font-bold text-white">
+                    {t('masks.firstPurchaseBadge')}
+                  </span>
+                )}
                 {pkg.badge && (
                   <span className="px-1.5 py-0.5 bg-indigo-600 rounded text-[10px] font-bold text-white">
                     {pkg.badge}
                   </span>
                 )}
               </div>
-              <span className="text-sm font-medium text-gray-300">{pkg.price}</span>
+              <div className="flex items-center gap-1.5">
+                {firstPurchaseEligible && (
+                  <span className="text-xs font-bold text-amber-400">{pkg.amount * 2}</span>
+                )}
+                <span className="text-sm font-medium text-gray-300">{pkg.price}</span>
+              </div>
             </button>
           ))}
         </div>

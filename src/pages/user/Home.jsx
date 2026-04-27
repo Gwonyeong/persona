@@ -128,32 +128,33 @@ export default function Home() {
             />
           </div>
 
-          {/* 태그 필터 */}
-          <div className="pb-3">
+        </div>
+
+        {/* 정렬 탭 + 필터 */}
+        <div className="flex items-center gap-2 pb-2">
+          <div className="flex gap-1.5">
+            {['default', 'popular', 'follow'].map((key) => (
+              <button
+                key={key}
+                onClick={() => setSort(key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  sort === key
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t(`home.sort.${key}`)}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-w-0">
             <TagFilterBar
               selectedTags={selectedTags}
               tagCategories={tagCategories}
               onApply={applyTags}
             />
           </div>
-        </div>
-
-        {/* 정렬 탭 */}
-        <div className="flex gap-1.5 pb-2">
-          {['default', 'popular', 'follow'].map((key) => (
-            <button
-              key={key}
-              onClick={() => setSort(key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                sort === key
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-              }`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              {t(`home.sort.${key}`)}
-            </button>
-          ))}
         </div>
 
         {/* 광고 */}

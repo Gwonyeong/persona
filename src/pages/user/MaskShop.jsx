@@ -28,11 +28,9 @@ export default function MaskShop() {
 
   // 구독 관련 데이터
   const FEATURES = [
-    { key: 'chat', label: t('subscription.feature.chat') },
     { key: 'dailyMasks', label: t('subscription.feature.dailyMasks') },
     { key: 'characters', label: t('subscription.feature.characters') },
     { key: 'contentLevel', label: t('subscription.feature.contentLevel') },
-    { key: 'imageGen', label: t('subscription.feature.imageGen') },
     { key: 'adFree', label: t('subscription.feature.adFree') },
   ]
 
@@ -93,6 +91,7 @@ export default function MaskShop() {
   const [feedLikeReward, setFeedLikeReward] = useState(null)
   const [checkinClaimed, setCheckinClaimed] = useState(null)
   const [claimingCheckin, setClaimingCheckin] = useState(false)
+  const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
 
   useEffect(() => {
     const native = isNativeBillingAvailable()
@@ -197,6 +196,7 @@ export default function MaskShop() {
     api.get('/masks/missions').then(({ missions }) => setMissions(missions)).catch(() => {})
     api.get('/masks/feed-like-reward/available').then((data) => setFeedLikeReward(data)).catch(() => {})
     api.get('/masks/checkin/available').then(({ claimed }) => setCheckinClaimed(claimed)).catch(() => {})
+    api.get('/masks/first-purchase-eligible').then(({ eligible }) => setFirstPurchaseEligible(eligible)).catch(() => {})
   }, [token])
 
   const handlePurchase = async () => {
@@ -229,6 +229,10 @@ export default function MaskShop() {
 
       await consumePurchase(purchaseToken)
       setMasks(serverRes.masks)
+      if (serverRes.firstPurchaseBonus) {
+        setFirstPurchaseEligible(false)
+        window.gtag?.('event', 'first_purchase_bonus', { bonus: serverRes.firstPurchaseBonus })
+      }
     } catch (err) {
       const msg = err?.message || ''
       if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
@@ -415,6 +419,16 @@ export default function MaskShop() {
             <span className="text-lg font-bold text-indigo-400">{t('myPage.masksCount', { count: masks })}</span>
           </div>
 
+          {firstPurchaseEligible && (
+            <div className="mb-3 p-3 bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 rounded-xl flex items-center gap-3">
+              <span className="text-2xl">🎉</span>
+              <div>
+                <p className="text-sm font-bold text-amber-300">{t('masks.firstPurchaseBanner')}</p>
+                <p className="text-xs text-amber-400/70">{t('masks.firstPurchaseDesc')}</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 mb-3">
             {PACKAGES.map((pkg, i) => (
               <button
@@ -430,6 +444,11 @@ export default function MaskShop() {
                 <div className="flex items-center gap-2">
                   <span className="text-base">🎭</span>
                   <span className="font-semibold text-sm text-gray-100">{pkg.label}</span>
+                  {firstPurchaseEligible && (
+                    <span className="px-1.5 py-0.5 bg-amber-500 rounded text-[10px] font-bold text-white">
+                      {t('masks.firstPurchaseBadge')}
+                    </span>
+                  )}
                   {pkg.discount && (
                     <span className="px-1.5 py-0.5 bg-red-500 rounded text-[10px] font-bold text-white">
                       {pkg.discount}
@@ -442,6 +461,9 @@ export default function MaskShop() {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {firstPurchaseEligible && (
+                    <span className="text-xs font-bold text-amber-400">{pkg.amount * 2}개</span>
+                  )}
                   {pkg.originalPrice && (
                     <span className="text-xs text-gray-500 line-through">{pkg.originalPrice}</span>
                   )}

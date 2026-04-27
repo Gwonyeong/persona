@@ -279,7 +279,11 @@
     "chargeTitle": "マスクチャージ",
     "currentBalance": "残高: {{count}}個",
     "hint": "マスク1個でキャラクターと1回会話できます",
-    "purchaseButton": "{{price}}で購入"
+    "purchaseButton": "{{price}}で購入",
+    "firstPurchaseBanner": "初回購入2倍ボーナス!",
+    "firstPurchaseBadge": "x2",
+    "firstPurchaseDesc": "初めてのご購入で2倍プレゼント",
+    "firstPurchaseBonus": "初回ボーナス +{{count}}個追加!"
   },
   "nav": {
     "home": "ホーム",
