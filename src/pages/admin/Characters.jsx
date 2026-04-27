@@ -68,6 +68,7 @@ const EMPTY_FORM = {
   initialAffinity: 0,
   followerCount: 0,
   followingCount: 0,
+  voiceId: '',
   isPublic: false,
   proactiveEnabled: false,
   proactiveMinInterval: 60,   // 분 단위로 표시
@@ -106,6 +107,7 @@ export default function Characters() {
       initialAffinity: c.initialAffinity || 0,
       followerCount: c.followerCount || 0,
       followingCount: c.followingCount || 0,
+      voiceId: c.voiceId || '',
       isPublic: c.isPublic,
       proactiveEnabled: c.proactiveEnabled || false,
       proactiveMinInterval: Math.round((c.proactiveMinInterval || 3600) / 60),
@@ -127,6 +129,7 @@ export default function Characters() {
       proactiveMaxInterval: form.proactiveMaxInterval * 60,  // 분 → 초
       proactiveProbability: form.proactiveProbability / 100, // % → 0~1
       proactiveMaxCount: form.proactiveMaxCount,
+      voiceId: form.voiceId.trim() || null,
     }
 
     if (editing === 'new') {
@@ -519,6 +522,18 @@ export default function Characters() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* TTS 설정 */}
+              <div className="border-t border-gray-700 pt-4 mt-2">
+                <label className="text-xs text-gray-400 block mb-1">ElevenLabs Voice ID (TTS)</label>
+                <input
+                  value={form.voiceId}
+                  onChange={(e) => setForm({ ...form, voiceId: e.target.value })}
+                  placeholder="ElevenLabs voice ID 입력"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">설정하면 채팅에서 TTS 버튼이 활성화됩니다</p>
               </div>
             </div>
 

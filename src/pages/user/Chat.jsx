@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -68,17 +68,61 @@ export default function Chat() {
   const affinityThresholdsRef = useRef([])
   const [showImageGenModal, setShowImageGenModal] = useState(false)
   const [showSelfieModal, setShowSelfieModal] = useState(false)
+  const [previewFeedImages, setPreviewFeedImages] = useState([])
   const [characterStatus, setCharacterStatus] = useState(null)
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
+  const [voiceMode, setVoiceMode] = useState(false)
+  const [generatingTTS, setGeneratingTTS] = useState(false)
+  const [playingAudioIdx, setPlayingAudioIdx] = useState(null)
+  const audioRef = useRef(null)
+  const audioQueueRef = useRef([])
+  const isPlayingQueueRef = useRef(false)
+  const playbackTimeoutRef = useRef(null)
+  const [isPlayingAll, setIsPlayingAll] = useState(false)
   const [errorToast, setErrorToast] = useState(null)
   const errorTimerRef = useRef(null)
   const pushPromptShownRef = useRef(false)
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
+  const subscription = useStore((s) => s.subscription)
+  const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
   const [currentUser, setCurrentUser] = useState(null)
   const { t } = useTranslation()
+
+  // 페이지 이탈 시 사운드 재생 정리
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      if (playbackTimeoutRef.current) {
+        clearTimeout(playbackTimeoutRef.current)
+        playbackTimeoutRef.current = null
+      }
+      audioQueueRef.current = []
+      isPlayingQueueRef.current = false
+    }
+  }, [])
+
+  // 최근 응답의 마지막 CHARACTER 인덱스 + 해당 응답의 audioUrl 목록
+  const { lastCharIdx, latestResponseAudios } = useMemo(() => {
+    let lastUserIdx = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'USER') { lastUserIdx = i; break }
+    }
+    let lastChar = -1
+    const audios = []
+    for (let i = lastUserIdx + 1; i < messages.length; i++) {
+      if (messages[i].role === 'CHARACTER') {
+        lastChar = i
+        if (messages[i].audioUrl) audios.push(messages[i].audioUrl)
+      }
+    }
+    return { lastCharIdx: lastChar, latestResponseAudios: audios }
+  }, [messages])
 
   // 모달/오버레이 뒤로가기 처리
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
@@ -167,6 +211,46 @@ export default function Chat() {
     }
   }, [])
 
+  const playFromQueue = () => {
+    if (isPlayingQueueRef.current) return
+    if (audioQueueRef.current.length === 0) {
+      setIsPlayingAll(false)
+      return
+    }
+    const url = audioQueueRef.current.shift()
+    isPlayingQueueRef.current = true
+    const audio = new Audio(url)
+    audioRef.current = audio
+    const onDone = () => {
+      audioRef.current = null
+      // 다음 버블 재생 전 1초 공백 — 타임아웃 ID 추적해 중지 시 취소 가능
+      playbackTimeoutRef.current = setTimeout(() => {
+        playbackTimeoutRef.current = null
+        isPlayingQueueRef.current = false
+        playFromQueue()
+      }, 1000)
+    }
+    audio.onended = onDone
+    audio.onerror = onDone
+    audio.play().catch(onDone)
+  }
+
+  const stopAllPlayback = () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
+    if (playbackTimeoutRef.current) { clearTimeout(playbackTimeoutRef.current); playbackTimeoutRef.current = null }
+    audioQueueRef.current = []
+    isPlayingQueueRef.current = false
+    setIsPlayingAll(false)
+  }
+
+  const playAllLatestAudios = (urls) => {
+    stopAllPlayback()
+    setPlayingAudioIdx(null)
+    audioQueueRef.current = [...urls]
+    setIsPlayingAll(true)
+    playFromQueue()
+  }
+
   const send = async () => {
     if (!input.trim() || sending) return
     const text = input.trim()
@@ -185,6 +269,7 @@ export default function Chat() {
     const confirmedUserMsg = { role: 'USER', content: text, createdAt: new Date().toISOString(), feedImage }
     const body = { content: text }
     if (feedToSend) body.feedPostId = feedToSend.id
+    if (voiceMode && character?.voiceId && !isFreeTier) body.voiceWithChat = true
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
@@ -207,6 +292,12 @@ export default function Chat() {
             })
             // 다음 메시지를 위해 다시 typing 표시
             setTimeout(() => setShowTyping(true), 0)
+            break
+          }
+          case 'audio': {
+            // 서버에서 TTS 생성 완료 시 즉시 큐에 추가하여 순차 재생
+            audioQueueRef.current.push(data.audioUrl)
+            playFromQueue()
             break
           }
           case 'done': {
@@ -235,6 +326,10 @@ export default function Chat() {
             setShowTyping(false)
             setSending(false)
             window.gtag?.('event', 'chat_message', { conversation_id: id })
+            // 보이스 사용 시 무료 횟수 갱신
+            if (voiceMode && character?.voiceId && !isFreeTier) {
+              api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
+            }
             if (!pushPromptShownRef.current && token) {
               getPushPermissionStatus().then((status) => {
                 if (status === 'default') {
@@ -351,6 +446,82 @@ export default function Chat() {
       }
       setGeneratingImage(false)
     }
+  }
+
+  const handleGenerateTTS = async () => {
+    if (generatingTTS || !token || !character?.voiceId) return
+    // 마지막 CHARACTER 메시지 찾기 (나레이션 제외)
+    let targetIdx = -1
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'CHARACTER') {
+        // 나레이션(애스터리스크만)이 아닌 실제 대사가 있는지 확인
+        const dialogue = messages[i].content?.replace(/\*[^*]+\*/g, '').trim()
+        if (dialogue) { targetIdx = i; break }
+      }
+    }
+    if (targetIdx === -1) return
+
+    // 이미 audioUrl이 있으면 바로 재생
+    if (messages[targetIdx].audioUrl) {
+      playAudio(messages[targetIdx].audioUrl, targetIdx)
+      return
+    }
+
+    // 원본 messages 배열에서의 인덱스 계산 (필터링된 messages와 conversation.messages 매핑)
+    // Chat.jsx에서 messages는 필터링된 배열이므로, conversation.messages에서 해당 메시지의 실제 인덱스를 찾아야 함
+    setGeneratingTTS(true)
+    try {
+      const convMessages = (await api.get(`/conversations/${id}/messages`)).conversation.messages
+      // 필터링된 targetIdx의 메시지와 매칭되는 원본 인덱스
+      const targetMsg = messages[targetIdx]
+      let realIdx = -1
+      // createdAt + content로 매칭
+      for (let i = convMessages.length - 1; i >= 0; i--) {
+        if (convMessages[i].role === 'CHARACTER' && convMessages[i].content === targetMsg.content && convMessages[i].createdAt === targetMsg.createdAt) {
+          realIdx = i
+          break
+        }
+      }
+      if (realIdx === -1) {
+        showError(t('chat.errorTTS'))
+        setGeneratingTTS(false)
+        return
+      }
+
+      const { audioUrl } = await api.post(`/conversations/${id}/generate-tts`, { messageIndex: realIdx })
+      setMessages((prev) => prev.map((m, i) => i === targetIdx ? { ...m, audioUrl } : m))
+      playAudio(audioUrl, targetIdx)
+    } catch (error) {
+      console.error('TTS error:', error)
+      if (error.message?.includes('Insufficient masks')) {
+        navigate('/mask-shop')
+      } else {
+        showError(t('chat.errorTTS'))
+      }
+    } finally {
+      setGeneratingTTS(false)
+    }
+  }
+
+  const playAudio = (url, idx) => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    const audio = new Audio(url)
+    audioRef.current = audio
+    setPlayingAudioIdx(idx)
+    audio.onended = () => { setPlayingAudioIdx(null); audioRef.current = null }
+    audio.onerror = () => { setPlayingAudioIdx(null); audioRef.current = null }
+    audio.play().catch(() => { setPlayingAudioIdx(null); audioRef.current = null })
+  }
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setPlayingAudioIdx(null)
   }
 
   if (!conversation) {
@@ -481,6 +652,23 @@ export default function Chat() {
                       <line x1="8" y1="11" x2="14" y2="11" />
                     </svg>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      api.put(`/conversations/${id}/background`, { backgroundImage: msg.content })
+                        .then(() => setBackgroundImage(msg.content))
+                        .catch(() => {})
+                    }}
+                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-black/60 text-white/80 hover:text-white text-[11px]"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    {t('gallery.changeBg')}
+                  </button>
                 </div>
               </div>
             )
@@ -515,25 +703,46 @@ export default function Chat() {
                     />
                   </div>
                 )}
-                <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
-                  {msg.content}
+                <div className="flex items-end gap-1.5">
+                  <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
+                    {msg.content}
+                  </div>
+                  {msg.role === 'CHARACTER' && msg.audioUrl && (
+                    <button
+                      onClick={() => playingAudioIdx === idx ? stopAudio() : playAudio(msg.audioUrl, idx)}
+                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-800/60 hover:bg-gray-700/60 transition-colors"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {playingAudioIdx === idx ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                      )}
+                    </button>
+                  )}
                 </div>
+                {idx === lastCharIdx && latestResponseAudios.length >= 2 && (
+                  <button
+                    onClick={() => isPlayingAll ? stopAllPlayback() : playAllLatestAudios(latestResponseAudios)}
+                    className={`mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${isPlayingAll ? 'bg-red-600/20 hover:bg-red-600/30 border-red-600/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 border-emerald-600/40'}`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {isPlayingAll ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="#f87171"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    )}
+                    <span className={`text-[10px] font-medium ${isPlayingAll ? 'text-red-400' : 'text-emerald-400'}`}>{isPlayingAll ? t('chat.playAllStop', { defaultValue: '중지' }) : t('chat.playAll', { defaultValue: '전체 재생' })}</span>
+                  </button>
+                )}
                 {showTime && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatChatTime(msg.createdAt)}</p>}
                 {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{t('chat.affinityUp', { name: character.name })}</p>}
               </div>
             </div>
           )
         })}
-        {generatingImage && (
-          <div className="flex justify-center mt-3">
-            <div className="bg-gray-800/80 rounded-2xl px-4 py-3 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" className="animate-spin">
-                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-              </svg>
-              <span className="text-sm text-purple-400">{t('chat.generatingImage')}</span>
-            </div>
-          </div>
-        )}
         {showTyping && (
           <div className="flex justify-start mt-3">
             <div className="w-7 flex-shrink-0 mr-2">
@@ -557,8 +766,41 @@ export default function Chat() {
       <div className="relative flex-shrink-0">
         {/* 플로팅 버튼들 */}
         <div className="absolute z-10 flex gap-2" style={{ right: 16, bottom: '100%', marginBottom: 12 }}>
+          {character.voiceId && (
+            <button
+              onClick={() => {
+                if (isFreeTier) { navigate('/subscription'); return }
+                setVoiceMode((v) => !v)
+              }}
+              disabled={!token}
+              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${isFreeTier ? 'bg-gray-800 opacity-50' : voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                {voiceMode ? (
+                  <>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                  </>
+                ) : (
+                  <>
+                    <line x1="18" y1="9" x2="22" y2="13" />
+                    <line x1="22" y1="9" x2="18" y2="13" />
+                  </>
+                )}
+              </svg>
+            </button>
+          )}
           <button
-            onClick={() => setShowImageGenModal(true)}
+            onClick={() => {
+              setShowImageGenModal(true)
+              api.get(`/characters/${conversation.characterId}`).then(({ character: c }) => {
+                const allImages = (c.feedPosts || []).flatMap((p) => (p.images || []).map((img) => img.filePath)).filter(Boolean)
+                const shuffled = allImages.sort(() => Math.random() - 0.5)
+                setPreviewFeedImages(shuffled.slice(0, 3))
+              }).catch(() => {})
+            }}
             disabled={generatingImage || !token}
             className="w-11 h-11 rounded-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 flex items-center justify-center shadow-lg transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -597,7 +839,7 @@ export default function Chat() {
           </div>
         </div>
 
-      <div className="p-3 border-t border-gray-800 bg-gray-900/95" style={{ paddingBottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 8px)' }}>
+      <div className="p-3 pt-5 border-t border-gray-800 bg-gray-900/95" style={{ paddingBottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 8px)' }}>
         {attachedFeed && (
           <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
             <img
@@ -630,20 +872,27 @@ export default function Chat() {
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <textarea value={input} onChange={(e) => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+          <textarea value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
           {suggestedReplies.length > 0 && (
             <button onClick={() => setShowSuggestions((prev) => !prev)} className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${showSuggestions ? 'bg-indigo-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'}`} style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="9" y1="10" x2="15" y2="10" /></svg>
             </button>
           )}
-          <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-          </button>
+          <div className="relative flex-shrink-0">
+            {voiceMode && (
+              (currentUser?.freeVoiceUses || 0) > 0
+                ? <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">{t('chat.voiceFreeRemaining', { count: currentUser.freeVoiceUses, defaultValue: '무료 {{count}}회' })}</span>
+                : <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">-5 🎭</span>
+            )}
+            <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+            </button>
+          </div>
         </div>
       </div>
       </div>
       {showImageGenModal && (
-        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowImageGenModal(false)}>
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => { setShowImageGenModal(false); setPreviewFeedImages([]) }}>
           <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 bg-gray-700 rounded-full" />
@@ -651,19 +900,29 @@ export default function Chat() {
             <div className="flex justify-center mb-3">
               <div className="w-12 h-12 rounded-full bg-purple-600/20 flex items-center justify-center">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
                 </svg>
               </div>
             </div>
-            <p className="text-white font-semibold text-center mb-1">{t('chat.imageGenTitle')}</p>
-            <p className="text-gray-400 text-sm text-center mb-5">
+            <p className="text-white font-semibold text-center mb-1">{t('chat.imageGenTitle', { name: character.name })}</p>
+            <p className="text-gray-400 text-sm text-center mb-4">
               {t('chat.imageGenDesc', { name: character.name })}
               <br />
               <span className="text-purple-400 font-medium">{t('chat.imageGenCost', { count: 5 })}</span>
             </p>
+            {previewFeedImages.length > 0 && (
+              <div className="flex gap-2 justify-center mb-5">
+                {previewFeedImages.map((url, i) => (
+                  <div key={i} className="w-20 h-28 rounded-xl overflow-hidden bg-gray-800">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2">
               <button
-                onClick={() => setShowImageGenModal(false)}
+                onClick={() => { setShowImageGenModal(false); setPreviewFeedImages([]) }}
                 className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
@@ -674,7 +933,7 @@ export default function Chat() {
                 className="flex-1 py-2.5 text-sm text-white bg-purple-600 rounded-xl font-semibold"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {t('common.generate')}
+                {t('chat.imageGenRequest')}
               </button>
             </div>
           </div>
@@ -713,7 +972,7 @@ export default function Chat() {
                 className="flex-1 py-2.5 text-sm text-white bg-pink-600 rounded-xl font-semibold"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {t('common.generate')}
+                {t('chat.imageGenRequest')}
               </button>
             </div>
           </div>
