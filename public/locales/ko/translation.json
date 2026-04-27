@@ -144,7 +144,7 @@
     "managedByGoogle": "구독은 Google Play를 통해 관리됩니다.",
     "cancelAnytime": "언제든 Play Store에서 해지할 수 있습니다.",
     "lightBenefitsTitle": "라이트 플랜의 혜택",
-    "lightBenefit1": "매일 가면 30개 지급 — 매일 꾸준히 대화하세요",
+    "lightBenefit1": "매일 가면 50개 지급 — 매일 꾸준히 대화하세요",
     "lightBenefit2": "모든 캐릭터와 자유롭게 대화",
     "lightBenefit3": "더 과감한 이미지 콘텐츠 잠금 해제",
     "lightBenefit4": "광고 없이 깔끔한 경험",
@@ -162,7 +162,7 @@
       "none": "-",
       "tenCharacters": "10명",
       "basic": "기본",
-      "thirtyPerDay": "30개/일",
+      "thirtyPerDay": "50개/일",
       "unlimited": "무제한",
       "boldImages": "과감한 이미지"
     }
@@ -276,19 +276,19 @@
     "reviewLater": "다음에 할게요"
   },
   "masks": {
-    "pkg30": "30개",
-    "pkg100": "100개",
-    "pkg300": "300개",
+    "pkg30": "60개",
+    "pkg100": "200개",
+    "pkg300": "700개",
     "badgePopular": "인기",
     "badgeDiscount": "할인",
     "chargeTitle": "가면 충전",
     "currentBalance": "현재 보유: {{count}}개",
     "hint": "가면 1개로 캐릭터와 1회 대화할 수 있어요",
     "purchaseButton": "{{price}} 결제하기",
-    "firstPurchaseBanner": "첫 결제 2배 보너스!",
-    "firstPurchaseBadge": "x2",
-    "firstPurchaseDesc": "처음 구매하시면 2배로 드려요",
-    "firstPurchaseBonus": "첫 구매 보너스 +{{count}}개 추가 지급!"
+    "firstPurchaseBanner": "첫 결제 50% 추가 보너스!",
+    "firstPurchaseBadge": "+50%",
+    "firstPurchaseDesc": "처음 구매하시면 50%를 더 드려요",
+    "firstPurchaseBonus": "+{{count}}개!"
   },
   "nav": {
     "home": "홈",

@@ -144,7 +144,7 @@
     "managedByGoogle": "サブスクリプションはGoogle Playで管理されています。",
     "cancelAnytime": "いつでもPlay Storeから解約できます。",
     "lightBenefitsTitle": "ライトプランの特典",
-    "lightBenefit1": "毎日マスク30個支給 — 毎日たくさん会話しよう",
+    "lightBenefit1": "毎日マスク50個支給 — 毎日たくさん会話しよう",
     "lightBenefit2": "全キャラクターと自由に会話",
     "lightBenefit3": "大胆な画像コンテンツを解放",
     "lightBenefit4": "広告なしのすっきり体験",
@@ -162,7 +162,7 @@
       "none": "-",
       "tenCharacters": "10人",
       "basic": "基本",
-      "thirtyPerDay": "30個/日",
+      "thirtyPerDay": "50個/日",
       "unlimited": "無制限",
       "boldImages": "大胆な画像"
     }
@@ -276,19 +276,19 @@
     "reviewLater": "後で"
   },
   "masks": {
-    "pkg30": "30個",
-    "pkg100": "100個",
-    "pkg300": "300個",
+    "pkg30": "60個",
+    "pkg100": "200個",
+    "pkg300": "700個",
     "badgePopular": "人気",
     "badgeDiscount": "割引",
     "chargeTitle": "マスクチャージ",
     "currentBalance": "残高: {{count}}個",
     "hint": "マスク1個でキャラクターと1回会話できます",
     "purchaseButton": "{{price}}で購入",
-    "firstPurchaseBanner": "初回購入2倍ボーナス!",
-    "firstPurchaseBadge": "x2",
-    "firstPurchaseDesc": "初めてのご購入で2倍プレゼント",
-    "firstPurchaseBonus": "初回ボーナス +{{count}}個追加!"
+    "firstPurchaseBanner": "初回購入+50%ボーナス!",
+    "firstPurchaseBadge": "+50%",
+    "firstPurchaseDesc": "初回購入で50%多くプレゼント",
+    "firstPurchaseBonus": "+{{count}}個!"
   },
   "nav": {
     "home": "ホーム",

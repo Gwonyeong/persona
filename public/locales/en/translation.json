@@ -144,7 +144,7 @@
     "managedByGoogle": "Subscription is managed through Google Play.",
     "cancelAnytime": "You can cancel anytime on Play Store.",
     "lightBenefitsTitle": "Light Plan Benefits",
-    "lightBenefit1": "30 masks daily — keep chatting every day",
+    "lightBenefit1": "50 masks daily — keep chatting every day",
     "lightBenefit2": "Chat with all characters freely",
     "lightBenefit3": "Unlock bold image content",
     "lightBenefit4": "Ad-free clean experience",
@@ -162,7 +162,7 @@
       "none": "-",
       "tenCharacters": "10",
       "basic": "Basic",
-      "thirtyPerDay": "30/day",
+      "thirtyPerDay": "50/day",
       "unlimited": "Unlimited",
       "boldImages": "Bold images"
     }
@@ -276,19 +276,19 @@
     "reviewLater": "Maybe later"
   },
   "masks": {
-    "pkg30": "30",
-    "pkg100": "100",
-    "pkg300": "300",
+    "pkg30": "60",
+    "pkg100": "200",
+    "pkg300": "700",
     "badgePopular": "Popular",
     "badgeDiscount": "Discount",
     "chargeTitle": "Get Masks",
     "currentBalance": "Balance: {{count}}",
     "hint": "1 mask = 1 conversation with a character",
     "purchaseButton": "Buy for {{price}}",
-    "firstPurchaseBanner": "First Purchase 2x Bonus!",
-    "firstPurchaseBadge": "x2",
-    "firstPurchaseDesc": "Double masks on your first purchase",
-    "firstPurchaseBonus": "First purchase bonus: +{{count}} extra!"
+    "firstPurchaseBanner": "First Purchase +50% Bonus!",
+    "firstPurchaseBadge": "+50%",
+    "firstPurchaseDesc": "Get 50% extra on your first purchase",
+    "firstPurchaseBonus": "+{{count}}!"
   },
   "nav": {
     "home": "Home",
