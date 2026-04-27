@@ -14,10 +14,22 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
   const touchRef = useRef({ startX: 0, startY: 0, dx: 0 })
   const [offsetX, setOffsetX] = useState(0)
   const [swiping, setSwiping] = useState(false)
+  const containerRef = useRef(null)
 
   useEffect(() => {
     setCurrent(initialIndex)
   }, [initialIndex])
+
+  // 인접 이미지 프리로드 (현재 기준 앞뒤 2장)
+  useEffect(() => {
+    const preloadRange = 2
+    for (let i = current - preloadRange; i <= current + preloadRange; i++) {
+      if (i >= 0 && i < images.length && i !== current) {
+        const img = new Image()
+        img.src = images[i].filePath
+      }
+    }
+  }, [current, images])
 
   const go = (dir) => {
     setCurrent((prev) => Math.max(0, Math.min(images.length - 1, prev + dir)))
@@ -27,6 +39,7 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
     touchRef.current.startX = e.touches[0].clientX
     touchRef.current.startY = e.touches[0].clientY
     touchRef.current.dx = 0
+    touchRef.current.locked = false
     setSwiping(true)
   }
 
@@ -34,7 +47,14 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
     if (!swiping) return
     const dx = e.touches[0].clientX - touchRef.current.startX
     const dy = e.touches[0].clientY - touchRef.current.startY
-    if (Math.abs(dy) > Math.abs(dx)) return
+    // 첫 움직임에서 세로 스크롤이면 스와이프 무시
+    if (!touchRef.current.locked) {
+      if (Math.abs(dy) > Math.abs(dx)) {
+        setSwiping(false)
+        return
+      }
+      touchRef.current.locked = true
+    }
     touchRef.current.dx = dx
     setOffsetX(dx)
   }
@@ -50,10 +70,14 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
   const img = images[current]
   if (!img) return null
 
+  // 컨테이너 너비 기반 슬라이드 오프셋 계산
+  const containerWidth = containerRef.current?.offsetWidth || 0
+  const trackOffset = -current * containerWidth + offsetX
+
   return (
     <div
       className="absolute inset-0 z-[60] bg-black/95 flex flex-col"
-      onClick={onClose}
+      onClick={(e) => { e.stopPropagation(); onClose() }}
     >
       {/* 헤더 */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 pt-3 pb-2" style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}>
@@ -74,17 +98,42 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
 
       {/* 이미지 영역 */}
       <div
-        className="flex-1 flex items-center justify-center overflow-hidden relative"
+        ref={containerRef}
+        className="flex-1 overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
+        {/* 이미지 트랙: 모든 이미지를 가로로 배치, translateX로 슬라이드 */}
+        <div
+          className="flex h-full"
+          style={{
+            transform: `translateX(${trackOffset}px)`,
+            transition: swiping ? 'none' : 'transform 0.25s ease-out',
+          }}
+        >
+          {images.map((image, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 flex items-center justify-center"
+              style={{ width: containerWidth || '100%' }}
+            >
+              <img
+                src={image.filePath}
+                alt=""
+                className="max-w-full max-h-full object-contain rounded-lg select-none"
+                draggable={false}
+              />
+            </div>
+          ))}
+        </div>
+
         {/* 좌측 화살표 */}
         {images.length > 1 && current > 0 && (
           <button
             onClick={() => go(-1)}
-            className="absolute left-2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -93,22 +142,11 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
           </button>
         )}
 
-        <img
-          src={img.filePath}
-          alt=""
-          className="max-w-full max-h-full object-contain rounded-lg select-none"
-          style={{
-            transform: `translateX(${offsetX}px)`,
-            transition: swiping ? 'none' : 'transform 0.25s ease-out',
-          }}
-          draggable={false}
-        />
-
         {/* 우측 화살표 */}
         {images.length > 1 && current < images.length - 1 && (
           <button
             onClick={() => go(1)}
-            className="absolute right-2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white/80 hover:text-white"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

@@ -42,6 +42,8 @@ export default function Feed() {
   const [initialLoaded, setInitialLoaded] = useState(false)
   const observerRef = useRef(null)
   const sentinelRef = useRef(null)
+  const nextCursorRef = useRef(null)
+  const loadingRef = useRef(false)
 
   const goToChat = async (character) => {
     try {
@@ -69,7 +71,8 @@ export default function Feed() {
 
   // 피드 포스트 fetch
   const fetchPosts = useCallback(async (cursor = null, reset = false) => {
-    if (loading) return
+    if (loadingRef.current) return
+    loadingRef.current = true
     setLoading(true)
     try {
       const params = new URLSearchParams({ limit: '10' })
@@ -82,7 +85,7 @@ export default function Feed() {
       const data = await api.get(`/feed-posts?${params.toString()}`)
       const posts = (data.feedPosts || []).map((post, idx) => ({
         ...post,
-        caption: post.caption || CAPTIONS[(cursor ? feedPosts.length + idx : idx) % CAPTIONS.length],
+        caption: post.caption || CAPTIONS[idx % CAPTIONS.length],
       }))
 
       if (reset) {
@@ -90,15 +93,17 @@ export default function Feed() {
       } else {
         setFeedPosts((prev) => [...prev, ...posts])
       }
+      nextCursorRef.current = data.nextCursor
       setNextCursor(data.nextCursor)
       setHasMore(!!data.nextCursor)
     } catch (err) {
       console.error('Feed fetch error:', err)
     } finally {
+      loadingRef.current = false
       setLoading(false)
       setInitialLoaded(true)
     }
-  }, [loading, followOnly, selectedTags, CAPTIONS, feedPosts.length])
+  }, [followOnly, selectedTags, CAPTIONS])
 
   // 필터 변경 시 리셋
   useEffect(() => {
@@ -113,7 +118,7 @@ export default function Feed() {
     if (!initialLoaded && hasMore) {
       fetchPosts(null, true)
     }
-  }, [initialLoaded, hasMore])
+  }, [initialLoaded, hasMore, fetchPosts])
 
   // IntersectionObserver로 무한스크롤
   useEffect(() => {
@@ -121,8 +126,8 @@ export default function Feed() {
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
-          fetchPosts(nextCursor)
+        if (entries[0].isIntersecting && !loadingRef.current && nextCursorRef.current) {
+          fetchPosts(nextCursorRef.current)
         }
       },
       { threshold: 0.1 }
@@ -133,7 +138,7 @@ export default function Feed() {
     }
 
     return () => observerRef.current?.disconnect()
-  }, [hasMore, loading, nextCursor])
+  }, [fetchPosts])
 
   const followedCharacters = followedIds
     ? characters.filter((c) => followedIds.includes(c.id))
