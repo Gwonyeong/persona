@@ -62,6 +62,9 @@ async function streamRequest(path, body, onEvent) {
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  // eventType은 청크 경계를 넘어 유지되어야 한다. 빈 라인(SSE 메시지 종결자)에서만 리셋.
+  let eventType = null
+  let dataLine = null
 
   while (true) {
     const { done, value } = await reader.read()
@@ -71,16 +74,21 @@ async function streamRequest(path, body, onEvent) {
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
 
-    let eventType = null
-    for (const line of lines) {
-      if (line.startsWith('event: ')) {
-        eventType = line.slice(7)
-      } else if (line.startsWith('data: ') && eventType) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          onEvent(eventType, data)
-        } catch {}
+    for (let raw of lines) {
+      const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw
+      if (line === '') {
+        // SSE 메시지 종결: 누적된 event/data를 dispatch
+        if (eventType && dataLine !== null) {
+          try {
+            onEvent(eventType, JSON.parse(dataLine))
+          } catch {}
+        }
         eventType = null
+        dataLine = null
+      } else if (line.startsWith('event: ')) {
+        eventType = line.slice(7)
+      } else if (line.startsWith('data: ')) {
+        dataLine = line.slice(6)
       }
     }
   }
@@ -97,6 +105,11 @@ export const api = {
   put: (path, body) =>
     request(path, {
       method: 'PUT',
+      body: body instanceof FormData ? body : JSON.stringify(body),
+    }),
+  patch: (path, body) =>
+    request(path, {
+      method: 'PATCH',
       body: body instanceof FormData ? body : JSON.stringify(body),
     }),
   delete: (path) => request(path, { method: 'DELETE' }),

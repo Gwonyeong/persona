@@ -145,6 +145,7 @@ export default function Chat() {
       setConversation(conv)
       setBackgroundImage(conv.backgroundImage || null)
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
+      setVoiceMode(!!conv.voiceMode)
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
@@ -770,7 +771,11 @@ export default function Chat() {
             <button
               onClick={() => {
                 if (isFreeTier) { navigate('/subscription'); return }
-                setVoiceMode((v) => !v)
+                setVoiceMode((v) => {
+                  const next = !v
+                  api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
+                  return next
+                })
               }}
               disabled={!token}
               className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${isFreeTier ? 'bg-gray-800 opacity-50' : voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
