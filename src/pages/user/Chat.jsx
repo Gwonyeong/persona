@@ -89,6 +89,8 @@ export default function Chat() {
   const subscription = useStore((s) => s.subscription)
   const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
   const [currentUser, setCurrentUser] = useState(null)
+  // 보이스 사용 자격: 유료 OR 무료 잔여(freeVoiceUses)
+  const canUseVoice = !isFreeTier || (currentUser?.freeVoiceUses || 0) > 0
   const { t } = useTranslation()
 
   // 페이지 이탈 시 사운드 재생 정리
@@ -270,7 +272,7 @@ export default function Chat() {
     const confirmedUserMsg = { role: 'USER', content: text, createdAt: new Date().toISOString(), feedImage }
     const body = { content: text }
     if (feedToSend) body.feedPostId = feedToSend.id
-    if (voiceMode && character?.voiceId && !isFreeTier) body.voiceWithChat = true
+    if (voiceMode && character?.voiceId && canUseVoice) body.voiceWithChat = true
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
@@ -328,7 +330,7 @@ export default function Chat() {
             setSending(false)
             window.gtag?.('event', 'chat_message', { conversation_id: id })
             // 보이스 사용 시 무료 횟수 갱신
-            if (voiceMode && character?.voiceId && !isFreeTier) {
+            if (voiceMode && character?.voiceId && canUseVoice) {
               api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
             }
             if (!pushPromptShownRef.current && token) {
@@ -770,7 +772,7 @@ export default function Chat() {
           {character.voiceId && (
             <button
               onClick={() => {
-                if (isFreeTier) { navigate('/subscription'); return }
+                if (!canUseVoice) { navigate('/subscription'); return }
                 setVoiceMode((v) => {
                   const next = !v
                   api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
@@ -778,7 +780,7 @@ export default function Chat() {
                 })
               }}
               disabled={!token}
-              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${isFreeTier ? 'bg-gray-800 opacity-50' : voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${!canUseVoice ? 'bg-gray-800 opacity-50' : voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -898,7 +900,7 @@ export default function Chat() {
       </div>
       {showImageGenModal && (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => { setShowImageGenModal(false); setPreviewFeedImages([]) }}>
-          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 bg-gray-700 rounded-full" />
             </div>
@@ -946,7 +948,7 @@ export default function Chat() {
       )}
       {showSelfieModal && (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowSelfieModal(false)}>
-          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 bg-gray-700 rounded-full" />
             </div>
@@ -985,7 +987,7 @@ export default function Chat() {
       )}
       {showPushPrompt && (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowPushPrompt(false)}>
-          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 pb-8 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 bg-gray-700 rounded-full" />
             </div>
