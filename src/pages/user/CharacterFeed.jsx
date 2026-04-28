@@ -8,6 +8,7 @@ import useBackHandler from '../../hooks/useBackHandler'
 import FeedPostCard from '../../components/FeedPostCard'
 import CommentSheet from '../../components/CommentSheet'
 import Lightbox from '../../components/Lightbox'
+import LoginModal from '../../components/LoginModal'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -25,6 +26,9 @@ export default function CharacterFeed() {
   const [likeState, setLikeState] = useState({})
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [commentPostId, setCommentPostId] = useState(null)
+  const [existingConv, setExistingConv] = useState(null)
+  const [starting, setStarting] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
   const scrolledRef = useRef(false)
   const targetPostId = searchParams.get('postId')
 
@@ -32,8 +36,28 @@ export default function CharacterFeed() {
     api.get(`/characters/${id}`).then(({ character }) => setCharacter(character))
   }, [id, i18n.language])
 
+  useEffect(() => {
+    if (!token) { setExistingConv(null); return }
+    api.get(`/conversations/check/${id}`)
+      .then((data) => setExistingConv(data.exists ? data : null))
+      .catch(() => setExistingConv(null))
+  }, [id, token])
+
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(!!commentPostId, () => setCommentPostId(null))
+
+  const handleSendMessage = async () => {
+    if (!token) { setShowLoginModal(true); return }
+    if (existingConv) { navigate(`/chats/${existingConv.conversationId}`); return }
+    setStarting(true)
+    try {
+      const { conversation } = await api.post('/conversations', { characterId: parseInt(id) })
+      navigate(`/chats/${conversation.id}`)
+    } catch (error) {
+      console.error(error)
+      setStarting(false)
+    }
+  }
 
   useEffect(() => {
     if (!character || !targetPostId || scrolledRef.current) return
@@ -72,7 +96,7 @@ export default function CharacterFeed() {
   const feedPosts = (character.feedPosts || []).sort((a, b) => new Date(b.publishAt) - new Date(a.publishAt))
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
+    <div className="relative flex flex-col h-screen bg-gray-950 text-gray-100">
       <Helmet>
         <title>{character.name}의 피드 - Pesona</title>
       </Helmet>
@@ -132,6 +156,22 @@ export default function CharacterFeed() {
         )}
       </div>
 
+      <button
+        onClick={handleSendMessage}
+        disabled={starting}
+        className="absolute right-4 z-40 flex items-center gap-2 pl-4 pr-5 h-12 rounded-full bg-indigo-600 shadow-lg shadow-indigo-600/30 text-white text-sm font-semibold hover:bg-indigo-500 active:scale-95 disabled:opacity-50 transition-all"
+        style={{
+          bottom: 'calc(3.5rem + env(safe-area-inset-bottom) + 1rem)',
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        {starting ? t('character.starting') : t('character.sendMessage')}
+      </button>
+
       {lightboxUrl && <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
 
       {commentPostId && (
@@ -142,6 +182,8 @@ export default function CharacterFeed() {
           onClose={() => setCommentPostId(null)}
         />
       )}
+
+      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} onLoginSuccess={() => setShowLoginModal(false)} />}
     </div>
   )
 }
