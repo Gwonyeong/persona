@@ -82,7 +82,53 @@ export default function Characters() {
   const [editing, setEditing] = useState(null) // null | 'new' | character object
   const [form, setForm] = useState(EMPTY_FORM)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [tab, setTab] = useState('public') // 'public' | 'private'
+  const [nationality, setNationality] = useState('all') // 'all' | 'kr' | 'jp' | 'us'
+  const [sortBy, setSortBy] = useState('conversations') // 'name' | 'conversations' | 'nationality'
   const navigate = useNavigate()
+
+  const NATIONALITY_TABS = [
+    { key: 'all', label: '전체' },
+    { key: 'kr', label: '🇰🇷' },
+    { key: 'jp', label: '🇯🇵' },
+    { key: 'us', label: '🇺🇸' },
+  ]
+  const NATIONALITY_ORDER = ['kr', 'jp', 'us']
+
+  const getNationality = (c) => {
+    const tag = (c.tags || []).find((t) => t.startsWith('nationality:'))
+    return tag ? tag.split(':')[1] : null
+  }
+
+  // 같은 voiceId를 쓰는 캐릭터가 둘 이상이면 중복 표시
+  const duplicateVoiceIds = (() => {
+    const counts = new Map()
+    for (const c of characters) {
+      const v = (c.voiceId || '').trim()
+      if (!v) continue
+      counts.set(v, (counts.get(v) || 0) + 1)
+    }
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([v]) => v))
+  })()
+
+  const filteredCharacters = characters
+    .filter((c) => (tab === 'public' ? c.isPublic : !c.isPublic))
+    .filter((c) => (nationality === 'all' ? true : getNationality(c) === nationality))
+    .slice()
+    .sort((a, b) => {
+      if (sortBy === 'conversations') {
+        return (b._count?.conversations || 0) - (a._count?.conversations || 0)
+      }
+      if (sortBy === 'nationality') {
+        const ai = NATIONALITY_ORDER.indexOf(getNationality(a))
+        const bi = NATIONALITY_ORDER.indexOf(getNationality(b))
+        const ax = ai === -1 ? NATIONALITY_ORDER.length : ai
+        const bx = bi === -1 ? NATIONALITY_ORDER.length : bi
+        if (ax !== bx) return ax - bx
+        return a.name.localeCompare(b.name)
+      }
+      return a.name.localeCompare(b.name)
+    })
 
   const load = () => {
     api.get('/admin/characters').then(({ characters }) => setCharacters(characters))
@@ -180,7 +226,7 @@ export default function Characters() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">캐릭터 관리</h2>
         <button
           onClick={openNew}
@@ -191,24 +237,84 @@ export default function Characters() {
         </button>
       </div>
 
+      {/* 정렬 */}
+      <div className="flex items-center gap-2 mb-4">
+        <label className="text-sm text-gray-400">정렬</label>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <option value="name">이름순</option>
+          <option value="conversations">대화 수 (내림차)</option>
+          <option value="nationality">국적</option>
+        </select>
+      </div>
+
+      {/* 공개/비공개 탭 */}
+      <div className="flex gap-1 mb-3 border-b border-gray-800">
+        {[
+          { key: 'public', label: '공개' },
+          { key: 'private', label: '비공개' },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === t.key
+                ? 'border-indigo-500 text-white'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {t.label} ({characters.filter((c) => (t.key === 'public' ? c.isPublic : !c.isPublic)).length})
+          </button>
+        ))}
+      </div>
+
+      {/* 국적 탭 */}
+      <div className="flex gap-1 mb-4">
+        {NATIONALITY_TABS.map((n) => {
+          const count = characters
+            .filter((c) => (tab === 'public' ? c.isPublic : !c.isPublic))
+            .filter((c) => (n.key === 'all' ? true : getNationality(c) === n.key)).length
+          return (
+            <button
+              key={n.key}
+              onClick={() => setNationality(n.key)}
+              className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                nationality === n.key
+                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+              }`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {n.label} ({count})
+            </button>
+          )
+        })}
+      </div>
+
       {/* 캐릭터 목록 */}
       <div className="bg-gray-900 rounded-lg border border-gray-800">
-        {characters.length === 0 ? (
-          <p className="p-4 text-gray-500">등록된 캐릭터가 없습니다.</p>
+        {filteredCharacters.length === 0 ? (
+          <p className="p-4 text-gray-500">
+            {tab === 'public' ? '공개된 캐릭터가 없습니다.' : '비공개 캐릭터가 없습니다.'}
+          </p>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">이름</th>
-                <th className="p-3">태그</th>
-                <th className="p-3">스타일</th>
                 <th className="p-3">대화 수</th>
-                <th className="p-3">공개</th>
+                <th className="p-3">선제</th>
+                <th className="p-3">TTS</th>
                 <th className="p-3">관리</th>
               </tr>
             </thead>
             <tbody>
-              {characters.map((c) => (
+              {filteredCharacters.map((c) => (
                 <tr key={c.id} className="border-b border-gray-800/50 text-sm">
                   <td className="p-3">
                     <div className="flex items-center gap-2.5">
@@ -225,21 +331,19 @@ export default function Characters() {
                       <span className="font-medium">{c.name}</span>
                     </div>
                   </td>
-                  <td className="p-3">
-                    <div className="flex gap-1 flex-wrap">
-                      {c.tags.map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 bg-gray-800 rounded text-xs text-gray-300">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="p-3">{c.styles.length}개</td>
                   <td className="p-3">{c._count.conversations}</td>
                   <td className="p-3">
-                    <span className={c.isPublic ? 'text-green-400' : 'text-gray-500'}>
-                      {c.isPublic ? '공개' : '비공개'}
+                    <span className={c.proactiveEnabled ? 'text-green-400' : 'text-gray-500'}>
+                      {c.proactiveEnabled ? 'ON' : 'OFF'}
                     </span>
+                  </td>
+                  <td className="p-3">
+                    <span className={c.voiceId ? 'text-green-400' : 'text-gray-500'}>
+                      {c.voiceId ? 'ON' : 'OFF'}
+                    </span>
+                    {c.voiceId && duplicateVoiceIds.has(c.voiceId.trim()) && (
+                      <span className="ml-1.5 text-red-400 font-semibold">(중복)</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2">
@@ -389,20 +493,6 @@ export default function Characters() {
                   onChange={(e) => setForm({ ...form, firstMessage: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-20 resize-none"
                   placeholder="대화 시작 시 캐릭터의 첫 메시지"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 block mb-2">캐릭터 태그</label>
-                <TagSelector
-                  tags={form.tags}
-                  onChange={(tags) => setForm({ ...form, tags })}
-                />
-                <input
-                  value={form.customTags}
-                  onChange={(e) => setForm({ ...form, customTags: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm mt-3"
-                  placeholder="기타 태그 (쉼표 구분)"
                 />
               </div>
 

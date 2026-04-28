@@ -6,9 +6,7 @@ export default function CharacterFeeds() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [character, setCharacter] = useState(null)
-  const [tab, setTab] = useState('feed') // 'feed' | 'story'
   const [feeds, setFeeds] = useState([])
-  const [stories, setStories] = useState([])
   const [uploading, setUploading] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editCaption, setEditCaption] = useState('')
@@ -27,11 +25,17 @@ export default function CharacterFeeds() {
       setCharacter(c)
     })
     loadFeeds()
-    loadStories()
   }, [id])
 
-  const loadFeeds = () => api.get(`/admin/characters/${id}/feeds`).then(({ feeds }) => setFeeds(feeds))
-  const loadStories = () => api.get(`/admin/characters/${id}/stories`).then(({ stories }) => setStories(stories))
+  const sortFeedsDesc = (list) =>
+    list.slice().sort((a, b) => {
+      const ad = new Date(a.publishAt || a.createdAt || 0).getTime()
+      const bd = new Date(b.publishAt || b.createdAt || 0).getTime()
+      return bd - ad
+    })
+
+  const loadFeeds = () =>
+    api.get(`/admin/characters/${id}/feeds`).then(({ feeds }) => setFeeds(sortFeedsDesc(feeds)))
 
   // 피드 새 게시물 업로드 (이미지 여러장 = 하나의 게시물)
   const uploadFeedFiles = useCallback(async (files) => {
@@ -48,7 +52,7 @@ export default function CharacterFeeds() {
       })
       const data = await res.json()
       if (data.feed) {
-        setFeeds((prev) => [...prev, data.feed])
+        setFeeds((prev) => sortFeedsDesc([...prev, data.feed]))
       }
     } catch (error) {
       console.error('Upload error:', error)
@@ -57,38 +61,10 @@ export default function CharacterFeeds() {
       if (fileRef.current) fileRef.current.value = ''
     }
   }, [id])
-
-  const uploadStoryFiles = useCallback(async (files) => {
-    if (files.length === 0) return
-    setUploading(true)
-    try {
-      for (const file of files) {
-        const formData = new FormData()
-        formData.append('image', file)
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/admin/characters/${id}/stories`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          body: formData,
-        })
-        const data = await res.json()
-        if (data.story) setStories((prev) => [...prev, data.story])
-      }
-    } catch (error) {
-      console.error('Upload error:', error)
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
-  }, [id])
-
-  const uploadFiles = useCallback(async (files) => {
-    if (tab === 'feed') await uploadFeedFiles(files)
-    else await uploadStoryFiles(files)
-  }, [tab, uploadFeedFiles, uploadStoryFiles])
 
   const handleUpload = (e) => {
     const files = Array.from(e.target.files || [])
-    uploadFiles(files)
+    uploadFeedFiles(files)
   }
 
   // 모달에서 기존 피드에 이미지 추가
@@ -148,7 +124,7 @@ export default function CharacterFeeds() {
     e.preventDefault(); e.stopPropagation()
     setDragging(false); dragCounter.current = 0
     const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'))
-    uploadFiles(files)
+    uploadFeedFiles(files)
   }
 
   // 모달 드래그 앤 드롭
@@ -172,10 +148,8 @@ export default function CharacterFeeds() {
 
   const handleDelete = async (itemId) => {
     if (!confirm('삭제하시겠습니까?')) return
-    const endpoint = tab === 'feed' ? `/admin/feeds/${itemId}` : `/admin/stories/${itemId}`
-    await api.delete(endpoint)
-    if (tab === 'feed') loadFeeds()
-    else loadStories()
+    await api.delete(`/admin/feeds/${itemId}`)
+    loadFeeds()
   }
 
   const handleEditSave = async (itemId) => {
@@ -183,8 +157,6 @@ export default function CharacterFeeds() {
     setEditingId(null)
     loadFeeds()
   }
-
-  const items = tab === 'feed' ? feeds : stories
 
   return (
     <div className="p-6">
@@ -197,26 +169,9 @@ export default function CharacterFeeds() {
           ← 뒤로
         </button>
         <h1 className="text-xl font-bold text-white">
-          {character?.name || '...'} — 피드/스토리 관리
+          {character?.name || '...'} — 피드 관리
+          <span className="ml-2 text-sm font-normal text-gray-500">({feeds.length})</span>
         </h1>
-      </div>
-
-      {/* 탭 */}
-      <div className="flex gap-1 mb-6 bg-gray-800 rounded-lg p-1 w-fit">
-        {['feed', 'story'].map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              tab === t ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {t === 'feed' ? '피드' : '스토리'}
-            <span className="ml-1.5 text-xs opacity-70">
-              ({t === 'feed' ? feeds.length : stories.length})
-            </span>
-          </button>
-        ))}
       </div>
 
       {/* 업로드 (드래그 앤 드롭 + 클릭) */}
@@ -261,10 +216,7 @@ export default function CharacterFeeds() {
                 이미지를 드래그하거나 클릭하여 업로드
               </p>
               <p className="text-xs text-gray-500">
-                {tab === 'feed'
-                  ? '여러 이미지를 한번에 선택하면 하나의 게시물에 슬라이드로 등���됩니다. AI가 캡��도 자동 생성합니다.'
-                  : '이미지 업로드 시 AI가 캐릭터 컨셉에 맞는 캡션을 자동 생성합니다.'
-                }
+                여러 이미지를 한번에 선택하면 하나의 게시물에 슬라이드로 등록됩니다. AI가 캡션도 자동 생성합니다.
               </p>
             </div>
           )}
@@ -272,27 +224,27 @@ export default function CharacterFeeds() {
       </div>
 
       {/* 아이템 그리드 */}
-      {items.length === 0 ? (
+      {feeds.length === 0 ? (
         <div className="text-center text-gray-500 py-12">
-          {tab === 'feed' ? '등록된 피드가 없습니다.' : '등록된 스토리가 없습니다.'}
+          등록된 피드가 없습니다.
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {items.map((item) => (
+          {feeds.map((item) => (
             <div
               key={item.id}
               className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
-              onClick={() => tab === 'feed' ? setDetailFeed(item) : null}
+              onClick={() => setDetailFeed(item)}
             >
               {/* 이미지 */}
               <div className="aspect-[9/16]">
                 <div className="w-full h-full relative">
                   <img
-                    src={tab === 'feed' ? (item.images?.[0]?.filePath || item.filePath) : item.filePath}
+                    src={item.images?.[0]?.filePath || item.filePath}
                     alt=""
                     className="w-full h-full object-cover"
                   />
-                  {tab === 'feed' && item.images?.length > 1 && (
+                  {item.images?.length > 1 && (
                     <div className="absolute top-2 right-2 bg-black/60 text-white text-[11px] px-2 py-0.5 rounded-full">
                       {item.images.length}장
                     </div>
@@ -301,7 +253,7 @@ export default function CharacterFeeds() {
               </div>
 
               {/* 게시 상태 */}
-              {tab === 'feed' && item.publishAt && (
+              {item.publishAt && (
                 <div className={`px-3 py-1.5 text-[11px] ${
                   new Date(item.publishAt) > new Date()
                     ? 'bg-yellow-900/30 text-yellow-400'
@@ -343,7 +295,7 @@ export default function CharacterFeeds() {
                 )}
 
                 <div className="flex items-center justify-between mt-2">
-                  {tab === 'feed' && editingId !== item.id && (
+                  {editingId !== item.id && (
                     <button
                       onClick={() => { setEditingId(item.id); setEditCaption(item.caption || '') }}
                       className="text-xs text-indigo-400 hover:text-indigo-300"
