@@ -73,7 +73,10 @@
     "errorTTS": "音声生成に失敗しました",
     "ttsPlay": "再生",
     "ttsStop": "停止",
-    "generatingTTS": "音声を生成中..."
+    "generatingTTS": "音声を生成中...",
+    "voicePremiumTitle": "プレミアム機能",
+    "voicePremiumDesc": "音声モードはライトプラン以上でご利用いただけます。",
+    "voicePremiumCta": "プランを見る"
   },
   "myPage": {
     "title": "マイページ - Pesona",

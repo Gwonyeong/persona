@@ -73,7 +73,10 @@
     "errorTTS": "Voice generation failed",
     "ttsPlay": "Play",
     "ttsStop": "Stop",
-    "generatingTTS": "Generating voice..."
+    "generatingTTS": "Generating voice...",
+    "voicePremiumTitle": "Premium Feature",
+    "voicePremiumDesc": "Voice mode is available with the Light plan or higher.",
+    "voicePremiumCta": "View Plans"
   },
   "myPage": {
     "title": "My Page - Pesona",

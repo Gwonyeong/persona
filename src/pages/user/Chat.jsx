@@ -73,6 +73,7 @@ export default function Chat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
+  const [showVoicePremiumModal, setShowVoicePremiumModal] = useState(false)
   const [generatingTTS, setGeneratingTTS] = useState(false)
   const [playingAudioIdx, setPlayingAudioIdx] = useState(null)
   const audioRef = useRef(null)
@@ -134,6 +135,7 @@ export default function Chat() {
   useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
   useBackHandler(showSelfieModal, () => setShowSelfieModal(false))
   useBackHandler(showReport, () => setShowReport(false))
+  useBackHandler(showVoicePremiumModal, () => setShowVoicePremiumModal(false))
 
   const showError = (msg) => {
     setErrorToast(msg)
@@ -622,6 +624,24 @@ export default function Chat() {
 
       <div className="h-full overflow-auto px-4 py-3 space-y-2" style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
         {/* <div className="py-1"><AdBanner slot="8921302150" /></div> */}
+        {profileUrl && (
+          <div className="flex justify-start mt-3">
+            <div className="w-7 flex-shrink-0 mr-2">
+              <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => setLightboxUrl(profileUrl)}>
+                <img src={profileUrl} alt="" className="w-full h-full object-cover" />
+              </div>
+            </div>
+            <div className="max-w-[75%]">
+              <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
+              <div
+                className="rounded-2xl rounded-tl-none overflow-hidden bg-gray-800/80 cursor-pointer"
+                onClick={() => setLightboxUrl(profileUrl)}
+              >
+                <img src={profileUrl} alt="" className="w-48 h-48 object-cover" />
+              </div>
+            </div>
+          </div>
+        )}
         {messages.map((msg, idx) => {
           if (msg.role === 'NARRATION') {
             return (
@@ -772,7 +792,7 @@ export default function Chat() {
           {character.voiceId && (
             <button
               onClick={() => {
-                if (!canUseVoice) { navigate('/subscription'); return }
+                if (!canUseVoice) { setShowVoicePremiumModal(true); return }
                 setVoiceMode((v) => {
                   const next = !v
                   api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
@@ -886,7 +906,7 @@ export default function Chat() {
             </button>
           )}
           <div className="relative flex-shrink-0">
-            {voiceMode && (
+            {voiceMode && canUseVoice && (
               (currentUser?.freeVoiceUses || 0) > 0
                 ? <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">{t('chat.voiceFreeRemaining', { count: currentUser.freeVoiceUses, defaultValue: '무료 {{count}}회' })}</span>
                 : <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">-5 🎭</span>
@@ -1016,6 +1036,31 @@ export default function Chat() {
         </div>
       )}
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+      {showVoicePremiumModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowVoicePremiumModal(false)} />
+          <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm text-center">
+            <p className="text-lg font-bold text-gray-100 mb-2">{t('chat.voicePremiumTitle')}</p>
+            <p className="text-sm text-gray-400 mb-6">{t('chat.voicePremiumDesc')}</p>
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => { setShowVoicePremiumModal(false); navigate('/subscription') }}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('chat.voicePremiumCta')}
+              </button>
+              <button
+                onClick={() => setShowVoicePremiumModal(false)}
+                className="px-6 py-2.5 bg-gray-800 text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-700 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showReport && (
         <ReportModal
           targetType="CONVERSATION"

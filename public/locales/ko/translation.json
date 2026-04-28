@@ -73,7 +73,10 @@
     "errorTTS": "음성 생성에 실패했습니다",
     "ttsPlay": "재생",
     "ttsStop": "정지",
-    "generatingTTS": "음성 생성 중..."
+    "generatingTTS": "음성 생성 중...",
+    "voicePremiumTitle": "프리미엄 기능",
+    "voicePremiumDesc": "음성 모드는 라이트 요금제 이상에서 이용할 수 있어요.",
+    "voicePremiumCta": "요금제 보기"
   },
   "myPage": {
     "title": "마이페이지 - Pesona",
