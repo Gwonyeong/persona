@@ -18,6 +18,7 @@ import AdminUsers from './pages/admin/Users'
 import UserLayout from './pages/user/UserLayout'
 import Home from './pages/user/Home'
 import CharacterDetail from './pages/user/CharacterDetail'
+import Storyline from './pages/user/Storyline'
 import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
@@ -148,6 +149,9 @@ function App() {
 
       {/* 공개 페이지 (인증 불필요) */}
       <Route path="/account/delete-info" element={<DeleteAccountInfo />} />
+
+      {/* 스토리 플레이어 (풀스크린, 탭바 없음) */}
+      <Route path="/storylines/:id" element={<Storyline />} />
 
       {/* 유저 - 탭바 레이아웃 */}
       <Route element={<UserLayout />}>

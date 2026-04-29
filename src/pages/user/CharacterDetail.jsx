@@ -56,6 +56,7 @@ export default function CharacterDetail() {
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
+  const [storylines, setStorylines] = useState([])
   const storyTimerRef = useRef(null)
 
   const stories = character?.stories || []
@@ -85,6 +86,9 @@ export default function CharacterDetail() {
     api.get(`/characters/${id}/gallery`)
       .then(({ galleryContents }) => setGalleryContents(galleryContents || []))
       .catch(() => setGalleryContents([]))
+    api.get(`/characters/${id}/storylines`)
+      .then(({ storylines }) => setStorylines(storylines || []))
+      .catch(() => setStorylines([]))
   }, [id, i18n.language])
 
   useEffect(() => {
@@ -312,6 +316,62 @@ export default function CharacterDetail() {
               </div>
             )}
           </div>
+
+          {/* 스토리 목록 */}
+          {storylines.length > 0 && (
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-gray-200">스토리</h3>
+                <span className="text-[11px] text-gray-500">{storylines.length}개</span>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+                {storylines.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      if (!token) {
+                        pendingActionRef.current = `storyline:${s.id}`
+                        setShowLoginModal(true)
+                        return
+                      }
+                      navigate(`/storylines/${s.id}`)
+                    }}
+                    className="flex-shrink-0 w-[260px] rounded-xl overflow-hidden bg-gray-900 border border-gray-800 hover:border-indigo-500 transition-colors text-left"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="aspect-[16/10] bg-gradient-to-br from-indigo-900/40 to-purple-900/30 relative overflow-hidden">
+                      {s.coverImage ? (
+                        <img src={s.coverImage} alt={s.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-700">
+                          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                          </svg>
+                        </div>
+                      )}
+                      {s.progress?.status === 'COMPLETED' && (
+                        <div className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-600/90 text-white text-[10px] rounded-full font-semibold">
+                          완료
+                        </div>
+                      )}
+                      {s.progress?.status === 'IN_PROGRESS' && (
+                        <div className="absolute top-2 right-2 px-2 py-0.5 bg-indigo-600/90 text-white text-[10px] rounded-full font-semibold">
+                          진행 중
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="font-semibold text-sm text-gray-100 line-clamp-1">{s.title}</p>
+                      {s.description && (
+                        <p className="text-xs text-gray-400 line-clamp-2 mt-1 leading-relaxed">{s.description}</p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 탭 바 */}
@@ -554,6 +614,9 @@ export default function CharacterDetail() {
         pendingActionRef.current = null
         if (action === 'start') startChat()
         else if (action === 'resume') resumeChat()
+        else if (typeof action === 'string' && action.startsWith('storyline:')) {
+          navigate(`/storylines/${action.split(':')[1]}`)
+        }
       }} />}
     </div>
   )
