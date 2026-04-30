@@ -3,10 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 
-// 메인 + 분기 노드를 사용자의 선택에 따라 평탄화한 sequence 생성
-// 동작: 메인 노드를 sortOrder 순으로 순회 → 각 노드에 선택이 있으면 그 선택의 branchNodes를 재귀적으로 펼쳐 끼워넣음
+// 메인 + 분기 노드를 사용자 선택에 따라 평탄화한 sequence
 function computeSequence(allNodes, choices) {
-  const branchMap = new Map()  // branchFromChoiceId → branch nodes (sorted)
+  const branchMap = new Map()
   const mainNodes = []
   for (const n of allNodes) {
     if (n.branchFromChoiceId == null) mainNodes.push(n)
@@ -16,16 +15,18 @@ function computeSequence(allNodes, choices) {
     }
   }
   mainNodes.sort((a, b) => a.sortOrder - b.sortOrder)
-  for (const arr of branchMap.values()) {
-    arr.sort((a, b) => a.branchSortOrder - b.branchSortOrder)
-  }
+  for (const arr of branchMap.values()) arr.sort((a, b) => a.branchSortOrder - b.branchSortOrder)
 
   function expand(node) {
     const out = [node]
-    const chosen = choices[node.id]
-    if (chosen) {
-      const branch = branchMap.get(chosen.id) || []
-      for (const bn of branch) out.push(...expand(bn))
+    const chapterChoices = node.choices || []
+    for (const c of chapterChoices) {
+      const chosen = choices[node.id]
+      if (chosen && chosen.id === c.id) {
+        const branch = branchMap.get(c.id) || []
+        for (const bn of branch) out.push(...expand(bn))
+        break
+      }
     }
     return out
   }
@@ -35,52 +36,106 @@ function computeSequence(allNodes, choices) {
   return sequence
 }
 
+// 현재 시점에서 거슬러 올라가 연속된 dialog(character/user) 아이템을 모음 — 챗 누적 표현용.
+// 챕터 경계를 넘어 이전 챕터의 chat tail까지 끌어옴 (분기 챕터로 넘어가도 직전 채팅이 그대로 유지됨).
+// narration/cg를 만나면 거기서 멈춤 (그게 "새 채팅 세션"의 시작점).
+function getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex) {
+  const lines = []
+  let i = nodeIndex
+  let j = scriptIndex
+
+  while (i >= 0) {
+    const node = sequence[i]
+    if (node?.nodeType !== 'CHAPTER') break
+    const script = node.script || []
+
+    let walkedToStart = true
+    while (j >= 0) {
+      const item = script[j]
+      if (item?.mode === 'character' || item?.mode === 'user') {
+        lines.unshift({ ...item, _key: `${node.id}-${j}` })
+        j--
+      } else {
+        walkedToStart = false
+        break
+      }
+    }
+
+    if (!walkedToStart) break
+    // 현재 챕터를 처음까지 다 걸었음 → 이전 챕터의 마지막 아이템부터 다시 시작
+    i--
+    if (i >= 0) {
+      const prev = sequence[i]
+      if (prev?.nodeType !== 'CHAPTER') break
+      const prevScript = prev.script || []
+      j = prevScript.length - 1
+    }
+  }
+
+  return lines
+}
+
+// 텍스트 박스 — 화면 하단 1/3 (narration / 마지막 dialog 아이템 기준)
+const MESSAGE_AREA_STYLE = {
+  top: '67%',
+  paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
+  paddingTop: '0',
+}
+
+const TEXT_BOX_STYLE = { backgroundColor: 'rgba(0,0,0,0.65)' }
+
 export default function Storyline() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user, token, masks, setMasks } = useStore()
+
   const [storyline, setStoryline] = useState(null)
   const [error, setError] = useState(null)
+
+  // 현재 위치
   const [nodeIndex, setNodeIndex] = useState(0)
-  const [chatStep, setChatStep] = useState(0)
+  const [scriptIndex, setScriptIndex] = useState(0)
+
+  // 진행 상태
   const [choices, setChoices] = useState({})
-  const [toast, setToast] = useState(null)
-  // 저장된 진행 시점 — 이 인덱스 이전으로는 goBack 불가
   const [lockedAtIndex, setLockedAtIndex] = useState(0)
-  // 완료 API 중복 호출 방지
   const [completeCalled, setCompleteCalled] = useState(false)
-  // 새로하기 확인 모달
+
+  // UI
+  const [toast, setToast] = useState(null)
   const [showRestartModal, setShowRestartModal] = useState(false)
   const [restarting, setRestarting] = useState(false)
-  // 선택지 확정 애니메이션 — 활성화된 choice id (애니 진행 중인 동안만 set)
   const [selectingChoiceId, setSelectingChoiceId] = useState(null)
-  // 현재 재생 중인 BGM/BGS — 새 노드의 bgmUrl/bgsUrl이 set되어 있을 때만 갱신됨 (그 외엔 유지)
+  const [chatLightbox, setChatLightbox] = useState(null)
+  const [audioMuted, setAudioMuted] = useState(false)
+
+  // 미디어/음향 상태 (지속성)
   const [currentBgm, setCurrentBgm] = useState(null)
   const [currentBgs, setCurrentBgs] = useState(null)
-  // 음향 토글 — 기본 on (false = 들림). true이면 BGM/BGS muted (재생 위치는 유지됨)
-  const [audioMuted, setAudioMuted] = useState(false)
-  // 채팅 내 미디어 풀스크린 라이트박스 — { url, type } 또는 null
-  const [chatLightbox, setChatLightbox] = useState(null)
+  const [currentBg, setCurrentBg] = useState(null)
+  const [currentCharImage, setCurrentCharImage] = useState(null)
 
+  // ── 데이터 로드 ─────────────────────────────────────────
   useEffect(() => {
     api.get(`/storylines/${id}`)
       .then(({ storyline, progress }) => {
         setStoryline(storyline)
-        // 저장된 선택지 복원 — 분기 sequence 계산에 필요
+
+        // 저장된 선택지 복원
         const restoredChoices = {}
         if (progress?.choices?.length) {
-          // 메인 + 브랜치 노드 모두에서 choice 객체를 찾아냄
           const choicesById = new Map()
           for (const n of (storyline.nodes || [])) {
             for (const c of (n.choices || [])) choicesById.set(c.id, c)
           }
           for (const pc of progress.choices) {
-            const choice = choicesById.get(pc.choiceId)
-            if (choice) restoredChoices[pc.nodeId] = choice
+            const c = choicesById.get(pc.choiceId)
+            if (c) restoredChoices[pc.nodeId] = c
           }
           setChoices(restoredChoices)
         }
-        // currentNodeId를 복원된 choices 기반 sequence에서 찾음
+
+        // 저장 시점으로 점프
         if (progress?.currentNodeId) {
           const seq = computeSequence(storyline.nodes || [], restoredChoices)
           const idx = seq.findIndex((n) => n.id === progress.currentNodeId)
@@ -89,8 +144,10 @@ export default function Storyline() {
             setLockedAtIndex(idx)
           }
         }
+
+        setCurrentBgm(storyline.defaultBgm || null)
       })
-      .catch((e) => setError(e.message || 'Failed to load'))
+      .catch((e) => setError(e?.message || 'Failed to load'))
   }, [id])
 
   // 토스트 자동 사라짐
@@ -100,106 +157,76 @@ export default function Storyline() {
     return () => clearTimeout(t)
   }, [toast])
 
-  // 사용자 선택을 반영한 평탄화 sequence — 메인 + 분기 노드 포함
   const sequence = useMemo(
     () => storyline ? computeSequence(storyline.nodes || [], choices) : [],
     [storyline, choices]
   )
+  const node = sequence[nodeIndex]
+  const isLastNode = nodeIndex === sequence.length - 1
+  const script = node?.script || []
+  const currentItem = node?.nodeType === 'CHAPTER' ? script[scriptIndex] : null
+  const isAtLastItem = node?.nodeType === 'CHAPTER' ? scriptIndex >= script.length - 1 : true
 
-  // 현재 CHAT 노드 직전의 연속 CHAT 노드들의 chatScript를 모두 모음
-  // 분기 CHAT으로 넘어가도 직전 메인 CHAT의 대화가 유지되어 보임
-  const chatHistory = useMemo(() => {
-    const cur = sequence[nodeIndex]
-    if (!cur || cur.nodeType !== 'CHAT') return []
-    const lines = []
-    for (let i = nodeIndex - 1; i >= 0; i--) {
-      const n = sequence[i]
-      if (n.nodeType !== 'CHAT') break
-      lines.unshift(...(n.chatScript || []))
+  // 현재 아이템의 effect를 sticky하게 반영 (null/undefined면 직전 값 유지)
+  useEffect(() => {
+    if (!currentItem) return
+    if (currentItem.backgroundImage != null) setCurrentBg(currentItem.backgroundImage)
+    // characterImage는 명시적으로 null을 보내면 캐릭터 이미지 제거 (story flow에서 캐릭터 사라지는 연출 가능)
+    if (currentItem.characterImage !== undefined) {
+      setCurrentCharImage(currentItem.characterImage)
     }
-    return lines
-  }, [sequence, nodeIndex])
+    if (currentItem.bgmUrl) setCurrentBgm(currentItem.bgmUrl)
+    if (currentItem.bgsUrl) setCurrentBgs(currentItem.bgsUrl)
+  }, [node?.id, scriptIndex])
 
-  // RESULT 노드 도달 시 완료 처리 (한 번만 호출)
+  // RESULT 도달 시 자동 완료
   useEffect(() => {
     if (completeCalled || !token || !sequence.length) return
-    const currentNode = sequence[nodeIndex]
-    if (currentNode?.nodeType !== 'RESULT') return
+    const cur = sequence[nodeIndex]
+    if (cur?.nodeType !== 'RESULT') return
     setCompleteCalled(true)
     api.post(`/storylines/${id}/complete`)
+      .then((res) => {
+        if (res?.unlockedImages?.length > 0) {
+          setToast(`🖼️ ${res.unlockedImages.length}장 해금!`)
+        }
+      })
       .catch((e) => {
         console.error('Complete storyline failed:', e)
         setCompleteCalled(false)
       })
   }, [sequence, nodeIndex, completeCalled, token, id])
 
-  // BGM/BGS 초기화 — storyline이 처음 로드될 때 storyline.defaultBgm을 시작 BGM으로 설정
-  useEffect(() => {
-    if (!storyline) return
-    setCurrentBgm(storyline.defaultBgm || null)
-    setCurrentBgs(null)
-  }, [storyline?.id])
-
-  // 노드 전환 시 — 새 노드에 bgmUrl/bgsUrl이 명시되어 있을 때만 전환. 미지정이면 현재 재생 유지.
-  const currentNodeId = sequence[nodeIndex]?.id
-  useEffect(() => {
-    if (!storyline) return
-    const n = sequence[nodeIndex]
-    if (!n) return
-    if (n.bgmUrl) setCurrentBgm(n.bgmUrl)
-    if (n.bgsUrl) setCurrentBgs(n.bgsUrl)
-  }, [currentNodeId])
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-dvh bg-black text-gray-400 gap-3">
-        <p>스토리를 불러오지 못했습니다.</p>
-        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>돌아가기</button>
-      </div>
-    )
-  }
-  if (!storyline) {
-    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">로딩 중...</div>
-  }
-
-  const node = sequence[nodeIndex]
-  const isLastNode = nodeIndex === sequence.length - 1
-
+  // ── 진행 로직 ───────────────────────────────────────────
   const advance = () => {
     if (!node) return
-    if (node.nodeType === 'CHAT') {
-      const script = Array.isArray(node.chatScript) ? node.chatScript : []
-      if (chatStep < script.length - 1) {
-        setChatStep(chatStep + 1)
-        return
-      }
+    if (node.nodeType === 'CHAPTER' && scriptIndex < script.length - 1) {
+      setScriptIndex(scriptIndex + 1)
+      return
     }
     if (isLastNode) {
       navigate(-1)
       return
     }
     setNodeIndex(nodeIndex + 1)
-    setChatStep(0)
+    setScriptIndex(0)
   }
 
   const goBack = () => {
     if (!node) return
-    // CHAT 노드 내부 단계 되돌리기 (같은 노드 내 이동은 lock 무관)
-    if (node.nodeType === 'CHAT' && chatStep > 0) {
-      setChatStep(chatStep - 1)
+    if (node.nodeType === 'CHAPTER' && scriptIndex > 0) {
+      setScriptIndex(scriptIndex - 1)
       return
     }
-    // 첫 노드 또는 저장 lock 지점이면 더 이상 못 감
     if (nodeIndex === 0 || nodeIndex <= lockedAtIndex) return
     const prevNode = sequence[nodeIndex - 1]
     setNodeIndex(nodeIndex - 1)
-    if (prevNode?.nodeType === 'CHAT') {
-      const script = Array.isArray(prevNode.chatScript) ? prevNode.chatScript : []
-      setChatStep(Math.max(0, script.length - 1))
+    if (prevNode?.nodeType === 'CHAPTER') {
+      const prevScript = prevNode.script || []
+      setScriptIndex(Math.max(0, prevScript.length - 1))
     } else {
-      setChatStep(0)
+      setScriptIndex(0)
     }
-    // 이전 노드의 선택 기록 클리어 (다시 고를 수 있게)
     if (prevNode && prevNode.id != null) {
       setChoices((prev) => {
         if (!(prevNode.id in prev)) return prev
@@ -210,32 +237,9 @@ export default function Storyline() {
     }
   }
 
-  // 새로하기 — 백엔드에 새 attempt 생성 후 플레이어 상태 초기화
-  const handleRestart = async () => {
-    if (!token || restarting) return
-    setRestarting(true)
-    try {
-      await api.post(`/storylines/${id}/restart`)
-      setNodeIndex(0)
-      setChatStep(0)
-      setChoices({})
-      setLockedAtIndex(0)
-      setCompleteCalled(false)
-      setShowRestartModal(false)
-      setToast('새 진행 시작')
-      // BGM/BGS 리셋 — 첫 노드부터 다시 시작
-      setCurrentBgm(storyline?.defaultBgm || null)
-      setCurrentBgs(null)
-    } catch (e) {
-      console.error('Restart failed:', e)
-    } finally {
-      setRestarting(false)
-    }
-  }
-
-  // 선택 클릭 → 애니메이션 시작 → 1.2초 후 실제 진행
+  // ── 선택지 처리 (애니 + 저장) ───────────────────────────
   const handleChoiceClick = (choice) => {
-    if (selectingChoiceId !== null) return  // 이미 애니메이션 중이면 무시
+    if (selectingChoiceId !== null) return
 
     const isPremium = choice.choiceType === 'PREMIUM'
     const cost = choice.maskCost || 0
@@ -245,7 +249,6 @@ export default function Storyline() {
     }
 
     setSelectingChoiceId(choice.id)
-    // 1s × 2 (깜빡임 두 번) = 2s 후 진행
     setTimeout(() => {
       setSelectingChoiceId(null)
       commitChoice(choice)
@@ -253,7 +256,6 @@ export default function Storyline() {
   }
 
   const commitChoice = async (choice) => {
-    // 다음 위치 계산 — 선택을 반영한 sequence를 미리 계산
     const nextChoices = { ...choices, [node.id]: choice }
     const nextSequence = computeSequence(storyline.nodes || [], nextChoices)
     const currentIdxInNext = nextSequence.findIndex((n) => n.id === node.id)
@@ -261,10 +263,9 @@ export default function Storyline() {
     const nextNodeId = nextNode?.id ?? null
     const lockTarget = currentIdxInNext + 1
 
-    // UI 업데이트
     setChoices(nextChoices)
     setNodeIndex(lockTarget)
-    setChatStep(0)
+    setScriptIndex(0)
 
     if (token) {
       try {
@@ -273,7 +274,12 @@ export default function Storyline() {
           choiceId: choice.id,
           nextNodeId,
         })
-        setToast('저장 완료')
+        const unlockCount = res?.unlockedImages?.length || 0
+        if (unlockCount > 0) {
+          setToast(`저장 완료 · 🖼️ ${unlockCount}장 해금`)
+        } else {
+          setToast('저장 완료')
+        }
         setLockedAtIndex(lockTarget)
         if (res.masks != null) setMasks(res.masks)
       } catch (e) {
@@ -287,78 +293,156 @@ export default function Storyline() {
     }
   }
 
+  const handleRestart = async () => {
+    if (!token || restarting) return
+    setRestarting(true)
+    try {
+      await api.post(`/storylines/${id}/restart`)
+      setNodeIndex(0)
+      setScriptIndex(0)
+      setChoices({})
+      setLockedAtIndex(0)
+      setCompleteCalled(false)
+      setShowRestartModal(false)
+      setToast('새 진행 시작')
+      setCurrentBgm(storyline?.defaultBgm || null)
+      setCurrentBgs(null)
+      setCurrentBg(null)
+      setCurrentCharImage(null)
+    } catch (e) {
+      console.error('Restart failed:', e)
+    } finally {
+      setRestarting(false)
+    }
+  }
+
+  // ── 렌더링 분기 결정 ───────────────────────────────────
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-dvh bg-black text-gray-400 gap-3">
+        <p>스토리를 불러오지 못했습니다.</p>
+        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>돌아가기</button>
+      </div>
+    )
+  }
+  if (!storyline) {
+    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">로딩 중...</div>
+  }
   if (!node) {
     return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">스토리 끝</div>
   }
 
-  // 선택지 대기 중이면 우측 탭(다음)을 비활성화
-  // SCENE: 항상 대기 / CHAT: 마지막 라인에 도달했을 때만 대기
-  const chatScriptLen = Array.isArray(node?.chatScript) ? node.chatScript.length : 0
-  const isAtLastChatStep = node?.nodeType === 'CHAT' && chatStep >= chatScriptLen - 1
-  const hasNodeChoices = Array.isArray(node?.choices) && node.choices.length > 0
-  const waitingChoice = hasNodeChoices && (
-    node.nodeType === 'SCENE' || (node.nodeType === 'CHAT' && isAtLastChatStep)
-  )
+  // 챕터 끝 + 선택지 있을 때 우측 탭 비활성화 (선택 강제)
+  const hasChoices = node.nodeType === 'CHAPTER' && Array.isArray(node.choices) && node.choices.length > 0
+  const waitingChoice = hasChoices && isAtLastItem
   const showTapZones = node.nodeType !== 'RESULT'
+
+  // CG 아이템: storyImageId로 storyline.images 에서 매칭되는 이미지 찾음
+  const cgImage = currentItem?.mode === 'cg'
+    ? (storyline.images || []).find((img) => img.id === currentItem.storyImageId)
+    : null
+
+  // 챗 누적 블록 (현재 아이템 포함)
+  const chatBlock = currentItem && (currentItem.mode === 'character' || currentItem.mode === 'user')
+    ? getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex)
+    : []
+
+  // 모드 플래그 — 배경/캐릭터 표시 여부 결정
+  const isChatMode = node.nodeType === 'CHAPTER' && (currentItem?.mode === 'character' || currentItem?.mode === 'user')
+  const isCgMode = node.nodeType === 'CHAPTER' && currentItem?.mode === 'cg'
+  const isNarrationMode = node.nodeType === 'CHAPTER' && currentItem?.mode === 'narration'
 
   return (
     <div className="relative w-full h-dvh bg-black text-white overflow-hidden select-none">
-      {/* BGM — 노드에서 명시된 새 URL이 들어왔을 때만 재마운트 (그 외엔 유지) */}
+      {/* 배경 — narration/cg 모드에서만 풀 표시. 채팅 모드는 다크 그레이로 전환 */}
+      {isChatMode ? (
+        <div className="absolute inset-0 bg-gray-950" />
+      ) : currentBg ? (
+        <img src={currentBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-950 to-black" />
+      )}
+
+      {/* 캐릭터 등장 시 약한 배경 딤드 (narration 모드에서만) */}
+      {isNarrationMode && currentCharImage && (
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }} />
+      )}
+
+      {/* 캐릭터 standing 이미지 — narration 모드에서만 (채팅 모드는 아바타로 대체됨) */}
+      {isNarrationMode && currentCharImage && (
+        <div className="absolute inset-x-0 top-0 flex items-end justify-center pointer-events-none" style={{ bottom: '33%' }}>
+          <img src={currentCharImage} alt="" className="max-h-full max-w-[80%] object-contain drop-shadow-2xl" />
+        </div>
+      )}
+
+      {/* CG 풀스크린 */}
+      {isCgMode && cgImage && (
+        <img src={cgImage.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      )}
+
+      {/* fullMedia (script item 레벨, narration에서 가능) */}
+      {currentItem?.fullMediaUrl && (
+        currentItem.fullMediaType === 'video'
+          ? <video src={currentItem.fullMediaUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline />
+          : <img src={currentItem.fullMediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      )}
+
+      {/* 음향 */}
       {currentBgm && (
-        <audio
-          key={currentBgm}
-          src={currentBgm}
-          autoPlay
-          loop
-          muted={audioMuted}
-          ref={(el) => { if (el) el.volume = 0.6 }}
-        />
+        <audio key={currentBgm} src={currentBgm} autoPlay loop muted={audioMuted} ref={(el) => { if (el) el.volume = 0.6 }} />
       )}
-      {/* BGS — 빗소리 등 효과음. BGM과 동시에 재생 */}
       {currentBgs && (
-        <audio
-          key={currentBgs}
-          src={currentBgs}
-          autoPlay
-          loop
-          muted={audioMuted}
-          ref={(el) => { if (el) el.volume = 0.4 }}
-        />
+        <audio key={currentBgs} src={currentBgs} autoPlay loop muted={audioMuted} ref={(el) => { if (el) el.volume = 0.4 }} />
       )}
-      {/* 캐릭터 보이스 — 노드별 1회 재생, 다른 노드로 이동 시 자동 정지 (key가 node.id 기반) */}
-      {node?.voiceUrl && (
+      {currentItem?.voiceUrl && (
         <audio
-          key={`voice-${node.id}-${node.voiceUrl}`}
-          src={node.voiceUrl}
+          key={`voice-${node?.id}-${scriptIndex}-${currentItem.voiceUrl}`}
+          src={currentItem.voiceUrl}
           autoPlay
           muted={audioMuted}
           ref={(el) => { if (el) el.volume = 0.85 }}
         />
       )}
 
-      {node.nodeType === 'SCENE' && (
-        <SceneView
-          node={node}
+      {/* 콘텐츠 — 모드별 분기 */}
+      {node.nodeType === 'CHAPTER' && currentItem?.mode === 'narration' && (
+        <NarrationView
+          item={currentItem}
           storyline={storyline}
-          user={user}
+          waitingChoice={waitingChoice}
+          choices={node.choices}
           masks={masks}
           onChoice={handleChoiceClick}
           selectingChoiceId={selectingChoiceId}
+          showChoices={waitingChoice}
         />
       )}
-      {node.nodeType === 'CHAT' && (
-        <ChatView
-          node={node}
+
+      {node.nodeType === 'CHAPTER' && (currentItem?.mode === 'character' || currentItem?.mode === 'user') && (
+        <ChatBlockView
+          chatBlock={chatBlock}
           storyline={storyline}
           user={user}
           masks={masks}
-          step={chatStep}
+          showChoices={waitingChoice}
+          choices={node.choices}
           onChoice={handleChoiceClick}
           selectingChoiceId={selectingChoiceId}
           onMediaClick={setChatLightbox}
-          chatHistory={chatHistory}
         />
       )}
+
+      {node.nodeType === 'CHAPTER' && currentItem?.mode === 'cg' && (
+        <CgView
+          image={cgImage}
+          showChoices={waitingChoice}
+          choices={node.choices}
+          masks={masks}
+          onChoice={handleChoiceClick}
+          selectingChoiceId={selectingChoiceId}
+        />
+      )}
+
       {node.nodeType === 'RESULT' && (
         <ResultView
           node={node}
@@ -370,27 +454,27 @@ export default function Storyline() {
         />
       )}
 
-      {/* 탭 영역 — 좌(이전) / 우(다음). 헤더(z-30) 아래, 메시지/선택지(z-20+) 아래 */}
+      {/* 탭 영역 */}
       {showTapZones && (
         <>
           <button
             onClick={goBack}
             className="absolute left-0 top-0 bottom-0 w-1/2 z-10 bg-transparent"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="이전 메시지"
+            aria-label="이전"
           />
           {!waitingChoice && (
             <button
               onClick={advance}
               className="absolute right-0 top-0 bottom-0 w-1/2 z-10 bg-transparent"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="다음 메시지"
+              aria-label="다음"
             />
           )}
         </>
       )}
 
-      {/* 헤더 — 좌측 X, 우측 음표 토글 */}
+      {/* 헤더 — X + 음향 토글 */}
       <div
         className="absolute top-0 left-0 right-0 z-30 px-4 flex items-center justify-between"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)', paddingBottom: '10px' }}
@@ -408,9 +492,7 @@ export default function Storyline() {
         </button>
         <button
           onClick={() => setAudioMuted((m) => !m)}
-          className={`w-9 h-9 flex items-center justify-center backdrop-blur-sm rounded-full transition-colors ${
-            audioMuted ? 'bg-black/50 text-gray-400' : 'bg-black/50 text-white'
-          }`}
+          className={`w-9 h-9 flex items-center justify-center backdrop-blur-sm rounded-full transition-colors ${audioMuted ? 'bg-black/50 text-gray-400' : 'bg-black/50 text-white'}`}
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           aria-label={audioMuted ? '음향 켜기' : '음향 끄기'}
         >
@@ -423,7 +505,7 @@ export default function Storyline() {
         </button>
       </div>
 
-      {/* 토스트 — 헤더 아래, 우측에서 슬라이드 인/아웃 */}
+      {/* 토스트 */}
       {toast && (
         <div
           className="absolute right-0 z-40 px-4 pointer-events-none overflow-hidden"
@@ -438,7 +520,7 @@ export default function Storyline() {
         </div>
       )}
 
-      {/* 채팅 미디어 풀스크린 라이트박스 — 9:16 미디어 기준, 세로 꽉 차게(가로는 넘치면 자름) */}
+      {/* 채팅 미디어 풀스크린 라이트박스 */}
       {chatLightbox && (
         <div
           className="absolute inset-0 z-50 bg-black/95 flex items-center justify-center overflow-hidden"
@@ -459,10 +541,7 @@ export default function Storyline() {
             <video
               src={chatLightbox.url}
               className="h-full w-auto max-w-none"
-              autoPlay
-              loop
-              muted
-              playsInline
+              autoPlay loop muted playsInline
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
@@ -476,7 +555,7 @@ export default function Storyline() {
         </div>
       )}
 
-      {/* 새로하기 확인 모달 */}
+      {/* 새로하기 모달 */}
       {showRestartModal && (
         <div
           className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-6"
@@ -518,158 +597,38 @@ export default function Storyline() {
   )
 }
 
-// 메시지 영역 컨테이너 스타일 — 하단 1/3 지점부터, 배경 없음 (텍스트 박스에만 dim 적용)
-// paddingTop은 0 — 텍스트 박스가 캐릭터 하단(67% 라인)과 정확히 맞닿게 함
-const MESSAGE_AREA_STYLE = {
-  top: '67%',
-  paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
-  paddingTop: '0',
-}
-
-// 텍스트 박스 자체의 dim 배경
-const TEXT_BOX_STYLE = {
-  backgroundColor: 'rgba(0,0,0,0.65)',
-}
-
-// SCENE 노드용 화자 해석
-// 우선순위: node.speakerName (자유 텍스트) > 등록 캐릭터 이름 > storyline 호스트 캐릭터 > 유저 이름
-function resolveSceneSpeaker(node, storyline, user) {
-  if (node.speakerName) return node.speakerName
-  if (node.speaker === 'CHARACTER') {
-    return node.character?.name || storyline.character?.name || null
-  }
-  if (node.speaker === 'USER') {
-    return user?.name || '나'
-  }
-  return null  // NARRATION — 이름 미표시
-}
-
-// CHAT 라인용 화자 해석
-// 우선순위: line.name (자유 텍스트) > line.role 기반 등록 캐릭터/유저 이름
-function resolveChatLineSpeaker(line, node, storyline, user) {
-  if (!line) return null
-  if (line.name) return line.name
-  if (line.role === 'user') return user?.name || '나'
-  if (line.role === 'character') {
-    return node.character?.name || storyline.character?.name || null
-  }
-  return null
-}
-
-function SceneView({ node, storyline, user, masks, onChoice, selectingChoiceId }) {
-  const hasChoices = Array.isArray(node.choices) && node.choices.length > 0
-  const isFullMedia = !!node.fullMediaUrl
-  const hasCharacter = !isFullMedia && !!node.characterImage
-  const speakerName = resolveSceneSpeaker(node, storyline, user)
+// ───────────────────────────────────────────────────────────
+// Narration 뷰 — 비주얼 노벨식 텍스트 박스 (하단 1/3)
+// ───────────────────────────────────────────────────────────
+function NarrationView({ item, storyline, showChoices, choices, masks, onChoice, selectingChoiceId }) {
+  const speakerName = item?.speakerName || null
 
   return (
     <div className="absolute inset-0">
-      {/* 배경 / 풀미디어 */}
-      {isFullMedia ? (
-        node.fullMediaType === 'video' ? (
-          <video src={node.fullMediaUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline />
-        ) : (
-          <img src={node.fullMediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        )
-      ) : node.backgroundImage ? (
-        <img src={node.backgroundImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-950 to-black" />
-      )}
-
-      {/* 캐릭터 등장 시 배경 약한 딤드 */}
-      {hasCharacter && (
-        <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }} />
-      )}
-
-      {/* 캐릭터 — 메시지 영역(하단 33%) 바로 위에 정확히 맞닿게 */}
-      {hasCharacter && (
-        <div className="absolute inset-x-0 top-0 flex items-end justify-center pointer-events-none" style={{ bottom: '33%' }}>
-          <img src={node.characterImage} alt="" className="max-h-full max-w-[80%] object-contain drop-shadow-2xl" />
-        </div>
-      )}
-
-      {/* 메시지 영역 — 하단 1/3 */}
-      {(node.message || hasChoices) && (
+      {(item?.text || showChoices) && (
         <div
           className="absolute left-0 right-0 bottom-0 z-20 px-5 pointer-events-none"
           style={MESSAGE_AREA_STYLE}
         >
-          {node.message && (
+          {item?.text && (
             <div className="relative rounded-xl px-4 py-5" style={TEXT_BOX_STYLE}>
               {speakerName && (
-                <span
-                  className={`absolute -top-2.5 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg ${
-                    node.speaker === 'USER'
-                      ? 'right-3 bg-gray-700 text-white'
-                      : 'left-3 bg-indigo-600 text-white'
-                  }`}
-                >
+                <span className="absolute -top-2.5 left-3 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg bg-indigo-600 text-white">
                   {speakerName}
                 </span>
               )}
               <p className="text-[15px] leading-relaxed text-white whitespace-pre-line">
-                {node.message}
+                {item.text}
               </p>
             </div>
           )}
-
-          {hasChoices && (
-            <div className="mt-3 flex flex-col gap-2 pointer-events-auto">
-              {node.choices.map((c) => {
-                const isPremium = c.choiceType === 'PREMIUM'
-                const cost = c.maskCost || 0
-                const insufficient = isPremium && cost > 0 && (masks ?? 0) < cost
-
-                // 선택 확정 애니메이션
-                const isSelecting = selectingChoiceId === c.id
-                const isOtherWhileSelecting = selectingChoiceId != null && selectingChoiceId !== c.id
-
-                const baseClass = 'w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between gap-3 border relative'
-                const variantClass = isPremium
-                  ? insufficient
-                    ? ' bg-gray-900/60 border-gray-800 text-gray-400'
-                    : ' bg-amber-900/30 hover:bg-amber-900/50 active:bg-amber-900/60 border-amber-600/60 hover:border-amber-500 text-amber-50'
-                  : ' bg-gray-900/85 hover:bg-indigo-900/70 active:bg-indigo-800/70 border-gray-700 hover:border-indigo-500 text-gray-100'
-
-                // 동적 애니메이션 스타일
-                const animStyle = {
-                  outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  transition: 'opacity 0.3s ease',
-                }
-                if (isOtherWhileSelecting) {
-                  animStyle.opacity = 0.2
-                  animStyle.pointerEvents = 'none'
-                } else if (isSelecting) {
-                  // 제자리에서 깜빡임 두 번 (각 1s × 2 = 2s)
-                  animStyle.animation = 'storyChoiceBlink 1s ease-in-out 2'
-                }
-
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => onChoice(c)}
-                    className={baseClass + variantClass}
-                    style={animStyle}
-                  >
-                    <span className="flex-1">{c.label}</span>
-                    {isPremium && cost > 0 && (
-                      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${
-                        insufficient
-                          ? 'bg-red-950/60 text-red-300 border-red-900/50'
-                          : 'bg-amber-950/70 text-amber-200 border-amber-700/50'
-                      }`}>
-                        <svg width="16" height="10" viewBox="0 0 32 20" fill="currentColor" fillRule="evenodd" style={{ transform: 'scaleY(-1)' }}>
-                          <path d="M0 10C0 5 3.5 0 8.5 0c2.5 0 4.5 1.2 7.5 4 3-2.8 5-4 7.5-4C28.5 0 32 5 32 10c0 2.5-1 4.5-2.8 6-1.2 1-2.8 1.8-4.2 2.2-1.5.4-2.8.3-3.8-.2-1.2-.6-2.2-1.8-3.5-3.8L16 11l-1.7 3.2c-1.3 2-2.3 3.2-3.5 3.8-1 .5-2.3.6-3.8.2C5.6 17.8 4 17 2.8 16 1 14.5 0 12.5 0 10zM7 7.5C5.5 7.5 4.2 8.5 3.8 10c-.3 1 .2 1.8 1 2.2 1 .5 2.3.3 3.4-.3 1.2-.7 2-1.7 2.3-2.8.3-1-.1-1.8-1-2.2-.5-.2-1.2-.2-1.8-.1l-.7.2zM25 7.5l-.7-.2c-.6-.1-1.3-.1-1.8.1-.9.4-1.3 1.2-1 2.2.3 1.1 1.1 2.1 2.3 2.8 1.1.6 2.4.8 3.4.3.8-.4 1.3-1.2 1-2.2-.4-1.5-1.7-2.5-3.2-2.5z" />
-                        </svg>
-                        {cost}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+          {showChoices && (
+            <ChoiceButtons
+              choices={choices}
+              masks={masks}
+              onChoice={onChoice}
+              selectingChoiceId={selectingChoiceId}
+            />
           )}
         </div>
       )}
@@ -677,39 +636,31 @@ function SceneView({ node, storyline, user, masks, onChoice, selectingChoiceId }
   )
 }
 
-function ChatView({ node, storyline, user, masks, step, onChoice, selectingChoiceId, onMediaClick, chatHistory }) {
-  const script = Array.isArray(node.chatScript) ? node.chatScript : []
-  const visibleLines = script.slice(0, step + 1)
-  const isAtLastLine = step >= script.length - 1
-  const hasChoices = Array.isArray(node.choices) && node.choices.length > 0
-
-  const characterName = node.character?.name || storyline.character?.name || ''
-  // profileImage 없으면 storyline coverImage(캐릭터 일러스트)로 fallback
-  const profileUrl = node.character?.profileImage || storyline.character?.profileImage || storyline.coverImage || null
+// ───────────────────────────────────────────────────────────
+// Chat Block 뷰 — 누적 말풍선
+// ───────────────────────────────────────────────────────────
+function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices, onChoice, selectingChoiceId, onMediaClick }) {
+  const characterName = storyline.character?.name || ''
+  const profileUrl = storyline.character?.profileImage || storyline.thumbnailImage || storyline.coverImage || null
   const userName = user?.name || '나'
 
-  // 선택지를 클릭한 직후(애니메이션 진행 중)에는 선택한 텍스트를 채팅 히스토리 끝에 user 버블로 추가하고
-  // 선택지 영역은 숨김 → "선택한 게 곧 유저의 답장"이라는 시각적 표현
   const pickedChoice = selectingChoiceId
-    ? node.choices?.find((c) => c.id === selectingChoiceId)
+    ? choices?.find((c) => c.id === selectingChoiceId)
     : null
-  // 직전 연속 CHAT 노드의 라인 + 현재 노드의 누적 라인 + (애니 중) 합성 user 버블
-  const baseLines = Array.isArray(chatHistory) ? [...chatHistory, ...visibleLines] : visibleLines
   const displayLines = pickedChoice
-    ? [...baseLines, { role: 'user', content: pickedChoice.label, _isPicked: true }]
-    : baseLines
-  const showChoices = isAtLastLine && hasChoices && !pickedChoice
+    ? [...chatBlock, { mode: 'user', content: pickedChoice.label, _isPicked: true }]
+    : chatBlock
 
   const scrollRef = useRef(null)
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [step, showChoices, selectingChoiceId])
+  }, [chatBlock.length, showChoices, selectingChoiceId])
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-gray-950">
-      {/* 메시지 영역 — 헤더 아래부터 시작, 누적 말풍선 */}
+    <div className="absolute inset-0 flex flex-col">
+      {/* 누적 말풍선 영역 */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-auto px-4 pb-2"
@@ -717,12 +668,10 @@ function ChatView({ node, storyline, user, masks, step, onChoice, selectingChoic
       >
         <div className="space-y-1 pb-2">
           {displayLines.map((line, i) => {
-            const prevLine = displayLines[i - 1]
-            const isConsecutive = prevLine?.role === line.role
-            const isUser = line.role === 'user'
-            const bubbleStyle = line._isPicked
-              ? { animation: 'storyChoiceBlink 1s ease-in-out 2' }
-              : undefined
+            const prev = displayLines[i - 1]
+            const isConsecutive = prev?.mode === line.mode
+            const isUser = line.mode === 'user'
+            const bubbleStyle = line._isPicked ? { animation: 'storyChoiceBlink 1s ease-in-out 2' } : undefined
             return (
               <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${isConsecutive ? '' : 'mt-3'}`}>
                 {!isUser && (
@@ -743,12 +692,9 @@ function ChatView({ node, storyline, user, masks, step, onChoice, selectingChoic
                   {isUser && !isConsecutive && (
                     <p className="text-xs text-gray-400 mb-1 font-medium text-right">{line.name || userName}</p>
                   )}
-                  {/* 미디어 (이미지/영상) — 클릭 시 풀스크린. z-20으로 탭 영역(z-10)보다 위 */}
                   {line.mediaUrl && (
                     <div
-                      className={`mb-1.5 rounded-2xl overflow-hidden cursor-pointer relative z-20 ${
-                        isUser ? 'rounded-tr-none' : 'rounded-tl-none'
-                      }`}
+                      className={`mb-1.5 rounded-2xl overflow-hidden cursor-pointer relative z-20 ${isUser ? 'rounded-tr-none' : 'rounded-tl-none'}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         onMediaClick && onMediaClick({ url: line.mediaUrl, type: line.mediaType || 'image' })
@@ -757,15 +703,7 @@ function ChatView({ node, storyline, user, masks, step, onChoice, selectingChoic
                     >
                       {line.mediaType === 'video' ? (
                         <>
-                          <video
-                            src={line.mediaUrl}
-                            className="w-full max-h-[240px] object-cover bg-black"
-                            muted
-                            loop
-                            autoPlay
-                            playsInline
-                          />
-                          {/* 영상 오버레이 — 풀스크린 표시 */}
+                          <video src={line.mediaUrl} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline />
                           <div className="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center bg-black/60 rounded-full">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="15 3 21 3 21 9" />
@@ -776,22 +714,13 @@ function ChatView({ node, storyline, user, masks, step, onChoice, selectingChoic
                           </div>
                         </>
                       ) : (
-                        <img
-                          src={line.mediaUrl}
-                          alt=""
-                          className="w-full max-h-[240px] object-cover"
-                          loading="lazy"
-                        />
+                        <img src={line.mediaUrl} alt="" className="w-full max-h-[240px] object-cover" loading="lazy" />
                       )}
                     </div>
                   )}
                   {line.content && (
                     <div
-                      className={`text-sm leading-relaxed px-3.5 py-2.5 whitespace-pre-line ${
-                        isUser
-                          ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
-                          : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'
-                      }`}
+                      className={`text-sm leading-relaxed px-3.5 py-2.5 whitespace-pre-line ${isUser ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}
                       style={bubbleStyle}
                     >
                       {line.content}
@@ -804,69 +733,113 @@ function ChatView({ node, storyline, user, masks, step, onChoice, selectingChoic
         </div>
       </div>
 
-      {/* 답장 선택지 — 마지막 라인 도달 후, 노드에 choices가 있을 때만 표시 */}
-      {showChoices && (
+      {/* 답장 선택지 */}
+      {showChoices && !pickedChoice && (
         <div
-          className="relative z-20 px-4 pt-2 flex flex-col gap-2 bg-gradient-to-t from-gray-950 via-gray-950 to-transparent"
+          className="relative z-20 px-4 pt-2 flex flex-col gap-2 bg-gradient-to-t from-gray-950/90 via-gray-950/90 to-transparent"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
         >
-          {node.choices.map((c) => {
-            const isPremium = c.choiceType === 'PREMIUM'
-            const cost = c.maskCost || 0
-            const insufficient = isPremium && cost > 0 && (masks ?? 0) < cost
-            const isSelecting = selectingChoiceId === c.id
-            const isOtherWhileSelecting = selectingChoiceId != null && selectingChoiceId !== c.id
-
-            const baseClass = 'w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between gap-3 border relative'
-            const variantClass = isPremium
-              ? insufficient
-                ? ' bg-gray-900/60 border-gray-800 text-gray-400'
-                : ' bg-amber-900/30 hover:bg-amber-900/50 active:bg-amber-900/60 border-amber-600/60 hover:border-amber-500 text-amber-50'
-              : ' bg-gray-900/85 hover:bg-indigo-900/70 active:bg-indigo-800/70 border-gray-700 hover:border-indigo-500 text-gray-100'
-
-            const animStyle = {
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'opacity 0.3s ease',
-            }
-            if (isOtherWhileSelecting) {
-              animStyle.opacity = 0.2
-              animStyle.pointerEvents = 'none'
-            } else if (isSelecting) {
-              animStyle.animation = 'storyChoiceBlink 1s ease-in-out 2'
-            }
-
-            return (
-              <button
-                key={c.id}
-                onClick={() => onChoice(c)}
-                className={baseClass + variantClass}
-                style={animStyle}
-              >
-                <span className="flex-1">{c.label}</span>
-                {isPremium && cost > 0 && (
-                  <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${
-                    insufficient
-                      ? 'bg-red-950/60 text-red-300 border-red-900/50'
-                      : 'bg-amber-950/70 text-amber-200 border-amber-700/50'
-                  }`}>
-                    <svg width="16" height="10" viewBox="0 0 32 20" fill="currentColor" fillRule="evenodd" style={{ transform: 'scaleY(-1)' }}>
-                      <path d="M0 10C0 5 3.5 0 8.5 0c2.5 0 4.5 1.2 7.5 4 3-2.8 5-4 7.5-4C28.5 0 32 5 32 10c0 2.5-1 4.5-2.8 6-1.2 1-2.8 1.8-4.2 2.2-1.5.4-2.8.3-3.8-.2-1.2-.6-2.2-1.8-3.5-3.8L16 11l-1.7 3.2c-1.3 2-2.3 3.2-3.5 3.8-1 .5-2.3.6-3.8.2C5.6 17.8 4 17 2.8 16 1 14.5 0 12.5 0 10zM7 7.5C5.5 7.5 4.2 8.5 3.8 10c-.3 1 .2 1.8 1 2.2 1 .5 2.3.3 3.4-.3 1.2-.7 2-1.7 2.3-2.8.3-1-.1-1.8-1-2.2-.5-.2-1.2-.2-1.8-.1l-.7.2zM25 7.5l-.7-.2c-.6-.1-1.3-.1-1.8.1-.9.4-1.3 1.2-1 2.2.3 1.1 1.1 2.1 2.3 2.8 1.1.6 2.4.8 3.4.3.8-.4 1.3-1.2 1-2.2-.4-1.5-1.7-2.5-3.2-2.5z" />
-                    </svg>
-                    {cost}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+          <ChoiceButtons
+            choices={choices}
+            masks={masks}
+            onChoice={onChoice}
+            selectingChoiceId={selectingChoiceId}
+          />
         </div>
       )}
     </div>
   )
 }
 
+// ───────────────────────────────────────────────────────────
+// CG 뷰 — 컬렉터블 풀스크린
+// ───────────────────────────────────────────────────────────
+function CgView({ image, showChoices, choices, masks, onChoice, selectingChoiceId }) {
+  return (
+    <div className="absolute inset-0">
+      {image?.title && (
+        <div
+          className="absolute left-0 right-0 z-20 px-5 pointer-events-none"
+          style={{ top: 'calc(env(safe-area-inset-top) + 70px)' }}
+        >
+          <div className="inline-block px-3 py-1 rounded-md text-xs font-bold bg-amber-600/90 text-white shadow-lg">
+            🖼️ {image.title}
+          </div>
+        </div>
+      )}
+      {showChoices && (
+        <div
+          className="absolute left-0 right-0 bottom-0 z-20 px-5 pointer-events-none"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
+        >
+          <ChoiceButtons
+            choices={choices}
+            masks={masks}
+            onChoice={onChoice}
+            selectingChoiceId={selectingChoiceId}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────
+// 선택지 버튼 (공통)
+// ───────────────────────────────────────────────────────────
+function ChoiceButtons({ choices, masks, onChoice, selectingChoiceId }) {
+  return (
+    <div className="mt-4 flex flex-col gap-2 pointer-events-auto">
+      {choices.map((c) => {
+        const isPremium = c.choiceType === 'PREMIUM'
+        const cost = c.maskCost || 0
+        const insufficient = isPremium && cost > 0 && (masks ?? 0) < cost
+        const isSelecting = selectingChoiceId === c.id
+        const isOtherWhileSelecting = selectingChoiceId != null && selectingChoiceId !== c.id
+
+        const baseClass = 'w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between gap-3 border relative'
+        const variantClass = isPremium
+          ? insufficient
+            ? ' bg-gray-900/60 border-gray-800 text-gray-400'
+            : ' bg-amber-900/30 hover:bg-amber-900/50 active:bg-amber-900/60 border-amber-600/60 hover:border-amber-500 text-amber-50'
+          : ' bg-gray-900/85 hover:bg-indigo-900/70 active:bg-indigo-800/70 border-gray-700 hover:border-indigo-500 text-gray-100'
+
+        const animStyle = {
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          transition: 'opacity 0.3s ease',
+        }
+        if (isOtherWhileSelecting) {
+          animStyle.opacity = 0.2
+          animStyle.pointerEvents = 'none'
+        } else if (isSelecting) {
+          animStyle.animation = 'storyChoiceBlink 1s ease-in-out 2'
+        }
+
+        return (
+          <button key={c.id} onClick={() => onChoice(c)} className={baseClass + variantClass} style={animStyle}>
+            <span className="flex-1">{c.label}</span>
+            {isPremium && cost > 0 && (
+              <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${insufficient ? 'bg-red-950/60 text-red-300 border-red-900/50' : 'bg-amber-950/70 text-amber-200 border-amber-700/50'}`}>
+                <svg width="16" height="10" viewBox="0 0 32 20" fill="currentColor" fillRule="evenodd" style={{ transform: 'scaleY(-1)' }}>
+                  <path d="M0 10C0 5 3.5 0 8.5 0c2.5 0 4.5 1.2 7.5 4 3-2.8 5-4 7.5-4C28.5 0 32 5 32 10c0 2.5-1 4.5-2.8 6-1.2 1-2.8 1.8-4.2 2.2-1.5.4-2.8.3-3.8-.2-1.2-.6-2.2-1.8-3.5-3.8L16 11l-1.7 3.2c-1.3 2-2.3 3.2-3.5 3.8-1 .5-2.3.6-3.8.2C5.6 17.8 4 17 2.8 16 1 14.5 0 12.5 0 10zM7 7.5C5.5 7.5 4.2 8.5 3.8 10c-.3 1 .2 1.8 1 2.2 1 .5 2.3.3 3.4-.3 1.2-.7 2-1.7 2.3-2.8.3-1-.1-1.8-1-2.2-.5-.2-1.2-.2-1.8-.1l-.7.2zM25 7.5l-.7-.2c-.6-.1-1.3-.1-1.8.1-.9.4-1.3 1.2-1 2.2.3 1.1 1.1 2.1 2.3 2.8 1.1.6 2.4.8 3.4.3.8-.4 1.3-1.2 1-2.2-.4-1.5-1.7-2.5-3.2-2.5z" />
+                </svg>
+                {cost}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────
+// Result 뷰 — 결말 페이지 + 해금 이미지 그리드
+// ───────────────────────────────────────────────────────────
 function ResultView({ node, storyline, choices, token, onClose, onRestart }) {
   const choiceList = Object.values(choices)
+  const unlockedImages = (storyline.images || []).filter((img) => img.unlocked)
 
   return (
     <div
@@ -891,6 +864,35 @@ function ResultView({ node, storyline, choices, token, onClose, onRestart }) {
                   <p className="text-sm text-white">"{c.label}"</p>
                   {c.description && (
                     <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{c.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 해금된 컬렉터블 이미지 그리드 */}
+        {(storyline.images || []).length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+              컬렉터블 ({unlockedImages.length} / {storyline.images.length})
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {storyline.images.map((img) => (
+                <div
+                  key={img.id}
+                  className="aspect-[9/16] rounded-lg overflow-hidden relative bg-gray-900 border border-gray-800"
+                >
+                  {img.unlocked ? (
+                    <img src={img.url} alt={img.title || ''} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      <p className="text-[10px] mt-1 px-1 text-center line-clamp-2">{img.title || '잠김'}</p>
+                    </div>
                   )}
                 </div>
               ))}

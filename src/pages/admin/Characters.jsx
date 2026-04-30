@@ -369,6 +369,13 @@ export default function Characters() {
                         갤러리
                       </button>
                       <button
+                        onClick={() => navigate(`/admin/characters/${c.id}/storylines`)}
+                        className="text-amber-400 hover:text-amber-300 text-xs"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        스토리
+                      </button>
+                      <button
                         onClick={() => remove(c.id)}
                         className="text-red-400 hover:text-red-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
