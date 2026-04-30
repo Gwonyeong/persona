@@ -275,7 +275,7 @@ function NewStorylineModal({ characterId, characterName, onClose, onCreated }) {
           {mode === 'empty' && (
             <div>
               <p className="text-xs text-gray-400 mb-2">
-                제목만 입력하면 SCENE 1개 + RESULT 1개의 초안이 생성됩니다. 편집 페이지에서 노드를 추가하세요.
+                제목만 입력하면 CHAPTER 1개 + RESULT 1개의 초안이 생성됩니다. 편집 페이지에서 노드를 추가하세요.
               </p>
               <input
                 value={emptyTitle}
@@ -335,11 +335,17 @@ ${seedIdea || '(여기에 운영자가 시드 아이디어를 작성)'}
 - 미디어 URL은 운영자가 별도로 제공한 것만 사용. 임의 생성 금지.
 - 응답 JSON에 characterId 키를 넣지 마세요 (URL 파라미터로 처리됨).
 
-[Chapter 모델 핵심]
-- nodeType은 "CHAPTER" 또는 "RESULT" 두 가지.
-- CHAPTER 노드의 script 배열에 narration / character / user / cg 모드 아이템들을 흐름대로 나열.
-- 선택지(choices)는 챕터 끝에서만 등장. 각 선택지는 branchNodes로 분기 챕터를 가질 수 있음.
-- script 아이템의 backgroundImage / characterImage / bgmUrl / bgsUrl 은 sticky (다음 변경 시까지 유지).
+[Chapter / Chat 모델 핵심]
+- nodeType은 "CHAPTER" / "CHAT" / "RESULT" 세 가지.
+  * CHAPTER: 비주얼 노벨 UI (배경+캐릭터 일러스트+하단 텍스트 박스). 분위기·내레이션·VN식 짧은 멘트.
+  * CHAT: 채팅 UI (다크 그레이+누적 채팅 버블+아바타). 캐릭터와의 1:1 대화 흐름.
+  * RESULT: 엔딩 페이지 (resultTitle/resultBody).
+- CHAPTER와 CHAT은 동일한 script 스키마를 공유. mode = narration / character / user / cg.
+  * CHAPTER에서 character/user는 텍스트 박스에 좌/우측 화자 뱃지로, narration은 일반 박스로 표시.
+  * CHAT에서 character는 좌측 채팅 버블, user는 화면 하단 "보내기" 버튼(유저가 탭해야 채팅 추가됨), narration은 가운데 회색 시스템 메시지(드물게 사용).
+- 선택지(choices)는 CHAPTER/CHAT 끝에서 등장. 각 선택지는 branchNodes로 분기 노드를 가질 수 있음 (CHAPTER/CHAT 혼합 가능).
+- CHAT 노드의 선택지는 클릭 후 그 label이 자동으로 유저 채팅 버블이 되어 히스토리에 남음 — 분기 CHAT 첫 아이템에 같은 user 라인을 굳이 넣지 않아도 됨.
+- script 아이템의 backgroundImage / characterImage / bgmUrl / bgsUrl 은 sticky (다음 변경 시까지 유지). CHAT 노드에서는 시각적으로 노출되지 않지만 상태는 유지됨.
 - voiceUrl 은 해당 아이템 진입 시 1회 재생.
 - 컬렉터블 이미지는 storyline.images 배열에 따로 등록 (tempId/url/title/unlockType).
   선택지의 unlockStoryImageIds 로 어떤 이미지가 어떤 선택지로 해금되는지 매핑.
@@ -354,6 +360,7 @@ ${seedIdea || '(여기에 운영자가 시드 아이디어를 작성)'}
   "images"?: [{ tempId: string, url: url, title?: string, description?: string, unlockType: "ALWAYS"|"CHOICE"|"ENDING"|"PLAY_ANY" }],
   "nodes": [
     { "nodeType": "CHAPTER", "script": [...], "choices"?: [...] },
+    { "nodeType": "CHAT", "script": [...], "choices"?: [...] },
     ...
     { "nodeType": "RESULT", "resultTitle": string, "resultBody": string }
   ]

@@ -36,42 +36,71 @@ function computeSequence(allNodes, choices) {
   return sequence
 }
 
-// 현재 시점에서 거슬러 올라가 연속된 dialog(character/user) 아이템을 모음 — 챗 누적 표현용.
-// 챕터 경계를 넘어 이전 챕터의 chat tail까지 끌어옴 (분기 챕터로 넘어가도 직전 채팅이 그대로 유지됨).
-// narration/cg를 만나면 거기서 멈춤 (그게 "새 채팅 세션"의 시작점).
-function getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex) {
-  const lines = []
+// 현재 시점에서 거슬러 올라가 연속된 CHAT 노드의 아이템을 모음 — 챗 누적 표현용.
+// CHAT 노드 경계를 넘어 이전 CHAT 노드의 tail까지 끌어옴 (분기 CHAT 노드로 넘어가도 직전 채팅이 그대로 유지됨).
+// CHAPTER/RESULT 노드를 만나면 거기서 멈춤. CHAT 안의 cg 아이템도 블록을 끊음.
+// narration/character/user는 모두 포함 — narration은 시스템 메시지로 렌더됨.
+//
+// choicesByNodeId: { nodeId → choice } 형태. 이전 CHAT 노드에서 유저가 고른 선택지가 있으면
+// 가상 user 라인으로 그 노드 끝에 끼워 넣어 채팅 히스토리에 보존한다.
+// 단, 다음 노드의 첫 아이템이 이미 그 선택지 label을 echo하는 user 라인이면 중복 방지.
+function getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex, choicesByNodeId) {
+  // 1단계: 노드별 그룹을 시간 순(과거→현재)으로 수집
+  const groups = []
   let i = nodeIndex
   let j = scriptIndex
 
   while (i >= 0) {
     const node = sequence[i]
-    if (node?.nodeType !== 'CHAPTER') break
+    if (node?.nodeType !== 'CHAT') break
     const script = node.script || []
-
+    const groupItems = []
     let walkedToStart = true
     while (j >= 0) {
       const item = script[j]
-      if (item?.mode === 'character' || item?.mode === 'user') {
-        lines.unshift({ ...item, _key: `${node.id}-${j}` })
-        j--
-      } else {
+      if (!item) { j--; continue }
+      if (item.mode === 'cg') {
         walkedToStart = false
         break
       }
+      groupItems.unshift({ ...item, _key: `${node.id}-${j}` })
+      j--
     }
-
+    groups.unshift({ nodeId: node.id, items: groupItems })
     if (!walkedToStart) break
-    // 현재 챕터를 처음까지 다 걸었음 → 이전 챕터의 마지막 아이템부터 다시 시작
     i--
     if (i >= 0) {
       const prev = sequence[i]
-      if (prev?.nodeType !== 'CHAPTER') break
+      if (prev?.nodeType !== 'CHAT') break
       const prevScript = prev.script || []
       j = prevScript.length - 1
     }
   }
 
+  // 2단계: 그룹을 평탄화하면서 그룹 사이에 선택지 echo 가상 라인 삽입
+  const lines = []
+  for (let g = 0; g < groups.length; g++) {
+    const grp = groups[g]
+    lines.push(...grp.items)
+    // 마지막 그룹(현재 노드)의 선택지는 commit 전이므로 처리하지 않음
+    if (g < groups.length - 1) {
+      const picked = choicesByNodeId?.[grp.nodeId]
+      if (picked) {
+        const nextFirstItem = groups[g + 1]?.items?.[0]
+        const alreadyEchoed =
+          nextFirstItem?.mode === 'user' &&
+          (nextFirstItem.content || '').trim() === (picked.label || '').trim()
+        if (!alreadyEchoed) {
+          lines.push({
+            mode: 'user',
+            content: picked.label,
+            _key: `choice-${picked.id}`,
+            _isChoiceEcho: true,
+          })
+        }
+      }
+    }
+  }
   return lines
 }
 
@@ -163,9 +192,10 @@ export default function Storyline() {
   )
   const node = sequence[nodeIndex]
   const isLastNode = nodeIndex === sequence.length - 1
-  const script = node?.script || []
-  const currentItem = node?.nodeType === 'CHAPTER' ? script[scriptIndex] : null
-  const isAtLastItem = node?.nodeType === 'CHAPTER' ? scriptIndex >= script.length - 1 : true
+  const hasScript = node?.nodeType === 'CHAPTER' || node?.nodeType === 'CHAT'
+  const script = hasScript ? (node?.script || []) : []
+  const currentItem = hasScript ? script[scriptIndex] : null
+  const isAtLastItem = hasScript ? scriptIndex >= script.length - 1 : true
 
   // 현재 아이템의 effect를 sticky하게 반영 (null/undefined면 직전 값 유지)
   useEffect(() => {
@@ -200,7 +230,7 @@ export default function Storyline() {
   // ── 진행 로직 ───────────────────────────────────────────
   const advance = () => {
     if (!node) return
-    if (node.nodeType === 'CHAPTER' && scriptIndex < script.length - 1) {
+    if (hasScript && scriptIndex < script.length - 1) {
       setScriptIndex(scriptIndex + 1)
       return
     }
@@ -214,14 +244,15 @@ export default function Storyline() {
 
   const goBack = () => {
     if (!node) return
-    if (node.nodeType === 'CHAPTER' && scriptIndex > 0) {
+    if (hasScript && scriptIndex > 0) {
       setScriptIndex(scriptIndex - 1)
       return
     }
     if (nodeIndex === 0 || nodeIndex <= lockedAtIndex) return
     const prevNode = sequence[nodeIndex - 1]
     setNodeIndex(nodeIndex - 1)
-    if (prevNode?.nodeType === 'CHAPTER') {
+    const prevHasScript = prevNode?.nodeType === 'CHAPTER' || prevNode?.nodeType === 'CHAT'
+    if (prevHasScript) {
       const prevScript = prevNode.script || []
       setScriptIndex(Math.max(0, prevScript.length - 1))
     } else {
@@ -332,51 +363,66 @@ export default function Storyline() {
     return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">스토리 끝</div>
   }
 
+  // 노드 타입 & 아이템 분류
+  const isChapterNode = node.nodeType === 'CHAPTER'
+  const isChatNode = node.nodeType === 'CHAT'
+  const isResultNode = node.nodeType === 'RESULT'
+  const isCgItem = currentItem?.mode === 'cg'
+
   // 챕터 끝 + 선택지 있을 때 우측 탭 비활성화 (선택 강제)
-  const hasChoices = node.nodeType === 'CHAPTER' && Array.isArray(node.choices) && node.choices.length > 0
+  const hasChoices = hasScript && Array.isArray(node.choices) && node.choices.length > 0
   const waitingChoice = hasChoices && isAtLastItem
-  const showTapZones = node.nodeType !== 'RESULT'
+  const showTapZones = !isResultNode
 
   // CG 아이템: storyImageId로 storyline.images 에서 매칭되는 이미지 찾음
-  const cgImage = currentItem?.mode === 'cg'
+  const cgImage = isCgItem
     ? (storyline.images || []).find((img) => img.id === currentItem.storyImageId)
     : null
 
-  // 챗 누적 블록 (현재 아이템 포함)
-  const chatBlock = currentItem && (currentItem.mode === 'character' || currentItem.mode === 'user')
-    ? getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex)
+  // 챗 누적 블록 — CHAT 노드 + 비-cg 아이템에서만
+  // choices 상태를 전달해서 이전 CHAT 노드의 선택지가 채팅 히스토리에 user 버블로 남도록
+  const rawChatBlock = isChatNode && currentItem && !isCgItem
+    ? getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex, choices)
     : []
 
-  // 모드 플래그 — 배경/캐릭터 표시 여부 결정
-  const isChatMode = node.nodeType === 'CHAPTER' && (currentItem?.mode === 'character' || currentItem?.mode === 'user')
-  const isCgMode = node.nodeType === 'CHAPTER' && currentItem?.mode === 'cg'
-  const isNarrationMode = node.nodeType === 'CHAPTER' && currentItem?.mode === 'narration'
+  // CHAT 노드의 mode:'user' 아이템 → 자동 버블 대신 화면 하단 "보내기" 버튼으로 처리
+  // 클릭 전: chat history에서 제외 + UserInputButton 노출
+  // 클릭 시: scriptIndex 진행 → 다음 렌더에서 chatBlock walker가 user item을 history로 포함
+  const showUserAsButton = isChatNode && currentItem?.mode === 'user'
+  const chatBlock = showUserAsButton ? rawChatBlock.slice(0, -1) : rawChatBlock
+
+  // 비주얼 노벨 텍스트 박스 뷰 — CHAPTER 노드 + 비-cg 아이템
+  const isVnTextView = isChapterNode && currentItem && !isCgItem
+  // 채팅 뷰 — CHAT 노드 + 비-cg 아이템
+  const isChatView = isChatNode && currentItem && !isCgItem
+  // CG 뷰 — 어느 노드 타입이든 cg 아이템
+  const isCgView = (isChapterNode || isChatNode) && isCgItem
 
   return (
     <div className="relative w-full h-dvh bg-black text-white overflow-hidden select-none">
-      {/* 배경 — narration/cg 모드에서만 풀 표시. 채팅 모드는 다크 그레이로 전환 */}
-      {isChatMode ? (
+      {/* 배경 — CHAT 노드는 다크 그레이, CHAPTER는 풀 배경, RESULT는 자체 그라디언트 */}
+      {isChatView ? (
         <div className="absolute inset-0 bg-gray-950" />
-      ) : currentBg ? (
+      ) : isResultNode ? null : currentBg ? (
         <img src={currentBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-950 to-black" />
       )}
 
-      {/* 캐릭터 등장 시 약한 배경 딤드 (narration 모드에서만) */}
-      {isNarrationMode && currentCharImage && (
+      {/* 캐릭터 등장 시 약한 배경 딤드 (CHAPTER 노드의 비-cg 아이템) */}
+      {isVnTextView && currentCharImage && (
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: 'rgba(0,0,0,0.15)' }} />
       )}
 
-      {/* 캐릭터 standing 이미지 — narration 모드에서만 (채팅 모드는 아바타로 대체됨) */}
-      {isNarrationMode && currentCharImage && (
+      {/* 캐릭터 standing 이미지 — CHAPTER 노드의 비-cg 아이템 */}
+      {isVnTextView && currentCharImage && (
         <div className="absolute inset-x-0 top-0 flex items-end justify-center pointer-events-none" style={{ bottom: '33%' }}>
           <img src={currentCharImage} alt="" className="max-h-full max-w-[80%] object-contain drop-shadow-2xl" />
         </div>
       )}
 
       {/* CG 풀스크린 */}
-      {isCgMode && cgImage && (
+      {isCgView && cgImage && (
         <img src={cgImage.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
 
@@ -404,35 +450,37 @@ export default function Storyline() {
         />
       )}
 
-      {/* 콘텐츠 — 모드별 분기 */}
-      {node.nodeType === 'CHAPTER' && currentItem?.mode === 'narration' && (
-        <NarrationView
+      {/* 콘텐츠 — nodeType별 분기 */}
+      {isVnTextView && (
+        <VnTextBoxView
           item={currentItem}
           storyline={storyline}
-          waitingChoice={waitingChoice}
+          user={user}
+          showChoices={waitingChoice}
           choices={node.choices}
           masks={masks}
           onChoice={handleChoiceClick}
           selectingChoiceId={selectingChoiceId}
-          showChoices={waitingChoice}
         />
       )}
 
-      {node.nodeType === 'CHAPTER' && (currentItem?.mode === 'character' || currentItem?.mode === 'user') && (
+      {isChatView && (
         <ChatBlockView
           chatBlock={chatBlock}
           storyline={storyline}
           user={user}
           masks={masks}
-          showChoices={waitingChoice}
+          showChoices={waitingChoice && !showUserAsButton}
           choices={node.choices}
+          userButton={showUserAsButton ? currentItem : null}
+          onUserButtonClick={advance}
           onChoice={handleChoiceClick}
           selectingChoiceId={selectingChoiceId}
           onMediaClick={setChatLightbox}
         />
       )}
 
-      {node.nodeType === 'CHAPTER' && currentItem?.mode === 'cg' && (
+      {isCgView && (
         <CgView
           image={cgImage}
           showChoices={waitingChoice}
@@ -443,7 +491,7 @@ export default function Storyline() {
         />
       )}
 
-      {node.nodeType === 'RESULT' && (
+      {isResultNode && (
         <ResultView
           node={node}
           storyline={storyline}
@@ -463,7 +511,7 @@ export default function Storyline() {
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             aria-label="이전"
           />
-          {!waitingChoice && (
+          {!waitingChoice && !showUserAsButton && (
             <button
               onClick={advance}
               className="absolute right-0 top-0 bottom-0 w-1/2 z-10 bg-transparent"
@@ -598,27 +646,51 @@ export default function Storyline() {
 }
 
 // ───────────────────────────────────────────────────────────
-// Narration 뷰 — 비주얼 노벨식 텍스트 박스 (하단 1/3)
+// VN 텍스트 박스 뷰 — 비주얼 노벨식 (하단 1/3)
+// CHAPTER 노드의 narration / character / user 모두 처리
+//   narration: 화자명 좌측(선택), 텍스트
+//   character: 캐릭터명 좌측 뱃지(인디고), content
+//   user: 유저명 우측 뱃지(에메랄드), content
 // ───────────────────────────────────────────────────────────
-function NarrationView({ item, storyline, showChoices, choices, masks, onChoice, selectingChoiceId }) {
-  const speakerName = item?.speakerName || null
+function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onChoice, selectingChoiceId }) {
+  let speakerName = null
+  let badgeSide = 'left'
+  let badgeColor = 'bg-indigo-600'
+  let text = ''
+
+  if (item.mode === 'narration') {
+    speakerName = item.speakerName || null
+    text = item.text || ''
+    badgeColor = 'bg-gray-700'
+  } else if (item.mode === 'character') {
+    speakerName = item.name || storyline.character?.name || null
+    text = item.content || ''
+    badgeColor = 'bg-indigo-600'
+  } else if (item.mode === 'user') {
+    speakerName = item.name || user?.name || '나'
+    text = item.content || ''
+    badgeSide = 'right'
+    badgeColor = 'bg-emerald-600'
+  }
 
   return (
     <div className="absolute inset-0">
-      {(item?.text || showChoices) && (
+      {(text || showChoices) && (
         <div
           className="absolute left-0 right-0 bottom-0 z-20 px-5 pointer-events-none"
           style={MESSAGE_AREA_STYLE}
         >
-          {item?.text && (
+          {text && (
             <div className="relative rounded-xl px-4 py-5" style={TEXT_BOX_STYLE}>
               {speakerName && (
-                <span className="absolute -top-2.5 left-3 px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg bg-indigo-600 text-white">
+                <span
+                  className={`absolute -top-2.5 ${badgeSide === 'right' ? 'right-3' : 'left-3'} px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg ${badgeColor} text-white`}
+                >
                   {speakerName}
                 </span>
               )}
               <p className="text-[15px] leading-relaxed text-white whitespace-pre-line">
-                {item.text}
+                {text}
               </p>
             </div>
           )}
@@ -639,7 +711,7 @@ function NarrationView({ item, storyline, showChoices, choices, masks, onChoice,
 // ───────────────────────────────────────────────────────────
 // Chat Block 뷰 — 누적 말풍선
 // ───────────────────────────────────────────────────────────
-function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices, onChoice, selectingChoiceId, onMediaClick }) {
+function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices, userButton, onUserButtonClick, onChoice, selectingChoiceId, onMediaClick }) {
   const characterName = storyline.character?.name || ''
   const profileUrl = storyline.character?.profileImage || storyline.thumbnailImage || storyline.coverImage || null
   const userName = user?.name || '나'
@@ -656,7 +728,7 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [chatBlock.length, showChoices, selectingChoiceId])
+  }, [chatBlock.length, showChoices, selectingChoiceId, userButton?.content])
 
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -668,6 +740,16 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
       >
         <div className="space-y-1 pb-2">
           {displayLines.map((line, i) => {
+            // CHAT 안의 narration → 가운데 정렬 시스템 메시지
+            if (line.mode === 'narration') {
+              return (
+                <div key={i} className="flex justify-center my-3 px-4">
+                  <p className="text-xs text-gray-400 italic text-center leading-relaxed whitespace-pre-line">
+                    {line.text}
+                  </p>
+                </div>
+              )
+            }
             const prev = displayLines[i - 1]
             const isConsecutive = prev?.mode === line.mode
             const isUser = line.mode === 'user'
@@ -733,6 +815,11 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
         </div>
       </div>
 
+      {/* 유저 입력 버튼 — mode:'user' 아이템을 직접 "보내는" 시뮬레이션 */}
+      {userButton && !pickedChoice && (
+        <UserInputButton item={userButton} userName={userName} onClick={onUserButtonClick} />
+      )}
+
       {/* 답장 선택지 */}
       {showChoices && !pickedChoice && (
         <div
@@ -747,6 +834,35 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
           />
         </div>
       )}
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────
+// 유저 입력 버튼 — CHAT 노드의 mode:'user' 아이템을 채팅 입력처럼 표시
+// 클릭하면 advance 호출 → 다음 렌더에서 user 버블이 채팅 히스토리에 누적됨
+// ───────────────────────────────────────────────────────────
+function UserInputButton({ item, userName, onClick }) {
+  return (
+    <div
+      className="relative z-20 px-4 pt-3 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+    >
+      <button
+        onClick={onClick}
+        className="w-full text-left px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm transition-colors flex items-center gap-3 shadow-lg"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        aria-label={`보내기: ${item.content}`}
+      >
+        <span className="flex-1 leading-relaxed whitespace-pre-line">{item.content || (item.mediaUrl ? '(첨부)' : '')}</span>
+        <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </span>
+      </button>
+      <p className="text-[10px] text-gray-500 text-right mt-1.5 pr-1">탭해서 {userName}로 보내기</p>
     </div>
   )
 }

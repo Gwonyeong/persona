@@ -469,11 +469,25 @@ function getChapterVisuals(chapter, storyline) {
 function ChapterThumb({ chapter, storyline, size = 'normal' }) {
   const v = getChapterVisuals(chapter, storyline)
   const widthClass = size === 'small' ? 'w-10' : 'w-14'
+  const isChat = chapter.nodeType === 'CHAT'
 
   if (v.isResult) {
     return (
       <div className={`relative flex-shrink-0 ${widthClass} aspect-[9/16] rounded overflow-hidden bg-gradient-to-br from-indigo-700 to-purple-800 flex items-center justify-center border border-indigo-600`}>
         <span className="text-[9px] font-bold text-white tracking-widest">FIN</span>
+      </div>
+    )
+  }
+
+  // CHAT 노드: 채팅 UI를 미리보기 — 다크 그레이 + 버블 실루엣
+  if (isChat) {
+    return (
+      <div className={`relative flex-shrink-0 ${widthClass} aspect-[9/16] rounded overflow-hidden bg-gray-950 border border-sky-700/60 flex flex-col justify-end p-1 gap-0.5`}>
+        <div className="flex justify-start"><div className="w-[60%] h-1.5 rounded-full bg-sky-500/60" /></div>
+        <div className="flex justify-start"><div className="w-[45%] h-1.5 rounded-full bg-sky-500/40" /></div>
+        <div className="flex justify-end"><div className="w-[55%] h-1.5 rounded-full bg-emerald-500/60" /></div>
+        <div className="flex justify-start"><div className="w-[50%] h-1.5 rounded-full bg-sky-500/40" /></div>
+        <div className="absolute top-0.5 right-0.5 text-[7px] text-sky-300 font-bold">CHAT</div>
       </div>
     )
   }
@@ -503,6 +517,7 @@ function ChapterThumb({ chapter, storyline, size = 'normal' }) {
 
 function ChapterCard({ chapter, index, branchMap, selectedChapterId, onChapterClick, isMain = false, storyline }) {
   const isResult = chapter.nodeType === 'RESULT'
+  const isChat = chapter.nodeType === 'CHAT'
   const script = Array.isArray(chapter.script) ? chapter.script : []
   const choices = Array.isArray(chapter.choices) ? chapter.choices : []
   const preview = getChapterPreview(chapter)
@@ -514,16 +529,26 @@ function ChapterCard({ chapter, index, branchMap, selectedChapterId, onChapterCl
     return acc
   }, {})
 
+  // 카드 배경/보더 — branch는 amber, main은 nodeType별 (CHAPTER:gray, CHAT:sky, RESULT:indigo)
+  const cardClass = isResult
+    ? 'bg-indigo-950/40 border-indigo-700'
+    : isMain
+      ? isChat
+        ? 'bg-sky-950/30 border-sky-800/60'
+        : 'bg-gray-900 border-gray-700'
+      : 'bg-amber-950/20 border-amber-800/60'
+
+  // nodeType 뱃지 — 색상으로 노드 타입 구분
+  const badgeClass = isResult
+    ? 'bg-indigo-700 text-white'
+    : isChat
+      ? 'bg-sky-700 text-white'
+      : isMain
+        ? 'bg-gray-700 text-gray-300'
+        : 'bg-amber-800/60 text-amber-100'
+
   return (
-    <div
-      className={`rounded-xl border ${
-        isResult
-          ? 'bg-indigo-950/40 border-indigo-700'
-          : isMain
-            ? 'bg-gray-900 border-gray-700'
-            : 'bg-amber-950/20 border-amber-800/60'
-      } ${isSelected ? 'ring-2 ring-indigo-500' : ''}`}
-    >
+    <div className={`rounded-xl border ${cardClass} ${isSelected ? 'ring-2 ring-indigo-500' : ''}`}>
       <button
         onClick={() => onChapterClick(chapter)}
         className="w-full text-left px-3 py-3 hover:bg-white/5 rounded-t-xl transition-colors"
@@ -536,10 +561,8 @@ function ChapterCard({ chapter, index, branchMap, selectedChapterId, onChapterCl
               <span className="text-xs text-gray-500 font-mono">
                 {isMain ? `#${index + 1}` : '↳ branch'}
               </span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                isResult ? 'bg-indigo-700 text-white' : isMain ? 'bg-gray-700 text-gray-300' : 'bg-amber-800/60 text-amber-100'
-              }`}>
-                {chapter.nodeType}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${badgeClass}`}>
+                {isChat && '💬 '}{chapter.nodeType}
               </span>
               {!isResult && (
                 <span className="text-[10px] text-gray-500">
@@ -641,17 +664,22 @@ const MODE_META = {
 
 function ChapterDetailPanel({ chapter, storyline, onClose }) {
   const isResult = chapter.nodeType === 'RESULT'
+  const isChat = chapter.nodeType === 'CHAT'
   const script = Array.isArray(chapter.script) ? chapter.script : []
   const choices = Array.isArray(chapter.choices) ? chapter.choices : []
   const isBranch = chapter.branchFromChoiceId != null
   const [lightbox, setLightbox] = useState(null) // { url, type: 'image'|'video'|'audio', label }
+
+  const nodeTypeLabel = isResult
+    ? 'RESULT 노드'
+    : `${isChat ? '💬 CHAT' : '📖 CHAPTER'} ${isBranch ? '· 분기' : `· 메인 #${chapter.sortOrder + 1}`}`
 
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden flex flex-col h-full relative">
       <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
         <div className="min-w-0">
           <p className="text-[10px] text-gray-500 font-mono">
-            {isResult ? 'RESULT 노드' : isBranch ? '분기 챕터' : `메인 챕터 #${chapter.sortOrder + 1}`}
+            {nodeTypeLabel}
             {' · '}id {chapter.id}
           </p>
           <h3 className="text-sm font-bold text-white line-clamp-1">
