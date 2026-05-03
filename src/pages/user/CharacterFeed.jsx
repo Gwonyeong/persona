@@ -96,7 +96,7 @@ export default function CharacterFeed() {
   const feedPosts = (character.feedPosts || []).sort((a, b) => new Date(b.publishAt) - new Date(a.publishAt))
 
   return (
-    <div className="relative flex flex-col h-screen bg-gray-950 text-gray-100">
+    <div className="relative flex flex-col h-full bg-gray-950 text-gray-100">
       <Helmet>
         <title>{character.name}의 피드 - Pesona</title>
       </Helmet>
