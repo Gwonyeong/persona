@@ -276,7 +276,9 @@
     "reviewDesc": "벌써 {{name}}까지 3명의 캐릭터와 대화를 시작하셨네요!\n짧은 후기를 남겨주시면 큰 힘이 됩니다.",
     "reviewReward": "후기 작성 시 가면 10개를 드려요!",
     "reviewButton": "후기 남기기",
-    "reviewLater": "다음에 할게요"
+    "reviewLater": "다음에 할게요",
+    "freeLimitReached": "무료 요금제는 최대 {{limit}}명의 캐릭터와 채팅할 수 있어요",
+    "freeLimitCta": "7일 무료 체험하기"
   },
   "masks": {
     "pkg30": "60개",

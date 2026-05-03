@@ -82,7 +82,7 @@ export default function Feed() {
     loadingRef.current = true
     setLoading(true)
     try {
-      const params = new URLSearchParams({ limit: '10' })
+      const params = new URLSearchParams({ limit: '12' })
       if (cursor) params.set('cursor', cursor)
       if (followOnly) params.set('followOnly', 'true')
       if (selectedTags.length > 0) {
@@ -306,6 +306,19 @@ export default function Feed() {
                   </svg>
                 </div>
               )}
+
+              {/* 좋아요 인디케이터 (좌측 하단) */}
+              <div className="absolute bottom-1 left-1 pointer-events-none drop-shadow">
+                {post.liked ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                )}
+              </div>
 
               {/* 캐릭터 프로필 오버레이 */}
               <div className="absolute bottom-1 right-1 left-1 flex justify-end pointer-events-none">

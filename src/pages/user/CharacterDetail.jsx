@@ -57,7 +57,14 @@ export default function CharacterDetail() {
   const [showReport, setShowReport] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
   const [storylines, setStorylines] = useState([])
+  const [toast, setToast] = useState(null)
   const storyTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   const stories = character?.stories || []
   const hasStories = stories.length > 0
@@ -133,6 +140,9 @@ export default function CharacterDetail() {
       }
     } catch (error) {
       console.error(error)
+      if (error?.data?.error === 'CHARACTER_LIMIT_REACHED') {
+        setToast(t('character.freeLimitReached', { limit: error.data.limit }))
+      }
       setStarting(false)
     }
   }
@@ -614,6 +624,24 @@ export default function CharacterDetail() {
           targetId={existingConv ? existingConv.conversationId : parseInt(id)}
           onClose={() => setShowReport(false)}
         />
+      )}
+
+      {toast && (
+        <div
+          className="absolute left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+          style={{ top: 'calc(env(safe-area-inset-top) + 60px)' }}
+        >
+          <div className="bg-gray-900/95 text-white text-sm px-4 py-3 rounded-xl shadow-lg backdrop-blur-sm border border-gray-700 pointer-events-auto flex flex-col gap-2 max-w-xs">
+            <p className="leading-snug">{toast}</p>
+            <button
+              onClick={() => { setToast(null); navigate('/subscription') }}
+              className="self-stretch py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-500 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {t('character.freeLimitCta')}
+            </button>
+          </div>
+        </div>
       )}
 
       {showLoginModal && <LoginModal onClose={() => { setShowLoginModal(false); pendingActionRef.current = null }} onLoginSuccess={() => {
