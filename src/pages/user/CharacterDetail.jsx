@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
@@ -28,6 +28,7 @@ import GalleryGrid from '../../components/GalleryGrid'
 import GalleryUnlockModal from '../../components/GalleryUnlockModal'
 import ImageSlideViewer from '../../components/ImageSlideViewer'
 import ReportModal from '../../components/ReportModal'
+import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import useBackHandler from '../../hooks/useBackHandler'
 import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib/review'
 
@@ -35,7 +36,7 @@ export default function CharacterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
-  const { token } = useStore()
+  const { token, user, setUser } = useStore()
   const [character, setCharacter] = useState(null)
   const [existingConv, setExistingConv] = useState(null)
   const [starting, setStarting] = useState(false)
@@ -170,6 +171,32 @@ export default function CharacterDetail() {
     }
   }
 
+  // 캐릭터 상세 투어 (early return 위에 hook 호출 — Rules of Hooks)
+  const tourActive = !!user && !user.onboardingState?.characterTour
+  const tourSteps = useMemo(() => [
+    { page: 'characterTour', key: 'follow', target: '[data-onboarding-target="follow"]', caption: t('characterTour.follow') },
+    { page: 'characterTour', key: 'message', target: '[data-onboarding-target="message"]', caption: t('characterTour.message') },
+    {
+      page: 'characterTour', key: 'feedTab',
+      target: '[data-onboarding-target="tab-feed"]',
+      caption: t('characterTour.feedTab'),
+      onEnter: () => setActiveTab('feed'),
+    },
+    {
+      page: 'characterTour', key: 'affinityTab',
+      target: '[data-onboarding-target="tab-affinity"]',
+      caption: t('characterTour.affinityTab', { name: user?.name || '' }),
+      onEnter: () => setActiveTab('affinity'),
+    },
+    {
+      page: 'characterTour', key: 'missionTab',
+      target: '[data-onboarding-target="tab-mission"]',
+      caption: t('characterTour.missionTab'),
+      onEnter: () => setActiveTab('mission'),
+    },
+    { page: 'characterTour', key: 'reset', target: '[data-onboarding-target="restart"]', caption: t('characterTour.reset') },
+  ], [user?.name, t])
+
   if (!character) {
     return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">{t('common.loading')}</div>
   }
@@ -180,6 +207,13 @@ export default function CharacterDetail() {
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   const feedPosts = character.feedPosts || []
+  const completeTour = () => {
+    setUser({
+      ...user,
+      onboardingState: { ...(user.onboardingState || {}), characterTour: true },
+    })
+    api.patch('/auth/onboarding', { key: 'characterTour' }).catch(() => {})
+  }
 
   return (
     <div className="flex flex-col h-full bg-gray-950 text-gray-100">
@@ -307,6 +341,7 @@ export default function CharacterDetail() {
                     : 'bg-gray-800 text-white border border-gray-700 hover:bg-gray-700'
                 }`}
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                data-onboarding-target="follow"
               >
                 {isFollowing ? t('character.unfollow') : t('character.follow')}
               </button>
@@ -315,17 +350,19 @@ export default function CharacterDetail() {
                 disabled={starting}
                 className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                data-onboarding-target="message"
               >
                 {starting ? t('character.starting') : t('character.sendMessage')}
               </button>
             </div>
-            {existingConv && (
+            {(existingConv || tourActive) && (
               <div className="flex justify-end">
                 <button
-                  onClick={() => setShowResetModal(true)}
+                  onClick={() => existingConv && !tourActive && setShowResetModal(true)}
                   disabled={starting}
                   className="py-1.5 px-4 text-xs text-red-400 font-semibold rounded-lg border border-red-400/30 hover:bg-red-400/10 disabled:opacity-50 transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  data-onboarding-target="restart"
                 >
                   {t('character.restart')}
                 </button>
@@ -405,6 +442,7 @@ export default function CharacterDetail() {
               onClick={() => setActiveTab('feed')}
               className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'feed' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="tab-feed"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" />
@@ -417,6 +455,7 @@ export default function CharacterDetail() {
               onClick={() => setActiveTab('affinity')}
               className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'affinity' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="tab-affinity"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -426,6 +465,7 @@ export default function CharacterDetail() {
               onClick={() => setActiveTab('mission')}
               className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'mission' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="tab-mission"
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -686,6 +726,12 @@ export default function CharacterDetail() {
           navigate(`/storylines/${action.split(':')[1]}`)
         }
       }} />}
+
+      <OnboardingSpotlight
+        active={tourActive}
+        steps={tourSteps}
+        onComplete={completeTour}
+      />
     </div>
   )
 }

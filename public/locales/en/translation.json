@@ -204,6 +204,45 @@
     "description": "Please login to use this feature.",
     "googleLogin": "Sign in with Google"
   },
+  "welcome": {
+    "title": "Hi there~ So nice to meet you!",
+    "subtitle": "I've prepared {{count}} masks as a welcome gift♡",
+    "tip1": "One mask lets you have a chat with a Pesona!",
+    "tip2": "The more you talk, the more they'll open up to you~",
+    "tip3": "Get closer and you'll unlock special images, just for you!",
+    "cta": "Let's begin!"
+  },
+  "tour": {
+    "next": "Tap to continue",
+    "done": "Tap to finish",
+    "soundPromptTitle": "Sound will play!",
+    "soundPromptBody": "Pop in some earphones for the best guidance experience!",
+    "soundOk": "Sounds good!",
+    "soundMute": "Continue without sound"
+  },
+  "feedTour": {
+    "stories": "These are stories from Pesonas you follow~",
+    "like": "A little tap on the heart makes them so happy♡",
+    "openPost": "Tap a post to peek at more pictures from that Pesona!",
+    "follow": "Follow them to never miss their updates! (Coming soon~)"
+  },
+  "characterTour": {
+    "follow": "Tap follow so you don't miss their news!",
+    "message": "Tap here to start chatting with this Pesona — exciting!",
+    "feedTab": "This is their feed~",
+    "affinityTab": "Build up affinity and special pictures just for {{name}} will appear♡",
+    "missionTab": "Pictures they shared during chats are all gathered here as memories!",
+    "reset": "You only get one chat per Pesona. Restarting wipes everything you've shared — please tap carefully, okay?"
+  },
+  "chatTour": {
+    "affinity": "As affinity grows, your Pesona starts to like {{name}} even more~ Even more intimate moments… oh dear, how embarrassing!",
+    "voice": "Toggle the 'Voice' button to hear your Pesona speak! Exciting, right?",
+    "imageGen": "Tap this button to get a picture that matches your conversation!",
+    "gallery": "The gallery holds all your photos with this Pesona~",
+    "galleryTabs": "Every memory you've built together lives in this album♡",
+    "attachFeed": "Attach a Pesona's feed to chat about it together! They remember likes and comments too — visit often to grow closer!",
+    "changeBg": "Want to brighten up the dark chat with one of your Pesona's pictures?"
+  },
   "gallery": {
     "unlockDesc": "Use masks to unlock images",
     "unlockCost": "Unlock cost",

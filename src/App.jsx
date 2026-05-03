@@ -12,6 +12,7 @@ import AdminCharacters from './pages/admin/Characters'
 import CharacterStyles from './pages/admin/CharacterStyles'
 import CharacterFeeds from './pages/admin/CharacterFeeds'
 import CharacterGallery from './pages/admin/CharacterGallery'
+import AffinityImages from './pages/admin/AffinityImages'
 import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import AdminUsers from './pages/admin/Users'
@@ -37,6 +38,7 @@ import FeedbackList from './pages/user/FeedbackList'
 import FeedbackDetail from './pages/user/FeedbackDetail'
 import FeedbackWrite from './pages/user/FeedbackWrite'
 import MessageNotification from './components/MessageNotification'
+import WelcomeMaskSheet from './components/WelcomeMaskSheet'
 
 function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
@@ -143,6 +145,7 @@ function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="characters" element={<AdminCharacters />} />
+        <Route path="affinity-images" element={<AffinityImages />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
         <Route path="characters/:id/gallery" element={<CharacterGallery />} />
@@ -177,6 +180,7 @@ function App() {
         <Route path="/feedback/write" element={<FeedbackWrite />} />
       </Route>
     </Routes>
+    <WelcomeMaskSheet />
     </>
   )
 }
