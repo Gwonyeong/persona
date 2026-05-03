@@ -340,9 +340,10 @@ ${seedIdea || '(여기에 운영자가 시드 아이디어를 작성)'}
   * CHAPTER: 비주얼 노벨 UI (배경+캐릭터 일러스트+하단 텍스트 박스). 분위기·내레이션·VN식 짧은 멘트.
   * CHAT: 채팅 UI (다크 그레이+누적 채팅 버블+아바타). 캐릭터와의 1:1 대화 흐름.
   * RESULT: 엔딩 페이지 (resultTitle/resultBody).
-- CHAPTER와 CHAT은 동일한 script 스키마를 공유. mode = narration / character / user / cg.
+- CHAPTER와 CHAT은 동일한 script 스키마를 공유. mode = narration / character / user / cg / media.
   * CHAPTER에서 character/user는 텍스트 박스에 좌/우측 화자 뱃지로, narration은 일반 박스로 표시.
   * CHAT에서 character는 좌측 채팅 버블, user는 화면 하단 "보내기" 버튼(유저가 탭해야 채팅 추가됨), narration은 가운데 회색 시스템 메시지(드물게 사용).
+  * **mode:"media" — CHAT 전용**. 캐릭터가 채팅에 보내는 이미지/영상 카드. 필드: mediaUrl(필수), variant("normal"|"premium"|"video", 필수), maskCost(premium일 때 양수 필수). normal=일반 노출 / premium=블러+자물쇠+해금 모달 / video=자동재생 영상.
 - 선택지(choices)는 CHAPTER/CHAT 끝에서 등장. 각 선택지는 branchNodes로 분기 노드를 가질 수 있음 (CHAPTER/CHAT 혼합 가능).
 - CHAT 노드의 선택지는 클릭 후 그 label이 자동으로 유저 채팅 버블이 되어 히스토리에 남음 — 분기 CHAT 첫 아이템에 같은 user 라인을 굳이 넣지 않아도 됨.
 - script 아이템의 backgroundImage / characterImage / bgmUrl / bgsUrl 은 sticky (다음 변경 시까지 유지). CHAT 노드에서는 시각적으로 노출되지 않지만 상태는 유지됨.

@@ -104,9 +104,16 @@ function getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex, choicesByNod
   return lines
 }
 
-// 텍스트 박스 — 화면 하단 1/3 (narration / 마지막 dialog 아이템 기준)
+// 배경 URL이 영상인지 판별 — 어드민에서 영상 배경을 등록한 경우 <video>로 재생
+function isBgVideoUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const cleaned = url.split(/[?#]/)[0].toLowerCase()
+  return /\.(mp4|webm|mov|m4v|ogv)$/.test(cleaned)
+}
+
+// 텍스트 박스 — 화면 하단 약 1/4 영역 (캐릭터 일러스트와 함께 하단에 배치)
 const MESSAGE_AREA_STYLE = {
-  top: '67%',
+  top: '76%',
   paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
   paddingTop: '0',
 }
@@ -124,6 +131,9 @@ export default function Storyline() {
   // 현재 위치
   const [nodeIndex, setNodeIndex] = useState(0)
   const [scriptIndex, setScriptIndex] = useState(0)
+  // CHAT 노드의 mode:'user' 아이템에서 send 버튼 → 즉시 다음으로 넘어가지 않고 버블만 보여주는 중간 상태
+  // true면 user 버블이 채팅에 노출되지만 다음 character 메시지는 아직 안 보임. 화면 탭 시 advance하며 false로 초기화.
+  const [userSent, setUserSent] = useState(false)
 
   // 진행 상태
   const [choices, setChoices] = useState({})
@@ -138,17 +148,25 @@ export default function Storyline() {
   const [chatLightbox, setChatLightbox] = useState(null)
   const [audioMuted, setAudioMuted] = useState(false)
 
-  // 미디어/음향 상태 (지속성)
+  // 음향만 sticky 유지 (다음 변경까지 이어짐). 배경/캐릭터 이미지는 비-sticky —
+  // 각 script 아이템에 명시 등록된 경우에만 렌더되도록 currentItem에서 직접 읽음.
   const [currentBgm, setCurrentBgm] = useState(null)
   const [currentBgs, setCurrentBgs] = useState(null)
-  const [currentBg, setCurrentBg] = useState(null)
-  const [currentCharImage, setCurrentCharImage] = useState(null)
+
+  // 프리미엄 미디어 해금 상태 — Set<mediaUrl>
+  const [unlockedMedia, setUnlockedMedia] = useState(new Set())
+  // 해금 모달 — { mediaUrl, maskCost } | null
+  const [unlockModal, setUnlockModal] = useState(null)
+  const [unlocking, setUnlocking] = useState(false)
+  // 인라인 미디어 라이트박스 (CHAT 미디어 클릭 시 풀스크린)
+  const [mediaLightbox, setMediaLightbox] = useState(null) // { url, type: 'image'|'video' } | null
 
   // ── 데이터 로드 ─────────────────────────────────────────
   useEffect(() => {
     api.get(`/storylines/${id}`)
-      .then(({ storyline, progress }) => {
+      .then(({ storyline, progress, unlockedMediaUrls }) => {
         setStoryline(storyline)
+        setUnlockedMedia(new Set(unlockedMediaUrls || []))
 
         // 저장된 선택지 복원
         const restoredChoices = {}
@@ -197,17 +215,17 @@ export default function Storyline() {
   const currentItem = hasScript ? script[scriptIndex] : null
   const isAtLastItem = hasScript ? scriptIndex >= script.length - 1 : true
 
-  // 현재 아이템의 effect를 sticky하게 반영 (null/undefined면 직전 값 유지)
+  // 음향만 sticky — 새 URL이 나오면 갱신, null/undefined면 직전 값 유지
+  // 배경/캐릭터 이미지는 비-sticky로 렌더 시점에 currentItem에서 직접 읽음
   useEffect(() => {
     if (!currentItem) return
-    if (currentItem.backgroundImage != null) setCurrentBg(currentItem.backgroundImage)
-    // characterImage는 명시적으로 null을 보내면 캐릭터 이미지 제거 (story flow에서 캐릭터 사라지는 연출 가능)
-    if (currentItem.characterImage !== undefined) {
-      setCurrentCharImage(currentItem.characterImage)
-    }
     if (currentItem.bgmUrl) setCurrentBgm(currentItem.bgmUrl)
     if (currentItem.bgsUrl) setCurrentBgs(currentItem.bgsUrl)
   }, [node?.id, scriptIndex])
+
+  // 현재 아이템에 명시 등록된 배경/캐릭터만 노출
+  const currentBg = currentItem?.backgroundImage || null
+  const currentCharImage = currentItem?.characterImage || null
 
   // RESULT 도달 시 자동 완료
   useEffect(() => {
@@ -230,6 +248,8 @@ export default function Storyline() {
   // ── 진행 로직 ───────────────────────────────────────────
   const advance = () => {
     if (!node) return
+    // userSent가 true면 (사용자 메시지 버블이 노출 중) — 한 번 더 탭한 것이므로 그제서야 다음 아이템으로
+    if (userSent) setUserSent(false)
     if (hasScript && scriptIndex < script.length - 1) {
       setScriptIndex(scriptIndex + 1)
       return
@@ -244,6 +264,11 @@ export default function Storyline() {
 
   const goBack = () => {
     if (!node) return
+    // 사용자 메시지를 막 보낸 상태(userSent=true)에서 뒤로 가면 → 버블을 다시 감추고 send 버튼 상태로 복귀
+    if (userSent) {
+      setUserSent(false)
+      return
+    }
     if (hasScript && scriptIndex > 0) {
       setScriptIndex(scriptIndex - 1)
       return
@@ -267,6 +292,17 @@ export default function Storyline() {
       })
     }
   }
+
+  // 사용자 send 버튼 클릭 — 즉시 advance 안 하고 user 버블만 노출하는 중간 상태로 진입
+  // 화면을 한 번 더 탭(advance)하면 그때서야 다음 아이템(캐릭터 메시지)으로 진행
+  const handleUserSend = () => {
+    setUserSent(true)
+  }
+
+  // 노드/scriptIndex 변경 시 userSent 리셋 (다른 챕터로 이동 등)
+  useEffect(() => {
+    setUserSent(false)
+  }, [node?.id, scriptIndex])
 
   // ── 선택지 처리 (애니 + 저장) ───────────────────────────
   const handleChoiceClick = (choice) => {
@@ -338,8 +374,6 @@ export default function Storyline() {
       setToast('새 진행 시작')
       setCurrentBgm(storyline?.defaultBgm || null)
       setCurrentBgs(null)
-      setCurrentBg(null)
-      setCurrentCharImage(null)
     } catch (e) {
       console.error('Restart failed:', e)
     } finally {
@@ -388,7 +422,10 @@ export default function Storyline() {
   // CHAT 노드의 mode:'user' 아이템 → 자동 버블 대신 화면 하단 "보내기" 버튼으로 처리
   // 클릭 전: chat history에서 제외 + UserInputButton 노출
   // 클릭 시: scriptIndex 진행 → 다음 렌더에서 chatBlock walker가 user item을 history로 포함
-  const showUserAsButton = isChatNode && currentItem?.mode === 'user'
+  // userSent=false면 user 버블 자리에 send 버튼 노출 (버블은 chatBlock에서 제외)
+  // userSent=true면 user 버블이 chatBlock에 포함되고, 다음 아이템(캐릭터 메시지)은 아직 안 보임
+  // 다음 화면 탭으로 advance 시 userSent=false + scriptIndex++ → 다음 아이템 등장
+  const showUserAsButton = isChatNode && currentItem?.mode === 'user' && !userSent
   const chatBlock = showUserAsButton ? rawChatBlock.slice(0, -1) : rawChatBlock
 
   // 비주얼 노벨 텍스트 박스 뷰 — CHAPTER 노드 + 비-cg 아이템
@@ -400,11 +437,23 @@ export default function Storyline() {
 
   return (
     <div className="relative w-full h-dvh bg-black text-white overflow-hidden select-none">
-      {/* 배경 — CHAT 노드는 다크 그레이, CHAPTER는 풀 배경, RESULT는 자체 그라디언트 */}
+      {/* 배경 — CHAT 노드는 다크 그레이, CHAPTER는 풀 배경(이미지/영상), RESULT는 자체 그라디언트 */}
       {isChatView ? (
         <div className="absolute inset-0 bg-gray-950" />
       ) : isResultNode ? null : currentBg ? (
-        <img src={currentBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        isBgVideoUrl(currentBg) ? (
+          <video
+            key={currentBg}
+            src={currentBg}
+            className="absolute inset-0 w-full h-full object-cover"
+            autoPlay
+            loop
+            muted={audioMuted}
+            playsInline
+          />
+        ) : (
+          <img src={currentBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        )
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900 via-gray-950 to-black" />
       )}
@@ -416,8 +465,8 @@ export default function Storyline() {
 
       {/* 캐릭터 standing 이미지 — CHAPTER 노드의 비-cg 아이템 */}
       {isVnTextView && currentCharImage && (
-        <div className="absolute inset-x-0 top-0 flex items-end justify-center pointer-events-none" style={{ bottom: '33%' }}>
-          <img src={currentCharImage} alt="" className="max-h-full max-w-[80%] object-contain drop-shadow-2xl" />
+        <div className="absolute inset-x-0 flex items-end justify-center pointer-events-none" style={{ top: '8%', bottom: '24%' }}>
+          <img src={currentCharImage} alt="" className="max-h-full max-w-full object-contain drop-shadow-2xl" />
         </div>
       )}
 
@@ -473,10 +522,13 @@ export default function Storyline() {
           showChoices={waitingChoice && !showUserAsButton}
           choices={node.choices}
           userButton={showUserAsButton ? currentItem : null}
-          onUserButtonClick={advance}
+          onUserButtonClick={handleUserSend}
           onChoice={handleChoiceClick}
           selectingChoiceId={selectingChoiceId}
           onMediaClick={setChatLightbox}
+          unlockedMedia={unlockedMedia}
+          onUnlockRequest={(line) => setUnlockModal({ mediaUrl: line.mediaUrl, maskCost: line.maskCost || 0 })}
+          onMediaPreview={(line) => setMediaLightbox({ url: line.mediaUrl, type: line.variant === 'video' ? 'video' : 'image' })}
         />
       )}
 
@@ -564,6 +616,114 @@ export default function Storyline() {
             style={{ animation: 'toastSlideInOut 1.8s ease-in-out forwards' }}
           >
             {toast}
+          </div>
+        </div>
+      )}
+
+      {/* 채팅 미디어 인라인 풀스크린 (정상 미디어 클릭 시) */}
+      {mediaLightbox && (
+        <div
+          className="absolute inset-0 z-50 bg-black/95 flex items-center justify-center overflow-hidden"
+          onClick={() => setMediaLightbox(null)}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setMediaLightbox(null) }}
+            className="absolute right-4 z-10 w-10 h-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-full text-white"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', top: 'calc(env(safe-area-inset-top) + 14px)' }}
+            aria-label="닫기"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          {mediaLightbox.type === 'video' ? (
+            <video
+              src={mediaLightbox.url}
+              className="h-full w-auto max-w-none"
+              autoPlay loop controls playsInline
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={mediaLightbox.url}
+              alt=""
+              className="h-full w-auto max-w-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      )}
+
+      {/* 프리미엄 미디어 해금 모달 */}
+      {unlockModal && (
+        <div
+          className="absolute inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-6"
+          onClick={() => !unlocking && setUnlockModal(null)}
+        >
+          <div
+            className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center mb-4">
+              <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mb-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white">프리미엄 미디어</h3>
+            </div>
+            <p className="text-sm text-gray-300 leading-relaxed text-center mb-2">
+              마스크 <span className="text-amber-400 font-bold">{unlockModal.maskCost}개</span>를 이용해 해금할 수 있어요!
+            </p>
+            <p className="text-xs text-gray-500 text-center mb-5">
+              현재 잔액: <span className="text-gray-300">{masks ?? 0} 마스크</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => !unlocking && setUnlockModal(null)}
+                disabled={unlocking}
+                className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={async () => {
+                  if (!token) {
+                    setToast('로그인이 필요합니다')
+                    return
+                  }
+                  if ((masks ?? 0) < (unlockModal.maskCost || 0)) {
+                    setToast('마스크가 부족합니다')
+                    return
+                  }
+                  setUnlocking(true)
+                  try {
+                    const res = await api.post(`/storylines/${id}/unlock-media`, { mediaUrl: unlockModal.mediaUrl })
+                    if (res.masks != null) setMasks(res.masks)
+                    setUnlockedMedia((prev) => {
+                      const next = new Set(prev)
+                      next.add(unlockModal.mediaUrl)
+                      return next
+                    })
+                    setUnlockModal(null)
+                    setToast('🖼️ 해금 완료')
+                  } catch (e) {
+                    const msg = e?.data?.error || e?.message || '해금 실패'
+                    setToast(msg)
+                  } finally {
+                    setUnlocking(false)
+                  }
+                }}
+                disabled={unlocking || (masks ?? 0) < (unlockModal.maskCost || 0)}
+                className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-500 transition-colors text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {unlocking ? '해금 중...' : `🎭 ${unlockModal.maskCost} 지불`}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -711,9 +871,10 @@ function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onC
 // ───────────────────────────────────────────────────────────
 // Chat Block 뷰 — 누적 말풍선
 // ───────────────────────────────────────────────────────────
-function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices, userButton, onUserButtonClick, onChoice, selectingChoiceId, onMediaClick }) {
+function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices, userButton, onUserButtonClick, onChoice, selectingChoiceId, onMediaClick, unlockedMedia, onUnlockRequest, onMediaPreview }) {
   const characterName = storyline.character?.name || ''
-  const profileUrl = storyline.character?.profileImage || storyline.thumbnailImage || storyline.coverImage || null
+  // 채팅 아바타는 Character 테이블의 profileImage만 사용 (fallback 없음)
+  const profileUrl = storyline.character?.profileImage || null
   const userName = user?.name || '나'
 
   const pickedChoice = selectingChoiceId
@@ -731,14 +892,19 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
   }, [chatBlock.length, showChoices, selectingChoiceId, userButton?.content])
 
   return (
-    <div className="absolute inset-0 flex flex-col">
-      {/* 누적 말풍선 영역 */}
+    <div className="absolute inset-0">
+      {/* 누적 말풍선 영역 — 항상 동일한 위치/높이.
+         하단에 send 버튼/선택지 영역을 고정으로 예약(bottom 120px)해서, 버튼이 나타나도 버블이 위로 밀리지 않음.
+         bottom-up 정렬로 버블이 항상 send 영역 바로 위에 붙어있도록 (채팅 앱 UX). */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto px-4 pb-2"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 64px)' }}
+        className="absolute inset-x-0 top-0 overflow-auto px-4"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top) + 64px)',
+          bottom: 'calc(env(safe-area-inset-bottom) + 120px)',
+        }}
       >
-        <div className="space-y-1 pb-2">
+        <div className="min-h-full flex flex-col justify-end space-y-1 pb-2">
           {displayLines.map((line, i) => {
             // CHAT 안의 narration → 가운데 정렬 시스템 메시지
             if (line.mode === 'narration') {
@@ -748,6 +914,20 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
                     {line.text}
                   </p>
                 </div>
+              )
+            }
+            // CHAT의 mode:'media' — 캐릭터가 보내는 이미지/영상/프리미엄
+            if (line.mode === 'media') {
+              return (
+                <ChatMediaBubble
+                  key={i}
+                  line={line}
+                  profileUrl={profileUrl}
+                  characterName={characterName}
+                  isUnlocked={!!unlockedMedia && unlockedMedia.has(line.mediaUrl)}
+                  onUnlockRequest={onUnlockRequest}
+                  onPreview={onMediaPreview}
+                />
               )
             }
             const prev = displayLines[i - 1]
@@ -815,16 +995,21 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
         </div>
       </div>
 
-      {/* 유저 입력 버튼 — mode:'user' 아이템을 직접 "보내는" 시뮬레이션 */}
+      {/* 유저 입력 버튼 — 예약된 하단 영역에 floating (버블 영역에 영향 없음) */}
       {userButton && !pickedChoice && (
-        <UserInputButton item={userButton} userName={userName} onClick={onUserButtonClick} />
+        <div
+          className="absolute inset-x-0 z-20 px-4"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
+        >
+          <UserInputButton item={userButton} userName={userName} onClick={onUserButtonClick} />
+        </div>
       )}
 
-      {/* 답장 선택지 */}
+      {/* 답장 선택지 — 동일하게 예약된 하단 영역에 floating */}
       {showChoices && !pickedChoice && (
         <div
-          className="relative z-20 px-4 pt-2 flex flex-col gap-2 bg-gradient-to-t from-gray-950/90 via-gray-950/90 to-transparent"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+          className="absolute inset-x-0 z-20 px-4 flex flex-col gap-2"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
         >
           <ChoiceButtons
             choices={choices}
@@ -844,13 +1029,10 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
 // ───────────────────────────────────────────────────────────
 function UserInputButton({ item, userName, onClick }) {
   return (
-    <div
-      className="relative z-20 px-4 pt-3 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
-    >
+    <div className="relative">
       <button
         onClick={onClick}
-        className="w-full text-left px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm transition-colors flex items-center gap-3 shadow-lg"
+        className="w-full text-left px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm transition-colors flex items-center gap-3 shadow-xl"
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         aria-label={`보내기: ${item.content}`}
       >
@@ -863,6 +1045,86 @@ function UserInputButton({ item, userName, onClick }) {
         </span>
       </button>
       <p className="text-[10px] text-gray-500 text-right mt-1.5 pr-1">탭해서 {userName}로 보내기</p>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────
+// 채팅 미디어 버블 — CHAT의 mode:'media' 아이템 (이미지/영상/프리미엄)
+// ───────────────────────────────────────────────────────────
+function ChatMediaBubble({ line, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview }) {
+  const isVideo = line.variant === 'video'
+  const isPremium = line.variant === 'premium'
+  const locked = isPremium && !isUnlocked
+
+  const handleClick = (e) => {
+    e.stopPropagation()
+    if (locked) {
+      onUnlockRequest && onUnlockRequest(line)
+    } else {
+      onPreview && onPreview(line)
+    }
+  }
+
+  return (
+    <div className="flex justify-start mt-3">
+      <div className="w-7 flex-shrink-0 mr-2">
+        <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden">
+          {profileUrl
+            ? <img src={profileUrl} alt="" className="w-full h-full object-cover" />
+            : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
+        </div>
+      </div>
+      <div className="max-w-[75%]">
+        {characterName && (
+          <p className="text-xs text-gray-400 mb-1 font-medium">{characterName}</p>
+        )}
+        <div
+          className="relative rounded-2xl rounded-tl-none overflow-hidden cursor-pointer bg-gray-900"
+          onClick={handleClick}
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', maxWidth: '220px' }}
+        >
+          {isVideo ? (
+            <video
+              src={line.mediaUrl}
+              className="w-full max-h-[280px] object-cover bg-black"
+              muted
+              loop
+              autoPlay
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <img
+              src={line.mediaUrl}
+              alt=""
+              className={`w-full max-h-[280px] object-cover transition-all ${locked ? 'blur-sm scale-[1.02]' : ''}`}
+              loading="lazy"
+            />
+          )}
+
+          {/* 영상 인디케이터 */}
+          {isVideo && (
+            <div className="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center bg-black/60 rounded-full pointer-events-none">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+            </div>
+          )}
+
+          {/* 프리미엄 잠금 오버레이 */}
+          {locked && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[1px]">
+              <div className="w-10 h-10 flex items-center justify-center bg-amber-500/90 rounded-full mb-1.5 shadow-lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <p className="text-[11px] text-white font-bold drop-shadow">탭해서 해금</p>
+              <p className="text-[10px] text-amber-200 mt-0.5 drop-shadow">🎭 {line.maskCost || 0}</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
