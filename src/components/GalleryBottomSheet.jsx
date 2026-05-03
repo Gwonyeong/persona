@@ -226,7 +226,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
 
           {/* 2x2 탭 그리드 */}
           <div className="border-t border-gray-800 px-4 py-2">
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5" data-onboarding-target="gallery-tabs">
               {tabs.map((t) => (
                 <button
                   key={t.key}
@@ -260,6 +260,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                   onClick={() => { setBgPickMode(true); setSelectedFeed(null) }}
                   className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-white transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  data-onboarding-target="change-bg"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -329,7 +330,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
               {tab === 'FEED' && (
                 <>
                   <div className="grid grid-cols-3 gap-[1px]">
-                    {feedPosts.map((post) => {
+                    {feedPosts.map((post, idx) => {
                       const isSelected = bgPickMode
                         ? bgSelected === (post.images?.[0]?.filePath || post.filePath)
                         : selectedFeed?.id === post.id
@@ -339,6 +340,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                           onClick={() => handleBgFeedClick(post)}
                           className="aspect-[9/16] overflow-hidden relative"
                           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          data-onboarding-target={idx === 0 ? 'first-feed' : undefined}
                         >
                           <img
                             src={post.images?.[0]?.filePath || post.filePath}
@@ -442,6 +444,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
               }}
               className="flex-1 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-xl"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="attach-feed"
             >
               {t('gallery.attachFeed')}
             </button>

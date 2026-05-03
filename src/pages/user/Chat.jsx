@@ -6,6 +6,7 @@ import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
 import ReportModal from '../../components/ReportModal'
+import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -88,6 +89,8 @@ export default function Chat() {
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
   const subscription = useStore((s) => s.subscription)
+  const user = useStore((s) => s.user)
+  const setUser = useStore((s) => s.setUser)
   const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
   const [currentUser, setCurrentUser] = useState(null)
   // 보이스 사용 자격: 유료 OR 무료 잔여(freeVoiceUses)
@@ -529,6 +532,33 @@ export default function Chat() {
     setPlayingAudioIdx(null)
   }
 
+  // 채팅 투어 (early return 위에 hook 호출 — Rules of Hooks)
+  const tourActive = !!user && !user.onboardingState?.chatTour
+  const tourSteps = useMemo(() => [
+    { page: 'chatTour', key: 'affinity', target: '[data-onboarding-target="affinity"]', caption: t('chatTour.affinity', { name: user?.name || '' }) },
+    { page: 'chatTour', key: 'voice', target: '[data-onboarding-target="voice-btn"]', caption: t('chatTour.voice') },
+    { page: 'chatTour', key: 'imageGen', target: '[data-onboarding-target="image-gen-btn"]', caption: t('chatTour.imageGen') },
+    { page: 'chatTour', key: 'gallery', target: '[data-onboarding-target="gallery-btn"]', caption: t('chatTour.gallery') },
+    {
+      page: 'chatTour', key: 'galleryTabs',
+      target: '[data-onboarding-target="gallery-tabs"]',
+      caption: t('chatTour.galleryTabs'),
+      onEnter: () => setShowGallery(true),
+      enterDelay: 380,
+    },
+    {
+      page: 'chatTour', key: 'attachFeed',
+      target: '[data-onboarding-target="attach-feed"]',
+      caption: t('chatTour.attachFeed'),
+      onEnter: () => {
+        const firstFeed = document.querySelector('[data-onboarding-target="first-feed"]')
+        if (firstFeed) firstFeed.click()
+      },
+      enterDelay: 100,
+    },
+    { page: 'chatTour', key: 'changeBg', target: '[data-onboarding-target="change-bg"]', caption: t('chatTour.changeBg') },
+  ], [user?.name, t])
+
   if (!conversation) {
     return <div className="flex items-center justify-center h-screen text-gray-400">{t('common.loading')}</div>
   }
@@ -538,6 +568,14 @@ export default function Chat() {
   const profileImg = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
   const profileUrl = getImageUrl(character.profileImage) || getImageUrl(profileImg?.filePath)
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
+
+  const completeTour = () => {
+    setUser({
+      ...user,
+      onboardingState: { ...(user.onboardingState || {}), chatTour: true },
+    })
+    api.patch('/auth/onboarding', { key: 'chatTour' }).catch(() => {})
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col bg-gray-950 z-20" style={{ top: viewportStyle.top || '0px', height: viewportStyle.height || '100%' }}>
@@ -561,7 +599,7 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
-        <span className="text-[11px] text-gray-500 font-mono">❤️ {conversation.affinity ?? 0}</span>
+        <span className="text-[11px] text-gray-500 font-mono" data-onboarding-target="affinity">❤️ {conversation.affinity ?? 0}</span>
         <button
           onClick={() => setShowReport(true)}
           className="text-gray-500 hover:text-red-400 transition-colors ml-1"
@@ -789,9 +827,10 @@ export default function Chat() {
       <div className="relative flex-shrink-0">
         {/* 플로팅 버튼들 */}
         <div className="absolute z-10 flex gap-2" style={{ right: 16, bottom: '100%', marginBottom: 12 }}>
-          {character.voiceId && (
+          {(character.voiceId || tourActive) && (
             <button
               onClick={() => {
+                if (tourActive && !character.voiceId) return
                 if (!canUseVoice) { setShowVoicePremiumModal(true); return }
                 setVoiceMode((v) => {
                   const next = !v
@@ -799,9 +838,10 @@ export default function Chat() {
                   return next
                 })
               }}
-              disabled={!token}
+              disabled={!token || (tourActive && !character.voiceId)}
               className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${!canUseVoice ? 'bg-gray-800 opacity-50' : voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="voice-btn"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -831,6 +871,7 @@ export default function Chat() {
             disabled={generatingImage || !token}
             className="w-11 h-11 rounded-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 flex items-center justify-center shadow-lg transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            data-onboarding-target="image-gen-btn"
           >
             {generatingImage ? (
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
@@ -855,6 +896,7 @@ export default function Chat() {
               onClick={() => { setShowGallery(true); setShowGalleryTooltip(false); setShowGalleryBadge(false) }}
               className="relative w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="gallery-btn"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -1086,6 +1128,12 @@ export default function Chat() {
           <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
         </div>
       )}
+      <OnboardingSpotlight
+        active={tourActive}
+        steps={tourSteps}
+        onComplete={completeTour}
+      />
+
       {errorToast && (
         <div className="absolute top-16 left-4 right-4 z-50 flex justify-center" style={{ pointerEvents: 'none' }}>
           <div

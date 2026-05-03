@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import TagFilterBar from '../../components/TagFilterBar'
 import useTagFilter from '../../hooks/useTagFilter'
+import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -35,7 +36,7 @@ export default function Feed() {
     catch { return false }
   })
   const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('feedFilter')
-  const { token } = useStore()
+  const { token, user, setUser } = useStore()
   const navigate = useNavigate()
 
   // 캐시 hydration: 같은 필터로 돌아왔을 때 데이터/스크롤 복원
@@ -223,6 +224,41 @@ export default function Feed() {
     }
   })
 
+  // 온보딩 투어
+  const tourSeen = !!user?.onboardingState?.feedTour
+  const tourReady = !!user && !tourSeen && initialLoaded && feedPosts.length > 0
+  const hasStories = storyCharacters.length > 0
+  const tourSteps = useMemo(() => [
+    ...(hasStories
+      ? [{ page: 'feedTour', key: 'stories', target: '[data-onboarding-target="stories"]', caption: t('feedTour.stories') }]
+      : []),
+    {
+      page: 'feedTour', key: 'like',
+      target: '[data-onboarding-target="firstPost"]',
+      caption: t('feedTour.like'),
+      pointer: { selector: '[data-onboarding-pointer="like"]', placement: 'top' },
+    },
+    {
+      page: 'feedTour', key: 'openPost',
+      target: '[data-onboarding-target="firstPost"]',
+      caption: t('feedTour.openPost'),
+      pointer: { selector: '[data-onboarding-target="firstPost"]', placement: 'top' },
+    },
+    {
+      page: 'feedTour', key: 'follow',
+      target: '[data-onboarding-target="firstPost"]',
+      caption: t('feedTour.follow'),
+      pointer: { selector: '[data-onboarding-pointer="follow"]', placement: 'top' },
+    },
+  ], [hasStories, t])
+  const completeTour = () => {
+    setUser({
+      ...user,
+      onboardingState: { ...(user.onboardingState || {}), feedTour: true },
+    })
+    api.patch('/auth/onboarding', { key: 'feedTour' }).catch(() => {})
+  }
+
   return (
     <div ref={containerRef} className="pb-2">
       {/* 헤더 */}
@@ -231,7 +267,7 @@ export default function Feed() {
       </div>
 
       {/* 스토리 */}
-      <div className="px-4 py-3">
+      <div className="px-4 py-3" data-onboarding-target="stories">
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
           {storyCharacters.map((c) => {
             return (
@@ -284,7 +320,7 @@ export default function Feed() {
 
       {/* 피드 포스트 그리드 */}
       <div className="grid grid-cols-3 gap-0.5 px-0.5">
-        {feedPosts.map((post) => {
+        {feedPosts.map((post, idx) => {
           const imageList = post.images?.length ? post.images : (post.imageUrl ? [{ filePath: post.imageUrl }] : [])
           const isMulti = imageList.length > 1
           const activeIdx = isMulti ? slideTick % imageList.length : 0
@@ -294,6 +330,7 @@ export default function Feed() {
               onClick={() => navigateWithScrollSave(`/characters/${post.character.id}/feed?postId=${post.id}`)}
               className="relative aspect-[9/16] bg-gray-900 overflow-hidden"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target={idx === 0 ? 'firstPost' : undefined}
             >
               {imageList.length > 0 ? (
                 imageList.map((img, idx) => (
@@ -318,7 +355,10 @@ export default function Feed() {
               )}
 
               {/* 좋아요 인디케이터 (좌측 하단) */}
-              <div className="absolute bottom-1 left-1 pointer-events-none drop-shadow">
+              <div
+                className="absolute bottom-1 left-1 pointer-events-none drop-shadow"
+                data-onboarding-pointer={idx === 0 ? 'like' : undefined}
+              >
                 {post.liked ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -332,7 +372,10 @@ export default function Feed() {
 
               {/* 캐릭터 프로필 오버레이 */}
               <div className="absolute bottom-1 right-1 left-1 flex justify-end pointer-events-none">
-                <div className="flex items-center gap-1 max-w-full bg-black/55 backdrop-blur-sm rounded-full pl-0.5 pr-1.5 py-0.5">
+                <div
+                  className="flex items-center gap-1 max-w-full bg-black/55 backdrop-blur-sm rounded-full pl-0.5 pr-1.5 py-0.5"
+                  data-onboarding-pointer={idx === 0 ? 'follow' : undefined}
+                >
                   {post.thumbUrl ? (
                     <img
                       src={post.thumbUrl}
@@ -368,6 +411,11 @@ export default function Feed() {
         </div>
       )}
 
+      <OnboardingSpotlight
+        active={tourReady}
+        steps={tourSteps}
+        onComplete={completeTour}
+      />
     </div>
   )
 }
