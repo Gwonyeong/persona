@@ -55,6 +55,12 @@ export default function Feed() {
   const containerRef = useRef(null)
   const skipFilterResetRef = useRef(true)
   const scrollHandlerRef = useRef(null)
+  const [slideTick, setSlideTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setSlideTick((t) => t + 1), 2000)
+    return () => clearInterval(id)
+  }, [])
 
   const goToChat = async (character) => {
     try {
@@ -279,8 +285,9 @@ export default function Feed() {
       {/* 피드 포스트 그리드 */}
       <div className="grid grid-cols-3 gap-0.5 px-0.5">
         {feedPosts.map((post) => {
-          const firstImage = post.images?.[0]?.filePath || post.imageUrl
-          const isMulti = (post.images?.length || 0) > 1
+          const imageList = post.images?.length ? post.images : (post.imageUrl ? [{ filePath: post.imageUrl }] : [])
+          const isMulti = imageList.length > 1
+          const activeIdx = isMulti ? slideTick % imageList.length : 0
           return (
             <button
               key={post.id}
@@ -288,13 +295,16 @@ export default function Feed() {
               className="relative aspect-[9/16] bg-gray-900 overflow-hidden"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              {firstImage ? (
-                <img
-                  src={firstImage}
-                  alt={post.caption || ''}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
+              {imageList.length > 0 ? (
+                imageList.map((img, idx) => (
+                  <img
+                    key={img.id ?? idx}
+                    src={img.filePath}
+                    alt={post.caption || ''}
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
+                    draggable={false}
+                  />
+                ))
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
               )}
