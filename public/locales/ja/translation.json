@@ -276,7 +276,9 @@
     "reviewDesc": "{{name}}を含め3人のキャラクターと会話を始めましたね！\n短いレビューを残していただけると励みになります。",
     "reviewReward": "レビュー投稿でマスク10個プレゼント！",
     "reviewButton": "レビューを書く",
-    "reviewLater": "後で"
+    "reviewLater": "後で",
+    "freeLimitReached": "無料プランは最大{{limit}}名のキャラクターとチャットできます",
+    "freeLimitCta": "7日間無料体験"
   },
   "masks": {
     "pkg30": "60個",

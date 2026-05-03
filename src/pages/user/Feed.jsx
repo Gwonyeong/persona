@@ -55,6 +55,12 @@ export default function Feed() {
   const containerRef = useRef(null)
   const skipFilterResetRef = useRef(true)
   const scrollHandlerRef = useRef(null)
+  const [slideTick, setSlideTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setSlideTick((t) => t + 1), 2000)
+    return () => clearInterval(id)
+  }, [])
 
   const goToChat = async (character) => {
     try {
@@ -82,7 +88,7 @@ export default function Feed() {
     loadingRef.current = true
     setLoading(true)
     try {
-      const params = new URLSearchParams({ limit: '10' })
+      const params = new URLSearchParams({ limit: '12' })
       if (cursor) params.set('cursor', cursor)
       if (followOnly) params.set('followOnly', 'true')
       if (selectedTags.length > 0) {
@@ -279,8 +285,9 @@ export default function Feed() {
       {/* 피드 포스트 그리드 */}
       <div className="grid grid-cols-3 gap-0.5 px-0.5">
         {feedPosts.map((post) => {
-          const firstImage = post.images?.[0]?.filePath || post.imageUrl
-          const isMulti = (post.images?.length || 0) > 1
+          const imageList = post.images?.length ? post.images : (post.imageUrl ? [{ filePath: post.imageUrl }] : [])
+          const isMulti = imageList.length > 1
+          const activeIdx = isMulti ? slideTick % imageList.length : 0
           return (
             <button
               key={post.id}
@@ -288,13 +295,16 @@ export default function Feed() {
               className="relative aspect-[9/16] bg-gray-900 overflow-hidden"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              {firstImage ? (
-                <img
-                  src={firstImage}
-                  alt={post.caption || ''}
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
+              {imageList.length > 0 ? (
+                imageList.map((img, idx) => (
+                  <img
+                    key={img.id ?? idx}
+                    src={img.filePath}
+                    alt={post.caption || ''}
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
+                    draggable={false}
+                  />
+                ))
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
               )}
@@ -306,6 +316,19 @@ export default function Feed() {
                   </svg>
                 </div>
               )}
+
+              {/* 좋아요 인디케이터 (좌측 하단) */}
+              <div className="absolute bottom-1 left-1 pointer-events-none drop-shadow">
+                {post.liked ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                )}
+              </div>
 
               {/* 캐릭터 프로필 오버레이 */}
               <div className="absolute bottom-1 right-1 left-1 flex justify-end pointer-events-none">

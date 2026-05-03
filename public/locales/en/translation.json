@@ -276,7 +276,9 @@
     "reviewDesc": "You've started chatting with 3 characters including {{name}}!\nA quick review would mean a lot to us.",
     "reviewReward": "Leave a review and get 10 masks!",
     "reviewButton": "Leave a Review",
-    "reviewLater": "Maybe later"
+    "reviewLater": "Maybe later",
+    "freeLimitReached": "Free plan can chat with up to {{limit}} characters",
+    "freeLimitCta": "Start 7-day free trial"
   },
   "masks": {
     "pkg30": "60",

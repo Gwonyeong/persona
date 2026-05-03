@@ -57,7 +57,20 @@ export default function CharacterDetail() {
   const [showReport, setShowReport] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
   const [storylines, setStorylines] = useState([])
+  const [toast, setToast] = useState(null)
+  const [slideTick, setSlideTick] = useState(0)
   const storyTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  useEffect(() => {
+    const id = setInterval(() => setSlideTick((t) => t + 1), 2000)
+    return () => clearInterval(id)
+  }, [])
 
   const stories = character?.stories || []
   const hasStories = stories.length > 0
@@ -133,6 +146,9 @@ export default function CharacterDetail() {
       }
     } catch (error) {
       console.error(error)
+      if (error?.data?.error === 'CHARACTER_LIMIT_REACHED') {
+        setToast(t('character.freeLimitReached', { limit: error.data.limit }))
+      }
       setStarting(false)
     }
   }
@@ -422,29 +438,55 @@ export default function CharacterDetail() {
         {activeTab === 'feed' && (
           <>
             <div className="grid grid-cols-3 gap-[1px]">
-              {feedPosts.map((post) => (
-                <button
-                  key={post.id}
-                  onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
-                  className="aspect-[9/16] overflow-hidden relative"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <img
-                    src={post.images?.[0]?.filePath || post.filePath}
-                    alt={post.caption || ''}
-                    className="w-full h-full object-cover hover:opacity-80 transition-opacity"
-                    loading="lazy"
-                  />
-                  {post.images?.length > 1 && (
-                    <div className="absolute top-1.5 right-1.5">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="drop-shadow">
-                        <rect x="3" y="3" width="15" height="15" rx="2" />
-                        <rect x="6" y="6" width="15" height="15" rx="2" />
-                      </svg>
+              {feedPosts.map((post) => {
+                const imageList = post.images?.length ? post.images : (post.filePath ? [{ filePath: post.filePath }] : [])
+                const isMulti = imageList.length > 1
+                const activeIdx = isMulti ? slideTick % imageList.length : 0
+                return (
+                  <button
+                    key={post.id}
+                    onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
+                    className="aspect-[9/16] overflow-hidden relative bg-gray-900"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {imageList.length > 0 ? (
+                      imageList.map((img, idx) => (
+                        <img
+                          key={img.id ?? idx}
+                          src={img.filePath}
+                          alt={post.caption || ''}
+                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
+                          loading="lazy"
+                          draggable={false}
+                        />
+                      ))
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
+                    )}
+                    {isMulti && (
+                      <div className="absolute top-1.5 right-1.5">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="drop-shadow">
+                          <rect x="3" y="3" width="15" height="15" rx="2" />
+                          <rect x="6" y="6" width="15" height="15" rx="2" />
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* 좋아요 인디케이터 (좌측 하단) */}
+                    <div className="absolute bottom-1 left-1 pointer-events-none drop-shadow">
+                      {post.liked ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                      )}
                     </div>
-                  )}
-                </button>
-              ))}
+                  </button>
+                )
+              })}
             </div>
             {feedPosts.length === 0 && (
               <div className="text-center text-gray-500 py-16">
@@ -614,6 +656,24 @@ export default function CharacterDetail() {
           targetId={existingConv ? existingConv.conversationId : parseInt(id)}
           onClose={() => setShowReport(false)}
         />
+      )}
+
+      {toast && (
+        <div
+          className="absolute left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+          style={{ top: 'calc(env(safe-area-inset-top) + 60px)' }}
+        >
+          <div className="bg-gray-900/95 text-white text-sm px-4 py-3 rounded-xl shadow-lg backdrop-blur-sm border border-gray-700 pointer-events-auto flex flex-col gap-2 max-w-xs">
+            <p className="leading-snug">{toast}</p>
+            <button
+              onClick={() => { setToast(null); navigate('/subscription') }}
+              className="self-stretch py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-500 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {t('character.freeLimitCta')}
+            </button>
+          </div>
+        </div>
       )}
 
       {showLoginModal && <LoginModal onClose={() => { setShowLoginModal(false); pendingActionRef.current = null }} onLoginSuccess={() => {

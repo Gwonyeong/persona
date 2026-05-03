@@ -13,6 +13,16 @@ function getImageUrl(filePath) {
   return null
 }
 
+function getCharacterOnlineStatus(activeHours) {
+  if (!activeHours?.schedule) return 'free'
+  const hour = new Date().getHours()
+  const slot = activeHours.schedule.find((s) => {
+    if (s.start < s.end) return hour >= s.start && hour < s.end
+    return hour >= s.start || hour < s.end
+  })
+  return slot?.status || 'free'
+}
+
 export default function ChatList() {
   const { t } = useTranslation()
   const { token } = useStore()
@@ -142,6 +152,7 @@ export default function ChatList() {
                 const thumbUrl = getImageUrl(conv.character.profileImage) || getImageUrl(thumb?.filePath)
                 const previewMsg = conv.lastCharMessage || conv.messages?.[0]
                 const isUnread = conv.updatedAt && (!conv.lastReadAt || new Date(conv.updatedAt) > new Date(conv.lastReadAt))
+                const onlineStatus = getCharacterOnlineStatus(conv.character.activeHours)
 
                 return (
                   <div key={conv.id} className="flex items-center">
@@ -151,11 +162,16 @@ export default function ChatList() {
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     >
                       {/* 프로필 이미지 */}
-                      <div className="w-14 h-14 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                        {thumbUrl ? (
-                          <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-600 text-lg">?</div>
+                      <div className="relative flex-shrink-0">
+                        <div className="w-14 h-14 rounded-full bg-gray-800 overflow-hidden">
+                          {thumbUrl ? (
+                            <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-600 text-lg">?</div>
+                          )}
+                        </div>
+                        {onlineStatus === 'free' && (
+                          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-gray-950" />
                         )}
                       </div>
 
