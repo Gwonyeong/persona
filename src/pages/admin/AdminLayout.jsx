@@ -6,7 +6,9 @@ import useStore from '../../store/useStore'
 const NAV_ITEMS = [
   { to: '/admin', label: '대시보드', end: true },
   { to: '/admin/characters', label: '캐릭터 관리' },
+  { to: '/admin/base-images', label: '베이스 이미지' },
   { to: '/admin/affinity-images', label: '호감도 이미지' },
+  { to: '/admin/expressions', label: '표정 이미지' },
   { to: '/admin/users', label: '유저 관리' },
 ]
 
