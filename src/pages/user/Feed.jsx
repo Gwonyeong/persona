@@ -328,7 +328,7 @@ export default function Feed() {
             <button
               key={post.id}
               onClick={() => navigateWithScrollSave(`/characters/${post.character.id}/feed?postId=${post.id}`)}
-              className="relative aspect-[9/16] bg-gray-900 overflow-hidden"
+              className="relative aspect-[3/4] bg-gray-900 overflow-hidden"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               data-onboarding-target={idx === 0 ? 'firstPost' : undefined}
             >
@@ -338,7 +338,7 @@ export default function Feed() {
                     key={img.id ?? idx}
                     src={img.filePath}
                     alt={post.caption || ''}
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
                     draggable={false}
                   />
                 ))

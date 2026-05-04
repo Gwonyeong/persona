@@ -135,7 +135,7 @@ export default function FeedPostCard({
 
       {/* 포스트 이미지 (슬라이드) */}
       <div
-        className="aspect-[9/16] bg-gray-900 w-full relative overflow-hidden"
+        className="aspect-[3/4] bg-gray-900 w-full relative overflow-hidden"
         onTouchStart={multi ? onTouchStart : undefined}
         onTouchMove={multi ? onTouchMove : undefined}
         onTouchEnd={multi ? onTouchEnd : undefined}
@@ -163,7 +163,7 @@ export default function FeedPostCard({
               <img
                 src={img.filePath}
                 alt={i === 0 ? caption || "" : ""}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-top"
                 draggable={false}
               />
             </button>

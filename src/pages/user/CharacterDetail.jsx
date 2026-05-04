@@ -486,7 +486,7 @@ export default function CharacterDetail() {
                   <button
                     key={post.id}
                     onClick={() => navigate(`/characters/${id}/feed?postId=${post.id}`)}
-                    className="aspect-[9/16] overflow-hidden relative bg-gray-900"
+                    className="aspect-[3/4] overflow-hidden relative bg-gray-900"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
                     {imageList.length > 0 ? (
@@ -495,7 +495,7 @@ export default function CharacterDetail() {
                           key={img.id ?? idx}
                           src={img.filePath}
                           alt={post.caption || ''}
-                          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
+                          className={`absolute inset-0 w-full h-full object-cover object-top transition-opacity duration-500 ${idx === activeIdx ? 'opacity-100' : 'opacity-0'}`}
                           loading="lazy"
                           draggable={false}
                         />
