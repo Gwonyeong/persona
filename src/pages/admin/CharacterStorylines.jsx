@@ -9,26 +9,42 @@ export default function CharacterStorylines() {
   const navigate = useNavigate()
   const [character, setCharacter] = useState(null)
   const [storylines, setStorylines] = useState([])
+  const [scenarios, setScenarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [editingScenario, setEditingScenario] = useState(null) // null 또는 { ...scenario } | 'new'
 
   useEffect(() => {
     api.get(`/admin/characters`).then(({ characters }) => {
       const found = characters.find((c) => c.id === parseInt(id))
       setCharacter(found || null)
     }).catch(() => {})
-    loadStorylines()
+    loadAll()
   }, [id])
 
-  const loadStorylines = async () => {
+  const loadAll = async () => {
     setLoading(true)
     try {
-      const { storylines } = await api.get(`/admin/characters/${id}/storylines`)
-      setStorylines(storylines || [])
+      const [stRes, scRes] = await Promise.all([
+        api.get(`/admin/characters/${id}/storylines`),
+        api.get(`/admin/characters/${id}/scenarios`),
+      ])
+      setStorylines(stRes.storylines || [])
+      setScenarios(scRes.scenarios || [])
     } catch (e) {
-      console.error('Load storylines failed:', e)
+      console.error('Load failed:', e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteScenario = async (scenarioId) => {
+    if (!confirm('이 시나리오를 삭제하시겠습니까? 안의 파트(스토리)는 단독 스토리로 풀려나옵니다.')) return
+    try {
+      await api.delete(`/admin/scenarios/${scenarioId}`)
+      await loadAll()
+    } catch (e) {
+      alert('삭제 실패: ' + (e?.data?.error || e?.message))
     }
   }
 
@@ -36,7 +52,7 @@ export default function CharacterStorylines() {
     if (!confirm('이 스토리를 삭제하시겠습니까? 모든 노드/선택지/유저 진행 기록이 함께 삭제됩니다.')) return
     try {
       await api.delete(`/admin/storylines/${storylineId}`)
-      await loadStorylines()
+      await loadAll()
     } catch (e) {
       console.error('Delete failed:', e)
       alert('삭제 실패: ' + (e?.response?.data?.error || e?.message))
@@ -61,6 +77,13 @@ export default function CharacterStorylines() {
           )}
         </div>
         <button
+          onClick={() => setEditingScenario('new')}
+          className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white rounded-lg text-xs font-semibold transition-colors"
+          style={{ outline: 'none' }}
+        >
+          + 시나리오
+        </button>
+        <button
           onClick={() => setShowNewModal(true)}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-colors"
           style={{ outline: 'none' }}
@@ -69,7 +92,59 @@ export default function CharacterStorylines() {
         </button>
       </div>
 
-      {/* 목록 */}
+      {/* 시나리오 섹션 */}
+      {scenarios.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-sm font-bold text-gray-300 mb-3">시나리오 ({scenarios.length}개)</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {scenarios.map((sc) => (
+              <div key={sc.id} className="rounded-xl bg-gray-900 border border-indigo-500/40 overflow-hidden">
+                <div className="aspect-[16/9] relative bg-gray-800">
+                  {sc.thumbnailImage ? (
+                    <img src={sc.thumbnailImage} alt={sc.title} className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-indigo-300/40 text-xs">시나리오</div>
+                  )}
+                  <div
+                    className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      sc.status === 'PUBLISHED'
+                        ? 'bg-emerald-600/90 text-white'
+                        : sc.status === 'TEST'
+                        ? 'bg-amber-600/90 text-white'
+                        : 'bg-gray-700/90 text-gray-200'
+                    }`}
+                  >
+                    {sc.status}
+                  </div>
+                </div>
+                <div className="p-3">
+                  <p className="font-semibold text-sm text-gray-100 line-clamp-1">{sc.title}</p>
+                  <p className="text-xs text-gray-500 mt-1">파트 {sc.storylines?.length ?? 0}개</p>
+                  <div className="mt-3 flex gap-1.5">
+                    <button
+                      onClick={() => setEditingScenario(sc)}
+                      className="flex-1 px-2 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded transition-colors"
+                      style={{ outline: 'none' }}
+                    >
+                      편집
+                    </button>
+                    <button
+                      onClick={() => handleDeleteScenario(sc.id)}
+                      className="px-2 py-1.5 bg-red-900/40 hover:bg-red-900/60 text-red-300 text-xs rounded transition-colors"
+                      style={{ outline: 'none' }}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 스토리(파트) 목록 */}
+      {scenarios.length > 0 && <h3 className="text-sm font-bold text-gray-300 mb-3">스토리(파트) ({storylines.length}개)</h3>}
       {loading ? (
         <p className="text-gray-500 text-sm">로딩 중...</p>
       ) : storylines.length === 0 ? (
@@ -112,6 +187,8 @@ export default function CharacterStorylines() {
                   className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                     s.status === 'PUBLISHED'
                       ? 'bg-emerald-600/90 text-white'
+                      : s.status === 'TEST'
+                      ? 'bg-amber-600/90 text-white'
                       : 'bg-gray-700/90 text-gray-200'
                   }`}
                 >
@@ -122,6 +199,12 @@ export default function CharacterStorylines() {
               {/* 정보 */}
               <div className="p-3">
                 <p className="font-semibold text-sm text-gray-100 line-clamp-1">{s.title}</p>
+                {s.scenarioId && (
+                  <p className="text-[10px] text-indigo-300 mt-0.5 line-clamp-1">
+                    {scenarios.find((sc) => sc.id === s.scenarioId)?.title || `시나리오 #${s.scenarioId}`}
+                    {s.partOrder != null && ` · 파트 ${s.partOrder}`}
+                  </p>
+                )}
                 <p className="text-xs text-gray-500 mt-1">노드 {s.nodeCount}개</p>
                 <div className="mt-3 flex gap-1.5">
                   <button
@@ -157,6 +240,141 @@ export default function CharacterStorylines() {
           }}
         />
       )}
+
+      {/* 시나리오 생성/편집 모달 */}
+      {editingScenario && (
+        <ScenarioEditModal
+          characterId={parseInt(id)}
+          scenario={editingScenario === 'new' ? null : editingScenario}
+          onClose={() => setEditingScenario(null)}
+          onSaved={async () => {
+            setEditingScenario(null)
+            await loadAll()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────
+// 시나리오 생성/편집 모달 — 메타만(제목/설명/썸네일/상태/정렬)
+// ──────────────────────────────────────────────────────────────
+function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
+  const isNew = !scenario
+  const [title, setTitle] = useState(scenario?.title || '')
+  const [description, setDescription] = useState(scenario?.description || '')
+  const [thumbnailImage, setThumbnailImage] = useState(scenario?.thumbnailImage || '')
+  const [status, setStatus] = useState(scenario?.status || 'DRAFT')
+  const [sortOrder, setSortOrder] = useState(scenario?.sortOrder ?? 0)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleSubmit = async () => {
+    setError(null)
+    if (!title.trim()) { setError('제목을 입력해 주세요.'); return }
+    setSubmitting(true)
+    try {
+      const body = {
+        title: title.trim(),
+        description: description.trim() || null,
+        thumbnailImage: thumbnailImage.trim() || null,
+        status,
+        sortOrder: parseInt(sortOrder) || 0,
+      }
+      if (isNew) {
+        await api.post(`/admin/characters/${characterId}/scenarios`, body)
+      } else {
+        await api.put(`/admin/scenarios/${scenario.id}`, body)
+      }
+      onSaved()
+    } catch (e) {
+      setError(e?.data?.error || e?.message || '저장 실패')
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+          <h3 className="text-lg font-bold">{isNew ? '새 시나리오' : '시나리오 편집'}</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-white" style={{ outline: 'none' }}>✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">제목</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+              placeholder="예: 새벽 시리즈"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">설명</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">썸네일 URL (16:9)</label>
+            <input
+              value={thumbnailImage}
+              onChange={(e) => setThumbnailImage(e.target.value)}
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+              placeholder="https://..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">상태</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="DRAFT">DRAFT (비공개)</option>
+                <option value="TEST">TEST (ADMIN 전용)</option>
+                <option value="PUBLISHED">PUBLISHED (공개)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">정렬 순서</label>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+              />
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-400">{error}</p>}
+        </div>
+        <div className="p-5 border-t border-gray-800 flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm rounded-lg transition-colors"
+            style={{ outline: 'none' }}
+          >
+            취소
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            style={{ outline: 'none' }}
+          >
+            {submitting ? '저장 중...' : '저장'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

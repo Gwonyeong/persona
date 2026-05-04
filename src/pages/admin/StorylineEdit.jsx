@@ -121,6 +121,7 @@ export default function StorylineEdit() {
   const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'json'
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [meta, setMeta] = useState({})
+  const [availableScenarios, setAvailableScenarios] = useState([])
   const [jsonText, setJsonText] = useState('')
   const [saving, setSaving] = useState(false)
   const [statusMsg, setStatusMsg] = useState(null)
@@ -157,7 +158,18 @@ export default function StorylineEdit() {
         defaultBgm: storyline.defaultBgm || '',
         status: storyline.status || 'DRAFT',
         sortOrder: storyline.sortOrder ?? 0,
+        scenarioId: storyline.scenarioId ?? '',
+        partOrder: storyline.partOrder ?? 0,
       })
+      // 같은 캐릭터의 시나리오 목록 — 셀렉트박스용
+      if (storyline.characterId) {
+        try {
+          const { scenarios } = await api.get(`/admin/characters/${storyline.characterId}/scenarios`)
+          setAvailableScenarios(scenarios || [])
+        } catch (e) {
+          setAvailableScenarios([])
+        }
+      }
       const editorJson = buildReplaceBody(storyline)
       setJsonText(JSON.stringify(editorJson, null, 2))
       setDirty(false)
@@ -393,6 +405,9 @@ export default function StorylineEdit() {
         defaultBgm: meta.defaultBgm || null,
         status: meta.status,
         sortOrder: parseInt(meta.sortOrder) || 0,
+        // null 명시 허용 (시나리오에서 떼서 단독으로)
+        scenarioId: meta.scenarioId === '' ? null : parseInt(meta.scenarioId),
+        partOrder: parseInt(meta.partOrder) || 0,
       }
       const { storyline: updated } = await api.put(`/admin/storylines/${id}`, payload)
       setStoryline((prev) => ({ ...prev, ...updated }))
@@ -627,6 +642,7 @@ export default function StorylineEdit() {
                 className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
               >
                 <option value="DRAFT">DRAFT (비공개)</option>
+                <option value="TEST">TEST (ADMIN 전용 — PLACEHOLDER 허용)</option>
                 <option value="PUBLISHED" disabled={hasPlaceholders}>
                   PUBLISHED (공개){hasPlaceholders ? ' — PLACEHOLDER 수정 후 가능' : ''}
                 </option>
@@ -634,6 +650,11 @@ export default function StorylineEdit() {
               {meta.status === 'PUBLISHED' && hasPlaceholders && (
                 <p className="text-[11px] text-red-400 mt-1.5">
                   ⚠️ PLACEHOLDER URL이 {placeholderCount}개 남아있어 저장 시 거부됩니다. 트리 탭에서 모두 교체해 주세요.
+                </p>
+              )}
+              {meta.status === 'TEST' && (
+                <p className="text-[11px] text-amber-400 mt-1.5">
+                  TEST 상태는 ADMIN 유저에게만 노출됩니다. PLACEHOLDER가 남아있어도 저장됩니다.
                 </p>
               )}
             </Field>
@@ -644,6 +665,37 @@ export default function StorylineEdit() {
                 onChange={(e) => setMeta({ ...meta, sortOrder: e.target.value })}
                 className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
               />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="시나리오 (파트 묶음)">
+              <select
+                value={meta.scenarioId ?? ''}
+                onChange={(e) => setMeta({ ...meta, scenarioId: e.target.value })}
+                className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="">(단독 스토리)</option>
+                {availableScenarios.map((sc) => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.title} {sc.status !== 'PUBLISHED' ? `(${sc.status})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1.5">
+                시나리오는 캐릭터 스토리 관리 페이지에서 생성/편집할 수 있습니다.
+              </p>
+            </Field>
+            <Field label="파트 순번">
+              <input
+                type="number"
+                value={meta.partOrder ?? 0}
+                onChange={(e) => setMeta({ ...meta, partOrder: e.target.value })}
+                disabled={!meta.scenarioId}
+                className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none disabled:opacity-40"
+              />
+              <p className="text-[11px] text-gray-500 mt-1.5">
+                같은 시나리오 내 파트 순서. 작은 값이 먼저 노출.
+              </p>
             </Field>
           </div>
           <Field label="썸네일 URL (9:16 카드용)">

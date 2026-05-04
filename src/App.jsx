@@ -13,6 +13,8 @@ import CharacterStyles from './pages/admin/CharacterStyles'
 import CharacterFeeds from './pages/admin/CharacterFeeds'
 import CharacterGallery from './pages/admin/CharacterGallery'
 import AffinityImages from './pages/admin/AffinityImages'
+import BaseImages from './pages/admin/BaseImages'
+import Expressions from './pages/admin/Expressions'
 import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import AdminUsers from './pages/admin/Users'
@@ -22,6 +24,7 @@ import UserLayout from './pages/user/UserLayout'
 import Home from './pages/user/Home'
 import CharacterDetail from './pages/user/CharacterDetail'
 import Storyline from './pages/user/Storyline'
+import Scenario from './pages/user/Scenario'
 import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
@@ -145,7 +148,9 @@ function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="characters" element={<AdminCharacters />} />
+        <Route path="base-images" element={<BaseImages />} />
         <Route path="affinity-images" element={<AffinityImages />} />
+        <Route path="expressions" element={<Expressions />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
         <Route path="characters/:id/gallery" element={<CharacterGallery />} />
@@ -168,6 +173,7 @@ function App() {
         <Route path="/my" element={<MyPage />} />
         <Route path="/characters/:id" element={<CharacterDetail />} />
         <Route path="/characters/:id/feed" element={<CharacterFeed />} />
+        <Route path="/scenarios/:id" element={<Scenario />} />
         <Route path="/chats/:id" element={<Chat />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />

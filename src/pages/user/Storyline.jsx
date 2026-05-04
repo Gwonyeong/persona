@@ -111,14 +111,23 @@ function isBgVideoUrl(url) {
   return /\.(mp4|webm|mov|m4v|ogv)$/.test(cleaned)
 }
 
-// 텍스트 박스 — 화면 하단 약 1/4 영역 (캐릭터 일러스트와 함께 하단에 배치)
+// CHAPTER 텍스트 박스 영역 — 전체 컨테이너에서 하단 정렬 (텍스트 박스 + 선택지 column flex)
+// safe-area 패딩으로 홈 인디케이터 침범 방지, paddingTop으로 헤더 영역 확보.
+// 텍스트 박스는 자체 max-height + scroll로 길어져도 선택지가 화면 밖으로 밀리지 않게 한다.
 const MESSAGE_AREA_STYLE = {
-  top: '76%',
+  paddingTop: 'calc(env(safe-area-inset-top) + 64px)',
   paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
-  paddingTop: '0',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'flex-end',
+  gap: '0.75rem',
 }
 
-const TEXT_BOX_STYLE = { backgroundColor: 'rgba(0,0,0,0.65)' }
+const TEXT_BOX_STYLE = {
+  backgroundColor: 'rgba(0,0,0,0.65)',
+  maxHeight: '45vh',
+  overflowY: 'auto',
+}
 
 export default function Storyline() {
   const { id } = useParams()
@@ -160,13 +169,16 @@ export default function Storyline() {
   const [unlocking, setUnlocking] = useState(false)
   // 인라인 미디어 라이트박스 (CHAT 미디어 클릭 시 풀스크린)
   const [mediaLightbox, setMediaLightbox] = useState(null) // { url, type: 'image'|'video' } | null
+  // 같은 시나리오의 다음 파트 — RESULT 화면 "다음 파트로" 버튼용
+  const [nextPart, setNextPart] = useState(null)
 
   // ── 데이터 로드 ─────────────────────────────────────────
   useEffect(() => {
     api.get(`/storylines/${id}`)
-      .then(({ storyline, progress, unlockedMediaUrls }) => {
+      .then(({ storyline, progress, unlockedMediaUrls, nextPart }) => {
         setStoryline(storyline)
         setUnlockedMedia(new Set(unlockedMediaUrls || []))
+        setNextPart(nextPart || null)
 
         // 저장된 선택지 복원
         const restoredChoices = {}
@@ -194,7 +206,14 @@ export default function Storyline() {
 
         setCurrentBgm(storyline.defaultBgm || null)
       })
-      .catch((e) => setError(e?.message || 'Failed to load'))
+      .catch((e) => {
+        // 잠긴 스토리 — 캐릭터 상세 페이지로 되돌려 거기서 광고 시청 흐름 진행
+        if (e?.status === 403 && e?.data?.locked) {
+          setError({ locked: true, reason: e.data.reason })
+          return
+        }
+        setError(e?.message || 'Failed to load')
+      })
   }, [id])
 
   // 토스트 자동 사라짐
@@ -383,10 +402,24 @@ export default function Storyline() {
 
   // ── 렌더링 분기 결정 ───────────────────────────────────
   if (error) {
+    const isLocked = typeof error === 'object' && error?.locked
     return (
-      <div className="flex flex-col items-center justify-center h-dvh bg-black text-gray-400 gap-3">
-        <p>스토리를 불러오지 못했습니다.</p>
-        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>돌아가기</button>
+      <div className="flex flex-col items-center justify-center h-dvh bg-black text-gray-400 gap-3 px-6 text-center">
+        {isLocked ? (
+          <>
+            <div className="w-12 h-12 rounded-full bg-indigo-600/20 flex items-center justify-center mb-1">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+            <p className="text-white text-sm font-bold">잠긴 스토리예요</p>
+            <p className="text-xs leading-relaxed">캐릭터 상세 페이지에서<br/>광고를 시청하면 진행할 수 있어요.</p>
+          </>
+        ) : (
+          <p>스토리를 불러오지 못했습니다.</p>
+        )}
+        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400 mt-1" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>돌아가기</button>
       </div>
     )
   }
@@ -549,8 +582,13 @@ export default function Storyline() {
           storyline={storyline}
           choices={choices}
           token={token}
+          nextPart={nextPart}
           onClose={() => navigate(-1)}
           onRestart={() => setShowRestartModal(true)}
+          onNextPart={(partId) => {
+            // 다음 파트로 — 같은 페이지에서 storylineId만 바꿔 navigate
+            navigate(`/storylines/${partId}`, { replace: true })
+          }}
         />
       )}
 
@@ -837,11 +875,11 @@ function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onC
     <div className="absolute inset-0">
       {(text || showChoices) && (
         <div
-          className="absolute left-0 right-0 bottom-0 z-20 px-5 pointer-events-none"
+          className="absolute inset-0 z-20 px-5 pointer-events-none"
           style={MESSAGE_AREA_STYLE}
         >
           {text && (
-            <div className="relative rounded-xl px-4 py-5" style={TEXT_BOX_STYLE}>
+            <div className="relative rounded-xl px-4 py-5 pointer-events-auto" style={TEXT_BOX_STYLE}>
               {speakerName && (
                 <span
                   className={`absolute -top-2.5 ${badgeSide === 'right' ? 'right-3' : 'left-3'} px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg ${badgeColor} text-white`}
@@ -901,7 +939,9 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
         className="absolute inset-x-0 top-0 overflow-auto px-4"
         style={{
           paddingTop: 'calc(env(safe-area-inset-top) + 64px)',
-          bottom: 'calc(env(safe-area-inset-bottom) + 120px)',
+          // 하단에 UserInputButton/ChoiceButtons floating 영역 예약
+          // (선택지 2개 + 마스크 뱃지 + safe-area 여백 모두 수용)
+          bottom: 'calc(env(safe-area-inset-bottom) + 150px)',
         }}
       >
         <div className="min-h-full flex flex-col justify-end space-y-1 pb-2">
@@ -942,7 +982,7 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
                       <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden">
                         {profileUrl
                           ? <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
+                          : <div className="w-full h-full flex items-center justify-center text-gray-300 text-[11px] font-semibold">{characterName?.[0] || ''}</div>}
                       </div>
                     )}
                   </div>
@@ -1072,7 +1112,7 @@ function ChatMediaBubble({ line, profileUrl, characterName, isUnlocked, onUnlock
         <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden">
           {profileUrl
             ? <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
+            : <div className="w-full h-full flex items-center justify-center text-gray-300 text-[11px] font-semibold">{characterName?.[0] || ''}</div>}
         </div>
       </div>
       <div className="max-w-[75%]">
@@ -1215,7 +1255,7 @@ function ChoiceButtons({ choices, masks, onChoice, selectingChoiceId }) {
 // ───────────────────────────────────────────────────────────
 // Result 뷰 — 결말 페이지 + 해금 이미지 그리드
 // ───────────────────────────────────────────────────────────
-function ResultView({ node, storyline, choices, token, onClose, onRestart }) {
+function ResultView({ node, storyline, choices, token, nextPart, onClose, onRestart, onNextPart }) {
   const choiceList = Object.values(choices)
   const unlockedImages = (storyline.images || []).filter((img) => img.unlocked)
 
@@ -1279,9 +1319,26 @@ function ResultView({ node, storyline, choices, token, onClose, onRestart }) {
         )}
 
         <div className="flex flex-col gap-2">
+          {/* 다음 파트로 — 같은 시나리오에 후속 파트가 있을 때만. 잠긴 파트는 잠금 라벨 표시 */}
+          {nextPart && token && (
+            <button
+              onClick={() => onNextPart?.(nextPart.id)}
+              className="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <span>다음 파트로</span>
+              <span className="opacity-80 text-xs font-medium truncate max-w-[60%]">{nextPart.title}</span>
+              {nextPart.locked && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              )}
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors"
+            className={`w-full py-3 ${nextPart && token ? 'bg-gray-800 active:bg-gray-700 border border-gray-700' : 'bg-indigo-600 active:bg-indigo-700'} text-white text-sm font-semibold rounded-lg transition-colors`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             돌아가기
