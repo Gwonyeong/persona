@@ -578,10 +578,16 @@ export default function Storyline() {
             key={currentBg}
             src={currentBg}
             className="absolute inset-0 w-full h-full object-cover"
-            autoPlay
+            style={{ backgroundColor: '#000' }}
             loop
             muted
             playsInline
+            preload="auto"
+            onLoadedData={(e) => {
+              // 첫 프레임이 디코딩된 직후 잠시 정지화면으로 보여주고 재생 시작 — 회색 로딩 화면 대신 첫 프레임 노출
+              const v = e.currentTarget
+              setTimeout(() => { v.play().catch(() => {}) }, 300)
+            }}
           />
         ) : (
           <img src={currentBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
