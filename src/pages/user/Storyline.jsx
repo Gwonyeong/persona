@@ -162,6 +162,27 @@ export default function Storyline() {
   const [currentBgm, setCurrentBgm] = useState(null)
   const [currentBgs, setCurrentBgs] = useState(null)
 
+  // 음향은 React 렌더 트리 밖에서 imperative하게 관리한다.
+  // <audio key={url}> JSX는 부모 re-render나 reconciliation으로 의도치 않게 mount/unmount되어 끊김.
+  // 추가로 브라우저 autoplay 정책: unmuted audio는 user gesture 없이 재생 시도 시 ~0.3s 후 강제 pause됨.
+  // 따라서 muted autoplay로 시작 → 첫 user 인터랙션에서 unmute 하는 패턴을 사용 (YouTube/Twitter 등 표준).
+  const bgmStateRef = useRef({ url: null, audio: null })
+  const bgsStateRef = useRef({ url: null, audio: null })
+  const hasInteractedRef = useRef(false)
+  const tryPlayAudio = () => {
+    hasInteractedRef.current = true
+    const bgm = bgmStateRef.current.audio
+    const bgs = bgsStateRef.current.audio
+    if (bgm) {
+      bgm.muted = audioMuted
+      bgm.play().catch(() => {})
+    }
+    if (bgs) {
+      bgs.muted = audioMuted
+      bgs.play().catch(() => {})
+    }
+  }
+
   // 프리미엄 미디어 해금 상태 — Set<mediaUrl>
   const [unlockedMedia, setUnlockedMedia] = useState(new Set())
   // 해금 모달 — { mediaUrl, maskCost } | null
@@ -241,6 +262,80 @@ export default function Storyline() {
     if (currentItem.bgmUrl) setCurrentBgm(currentItem.bgmUrl)
     if (currentItem.bgsUrl) setCurrentBgs(currentItem.bgsUrl)
   }, [node?.id, scriptIndex])
+
+  // unmuted autoplay 가능 여부 — 이미 인터랙션이 있었거나 브라우저가 user activation을 보고함
+  const canPlayUnmuted = () => {
+    if (hasInteractedRef.current) return true
+    try { return !!navigator.userActivation?.hasBeenActive } catch { return false }
+  }
+
+  // BGM/BGS imperative lifecycle — currentBgm 변경 시에만 audio 재생성
+  // unmuted autoplay 허용 환경이면 user 설정 그대로 시도, 아니면 force-mute로 시작.
+  // play()가 reject되면(드물지만) muted로 fallback해서 라이프사이클 살림.
+  useEffect(() => {
+    const ref = bgmStateRef.current
+    if (!currentBgm) {
+      if (ref.audio) {
+        ref.audio.pause()
+        bgmStateRef.current = { url: null, audio: null }
+      }
+      return
+    }
+    if (ref.url !== currentBgm) {
+      ref.audio?.pause()
+      const audio = new Audio(currentBgm)
+      audio.loop = true
+      audio.volume = 0.6
+      audio.muted = canPlayUnmuted() ? audioMuted : true
+      bgmStateRef.current = { url: currentBgm, audio }
+    }
+    const a = bgmStateRef.current.audio
+    a.play().catch(() => {
+      a.muted = true
+      a.play().catch(() => {})
+    })
+  }, [currentBgm])
+
+  useEffect(() => {
+    const ref = bgsStateRef.current
+    if (!currentBgs) {
+      if (ref.audio) {
+        ref.audio.pause()
+        bgsStateRef.current = { url: null, audio: null }
+      }
+      return
+    }
+    if (ref.url !== currentBgs) {
+      ref.audio?.pause()
+      const audio = new Audio(currentBgs)
+      audio.loop = true
+      audio.volume = 0.4
+      audio.muted = canPlayUnmuted() ? audioMuted : true
+      bgsStateRef.current = { url: currentBgs, audio }
+    }
+    const a = bgsStateRef.current.audio
+    a.play().catch(() => {
+      a.muted = true
+      a.play().catch(() => {})
+    })
+  }, [currentBgs])
+
+  // 음소거 토글 동기화 — 인터랙션 후에만 user 설정 반영 (인터랙션 전엔 force-mute 유지)
+  useEffect(() => {
+    if (!hasInteractedRef.current) return
+    if (bgmStateRef.current.audio) bgmStateRef.current.audio.muted = audioMuted
+    if (bgsStateRef.current.audio) bgsStateRef.current.audio.muted = audioMuted
+  }, [audioMuted])
+
+  // 컴포넌트 unmount 시 모든 audio 정리
+  useEffect(() => {
+    return () => {
+      bgmStateRef.current.audio?.pause()
+      bgsStateRef.current.audio?.pause()
+      bgmStateRef.current = { url: null, audio: null }
+      bgsStateRef.current = { url: null, audio: null }
+    }
+  }, [])
 
   // 현재 아이템에 명시 등록된 배경/캐릭터만 노출
   const currentBg = currentItem?.backgroundImage || null
@@ -469,7 +564,11 @@ export default function Storyline() {
   const isCgView = (isChapterNode || isChatNode) && isCgItem
 
   return (
-    <div className="relative w-full h-dvh bg-black text-white overflow-hidden select-none">
+    <div
+      className="relative w-full h-dvh bg-black text-white overflow-hidden select-none"
+      onClickCapture={tryPlayAudio}
+      onTouchStartCapture={tryPlayAudio}
+    >
       {/* 배경 — CHAT 노드는 다크 그레이, CHAPTER는 풀 배경(이미지/영상), RESULT는 자체 그라디언트 */}
       {isChatView ? (
         <div className="absolute inset-0 bg-gray-950" />
@@ -481,7 +580,7 @@ export default function Storyline() {
             className="absolute inset-0 w-full h-full object-cover"
             autoPlay
             loop
-            muted={audioMuted}
+            muted
             playsInline
           />
         ) : (
@@ -515,13 +614,7 @@ export default function Storyline() {
           : <img src={currentItem.fullMediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
 
-      {/* 음향 */}
-      {currentBgm && (
-        <audio key={currentBgm} src={currentBgm} autoPlay loop muted={audioMuted} ref={(el) => { if (el) el.volume = 0.6 }} />
-      )}
-      {currentBgs && (
-        <audio key={currentBgs} src={currentBgs} autoPlay loop muted={audioMuted} ref={(el) => { if (el) el.volume = 0.4 }} />
-      )}
+      {/* 음향 — BGM/BGS는 imperative하게 관리 (위 useEffect 참조). voice는 per-item이라 JSX */}
       {currentItem?.voiceUrl && (
         <audio
           key={`voice-${node?.id}-${scriptIndex}-${currentItem.voiceUrl}`}
@@ -879,17 +972,19 @@ function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onC
           style={MESSAGE_AREA_STYLE}
         >
           {text && (
-            <div className="relative rounded-xl px-4 py-5 pointer-events-auto" style={TEXT_BOX_STYLE}>
+            <div className="relative pointer-events-auto">
               {speakerName && (
                 <span
-                  className={`absolute -top-2.5 ${badgeSide === 'right' ? 'right-3' : 'left-3'} px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg ${badgeColor} text-white`}
+                  className={`absolute -top-2.5 z-10 ${badgeSide === 'right' ? 'right-3' : 'left-3'} px-3 py-1 rounded-md text-xs font-bold whitespace-nowrap shadow-lg ${badgeColor} text-white`}
                 >
                   {speakerName}
                 </span>
               )}
-              <p className="text-[15px] leading-relaxed text-white whitespace-pre-line">
-                {text}
-              </p>
+              <div className="rounded-xl px-4 py-5" style={TEXT_BOX_STYLE}>
+                <p className="text-[15px] leading-relaxed text-white whitespace-pre-line">
+                  {text}
+                </p>
+              </div>
             </div>
           )}
           {showChoices && (
@@ -1120,7 +1215,7 @@ function ChatMediaBubble({ line, profileUrl, characterName, isUnlocked, onUnlock
           <p className="text-xs text-gray-400 mb-1 font-medium">{characterName}</p>
         )}
         <div
-          className="relative rounded-2xl rounded-tl-none overflow-hidden cursor-pointer bg-gray-900"
+          className="relative z-20 rounded-2xl rounded-tl-none overflow-hidden cursor-pointer bg-gray-900"
           onClick={handleClick}
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', maxWidth: '220px' }}
         >
