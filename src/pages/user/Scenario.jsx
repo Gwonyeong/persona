@@ -160,20 +160,25 @@ export default function Scenario() {
                         const isActive = idx === activeIdx
                         const blur = !m.unlocked
                         const baseCls = `absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`
-                        return m.type === 'video' ? (
-                          <video
-                            key={idx}
-                            src={m.url}
-                            className={baseCls}
-                            style={blur ? LOCKED_MEDIA_STYLE : undefined}
-                            muted
-                            playsInline
-                            preload="metadata"
-                          />
-                        ) : (
+                        // 비디오라도 포스터 이미지가 있으면 <img>로 렌더 — 영상 다운로드 회피.
+                        // 포스터 없는 레거시 비디오만 <video preload="metadata"> fallback.
+                        if (m.type === 'video' && !m.posterUrl) {
+                          return (
+                            <video
+                              key={idx}
+                              src={m.url}
+                              className={baseCls}
+                              style={blur ? LOCKED_MEDIA_STYLE : undefined}
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                          )
+                        }
+                        return (
                           <img
                             key={idx}
-                            src={m.url}
+                            src={m.type === 'video' ? m.posterUrl : m.url}
                             alt=""
                             className={baseCls}
                             style={blur ? LOCKED_MEDIA_STYLE : undefined}

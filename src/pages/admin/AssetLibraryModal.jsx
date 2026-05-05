@@ -50,6 +50,55 @@ function isVideoLibraryItem(it) {
   return isVideoSrc(it.url)
 }
 
+// 비디오에서 첫 프레임을 jpeg Blob으로 추출. 입력은 File/Blob 또는 URL 문자열.
+// URL인 경우 crossOrigin='anonymous'로 로드 — Supabase Storage 등 CORS 허용 origin에서만 동작.
+// 실패 시 null 반환 — 호출자는 fallback 처리.
+async function extractVideoPoster(source) {
+  return new Promise((resolve) => {
+    let settled = false
+    let objectUrl = null
+    const finish = (blob) => {
+      if (settled) return
+      settled = true
+      if (objectUrl) try { URL.revokeObjectURL(objectUrl) } catch (_) {}
+      resolve(blob)
+    }
+    const isUrl = typeof source === 'string'
+    if (!isUrl) {
+      try { objectUrl = URL.createObjectURL(source) } catch (_) { return resolve(null) }
+    }
+    const video = document.createElement('video')
+    video.preload = 'auto'
+    video.muted = true
+    video.playsInline = true
+    if (isUrl) video.crossOrigin = 'anonymous'
+    const captureFrame = () => {
+      try {
+        const w = video.videoWidth
+        const h = video.videoHeight
+        if (!w || !h) return finish(null)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d').drawImage(video, 0, 0, w, h)
+        canvas.toBlob((blob) => finish(blob), 'image/jpeg', 0.85)
+      } catch (_) {
+        // tainted canvas (CORS 거부) 등 — null로 신호
+        finish(null)
+      }
+    }
+    video.addEventListener('loadeddata', () => {
+      const target = Math.min(0.1, Math.max(0, (video.duration || 1) - 0.01))
+      try { video.currentTime = target }
+      catch (_) { captureFrame() }
+    })
+    video.addEventListener('seeked', captureFrame, { once: true })
+    video.addEventListener('error', () => finish(null))
+    setTimeout(() => finish(null), 8000)
+    video.src = isUrl ? source : objectUrl
+  })
+}
+
 // "0-3,5,7~9" 같은 다중 범위 표현을 인덱스 배열로 파싱
 function parseRangeInput(input, max) {
   if (!input || typeof input !== 'string') return []
@@ -89,6 +138,7 @@ export default function AssetLibraryModal({
   const [error, setError] = useState(null)
   const [labelInput, setLabelInput] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [posterBackfillingId, setPosterBackfillingId] = useState(null)
   // 피커 모드: 이미지 클릭 후 범위 입력 단계
   const [pendingPick, setPendingPick] = useState(null) // { url, label, idx }
   const [rangeInput, setRangeInput] = useState('')
@@ -137,6 +187,10 @@ export default function AssetLibraryModal({
     form.append('image', file)
     form.append('kind', activeKind)
     if (label) form.append('label', label)
+    if (file.type?.startsWith('video/')) {
+      const poster = await extractVideoPoster(file)
+      if (poster) form.append('poster', poster, 'poster.jpg')
+    }
     const res = await api.post(`/admin/storylines/${storylineId}/assets`, form)
     return res.assetLibrary
   }
@@ -230,6 +284,28 @@ export default function AssetLibraryModal({
       setConfirmDeleteId(null)
     } catch (e) {
       setError(e?.data?.error || e?.message || '삭제 실패')
+    }
+  }
+
+  // 기존 비디오에 첫 프레임 포스터를 백필 — 신규 업로드와 같은 추출 로직을 URL 입력으로 재사용
+  const handleGeneratePoster = async (asset) => {
+    if (!asset?.id || !asset?.url) return
+    setError(null)
+    setPosterBackfillingId(asset.id)
+    try {
+      const blob = await extractVideoPoster(asset.url)
+      if (!blob) {
+        setError('첫 프레임을 추출할 수 없습니다 (CORS 또는 코덱 문제일 수 있어요).')
+        return
+      }
+      const form = new FormData()
+      form.append('poster', blob, 'poster.jpg')
+      const res = await api.post(`/admin/storylines/${storylineId}/assets/${asset.id}/poster`, form)
+      if (res?.assetLibrary) onLibraryChange(res.assetLibrary)
+    } catch (e) {
+      setError(e?.data?.error || e?.message || '포스터 생성 실패')
+    } finally {
+      setPosterBackfillingId(null)
     }
   }
 
@@ -423,6 +499,16 @@ export default function AssetLibraryModal({
                       >
                         라벨
                       </button>
+                      {isVideoLibraryItem(it) && !it.posterUrl && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleGeneratePoster(it) }}
+                          disabled={posterBackfillingId === it.id}
+                          className="px-2 py-1 bg-indigo-600/90 hover:bg-indigo-500 text-white text-[11px] rounded disabled:opacity-50"
+                          style={{ outline: 'none' }}
+                        >
+                          {posterBackfillingId === it.id ? '생성 중...' : '포스터'}
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(it.id) }}
                         className="px-2 py-1 bg-red-600/90 hover:bg-red-500 text-white text-[11px] rounded"
