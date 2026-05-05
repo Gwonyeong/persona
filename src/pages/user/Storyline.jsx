@@ -1497,7 +1497,7 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
 
   return (
     <div
-      className="absolute inset-0 overflow-auto bg-gradient-to-br from-indigo-950 via-gray-950 to-purple-950"
+      className="absolute inset-0 overflow-auto bg-black"
       style={{ paddingTop: 'calc(env(safe-area-inset-top) + 64px)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
     >
       <div className="px-6 max-w-md mx-auto">

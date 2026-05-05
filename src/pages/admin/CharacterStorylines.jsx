@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 
@@ -260,7 +260,30 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
   const [status, setStatus] = useState(scenario?.status || 'DRAFT')
   const [sortOrder, setSortOrder] = useState(scenario?.sortOrder ?? 0)
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
+  const fileRef = useRef(null)
+
+  const handleFileSelect = async (file) => {
+    if (!file) return
+    if (!file.type?.startsWith('image/')) {
+      setError('이미지 파일만 업로드할 수 있어요.')
+      return
+    }
+    setError(null)
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('image', file)
+      const res = await api.post(`/admin/characters/${characterId}/scenarios/thumbnail`, form)
+      if (res?.url) setThumbnailImage(res.url)
+    } catch (e) {
+      setError(e?.data?.error || e?.message || '업로드 실패')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async () => {
     setError(null)
@@ -316,12 +339,37 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1.5">썸네일 URL (16:9)</label>
+            <label className="block text-xs text-gray-400 mb-1.5">썸네일 (16:9)</label>
+            {thumbnailImage && (
+              <div className="mb-2 aspect-video rounded-lg overflow-hidden bg-gray-950 border border-gray-800 relative">
+                <img src={thumbnailImage} alt="썸네일 미리보기" className="absolute inset-0 w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setThumbnailImage('')}
+                  disabled={uploading || submitting}
+                  className="absolute top-2 right-2 px-2 py-1 bg-black/70 hover:bg-black/90 text-white text-[11px] rounded disabled:opacity-50"
+                  style={{ outline: 'none' }}
+                >
+                  제거
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                disabled={uploading || submitting}
+                onChange={(e) => handleFileSelect(e.target.files?.[0])}
+                className="text-xs text-gray-300 file:mr-2 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-indigo-600 file:text-white file:text-xs hover:file:bg-indigo-500 file:cursor-pointer flex-1"
+              />
+              {uploading && <span className="text-[11px] text-indigo-300">업로드 중...</span>}
+            </div>
             <input
               value={thumbnailImage}
               onChange={(e) => setThumbnailImage(e.target.value)}
               className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
-              placeholder="https://..."
+              placeholder="또는 URL 직접 입력 (https://...)"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -359,7 +407,7 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || uploading}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
             style={{ outline: 'none' }}
           >
