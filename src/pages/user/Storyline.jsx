@@ -218,13 +218,16 @@ export default function Storyline() {
   const [mediaLightbox, setMediaLightbox] = useState(null) // { url, type: 'image'|'video' } | null
   // 같은 시나리오의 다음 파트 — RESULT 화면 "다음 파트로" 버튼용
   const [nextPart, setNextPart] = useState(null)
+  // 이전 attempt들에서 진행한 노드 ID 집합 — 결과 페이지 PREMIUM 분기 미디어 영구 unlock 판별용
+  const [historicalNodeIds, setHistoricalNodeIds] = useState(new Set())
 
   // ── 데이터 로드 ─────────────────────────────────────────
   useEffect(() => {
     api.get(`/storylines/${id}`)
-      .then(({ storyline, progress, unlockedMediaUrls, nextPart }) => {
+      .then(({ storyline, progress, unlockedMediaUrls, unlockedNodeIds, nextPart }) => {
         setStoryline(storyline)
         setUnlockedMedia(new Set(unlockedMediaUrls || []))
+        setHistoricalNodeIds(new Set(unlockedNodeIds || []))
         setNextPart(nextPart || null)
 
         // 저장된 선택지 복원
@@ -337,10 +340,10 @@ export default function Storyline() {
       }
       return false
     }
-    // 진행한 시퀀스 — 이 시퀀스에 포함된 노드는 사용자가 해당 분기를 통과한 것이므로 unlocked
-    const playedNodeIds = new Set(
-      computeSequence(storyline.nodes || [], choices).map((n) => n.id)
-    )
+    // 진행한 시퀀스 — 현재 attempt + 이전 attempt들 union
+    // (새로하기로 attempt가 바뀌어도 이전에 본 미디어가 다시 잠기지 않도록 historicalNodeIds 합집합)
+    const currentSeqIds = computeSequence(storyline.nodes || [], choices).map((n) => n.id)
+    const playedNodeIds = new Set([...historicalNodeIds, ...currentSeqIds])
 
     for (const n of storyline.nodes || []) {
       if (!hasPremiumAncestor(n)) continue
@@ -361,7 +364,7 @@ export default function Storyline() {
       }
     }
     return out
-  }, [storyline, choices, unlockedMedia])
+  }, [storyline, choices, unlockedMedia, historicalNodeIds])
   const node = sequence[nodeIndex]
   const isLastNode = nodeIndex === sequence.length - 1
   const hasScript = node?.nodeType === 'CHAPTER' || node?.nodeType === 'CHAT'
