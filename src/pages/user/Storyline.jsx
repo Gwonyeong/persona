@@ -111,6 +111,18 @@ function isBgVideoUrl(url) {
   return /\.(mp4|webm|mov|m4v|ogv)$/.test(cleaned)
 }
 
+// asset library 항목들에서 url → posterUrl 매핑 — 영상 로드 전 첫 프레임 노출용
+function buildPosterMap(storyline) {
+  const map = new Map()
+  const lib = storyline?.assetLibrary || {}
+  for (const bucket of [lib.backgrounds, lib.characters, lib.chatImage, lib.chatVideo]) {
+    for (const it of (bucket || [])) {
+      if (it?.url && it.posterUrl) map.set(it.url, it.posterUrl)
+    }
+  }
+  return map
+}
+
 // 시퀀스 nodeIndex 시점 직전까지의 sticky 음향(bgmUrl/bgsUrl) 마지막 값 추적.
 // 진행도 불러오기 시 이전 노드들에서 설정됐던 BGM/BGS를 그대로 이어 재생하기 위함.
 function findLatestStickyBefore(sequence, nodeIndex, field) {
@@ -270,6 +282,9 @@ export default function Storyline() {
     [storyline, choices]
   )
 
+  // url → posterUrl 매핑 — 영상 재생 위치마다 poster 속성으로 첫 프레임 즉시 노출
+  const posterMap = useMemo(() => buildPosterMap(storyline), [storyline])
+
   // 결과 페이지에 노출할 "프리미엄 컨텐츠" — 해금 여부와 무관하게 모두 수집.
   // 1) PREMIUM 선택지의 분기(중첩 sub-branch 포함) 노드들의 backgroundImage / fullMediaUrl
   //    → 진행한 시퀀스에 포함된 노드면 unlocked, 아니면 locked
@@ -300,7 +315,9 @@ export default function Storyline() {
         return
       }
       seen.set(url, out.length)
-      out.push({ url, type: detectType(url, hint), unlocked: !!unlocked })
+      const type = detectType(url, hint)
+      const posterUrl = type === 'video' ? posterMap.get(url) : null
+      out.push({ url, type, unlocked: !!unlocked, ...(posterUrl ? { posterUrl } : {}) })
     }
 
     const choiceMap = new Map()
@@ -686,6 +703,7 @@ export default function Storyline() {
           <video
             key={currentBg}
             src={currentBg}
+            poster={posterMap.get(currentBg) || undefined}
             className="absolute inset-0 w-full h-full object-cover"
             style={{ backgroundColor: '#000' }}
             loop
@@ -725,7 +743,7 @@ export default function Storyline() {
       {/* fullMedia (script item 레벨, narration에서 가능) */}
       {currentItem?.fullMediaUrl && (
         currentItem.fullMediaType === 'video'
-          ? <video src={currentItem.fullMediaUrl} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline />
+          ? <video src={currentItem.fullMediaUrl} poster={posterMap.get(currentItem.fullMediaUrl) || undefined} className="absolute inset-0 w-full h-full object-cover" autoPlay muted loop playsInline />
           : <img src={currentItem.fullMediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
 
@@ -758,6 +776,7 @@ export default function Storyline() {
         <ChatBlockView
           chatBlock={chatBlock}
           storyline={storyline}
+          posterMap={posterMap}
           user={user}
           masks={masks}
           showChoices={waitingChoice && !showUserAsButton}
@@ -887,6 +906,7 @@ export default function Storyline() {
           {mediaLightbox.type === 'video' ? (
             <video
               src={mediaLightbox.url}
+              poster={posterMap.get(mediaLightbox.url) || undefined}
               className="h-full w-auto max-w-none"
               autoPlay loop controls playsInline
               onClick={(e) => e.stopPropagation()}
@@ -995,6 +1015,7 @@ export default function Storyline() {
           {chatLightbox.type === 'video' ? (
             <video
               src={chatLightbox.url}
+              poster={posterMap.get(chatLightbox.url) || undefined}
               className="h-full w-auto max-w-none"
               autoPlay loop muted playsInline
               onClick={(e) => e.stopPropagation()}
@@ -1120,7 +1141,7 @@ function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onC
 // ───────────────────────────────────────────────────────────
 // Chat Block 뷰 — 누적 말풍선
 // ───────────────────────────────────────────────────────────
-function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices, userButton, onUserButtonClick, onChoice, selectingChoiceId, onMediaClick, unlockedMedia, onUnlockRequest, onMediaPreview }) {
+function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoices, choices, userButton, onUserButtonClick, onChoice, selectingChoiceId, onMediaClick, unlockedMedia, onUnlockRequest, onMediaPreview }) {
   const characterName = storyline.character?.name || ''
   // 채팅 아바타는 Character 테이블의 profileImage만 사용 (fallback 없음)
   const profileUrl = storyline.character?.profileImage || null
@@ -1173,6 +1194,7 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
                 <ChatMediaBubble
                   key={i}
                   line={line}
+                  posterMap={posterMap}
                   profileUrl={profileUrl}
                   characterName={characterName}
                   isUnlocked={!!unlockedMedia && unlockedMedia.has(line.mediaUrl)}
@@ -1216,7 +1238,7 @@ function ChatBlockView({ chatBlock, storyline, user, masks, showChoices, choices
                     >
                       {line.mediaType === 'video' ? (
                         <>
-                          <video src={line.mediaUrl} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline />
+                          <video src={line.mediaUrl} poster={posterMap?.get(line.mediaUrl) || undefined} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline />
                           <div className="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center bg-black/60 rounded-full">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="15 3 21 3 21 9" />
@@ -1303,7 +1325,7 @@ function UserInputButton({ item, userName, onClick }) {
 // ───────────────────────────────────────────────────────────
 // 채팅 미디어 버블 — CHAT의 mode:'media' 아이템 (이미지/영상/프리미엄)
 // ───────────────────────────────────────────────────────────
-function ChatMediaBubble({ line, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview }) {
+function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview }) {
   const isVideo = line.variant === 'video'
   const isPremium = line.variant === 'premium'
   const locked = isPremium && !isUnlocked
@@ -1338,6 +1360,7 @@ function ChatMediaBubble({ line, profileUrl, characterName, isUnlocked, onUnlock
           {isVideo ? (
             <video
               src={line.mediaUrl}
+              poster={posterMap?.get(line.mediaUrl) || undefined}
               className="w-full max-h-[280px] object-cover bg-black"
               muted
               loop
@@ -1523,8 +1546,10 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
                       {...tagProps}
                     >
                       {m.type === 'video' && m.unlocked ? (
+                        // 다운로드 완료 전까지 poster(첫 프레임)가 노출되고, 디코드되면 자연스럽게 영상 재생으로 전환
                         <video
                           src={m.url}
+                          poster={m.posterUrl || undefined}
                           className="w-full h-full object-cover"
                           muted
                           loop
@@ -1534,14 +1559,24 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
                           onLoadedData={(e) => { e.currentTarget.play().catch(() => {}) }}
                         />
                       ) : m.type === 'video' ? (
-                        <video
-                          src={m.url}
-                          className="w-full h-full object-cover"
-                          style={lockedStyle}
-                          muted
-                          playsInline
-                          preload="metadata"
-                        />
+                        // 잠긴 비디오는 재생할 일이 없으므로 포스터가 있으면 영상 다운로드 자체를 회피
+                        m.posterUrl ? (
+                          <img
+                            src={m.posterUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            style={lockedStyle}
+                          />
+                        ) : (
+                          <video
+                            src={m.url}
+                            className="w-full h-full object-cover"
+                            style={lockedStyle}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        )
                       ) : (
                         <img
                           src={m.url}
