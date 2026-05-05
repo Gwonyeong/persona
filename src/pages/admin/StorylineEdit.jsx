@@ -31,8 +31,6 @@ const URL_FIELDS_IN_SCRIPT_ITEM = [
 function countPlaceholders(s) {
   if (!s) return 0
   let n = 0
-  if (isPlaceholderUrl(s.thumbnailImage)) n++
-  if (isPlaceholderUrl(s.coverImage)) n++
   if (isPlaceholderUrl(s.defaultBgm)) n++
   ;(s.images || []).forEach((img) => { if (isPlaceholderUrl(img?.url)) n++ })
   ;(s.nodes || []).forEach((node) => {
@@ -129,6 +127,8 @@ export default function StorylineEdit() {
   const [dirty, setDirty] = useState(false)
   // 라이브러리/피커 모달 상태
   const [libraryModal, setLibraryModal] = useState(null) // null | { mode: 'manage' } | { mode: 'pick', kind, onPick }
+  // 메타 탭의 BGM 슬롯 미리보기용 라이트박스 (ChapterDetailPanel 내부 lightbox와 별개)
+  const [metaLightbox, setMetaLightbox] = useState(null) // { url, type: 'audio', label } | null
 
   useEffect(() => {
     load()
@@ -153,8 +153,6 @@ export default function StorylineEdit() {
       setMeta({
         title: storyline.title || '',
         description: storyline.description || '',
-        thumbnailImage: storyline.thumbnailImage || '',
-        coverImage: storyline.coverImage || '',
         defaultBgm: storyline.defaultBgm || '',
         status: storyline.status || 'DRAFT',
         sortOrder: storyline.sortOrder ?? 0,
@@ -185,8 +183,6 @@ export default function StorylineEdit() {
     return {
       title: s.title,
       description: s.description,
-      thumbnailImage: s.thumbnailImage,
-      coverImage: s.coverImage,
       defaultBgm: s.defaultBgm,
       status: s.status,
       sortOrder: s.sortOrder,
@@ -400,8 +396,6 @@ export default function StorylineEdit() {
       const payload = {
         title: meta.title,
         description: meta.description || null,
-        thumbnailImage: meta.thumbnailImage || null,
-        coverImage: meta.coverImage || null,
         defaultBgm: meta.defaultBgm || null,
         status: meta.status,
         sortOrder: parseInt(meta.sortOrder) || 0,
@@ -696,34 +690,62 @@ export default function StorylineEdit() {
               <p className="text-[11px] text-gray-500 mt-1.5">
                 같은 시나리오 내 파트 순서. 작은 값이 먼저 노출.
               </p>
+              {/* 같은 시나리오의 다른 파트 순번 분포 — 충돌/중복 확인용 */}
+              {meta.scenarioId && (() => {
+                const sc = availableScenarios.find((x) => String(x.id) === String(meta.scenarioId))
+                const siblings = (sc?.storylines || [])
+                  .slice()
+                  .sort((a, b) => (a.partOrder ?? 0) - (b.partOrder ?? 0))
+                if (siblings.length === 0) return null
+                const currentIdNum = parseInt(id)
+                return (
+                  <div className="mt-2 rounded border border-gray-800 bg-gray-950/60 p-2">
+                    <p className="text-[10px] text-gray-500 mb-1.5">같은 시나리오의 파트</p>
+                    <ul className="space-y-0.5">
+                      {siblings.map((sib) => {
+                        const isMe = sib.id === currentIdNum
+                        return (
+                          <li key={sib.id} className={`flex items-center gap-2 text-[11px] ${isMe ? 'text-indigo-300' : 'text-gray-400'}`}>
+                            <span className={`w-7 px-1 py-0.5 text-center rounded font-mono font-bold ${isMe ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-300'}`}>
+                              {sib.partOrder ?? 0}
+                            </span>
+                            <span className="truncate flex-1" title={sib.title}>{sib.title}</span>
+                            {isMe && <span className="text-[9px] text-indigo-400 font-semibold">(현재)</span>}
+                            {sib.status !== 'PUBLISHED' && !isMe && (
+                              <span className="text-[9px] text-gray-500">{sib.status}</span>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )
+              })()}
             </Field>
           </div>
-          <Field label="썸네일 URL (9:16 카드용)">
-            <input
-              value={meta.thumbnailImage}
-              onChange={(e) => setMeta({ ...meta, thumbnailImage: e.target.value })}
-              placeholder="https://..."
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none font-mono text-xs"
+          <Field label="기본 BGM (라이브러리)">
+            <EditableAudioSlot
+              kind="bgm"
+              label="🎵 기본 BGM"
+              url={meta.defaultBgm || null}
+              storyline={storyline}
+              onMediaClick={setMetaLightbox}
+              editable
+              onPick={() =>
+                setLibraryModal({
+                  mode: 'pick',
+                  kind: 'bgm',
+                  onPick: (url) => {
+                    setMeta((prev) => ({ ...prev, defaultBgm: url }))
+                    setLibraryModal(null)
+                  },
+                })
+              }
+              onClear={() => setMeta((prev) => ({ ...prev, defaultBgm: '' }))}
             />
-            {meta.thumbnailImage && (
-              <img src={meta.thumbnailImage} alt="" className="mt-2 w-24 aspect-[9/16] object-cover rounded border border-gray-800" />
-            )}
-          </Field>
-          <Field label="커버 URL (풀사이즈)">
-            <input
-              value={meta.coverImage}
-              onChange={(e) => setMeta({ ...meta, coverImage: e.target.value })}
-              placeholder="https://..."
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none font-mono text-xs"
-            />
-          </Field>
-          <Field label="기본 BGM URL">
-            <input
-              value={meta.defaultBgm}
-              onChange={(e) => setMeta({ ...meta, defaultBgm: e.target.value })}
-              placeholder="https://....mp3"
-              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none font-mono text-xs"
-            />
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              스토리 시작 시 또는 시퀀스에 BGM이 한 번도 등장하지 않은 구간의 fallback. 라이브러리 탭에서 BGM 항목을 추가/관리할 수 있습니다.
+            </p>
           </Field>
 
           <div className="pt-3 border-t border-gray-800">
@@ -791,6 +813,27 @@ export default function StorylineEdit() {
           onPick={libraryModal.onPick}
           onClose={() => setLibraryModal(null)}
         />
+      )}
+
+      {/* 메타 탭 BGM 미리보기 라이트박스 */}
+      {metaLightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          onClick={() => setMetaLightbox(null)}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setMetaLightbox(null) }}
+            className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-full text-white"
+            style={{ outline: 'none' }}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+          <div onClick={(e) => e.stopPropagation()} className="bg-gray-900 rounded-xl p-6 max-w-md w-full">
+            <p className="text-xs text-gray-400 mb-3 break-all">{metaLightbox.url}</p>
+            <audio src={metaLightbox.url} controls autoPlay className="w-full" />
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1586,7 +1629,11 @@ function ScriptItemRow({ item, index, storyline, chapter, onMediaClick, editable
   // 편집 불가 미디어 (full/attach/voice)
   const otherMedias = []
   if (item.fullMediaUrl) otherMedias.push({ url: item.fullMediaUrl, type: item.fullMediaType === 'video' ? 'video' : 'image', label: '📺 full', aspect: '9:16' })
-  if (item.mediaUrl) otherMedias.push({ url: item.mediaUrl, type: item.mediaType === 'video' ? 'video' : 'image', label: '📎 attach', aspect: '9:16' })
+  // mediaUrl: CHAT 노드의 character/user/narration에 첨부된 경우 삭제 가능한 슬롯으로 분리 렌더,
+  // 그 외(예: mode='media'는 MediaItemEditor가 처리, RESULT/CHAPTER 잔존 데이터 등)는 read-only로 표시
+  const isChatTextItem = chapter?.nodeType === 'CHAT' && (item.mode === 'character' || item.mode === 'user' || item.mode === 'narration')
+  const showEditableAttach = editable && isChatTextItem && !!item.mediaUrl
+  if (item.mediaUrl && !showEditableAttach) otherMedias.push({ url: item.mediaUrl, type: item.mediaType === 'video' ? 'video' : 'image', label: '📎 attach', aspect: '9:16' })
 
   return (
     <div className={`rounded-lg p-3 ${meta.bg}`}>
@@ -1777,6 +1824,35 @@ function ScriptItemRow({ item, index, storyline, chapter, onMediaClick, editable
           </div>
         )
       })()}
+
+      {/* CHAT 노드의 character/user/narration에 첨부된 mediaUrl — 삭제 가능 */}
+      {showEditableAttach && (
+        <div className="mb-2 flex items-start gap-1.5">
+          <div className="relative group w-16 aspect-[9/16] flex-shrink-0 rounded overflow-hidden bg-gray-800 border border-gray-700">
+            <button
+              onClick={() => onMediaClick({ url: item.mediaUrl, type: item.mediaType === 'video' ? 'video' : 'image', label: '📎 attach' })}
+              className="absolute inset-0 w-full h-full"
+              style={{ outline: 'none' }}
+              title="📎 attach"
+            >
+              {item.mediaType === 'video' ? (
+                <video src={item.mediaUrl} className="w-full h-full object-cover" muted loop playsInline preload="metadata" />
+              ) : (
+                <img src={item.mediaUrl} alt="" className="w-full h-full object-cover" />
+              )}
+            </button>
+            <button
+              onClick={() => onFieldChange && onFieldChange({ mediaUrl: null, mediaType: null })}
+              className="absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center bg-red-600 hover:bg-red-500 text-white text-[10px] rounded leading-none font-bold shadow"
+              style={{ outline: 'none' }}
+              title="첨부 삭제"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400 leading-tight pt-0.5">📎 첨부</p>
+        </div>
+      )}
 
       {/* 그 외 미디어 (변경 불가, 표시만) */}
       {otherMedias.length > 0 && (

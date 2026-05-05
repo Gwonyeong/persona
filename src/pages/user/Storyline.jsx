@@ -111,12 +111,26 @@ function isBgVideoUrl(url) {
   return /\.(mp4|webm|mov|m4v|ogv)$/.test(cleaned)
 }
 
+// 시퀀스 nodeIndex 시점 직전까지의 sticky 음향(bgmUrl/bgsUrl) 마지막 값 추적.
+// 진행도 불러오기 시 이전 노드들에서 설정됐던 BGM/BGS를 그대로 이어 재생하기 위함.
+function findLatestStickyBefore(sequence, nodeIndex, field) {
+  let latest = null
+  for (let i = 0; i < nodeIndex && i < sequence.length; i++) {
+    const n = sequence[i]
+    if (n?.nodeType !== 'CHAPTER' && n?.nodeType !== 'CHAT') continue
+    for (const it of (n.script || [])) {
+      if (it && it[field]) latest = it[field]
+    }
+  }
+  return latest
+}
+
 // CHAPTER 텍스트 박스 영역 — 전체 컨테이너에서 하단 정렬 (텍스트 박스 + 선택지 column flex)
 // safe-area 패딩으로 홈 인디케이터 침범 방지, paddingTop으로 헤더 영역 확보.
 // 텍스트 박스는 자체 max-height + scroll로 길어져도 선택지가 화면 밖으로 밀리지 않게 한다.
 const MESSAGE_AREA_STYLE = {
   paddingTop: 'calc(env(safe-area-inset-top) + 64px)',
-  paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)',
+  paddingBottom: 'calc(env(safe-area-inset-bottom) + 40px)',
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'flex-end',
@@ -215,17 +229,24 @@ export default function Storyline() {
           setChoices(restoredChoices)
         }
 
-        // 저장 시점으로 점프
+        // 저장 시점으로 점프 — 더불어 그 시점까지의 sticky BGM/BGS도 복원
+        let restoredBgm = storyline.defaultBgm || null
+        let restoredBgs = null
         if (progress?.currentNodeId) {
           const seq = computeSequence(storyline.nodes || [], restoredChoices)
           const idx = seq.findIndex((n) => n.id === progress.currentNodeId)
           if (idx >= 0) {
             setNodeIndex(idx)
             setLockedAtIndex(idx)
+            const latestBgm = findLatestStickyBefore(seq, idx, 'bgmUrl')
+            const latestBgs = findLatestStickyBefore(seq, idx, 'bgsUrl')
+            if (latestBgm) restoredBgm = latestBgm
+            if (latestBgs) restoredBgs = latestBgs
           }
         }
 
-        setCurrentBgm(storyline.defaultBgm || null)
+        setCurrentBgm(restoredBgm)
+        setCurrentBgs(restoredBgs)
       })
       .catch((e) => {
         // 잠긴 스토리 — 캐릭터 상세 페이지로 되돌려 거기서 광고 시청 흐름 진행
@@ -248,6 +269,82 @@ export default function Storyline() {
     () => storyline ? computeSequence(storyline.nodes || [], choices) : [],
     [storyline, choices]
   )
+
+  // 결과 페이지에 노출할 "프리미엄 컨텐츠" — 해금 여부와 무관하게 모두 수집.
+  // 1) PREMIUM 선택지의 분기(중첩 sub-branch 포함) 노드들의 backgroundImage / fullMediaUrl
+  //    → 진행한 시퀀스에 포함된 노드면 unlocked, 아니면 locked
+  // 2) CHAT 노드의 mode='media' + variant='premium' 미디어 → unlockedMedia 기록으로 판별
+  const premiumMedia = useMemo(() => {
+    if (!storyline) return []
+    const out = []
+    const seen = new Map() // url → out index
+    const lib = storyline.assetLibrary || {}
+    const libTypeMap = new Map()
+    for (const bucket of [lib.backgrounds, lib.characters, lib.chatImage, lib.chatVideo]) {
+      for (const it of (bucket || [])) {
+        if (it?.url && it.mediaType) libTypeMap.set(it.url, it.mediaType)
+      }
+    }
+    const detectType = (url, hint) => {
+      if (hint === 'video' || hint === 'image') return hint
+      const libType = libTypeMap.get(url)
+      if (libType === 'video' || libType === 'image') return libType
+      return isBgVideoUrl(url) ? 'video' : 'image'
+    }
+    const push = (url, hint, unlocked) => {
+      if (!url) return
+      if (seen.has(url)) {
+        // 같은 URL이 다른 곳에서 unlocked로 나오면 잠금 해제로 승격
+        const idx = seen.get(url)
+        if (unlocked) out[idx].unlocked = true
+        return
+      }
+      seen.set(url, out.length)
+      out.push({ url, type: detectType(url, hint), unlocked: !!unlocked })
+    }
+
+    const choiceMap = new Map()
+    const nodeMap = new Map()
+    for (const n of storyline.nodes || []) {
+      nodeMap.set(n.id, n)
+      for (const c of (n.choices || [])) choiceMap.set(c.id, { ...c, parentNodeId: n.id })
+    }
+    // 노드의 분기 조상 체인을 따라가며 PREMIUM 조상이 있는지 검사
+    const hasPremiumAncestor = (node) => {
+      let cur = node
+      while (cur && cur.branchFromChoiceId != null) {
+        const ch = choiceMap.get(cur.branchFromChoiceId)
+        if (!ch) return false
+        if (ch.choiceType === 'PREMIUM') return true
+        cur = nodeMap.get(ch.parentNodeId)
+      }
+      return false
+    }
+    // 진행한 시퀀스 — 이 시퀀스에 포함된 노드는 사용자가 해당 분기를 통과한 것이므로 unlocked
+    const playedNodeIds = new Set(
+      computeSequence(storyline.nodes || [], choices).map((n) => n.id)
+    )
+
+    for (const n of storyline.nodes || []) {
+      if (!hasPremiumAncestor(n)) continue
+      const unlocked = playedNodeIds.has(n.id)
+      for (const it of (n.script || [])) {
+        if (it?.backgroundImage) push(it.backgroundImage, undefined, unlocked)
+        if (it?.fullMediaUrl) push(it.fullMediaUrl, it.fullMediaType, unlocked)
+      }
+    }
+
+    // CHAT premium 미디어 — 해금 여부와 무관하게 모두 수집, unlockedMedia 기록 기준으로 unlocked 판별
+    for (const n of storyline.nodes || []) {
+      if (n.nodeType !== 'CHAT') continue
+      for (const it of (n.script || [])) {
+        if (it?.mode === 'media' && it.variant === 'premium' && it.mediaUrl) {
+          push(it.mediaUrl, it.mediaType, !!unlockedMedia?.has(it.mediaUrl))
+        }
+      }
+    }
+    return out
+  }, [storyline, choices, unlockedMedia])
   const node = sequence[nodeIndex]
   const isLastNode = nodeIndex === sequence.length - 1
   const hasScript = node?.nodeType === 'CHAPTER' || node?.nodeType === 'CHAT'
@@ -341,6 +438,16 @@ export default function Storyline() {
   const currentBg = currentItem?.backgroundImage || null
   const currentCharImage = currentItem?.characterImage || null
 
+  // 서버 응답의 newlyUnlocked 이미지를 storyline.images에 반영 — 결과 화면 그리드에 즉시 노출되게
+  const markImagesUnlocked = (newlyUnlocked) => {
+    if (!newlyUnlocked?.length) return
+    const ids = new Set(newlyUnlocked.map((u) => u.id))
+    setStoryline((prev) => prev ? {
+      ...prev,
+      images: (prev.images || []).map((img) => ids.has(img.id) ? { ...img, unlocked: true } : img),
+    } : prev)
+  }
+
   // RESULT 도달 시 자동 완료
   useEffect(() => {
     if (completeCalled || !token || !sequence.length) return
@@ -349,6 +456,7 @@ export default function Storyline() {
     setCompleteCalled(true)
     api.post(`/storylines/${id}/complete`)
       .then((res) => {
+        markImagesUnlocked(res?.unlockedImages)
         if (res?.unlockedImages?.length > 0) {
           setToast(`🖼️ ${res.unlockedImages.length}장 해금!`)
         }
@@ -455,6 +563,7 @@ export default function Storyline() {
           choiceId: choice.id,
           nextNodeId,
         })
+        markImagesUnlocked(res?.unlockedImages)
         const unlockCount = res?.unlockedImages?.length || 0
         if (unlockCount > 0) {
           setToast(`저장 완료 · 🖼️ ${unlockCount}장 해금`)
@@ -603,7 +712,7 @@ export default function Storyline() {
 
       {/* 캐릭터 standing 이미지 — CHAPTER 노드의 비-cg 아이템 */}
       {isVnTextView && currentCharImage && (
-        <div className="absolute inset-x-0 flex items-end justify-center pointer-events-none" style={{ top: '8%', bottom: '24%' }}>
+        <div className="absolute inset-x-0 flex items-end justify-center pointer-events-none" style={{ top: '8%', bottom: 'env(safe-area-inset-bottom)' }}>
           <img src={currentCharImage} alt="" className="max-h-full max-w-full object-contain drop-shadow-2xl" />
         </div>
       )}
@@ -679,7 +788,7 @@ export default function Storyline() {
         <ResultView
           node={node}
           storyline={storyline}
-          choices={choices}
+          premiumMedia={premiumMedia}
           token={token}
           nextPart={nextPart}
           onClose={() => navigate(-1)}
@@ -688,6 +797,7 @@ export default function Storyline() {
             // 다음 파트로 — 같은 페이지에서 storylineId만 바꿔 navigate
             navigate(`/storylines/${partId}`, { replace: true })
           }}
+          onMediaClick={(m) => setMediaLightbox({ url: m.url, type: m.type })}
         />
       )}
 
@@ -1356,8 +1466,7 @@ function ChoiceButtons({ choices, masks, onChoice, selectingChoiceId }) {
 // ───────────────────────────────────────────────────────────
 // Result 뷰 — 결말 페이지 + 해금 이미지 그리드
 // ───────────────────────────────────────────────────────────
-function ResultView({ node, storyline, choices, token, nextPart, onClose, onRestart, onNextPart }) {
-  const choiceList = Object.values(choices)
+function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClose, onRestart, onNextPart, onMediaClick }) {
   const unlockedImages = (storyline.images || []).filter((img) => img.unlocked)
 
   return (
@@ -1367,57 +1476,95 @@ function ResultView({ node, storyline, choices, token, nextPart, onClose, onRest
     >
       <div className="px-6 max-w-md mx-auto">
         <p className="text-center text-xs text-indigo-400 font-semibold tracking-[0.3em] mb-3">FIN</p>
-        <h2 className="text-center text-2xl font-bold text-white mb-3">{node.resultTitle || storyline.title}</h2>
-        {node.resultBody && (
-          <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line text-center mb-8">
-            {node.resultBody}
-          </p>
-        )}
+        <h2 className="text-center text-2xl font-bold text-white mb-8">{node.resultTitle || storyline.title}</h2>
 
-        {choiceList.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">당신의 선택</h3>
-            <div className="space-y-2">
-              {choiceList.map((c, i) => (
-                <div key={i} className="bg-gray-900/60 backdrop-blur-sm border border-gray-800 rounded-lg p-3">
-                  <p className="text-sm text-white">"{c.label}"</p>
-                  {c.description && (
-                    <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{c.description}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 해금된 컬렉터블 이미지 그리드 */}
-        {(storyline.images || []).length > 0 && (
+        {/* 이 파트에서 해금한 이미지 */}
+        {unlockedImages.length > 0 && (
           <div className="mb-8">
             <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
-              컬렉터블 ({unlockedImages.length} / {storyline.images.length})
+              해금한 이미지 ({unlockedImages.length})
             </h3>
             <div className="grid grid-cols-3 gap-2">
-              {storyline.images.map((img) => (
-                <div
+              {unlockedImages.map((img) => (
+                <button
                   key={img.id}
+                  onClick={() => onMediaClick && onMediaClick({ url: img.url, type: 'image' })}
                   className="aspect-[9/16] rounded-lg overflow-hidden relative bg-gray-900 border border-gray-800"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  {img.unlocked ? (
-                    <img src={img.url} alt={img.title || ''} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                      </svg>
-                      <p className="text-[10px] mt-1 px-1 text-center line-clamp-2">{img.title || '잠김'}</p>
-                    </div>
-                  )}
-                </div>
+                  <img src={img.url} alt={img.title || ''} className="w-full h-full object-cover" />
+                </button>
               ))}
             </div>
           </div>
         )}
+
+        {premiumMedia.length > 0 && (() => {
+          const unlockedCount = premiumMedia.filter((m) => m.unlocked).length
+          const lockedStyle = { filter: 'blur(3px)', transform: 'scale(1.03)' }
+          return (
+            <div className="mb-8">
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+                프리미엄 컨텐츠 ({unlockedCount} / {premiumMedia.length})
+              </h3>
+              <div className="grid grid-cols-3 gap-2">
+                {premiumMedia.map((m, i) => {
+                  const Tag = m.unlocked ? 'button' : 'div'
+                  const tagProps = m.unlocked
+                    ? {
+                        onClick: () => onMediaClick && onMediaClick({ url: m.url, type: m.type }),
+                        style: { outline: 'none', WebkitTapHighlightColor: 'transparent' },
+                      }
+                    : {}
+                  return (
+                    <Tag
+                      key={i}
+                      className="aspect-[9/16] rounded-lg overflow-hidden relative bg-gray-900 border border-gray-800"
+                      {...tagProps}
+                    >
+                      {m.type === 'video' && m.unlocked ? (
+                        <video
+                          src={m.url}
+                          className="w-full h-full object-cover"
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                          preload="auto"
+                          onLoadedData={(e) => { e.currentTarget.play().catch(() => {}) }}
+                        />
+                      ) : m.type === 'video' ? (
+                        <video
+                          src={m.url}
+                          className="w-full h-full object-cover"
+                          style={lockedStyle}
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={m.url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          style={m.unlocked ? undefined : lockedStyle}
+                        />
+                      )}
+                      {!m.unlocked && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-80 drop-shadow">
+                            <rect x="3" y="11" width="18" height="11" rx="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                        </div>
+                      )}
+                    </Tag>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
 
         <div className="flex flex-col gap-2">
           {/* 다음 파트로 — 같은 시나리오에 후속 파트가 있을 때만. 잠긴 파트는 잠금 라벨 표시 */}

@@ -463,6 +463,10 @@ export default function CharacterDetail() {
                 {storylines.map((s) => {
                   const isUnlocking = unlockingStorylineId === s.id
                   const locked = !!s.locked
+                  const media = Array.isArray(s.premiumMedia) ? s.premiumMedia : []
+                  const isMulti = media.length > 1
+                  const activeIdx = isMulti ? slideTick % media.length : 0
+                  const lockedMediaStyle = { filter: 'blur(3px)', transform: 'scale(1.03)' }
                   return (
                   <button
                     key={s.id}
@@ -471,14 +475,33 @@ export default function CharacterDetail() {
                     className="flex-shrink-0 w-[180px] aspect-[9/16] rounded-xl overflow-hidden relative bg-gray-900 border border-gray-800 hover:border-indigo-500 transition-colors snap-start disabled:opacity-80"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    {/* 풀커버 이미지 (9:16) — thumbnailImage 우선, 없으면 coverImage fallback. 잠금 시 블러. */}
-                    {(s.thumbnailImage || s.coverImage) ? (
-                      <img
-                        src={s.thumbnailImage || s.coverImage}
-                        alt={s.title}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={locked ? { filter: 'blur(14px)', transform: 'scale(1.08)' } : undefined}
-                      />
+                    {/* 슬라이드쇼 — premiumMedia 항목들을 페이드 회전, 잠긴 항목은 약한 블러 */}
+                    {media.length > 0 ? (
+                      media.map((m, idx) => {
+                        const isActive = idx === activeIdx
+                        const blur = !m.unlocked
+                        const baseCls = `absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`
+                        return m.type === 'video' ? (
+                          <video
+                            key={idx}
+                            src={m.url}
+                            className={baseCls}
+                            style={blur ? lockedMediaStyle : undefined}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            key={idx}
+                            src={m.url}
+                            alt=""
+                            className={baseCls}
+                            style={blur ? lockedMediaStyle : undefined}
+                            draggable={false}
+                          />
+                        )
+                      })
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 to-purple-900/30 flex items-center justify-center text-gray-700">
                         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

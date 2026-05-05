@@ -171,17 +171,9 @@ export default function CharacterStorylines() {
                 className="block w-full aspect-[9/16] relative bg-gray-800 hover:opacity-90 transition-opacity"
                 style={{ outline: 'none' }}
               >
-                {(s.thumbnailImage || s.coverImage) ? (
-                  <img
-                    src={s.thumbnailImage || s.coverImage}
-                    alt={s.title}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-xs">
-                    썸네일 없음
-                  </div>
-                )}
+                <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-xs">
+                  미리보기 없음
+                </div>
                 {/* 상태 뱃지 */}
                 <div
                   className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
@@ -572,8 +564,6 @@ ${seedIdea || '(여기에 운영자가 시드 아이디어를 작성)'}
 [필수 출력 키]
 {
   "title": string,
-  "thumbnailImage"?: url,
-  "coverImage"?: url,
   "defaultBgm"?: url,
   "status": "PUBLISHED",
   "images"?: [{ tempId: string, url: url, title?: string, description?: string, unlockType: "ALWAYS"|"CHOICE"|"ENDING"|"PLAY_ANY" }],

@@ -6,6 +6,10 @@ import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 
+// 파트 썸네일 슬라이드 — 결과 페이지의 premiumMedia를 그대로 사용 (잠긴 항목은 약한 블러)
+const THUMB_SLIDE_INTERVAL_MS = 2000
+const LOCKED_MEDIA_STYLE = { filter: 'blur(3px)', transform: 'scale(1.03)' }
+
 export default function Scenario() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -19,9 +23,14 @@ export default function Scenario() {
   const [unlockingId, setUnlockingId] = useState(null)
   const [adUnsupportedModal, setAdUnsupportedModal] = useState(false)
   const [adFailedToast, setAdFailedToast] = useState(false)
+  const [slideTick, setSlideTick] = useState(0)
 
   useEffect(() => {
     if (isAdMobAvailable()) initAdMob().catch(() => {})
+  }, [])
+  useEffect(() => {
+    const id = setInterval(() => setSlideTick((t) => t + 1), THUMB_SLIDE_INTERVAL_MS)
+    return () => clearInterval(id)
   }, [])
   useEffect(() => {
     if (!adFailedToast) return
@@ -135,6 +144,9 @@ export default function Scenario() {
               {parts.map((s) => {
                 const isUnlocking = unlockingId === s.id
                 const locked = !!s.locked
+                const media = Array.isArray(s.premiumMedia) ? s.premiumMedia : []
+                const isMulti = media.length > 1
+                const activeIdx = isMulti ? slideTick % media.length : 0
                 return (
                   <button
                     key={s.id}
@@ -143,13 +155,32 @@ export default function Scenario() {
                     className="aspect-[9/16] rounded-xl overflow-hidden relative bg-gray-900 border border-gray-800 hover:border-indigo-500 transition-colors disabled:opacity-80"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    {(s.thumbnailImage || s.coverImage) ? (
-                      <img
-                        src={s.thumbnailImage || s.coverImage}
-                        alt={s.title}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={locked ? { filter: 'blur(14px)', transform: 'scale(1.08)' } : undefined}
-                      />
+                    {media.length > 0 ? (
+                      media.map((m, idx) => {
+                        const isActive = idx === activeIdx
+                        const blur = !m.unlocked
+                        const baseCls = `absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`
+                        return m.type === 'video' ? (
+                          <video
+                            key={idx}
+                            src={m.url}
+                            className={baseCls}
+                            style={blur ? LOCKED_MEDIA_STYLE : undefined}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            key={idx}
+                            src={m.url}
+                            alt=""
+                            className={baseCls}
+                            style={blur ? LOCKED_MEDIA_STYLE : undefined}
+                            draggable={false}
+                          />
+                        )
+                      })
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 to-purple-900/30" />
                     )}
