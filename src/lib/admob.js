@@ -17,7 +17,7 @@ export async function initAdMob() {
     AdMob = module.AdMob
 
     await AdMob.initialize({
-      initializeForTesting: true,
+      initializeForTesting: false,
     })
     initialized = true
     return true
