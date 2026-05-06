@@ -19,6 +19,9 @@ import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
+import FinanceSubscriptions from './pages/admin/FinanceSubscriptions'
+import FinanceMaskPurchases from './pages/admin/FinanceMaskPurchases'
+import FinanceMaskStats from './pages/admin/FinanceMaskStats'
 
 // User
 import UserLayout from './pages/user/UserLayout'
@@ -159,6 +162,9 @@ function App() {
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="banners" element={<AdminBanners />} />
+        <Route path="finance/subscriptions" element={<FinanceSubscriptions />} />
+        <Route path="finance/mask-purchases" element={<FinanceMaskPurchases />} />
+        <Route path="finance/mask-stats" element={<FinanceMaskStats />} />
       </Route>
 
       {/* 공개 페이지 (인증 불필요) */}

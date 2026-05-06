@@ -11,6 +11,9 @@ const NAV_ITEMS = [
   { to: '/admin/expressions', label: '표정 이미지' },
   { to: '/admin/banners', label: '광고 배너' },
   { to: '/admin/users', label: '유저 관리' },
+  { to: '/admin/finance/subscriptions', label: '재무 - 구독' },
+  { to: '/admin/finance/mask-purchases', label: '재무 - 마스크 구매' },
+  { to: '/admin/finance/mask-stats', label: '재무 - 마스크 사용 통계' },
 ]
 
 export default function AdminLayout() {
