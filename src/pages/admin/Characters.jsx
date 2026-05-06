@@ -362,20 +362,6 @@ export default function Characters() {
                         피드
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/characters/${c.id}/gallery`)}
-                        className="text-pink-400 hover:text-pink-300 text-xs"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        갤러리
-                      </button>
-                      <button
-                        onClick={() => navigate(`/admin/characters/${c.id}/storylines`)}
-                        className="text-amber-400 hover:text-amber-300 text-xs"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        스토리
-                      </button>
-                      <button
                         onClick={() => remove(c.id)}
                         className="text-red-400 hover:text-red-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}

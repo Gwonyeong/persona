@@ -1,24 +1,94 @@
-import { NavLink, Outlet, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 
 const NAV_ITEMS = [
   { to: '/admin', label: '대시보드', end: true },
-  { to: '/admin/characters', label: '캐릭터 관리' },
-  { to: '/admin/base-images', label: '베이스 이미지' },
-  { to: '/admin/affinity-images', label: '호감도 이미지' },
-  { to: '/admin/expressions', label: '표정 이미지' },
+  {
+    key: 'character',
+    label: '캐릭터',
+    children: [
+      { to: '/admin/characters', label: '캐릭터 관리' },
+      { to: '/admin/storylines', label: '스토리' },
+      { to: '/admin/base-images', label: '베이스 이미지' },
+      { to: '/admin/affinity-images', label: '호감도 이미지' },
+      { to: '/admin/expressions', label: '표정 이미지' },
+    ],
+  },
   { to: '/admin/banners', label: '광고 배너' },
   { to: '/admin/users', label: '유저 관리' },
-  { to: '/admin/finance/subscriptions', label: '재무 - 구독' },
-  { to: '/admin/finance/mask-purchases', label: '재무 - 마스크 구매' },
-  { to: '/admin/finance/mask-stats', label: '재무 - 마스크 사용 통계' },
+  {
+    key: 'finance',
+    label: '재무',
+    children: [
+      { to: '/admin/finance/subscriptions', label: '구독' },
+      { to: '/admin/finance/mask-purchases', label: '마스크 구매' },
+      { to: '/admin/finance/mask-stats', label: '마스크 사용 통계' },
+    ],
+  },
 ]
+
+const STORAGE_KEY = 'admin:sidebar:openGroups'
+
+function loadOpenGroups() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 export default function AdminLayout() {
   const { token } = useStore()
   const [authorized, setAuthorized] = useState(null)
+  const location = useLocation()
+
+  const activeGroupKeys = useMemo(() => {
+    const keys = new Set()
+    for (const item of NAV_ITEMS) {
+      if (!item.children) continue
+      const hit = item.children.some((c) => location.pathname.startsWith(c.to))
+      if (hit) keys.add(item.key)
+    }
+    return keys
+  }, [location.pathname])
+
+  const [openGroups, setOpenGroups] = useState(() => {
+    const stored = loadOpenGroups()
+    if (stored) return stored
+    const initial = {}
+    for (const item of NAV_ITEMS) {
+      if (item.children) initial[item.key] = true
+    }
+    return initial
+  })
+
+  useEffect(() => {
+    if (activeGroupKeys.size === 0) return
+    setOpenGroups((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const key of activeGroupKeys) {
+        if (!next[key]) {
+          next[key] = true
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [activeGroupKeys])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(openGroups))
+    } catch {
+      // ignore storage errors
+    }
+  }, [openGroups])
 
   useEffect(() => {
     if (!token) return
@@ -38,6 +108,10 @@ export default function AdminLayout() {
   }
   if (!authorized) return <Navigate to="/" replace />
 
+  const toggleGroup = (key) => {
+    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
   return (
     <div className="admin-layout flex h-screen bg-gray-950 text-gray-100">
       {/* Sidebar */}
@@ -45,23 +119,75 @@ export default function AdminLayout() {
         <div className="p-4 border-b border-gray-800">
           <h1 className="text-lg font-bold">Pesona Admin</h1>
         </div>
-        <div className="flex-1 py-2">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `block px-4 py-2.5 text-sm transition-colors ${
-                  isActive
-                    ? 'bg-gray-800 text-white font-medium'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+        <div className="flex-1 py-2 overflow-y-auto">
+          {NAV_ITEMS.map((item) => {
+            if (item.children) {
+              const isOpen = !!openGroups[item.key]
+              const hasActiveChild = activeGroupKeys.has(item.key)
+              return (
+                <div key={item.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(item.key)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                      hasActiveChild
+                        ? 'text-white font-medium'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                    }`}
+                    style={{
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    <span
+                      className={`text-xs transition-transform ${
+                        isOpen ? 'rotate-90' : ''
+                      }`}
+                    >
+                      ▶
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="pb-1">
+                      {item.children.map((child) => (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          end={child.end}
+                          className={({ isActive }) =>
+                            `block pl-8 pr-4 py-2 text-sm transition-colors ${
+                              isActive
+                                ? 'bg-gray-800 text-white font-medium'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                            }`
+                          }
+                        >
+                          {child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `block px-4 py-2.5 text-sm transition-colors ${
+                    isActive
+                      ? 'bg-gray-800 text-white font-medium'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            )
+          })}
         </div>
         <div className="p-4 border-t border-gray-800">
           <NavLink to="/" className="text-sm text-gray-500 hover:text-gray-300">
