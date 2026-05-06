@@ -16,9 +16,13 @@ import AffinityImages from './pages/admin/AffinityImages'
 import BaseImages from './pages/admin/BaseImages'
 import Expressions from './pages/admin/Expressions'
 import CharacterStorylines from './pages/admin/CharacterStorylines'
+import StorylinesOverview from './pages/admin/StorylinesOverview'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
+import FinanceSubscriptions from './pages/admin/FinanceSubscriptions'
+import FinanceMaskPurchases from './pages/admin/FinanceMaskPurchases'
+import FinanceMaskStats from './pages/admin/FinanceMaskStats'
 
 // User
 import UserLayout from './pages/user/UserLayout'
@@ -156,9 +160,13 @@ function App() {
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
         <Route path="characters/:id/gallery" element={<CharacterGallery />} />
         <Route path="characters/:id/storylines" element={<CharacterStorylines />} />
+        <Route path="storylines" element={<StorylinesOverview />} />
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="banners" element={<AdminBanners />} />
+        <Route path="finance/subscriptions" element={<FinanceSubscriptions />} />
+        <Route path="finance/mask-purchases" element={<FinanceMaskPurchases />} />
+        <Route path="finance/mask-stats" element={<FinanceMaskStats />} />
       </Route>
 
       {/* 공개 페이지 (인증 불필요) */}
