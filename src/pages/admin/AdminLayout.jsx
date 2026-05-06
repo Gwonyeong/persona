@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/admin/base-images', label: '베이스 이미지' },
   { to: '/admin/affinity-images', label: '호감도 이미지' },
   { to: '/admin/expressions', label: '표정 이미지' },
+  { to: '/admin/banners', label: '광고 배너' },
   { to: '/admin/users', label: '유저 관리' },
 ]
 

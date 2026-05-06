@@ -8,6 +8,8 @@ import useStore from '../../store/useStore'
 import TagFilterBar from '../../components/TagFilterBar'
 import useTagFilter from '../../hooks/useTagFilter'
 import { getTagLabel } from '../../lib/tagLabel'
+import HomeBannerSlider from '../../components/HomeBannerSlider'
+import RecentStoriesRow from '../../components/RecentStoriesRow'
 // import AdBanner from '../../components/AdBanner'
 
 const LANGUAGES = [
@@ -115,6 +117,12 @@ export default function Home() {
         <div
           style={{ display: headerCollapsed ? 'none' : 'block' }}
         >
+          {/* 광고 배너 (어드민 관리) */}
+          <HomeBannerSlider />
+
+          {/* 최근 공개된 스토리 */}
+          <RecentStoriesRow />
+
           {/* 검색바 */}
           <div className="relative mb-3">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -18,6 +18,7 @@ import Expressions from './pages/admin/Expressions'
 import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import AdminUsers from './pages/admin/Users'
+import AdminBanners from './pages/admin/Banners'
 
 // User
 import UserLayout from './pages/user/UserLayout'
@@ -157,6 +158,7 @@ function App() {
         <Route path="characters/:id/storylines" element={<CharacterStorylines />} />
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
+        <Route path="banners" element={<AdminBanners />} />
       </Route>
 
       {/* 공개 페이지 (인증 불필요) */}
