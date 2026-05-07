@@ -92,7 +92,8 @@ export default function UserLayout() {
       {/* 피드백 버튼 */}
       {showFeedback && <FeedbackButton />}
 
-      {/* 하단 탭바 */}
+      {/* 하단 탭바 (채팅 페이지에서는 키보드 애니메이션과 충돌하므로 숨김) */}
+      {!isChatPage && (
       <nav className="relative flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {TABS.map((tab, i) => (
           <React.Fragment key={tab.to}>
@@ -145,6 +146,7 @@ export default function UserLayout() {
           </React.Fragment>
         ))}
       </nav>
+      )}
 
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
