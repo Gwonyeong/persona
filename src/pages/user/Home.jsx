@@ -56,7 +56,7 @@ export default function Home() {
     const scrollEl = document.querySelector('.user-layout > main')
     if (!scrollEl) return
     const onScroll = () => {
-      setHeaderCollapsed(scrollEl.scrollTop > 10)
+      setHeaderCollapsed(scrollEl.scrollTop > 0)
     }
     scrollEl.addEventListener('scroll', onScroll, { passive: true })
     return () => scrollEl.removeEventListener('scroll', onScroll)
