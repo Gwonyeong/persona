@@ -7,6 +7,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import TagFilterBar from '../../components/TagFilterBar'
 import useTagFilter from '../../hooks/useTagFilter'
+import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import { getTagLabel } from '../../lib/tagLabel'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import RecentStoriesRow from '../../components/RecentStoriesRow'
@@ -25,6 +26,10 @@ function getImageUrl(filePath) {
   return null
 }
 
+function isVideoUrl(url) {
+  return !!url && /\.(mp4|webm)(\?|$)/i.test(url)
+}
+
 export default function Home() {
   const { t, i18n: i18nInstance } = useTranslation()
   const { token, masks, setMasks } = useStore()
@@ -34,6 +39,7 @@ export default function Home() {
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
+  const reducedData = usePrefersReducedData()
   const navigate = useNavigate()
 
   const currentLang = LANGUAGES.find((l) => l.code === i18n.language?.split('-')[0]) || LANGUAGES[1]
@@ -178,7 +184,10 @@ export default function Home() {
         <div className="grid grid-cols-2 gap-3">
           {filterByTags(characters).map((c) => {
             const thumb = c.styles?.[0]?.images?.[0]
-            const thumbUrl = getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
+            const homeMedia = reducedData ? null : c.homeImage
+            const thumbUrl = getImageUrl(homeMedia) || getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
+            const isVideo = isVideoUrl(thumbUrl)
+            const posterUrl = isVideo ? (getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)) : null
 
             const flagTag = c.tags.find((t) => t.startsWith('nationality:'))
             const flagCode = flagTag?.split(':')[1]
@@ -213,10 +222,23 @@ export default function Home() {
                     </svg>
                   </div>
                 )}
-                {/* 이미지 */}
+                {/* 미디어 (이미지/영상) */}
                 <div className="aspect-[2/3] bg-gray-800 flex items-center justify-center">
                   {thumbUrl ? (
-                    <img src={thumbUrl} alt={c.name} className="w-full h-full object-cover" />
+                    isVideo ? (
+                      <video
+                        src={thumbUrl}
+                        poster={posterUrl || undefined}
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <img src={thumbUrl} alt={c.name} className="w-full h-full object-cover" />
+                    )
                   ) : (
                     <span className="text-4xl text-gray-600">?</span>
                   )}

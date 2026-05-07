@@ -224,6 +224,36 @@ export default function Characters() {
     }
   }
 
+  const uploadHomeImage = async (file) => {
+    if (!editing || editing === 'new') return
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const { character } = await api.put(`/admin/characters/${editing.id}/home-image`, formData)
+      setEditing({ ...editing, homeImage: character.homeImage })
+      load()
+    } catch (e) {
+      alert('홈 이미지 업로드 실패')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const removeHomeImage = async () => {
+    if (!editing || editing === 'new') return
+    setUploadingImage(true)
+    try {
+      await api.delete(`/admin/characters/${editing.id}/home-image`)
+      setEditing({ ...editing, homeImage: null })
+      load()
+    } catch (e) {
+      alert('홈 이미지 삭제 실패')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
@@ -437,6 +467,71 @@ export default function Characters() {
                 </div>
               </div>
             )}
+
+            {/* 홈 미디어 (이미지/영상 — 홈 화면에서만 노출) */}
+            {editing !== 'new' && (() => {
+              const isVideo = editing.homeImage && /\.(mp4|webm)(\?|$)/i.test(editing.homeImage)
+              return (
+                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700">
+                  <div className="w-16 h-16 rounded-xl bg-gray-800 overflow-hidden flex-shrink-0">
+                    {editing.homeImage ? (
+                      isVideo ? (
+                        <video
+                          src={editing.homeImage}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img src={editing.homeImage} alt="" className="w-full h-full object-cover" />
+                      )
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">?</div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-gray-400">
+                      {editing.homeImage
+                        ? `홈 미디어 (${isVideo ? '영상' : '이미지'})`
+                        : '홈 미디어 (미설정 — 프로필 이미지 사용)'}
+                    </p>
+                    <p className="text-[10px] text-gray-500">MP4/WebM 권장 (GIF보다 10배 작음)</p>
+                    <div className="flex gap-2">
+                      <label
+                        className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer ${
+                          uploadingImage ? 'bg-gray-700 text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                        }`}
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        {uploadingImage ? '업로드 중...' : '미디어 변경'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm"
+                          className="hidden"
+                          disabled={uploadingImage}
+                          onChange={(e) => {
+                            if (e.target.files[0]) uploadHomeImage(e.target.files[0])
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                      {editing.homeImage && (
+                        <button
+                          onClick={removeHomeImage}
+                          disabled={uploadingImage}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-red-400 hover:text-red-300 border border-gray-700"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
             <div className="space-y-4">
               <div>
