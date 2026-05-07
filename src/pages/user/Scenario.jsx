@@ -4,7 +4,6 @@ import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
-import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 
 // 파트 썸네일 슬라이드 — 결과 페이지의 premiumMedia를 그대로 사용 (잠긴 항목은 약한 블러)
 const THUMB_SLIDE_INTERVAL_MS = 2000
@@ -20,23 +19,12 @@ export default function Scenario() {
   const [error, setError] = useState(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [pendingPartId, setPendingPartId] = useState(null)
-  const [unlockingId, setUnlockingId] = useState(null)
-  const [adUnsupportedModal, setAdUnsupportedModal] = useState(false)
-  const [adFailedToast, setAdFailedToast] = useState(false)
   const [slideTick, setSlideTick] = useState(0)
 
-  useEffect(() => {
-    if (isAdMobAvailable()) initAdMob().catch(() => {})
-  }, [])
   useEffect(() => {
     const id = setInterval(() => setSlideTick((t) => t + 1), THUMB_SLIDE_INTERVAL_MS)
     return () => clearInterval(id)
   }, [])
-  useEffect(() => {
-    if (!adFailedToast) return
-    const t = setTimeout(() => setAdFailedToast(false), 4000)
-    return () => clearTimeout(t)
-  }, [adFailedToast])
 
   useEffect(() => {
     api.get(`/scenarios/${id}`)
@@ -47,33 +35,13 @@ export default function Scenario() {
       .catch((e) => setError(e?.message || 'Failed to load'))
   }, [id])
 
-  const handlePartClick = async (s) => {
+  const handlePartClick = (s) => {
     if (!token) {
       setPendingPartId(s.id)
       setShowLoginModal(true)
       return
     }
-    if (!s.locked) {
-      navigate(`/storylines/${s.id}`)
-      return
-    }
-    if (!isAdMobAvailable()) {
-      setAdUnsupportedModal(true)
-      return
-    }
-    if (unlockingId) return
-    setUnlockingId(s.id)
-    try {
-      await showRewardedAd()
-      await api.post(`/storylines/${s.id}/unlock-ad`)
-      setParts((prev) => prev.map((x) => (x.id === s.id ? { ...x, locked: false } : x)))
-      setUnlockingId(null)
-      navigate(`/storylines/${s.id}`)
-    } catch (e) {
-      setUnlockingId(null)
-      if (e?.message === 'AD_DISMISSED') return
-      setAdFailedToast(true)
-    }
+    navigate(`/storylines/${s.id}`)
   }
 
   if (error) {
@@ -142,8 +110,6 @@ export default function Scenario() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {parts.map((s) => {
-                const isUnlocking = unlockingId === s.id
-                const locked = !!s.locked
                 const media = Array.isArray(s.premiumMedia) ? s.premiumMedia : []
                 const isMulti = media.length > 1
                 const activeIdx = isMulti ? slideTick % media.length : 0
@@ -151,8 +117,7 @@ export default function Scenario() {
                   <button
                     key={s.id}
                     onClick={() => handlePartClick(s)}
-                    disabled={isUnlocking}
-                    className="aspect-[9/16] rounded-xl overflow-hidden relative bg-gray-900 border border-gray-800 hover:border-indigo-500 transition-colors disabled:opacity-80"
+                    className="aspect-[9/16] rounded-xl overflow-hidden relative bg-gray-900 border border-gray-800 hover:border-indigo-500 transition-colors"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
                     {media.length > 0 ? (
@@ -197,41 +162,19 @@ export default function Scenario() {
                       </div>
                     )}
 
-                    {!locked && s.progress?.status === 'COMPLETED' && (
+                    {s.progress?.status === 'COMPLETED' && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-600/90 text-white text-[10px] rounded-full font-semibold">완료</div>
                     )}
-                    {!locked && s.progress?.status === 'IN_PROGRESS' && (
+                    {s.progress?.status === 'IN_PROGRESS' && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 bg-indigo-600/90 text-white text-[10px] rounded-full font-semibold">진행 중</div>
                     )}
                     {s.status === 'TEST' && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 bg-amber-600/90 text-white text-[10px] rounded-full font-semibold">TEST</div>
                     )}
 
-                    {/* 잠금 오버레이 */}
-                    {locked && (
-                      <div className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center px-3 text-center pointer-events-none">
-                        {isUnlocking ? (
-                          <>
-                            <div className="w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin mb-2" />
-                            <p className="text-white text-xs font-semibold">광고 준비 중...</p>
-                          </>
-                        ) : (
-                          <>
-                            <div className="w-11 h-11 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center mb-2 ring-1 ring-white/20">
-                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                              </svg>
-                            </div>
-                            <p className="text-white text-[12px] font-bold leading-tight">광고보고<br/>진행하기</p>
-                          </>
-                        )}
-                      </div>
-                    )}
-
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent px-3 pt-10 pb-3 text-left">
                       <p className="font-semibold text-sm text-white line-clamp-1">{s.title}</p>
-                      {s.description && !locked && (
+                      {s.description && (
                         <p className="text-[11px] text-gray-300 line-clamp-2 mt-1 leading-relaxed">{s.description}</p>
                       )}
                     </div>
@@ -241,43 +184,6 @@ export default function Scenario() {
             </div>
           )}
         </div>
-
-        {/* 광고 실패 토스트 */}
-        {adFailedToast && (
-          <div
-            className="absolute left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
-            style={{ top: 'calc(env(safe-area-inset-top) + 60px)' }}
-          >
-            <div className="bg-gray-900/95 text-white text-sm px-4 py-3 rounded-xl shadow-lg backdrop-blur-sm border border-gray-700 max-w-xs">
-              <p className="leading-snug">광고를 불러오지 못했어요.<br/>잠시 후 다시 시도해주세요.</p>
-            </div>
-          </div>
-        )}
-
-        {/* 광고 사용 불가 환경 안내 */}
-        {adUnsupportedModal && (
-          <div className="absolute inset-0 z-50 bg-black/60 flex items-center justify-center px-6">
-            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 max-w-xs w-full text-center">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-indigo-600/20 flex items-center justify-center">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </div>
-              <p className="text-white text-sm font-bold mb-1">앱에서 해금할 수 있어요</p>
-              <p className="text-gray-400 text-xs leading-relaxed mb-4">
-                스토리는 모바일 앱에서 광고 시청 후 진행할 수 있어요.
-              </p>
-              <button
-                onClick={() => setAdUnsupportedModal(false)}
-                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        )}
 
         {showLoginModal && (
           <LoginModal

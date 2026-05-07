@@ -264,7 +264,6 @@ export default function Storyline() {
         setCurrentBgs(restoredBgs)
       })
       .catch((e) => {
-        // 잠긴 스토리 — 캐릭터 상세 페이지로 되돌려 거기서 광고 시청 흐름 진행
         if (e?.status === 403 && e?.data?.locked) {
           setError({ locked: true, reason: e.data.reason })
           return
@@ -637,8 +636,8 @@ export default function Storyline() {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </div>
-            <p className="text-white text-sm font-bold">잠긴 스토리예요</p>
-            <p className="text-xs leading-relaxed">캐릭터 상세 페이지에서<br/>광고를 시청하면 진행할 수 있어요.</p>
+            <p className="text-white text-sm font-bold">로그인이 필요해요</p>
+            <p className="text-xs leading-relaxed">로그인 후 스토리를 진행할 수 있어요.</p>
           </>
         ) : (
           <p>스토리를 불러오지 못했습니다.</p>
