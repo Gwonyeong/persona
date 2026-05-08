@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -18,6 +18,55 @@ function getImageUrl(filePath) {
   return null
 }
 
+// 한글 음절(가-힣)을 자모 단계로 분해. 예: '상' → ['ㅅ', '사', '상'], '가' → ['ㄱ', '가'] (받침 없음)
+const HANGUL_INITIALS = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+const HANGUL_SYL_BASE = 0xAC00
+const HANGUL_SYL_END = 0xD7A3
+function decomposeJamoStages(ch) {
+  const code = ch.charCodeAt(0)
+  if (code < HANGUL_SYL_BASE || code > HANGUL_SYL_END) return [ch]
+  const offset = code - HANGUL_SYL_BASE
+  const initial = Math.floor(offset / (21 * 28))
+  const vowel = Math.floor((offset % (21 * 28)) / 28)
+  const finalConsonant = offset % 28
+  const stages = [HANGUL_INITIALS[initial]]
+  // 초성 + 중성 (받침 없는 음절)
+  stages.push(String.fromCharCode(HANGUL_SYL_BASE + initial * 21 * 28 + vowel * 28))
+  // 받침까지 (있을 때만 한 단계 더)
+  if (finalConsonant > 0) stages.push(ch)
+  return stages
+}
+function getTypingStateAt(text, step) {
+  let count = 0
+  let prefix = ''
+  for (const ch of text) {
+    const stages = decomposeJamoStages(ch)
+    for (const stage of stages) {
+      if (count === step) return prefix + stage
+      count++
+    }
+    prefix += ch
+  }
+  return text
+}
+function getTotalTypingSteps(text) {
+  let total = 0
+  for (const ch of text) total += decomposeJamoStages(ch).length
+  return total
+}
+
+// 캐릭터: 《...》 = 행동 묘사. 유저: (...) = 행동 묘사. 같은 버블 안에서 흐릿한 색으로 표시.
+function parseMessageSegments(content, role) {
+  if (!content || typeof content !== 'string') return [{ type: 'text', value: content || '' }]
+  const pattern = role === 'USER' ? /(\([^()\n]+\))/g : /(《[^》\n]+》)/g
+  const parts = content.split(pattern).filter((p) => p !== '' && p != null)
+  return parts.map((p) => {
+    if (role === 'USER' && /^\(.+\)$/.test(p)) return { type: 'action', value: p.slice(1, -1) }
+    if (role !== 'USER' && /^《.+》$/.test(p)) return { type: 'action', value: p.slice(1, -1) }
+    return { type: 'text', value: p }
+  })
+}
+
 
 function getCharacterOnlineStatus(activeHours) {
   if (!activeHours?.schedule) return 'free'
@@ -32,7 +81,7 @@ function getCharacterOnlineStatus(activeHours) {
 function getDefaultStatus(activeHours) {
   const hour = new Date().getHours()
   if (!activeHours?.schedule) {
-    return { emoji: '💬', mood: '-', location: '-', activity: '-' }
+    return { emoji: '💬', mood: '-', location: '-', activity: '-', outfit: '-' }
   }
   const slot = activeHours.schedule.find((s) => {
     if (s.start < s.end) return hour >= s.start && hour < s.end
@@ -40,17 +89,246 @@ function getDefaultStatus(activeHours) {
   })
   const status = slot?.status || 'free'
   const label = slot?.label || null
-  if (status === 'sleep') return { emoji: '😴', mood: '수면 중', location: '-', activity: label || '잠자는 중' }
-  if (status === 'busy') return { emoji: '🔒', mood: '바쁨', location: '-', activity: label || '바쁜 중' }
-  return { emoji: '🟢', mood: '여유', location: '-', activity: label || '자유 시간' }
+  if (status === 'sleep') return { emoji: '😴', mood: '수면 중', location: '-', activity: label || '잠자는 중', outfit: '잠옷' }
+  if (status === 'busy') return { emoji: '🔒', mood: '바쁨', location: '-', activity: label || '바쁜 중', outfit: '-' }
+  return { emoji: '🟢', mood: '여유', location: '-', activity: label || '자유 시간', outfit: '-' }
 }
+
+// 호감도 → 라벨 변환 (서버 getAffinityLabel과 일치)
+function getAffinityLabelKey(affinity) {
+  if (affinity <= -50) return 'affinityVeryHostile'
+  if (affinity <= -20) return 'affinityHostile'
+  if (affinity <= -5) return 'affinityUncomfortable'
+  if (affinity <= 5) return 'affinityNeutral'
+  if (affinity <= 20) return 'affinitySlightLike'
+  if (affinity <= 50) return 'affinityLike'
+  if (affinity <= 80) return 'affinityIntimate'
+  return 'affinityDeep'
+}
+
+// 자모 단위 타이프라이터 애니메이션 훅. shouldAnimate가 true로 전환된 시점에 활성화 → 끝까지 재생.
+// shouldAnimate가 처음에 false였다가 나중에 true가 되어도 정상 발동 (딜레이 큐 시나리오 지원).
+const TYPING_SPEED_MS = 18
+function useJamoTypewriter(fullText, shouldAnimate) {
+  const [active, setActive] = useState(shouldAnimate === true)
+  const [step, setStep] = useState(0)
+
+  // shouldAnimate가 true가 되는 순간 활성화 (한 번만, one-way)
+  useEffect(() => {
+    if (shouldAnimate && !active) {
+      setActive(true)
+      setStep(0)
+    }
+  }, [shouldAnimate, active])
+
+  const totalSteps = useMemo(
+    () => (active ? getTotalTypingSteps(fullText || '') : 0),
+    [fullText, active],
+  )
+
+  useEffect(() => {
+    if (!active) return
+    if (step >= totalSteps) return
+    const t = setTimeout(() => setStep((s) => s + 1), TYPING_SPEED_MS)
+    return () => clearTimeout(t)
+  }, [active, step, totalSteps])
+
+  // shouldAnimate=true이지만 아직 active 전환 전 (한 프레임) → 빈 문자열로 깜빡임 방지
+  if (shouldAnimate && !active) return ''
+  if (active && step < totalSteps) return getTypingStateAt(fullText || '', step)
+  return fullText || ''
+}
+
+// 메시지 한 개를 렌더링하는 메모이즈된 컴포넌트.
+// 부모(Chat) 리렌더에 의한 입력 lag를 차단하기 위해 React.memo로 감싸 불필요한 재렌더를 막는다.
+const MessageBubble = memo(function MessageBubble({
+  msg,
+  msgIdx,
+  isConsecutive,
+  showTime,
+  profileUrl,
+  characterName,
+  isLastChar,
+  latestResponseAudios,
+  isPlayingAll,
+  isThisPlayingAudio,
+  onLightbox,
+  onPlayAudio,
+  onStopAudio,
+  onSetBackground,
+  onPlayAll,
+  onStopAll,
+  onAppear,
+  t,
+}) {
+  // 순차 애니메이션: _animateDelay가 지나야 visible. 그 전엔 null 렌더링으로 자리도 차지 안 함.
+  const wantAnimate =
+    (msg.role === 'CHARACTER' || msg.role === 'NARRATION') &&
+    (msg.streaming === true || msg._animate === true)
+  const delayMs = wantAnimate ? Math.max(0, msg._animateDelay || 0) : 0
+  const [delayElapsed, setDelayElapsed] = useState(delayMs === 0)
+
+  useEffect(() => {
+    if (delayElapsed) return
+    if (delayMs <= 0) {
+      setDelayElapsed(true)
+      return
+    }
+    const t = setTimeout(() => setDelayElapsed(true), delayMs)
+    return () => clearTimeout(t)
+  }, [delayMs, delayElapsed])
+
+  // 등장 시점에 부모에게 알림 (스크롤 따라가기용)
+  useEffect(() => {
+    if (delayElapsed && wantAnimate && onAppear) onAppear()
+  }, [delayElapsed, wantAnimate, onAppear])
+
+  // hooks는 early return 전에 호출되어야 함 (Rules of Hooks)
+  // delayElapsed 후에만 shouldAnimate=true → 자모 타이프라이터 활성화
+  const animatedContent = useJamoTypewriter(
+    msg.content || '',
+    delayElapsed && wantAnimate,
+  )
+  const segments = useMemo(() => {
+    if (msg.role !== 'CHARACTER' && msg.role !== 'USER') return null
+    return parseMessageSegments(animatedContent, msg.role)
+  }, [animatedContent, msg.role])
+
+  // 딜레이가 끝나기 전엔 DOM에서 빠져 있어야 순차 등장 효과가 자연스러움
+  if (wantAnimate && !delayElapsed) return null
+
+  if (msg.role === 'NARRATION') {
+    return (
+      <div className="flex justify-center my-4">
+        <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
+          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{animatedContent}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (msg.role === 'GENERATED_IMAGE') {
+    if (msg.status === 'PENDING' || msg.status === 'RETRYING' || !msg.content) {
+      return (
+        <div className="flex justify-center mt-3">
+          <div className="max-w-[75%] rounded-2xl overflow-hidden bg-gray-800/60 flex flex-col items-center justify-center py-10 px-6">
+            <div className="animate-spin w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full mb-3" />
+            <span className="text-[13px] text-gray-400">{msg.status === 'RETRYING' ? t('chat.retryingImage') : t('chat.generatingImage')}</span>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="flex justify-center mt-3">
+        <div className="max-w-[75%] rounded-2xl overflow-hidden relative" onClick={() => onLightbox(msg.content)}>
+          <img src={msg.content} alt="" className="w-full object-cover cursor-pointer" loading="lazy" />
+          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onSetBackground(msg.content) }}
+            className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-black/60 text-white/80 hover:text-white text-[11px]"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            {t('gallery.changeBg')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'} ${isConsecutive ? '' : 'mt-3'}`}>
+      {msg.role === 'CHARACTER' && (
+        <div className="w-7 flex-shrink-0 mr-2">
+          {!isConsecutive ? (
+            <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => profileUrl && onLightbox(profileUrl)}>
+              {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
+            </div>
+          ) : null}
+        </div>
+      )}
+      <div className="max-w-[75%]">
+        {msg.role === 'CHARACTER' && !isConsecutive && <p className="text-xs text-gray-400 mb-1 font-medium">{characterName}</p>}
+        {msg.feedImage && (
+          <div className="mb-1.5 rounded-2xl rounded-tr-none overflow-hidden">
+            <img src={msg.feedImage} alt="" className="w-full aspect-square object-cover" loading="lazy" />
+          </div>
+        )}
+        <div className="flex items-end gap-1.5">
+          <div className={`text-sm leading-relaxed px-3.5 py-2.5 whitespace-pre-wrap ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
+            {segments && segments.map((seg, i) => (
+              <span key={i}>
+                {i > 0 && '\n\n'}
+                {seg.type === 'action' ? (
+                  <span className={`italic ${msg.role === 'USER' ? 'text-indigo-200/70' : 'text-gray-400/80'}`}>
+                    {seg.value}
+                  </span>
+                ) : (
+                  seg.value
+                )}
+              </span>
+            ))}
+          </div>
+          {msg.role === 'CHARACTER' && msg.audioUrl && (
+            <button
+              onClick={() => isThisPlayingAudio ? onStopAudio() : onPlayAudio(msg.audioUrl, msgIdx)}
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-800/60 hover:bg-gray-700/60 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {isThisPlayingAudio ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+              )}
+            </button>
+          )}
+        </div>
+        {isLastChar && latestResponseAudios.length >= 2 && (
+          <button
+            onClick={() => isPlayingAll ? onStopAll() : onPlayAll(latestResponseAudios)}
+            className={`mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${isPlayingAll ? 'bg-red-600/20 hover:bg-red-600/30 border-red-600/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 border-emerald-600/40'}`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {isPlayingAll ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#f87171"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            )}
+            <span className={`text-[10px] font-medium ${isPlayingAll ? 'text-red-400' : 'text-emerald-400'}`}>{isPlayingAll ? t('chat.playAllStop', { defaultValue: '중지' }) : t('chat.playAll', { defaultValue: '전체 재생' })}</span>
+          </button>
+        )}
+        {showTime && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatChatTime(msg.createdAt)}</p>}
+        {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{t('chat.affinityUp', { name: characterName })}</p>}
+      </div>
+    </div>
+  )
+})
 
 export default function Chat() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
+  // 렌더 페이지네이션 — 처음엔 최근 PAGE_SIZE개만 DOM에 그려서 입력 lag 차단
+  const PAGE_SIZE = 50
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const scrollContainerRef = useRef(null)
+  const topSentinelRef = useRef(null)
   const [input, setInput] = useState('')
+  const textareaRef = useRef(null)
   const [sending, setSending] = useState(false)
   const [showTyping, setShowTyping] = useState(false)
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
@@ -112,6 +390,34 @@ export default function Chat() {
       isPlayingQueueRef.current = false
     }
   }, [])
+
+  // 렌더 페이지네이션 — 최근 visibleCount개만 DOM에 그림
+  const visibleStart = Math.max(0, messages.length - visibleCount)
+  const visibleMessages = useMemo(() => messages.slice(visibleStart), [messages, visibleStart])
+
+  // 위로 스크롤 시 더 로드 (스크롤 위치 보존)
+  const loadMore = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const prevHeight = container.scrollHeight
+    const prevTop = container.scrollTop
+    setVisibleCount((c) => Math.min(messages.length, c + PAGE_SIZE))
+    requestAnimationFrame(() => {
+      const newHeight = container.scrollHeight
+      container.scrollTop = newHeight - prevHeight + prevTop
+    })
+  }, [messages.length])
+
+  useEffect(() => {
+    if (visibleStart === 0) return
+    const sentinel = topSentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMore()
+    }, { threshold: 0, root: scrollContainerRef.current, rootMargin: '200px 0px 0px 0px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleStart, loadMore])
 
   // 최근 응답의 마지막 CHARACTER 인덱스 + 해당 응답의 audioUrl 목록
   const { lastCharIdx, latestResponseAudios } = useMemo(() => {
@@ -213,7 +519,7 @@ export default function Chat() {
     }
   }, [])
 
-  const playFromQueue = () => {
+  const playFromQueue = useCallback(() => {
     if (isPlayingQueueRef.current) return
     if (audioQueueRef.current.length === 0) {
       setIsPlayingAll(false)
@@ -235,23 +541,23 @@ export default function Chat() {
     audio.onended = onDone
     audio.onerror = onDone
     audio.play().catch(onDone)
-  }
+  }, [])
 
-  const stopAllPlayback = () => {
+  const stopAllPlayback = useCallback(() => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
     if (playbackTimeoutRef.current) { clearTimeout(playbackTimeoutRef.current); playbackTimeoutRef.current = null }
     audioQueueRef.current = []
     isPlayingQueueRef.current = false
     setIsPlayingAll(false)
-  }
+  }, [])
 
-  const playAllLatestAudios = (urls) => {
+  const playAllLatestAudios = useCallback((urls) => {
     stopAllPlayback()
     setPlayingAudioIdx(null)
     audioQueueRef.current = [...urls]
     setIsPlayingAll(true)
     playFromQueue()
-  }
+  }, [stopAllPlayback, playFromQueue])
 
   const send = async () => {
     if (!input.trim() || sending) return
@@ -275,36 +581,33 @@ export default function Chat() {
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
-          case 'narration': {
-            setMessages((prev) => {
-              const withoutTemp = prev.some((m) => m.id === tempUserMsg.id)
-                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
-                : prev
-              return [...withoutTemp, { role: 'NARRATION', content: data.content, streaming: true }]
-            })
-            break
-          }
+          case 'narration':
           case 'message': {
-            setShowTyping(false)
+            // 순차 애니메이션을 위해 streaming 버블은 더 이상 추가하지 않음.
+            // tempUserMsg → confirmedUserMsg 교체만 처리하고, typing 표시는 'done'까지 유지.
             setMessages((prev) => {
-              const withoutTemp = prev.some((m) => m.id === tempUserMsg.id)
-                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
-                : prev
-              return [...withoutTemp, { role: 'CHARACTER', content: data.content, streaming: true }]
+              if (!prev.some((m) => m.id === tempUserMsg.id)) return prev
+              return [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
             })
-            // 다음 메시지를 위해 다시 typing 표시
-            setTimeout(() => setShowTyping(true), 0)
             break
           }
           case 'audio': {
-            // 서버에서 TTS 생성 완료 시 즉시 큐에 추가하여 순차 재생
+            // 서버 TTS 도착 — 큐에만 적재. 실제 재생은 'done'에서 첫 버블 등장과 함께 시작.
             audioQueueRef.current.push(data.audioUrl)
-            playFromQueue()
             break
           }
           case 'done': {
             const { responseMessages } = data
-            const charMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
+            const rawCharMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
+            // 순차 등장: 각 버블에 누적 delay 부여 (이전 버블의 타이핑 시간 + 짧은 호흡)
+            const PAUSE_BETWEEN_MS = 250
+            let cumulativeMs = 0
+            const charMsgs = rawCharMsgs.map((m) => {
+              const delay = cumulativeMs
+              const typingMs = getTotalTypingSteps(m.content || '') * TYPING_SPEED_MS
+              cumulativeMs += typingMs + PAUSE_BETWEEN_MS
+              return { ...m, _animate: true, _animateDelay: delay }
+            })
             // 호감도가 오른 경우 마지막 캐릭터 메시지에 표시
             const lastChar = [...charMsgs].reverse().find((m) => m.role === 'CHARACTER')
             if (data.affinityChange > 0 && lastChar) {
@@ -312,9 +615,8 @@ export default function Chat() {
               charMsgs[lastIdx] = { ...charMsgs[lastIdx], affinityUp: true }
             }
             setMessages((prev) => {
-              // streaming 버블과 tempUserMsg 제거, confirmedUserMsg는 유지
-              const cleaned = prev.filter((m) => !m.streaming && m.id !== tempUserMsg.id)
-              // confirmedUserMsg가 아직 없으면 추가
+              // tempUserMsg 제거, confirmedUserMsg는 유지 (streaming 필터는 더 이상 의미 없음)
+              const cleaned = prev.filter((m) => m.id !== tempUserMsg.id)
               const hasUser = cleaned.some((m) => m === confirmedUserMsg || (m.role === 'USER' && m.content === text && m.createdAt === confirmedUserMsg.createdAt))
               return [
                 ...cleaned,
@@ -327,6 +629,8 @@ export default function Chat() {
             if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
             setShowTyping(false)
             setSending(false)
+            // 첫 버블이 등장할 때 큐에 쌓인 오디오 재생 시작 (TTS-bubble 동기)
+            if (audioQueueRef.current.length > 0) playFromQueue()
             window.gtag?.('event', 'chat_message', { conversation_id: id })
             // 보이스 사용 시 무료 횟수 갱신
             if (voiceMode && character?.voiceId && canUseVoice) {
@@ -505,7 +809,7 @@ export default function Chat() {
     }
   }
 
-  const playAudio = (url, idx) => {
+  const playAudio = useCallback((url, idx) => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
@@ -516,15 +820,49 @@ export default function Chat() {
     audio.onended = () => { setPlayingAudioIdx(null); audioRef.current = null }
     audio.onerror = () => { setPlayingAudioIdx(null); audioRef.current = null }
     audio.play().catch(() => { setPlayingAudioIdx(null); audioRef.current = null })
-  }
+  }, [])
 
-  const stopAudio = () => {
+  const stopAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
     }
     setPlayingAudioIdx(null)
-  }
+  }, [])
+
+  // setBackgroundImage 호출하는 안정화된 핸들러 (MessageBubble용)
+  const handleSetBackground = useCallback((imageUrl) => {
+    api.put(`/conversations/${id}/background`, { backgroundImage: imageUrl })
+      .then(() => setBackgroundImage(imageUrl))
+      .catch(() => {})
+  }, [id])
+
+  // 순차 등장 시 새 버블이 보이게 자동 스크롤
+  const handleBubbleAppear = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  // 입력창 커서 위치에 () 삽입. 선택 영역이 있으면 그 영역을 (괄호로) 감쌈.
+  const handleInsertParens = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart ?? input.length
+    const end = textarea.selectionEnd ?? start
+    const before = input.slice(0, start)
+    const middle = input.slice(start, end)
+    const after = input.slice(end)
+    const newValue = `${before}(${middle})${after}`
+    if (newValue.length > 300) return
+    setInput(newValue)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      // 선택 영역이 있으면 닫는 괄호 다음, 없으면 괄호 안쪽에 커서 위치
+      const cursorPos = end === start ? start + 1 : end + 1
+      textarea.setSelectionRange(cursorPos, cursorPos)
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+    })
+  }, [input])
 
   // 채팅 투어 (early return 위에 hook 호출 — Rules of Hooks)
   const tourActive = !!user && !user.onboardingState?.chatTour
@@ -593,7 +931,6 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
-        <span className="text-[11px] text-gray-500 font-mono" data-onboarding-target="affinity">❤️ {conversation.affinity ?? 0}</span>
         <button
           onClick={() => setShowReport(true)}
           className="text-gray-500 hover:text-red-400 transition-colors ml-1"
@@ -625,10 +962,12 @@ export default function Chat() {
             <div className="bg-gray-900/95 backdrop-blur-md border-b border-gray-700/50 rounded-b-2xl px-4 pt-3 pb-4 shadow-xl animate-slide-down" onClick={(e) => e.stopPropagation()}>
               {(() => {
                 const status = characterStatus || getDefaultStatus(character.activeHours)
+                const affinity = conversation.affinity ?? 0
+                const affinityLabel = t(`chat.${getAffinityLabelKey(affinity)}`)
                 return (
                   <div className="flex items-start gap-3">
                     <span className="text-3xl leading-none">{status.emoji}</span>
-                    <div className="flex-1 min-w-0 grid grid-cols-3 gap-2">
+                    <div className="flex-1 min-w-0 grid grid-cols-3 gap-x-2 gap-y-2">
                       <div>
                         <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusMood')}</p>
                         <p className="text-xs text-gray-200 truncate">{status.mood}</p>
@@ -640,6 +979,14 @@ export default function Chat() {
                       <div>
                         <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusActivity')}</p>
                         <p className="text-xs text-gray-200 truncate">{status.activity}</p>
+                      </div>
+                      <div data-onboarding-target="affinity">
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusAffinity')}</p>
+                        <p className="text-xs text-pink-300 truncate">❤️ {affinity} <span className="text-gray-400">· {affinityLabel}</span></p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusOutfit')}</p>
+                        <p className="text-xs text-gray-200 truncate">{status.outfit || '-'}</p>
                       </div>
                     </div>
                   </div>
@@ -654,80 +1001,34 @@ export default function Chat() {
           </div>
         )}
 
-      <div className="h-full overflow-auto px-4 py-3 space-y-2" style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-        {/* <div className="py-1"><AdBanner slot="8921302150" /></div> */}
-        {profileUrl && (
-          <div className="flex justify-start mt-3">
-            <div className="w-7 flex-shrink-0 mr-2">
-              <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => setLightboxUrl(profileUrl)}>
-                <img src={profileUrl} alt="" className="w-full h-full object-cover" />
+      <div ref={scrollContainerRef} className="h-full overflow-auto px-4 py-3 space-y-2" style={backgroundImage ? { backgroundImage: `url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+        {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
+        {visibleStart === 0 ? (
+          profileUrl && (
+            <div className="flex justify-start mt-3">
+              <div className="w-7 flex-shrink-0 mr-2">
+                <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => setLightboxUrl(profileUrl)}>
+                  <img src={profileUrl} alt="" className="w-full h-full object-cover" />
+                </div>
+              </div>
+              <div className="max-w-[75%]">
+                <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
+                <div
+                  className="rounded-2xl rounded-tl-none overflow-hidden bg-gray-800/80 cursor-pointer"
+                  onClick={() => setLightboxUrl(profileUrl)}
+                >
+                  <img src={profileUrl} alt="" className="w-48 h-48 object-cover" />
+                </div>
               </div>
             </div>
-            <div className="max-w-[75%]">
-              <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>
-              <div
-                className="rounded-2xl rounded-tl-none overflow-hidden bg-gray-800/80 cursor-pointer"
-                onClick={() => setLightboxUrl(profileUrl)}
-              >
-                <img src={profileUrl} alt="" className="w-48 h-48 object-cover" />
-              </div>
-            </div>
+          )
+        ) : (
+          <div ref={topSentinelRef} className="flex justify-center py-2">
+            <div className="text-[11px] text-gray-500">{t('chat.loadingMore', { defaultValue: '이전 대화 불러오는 중...' })}</div>
           </div>
         )}
-        {messages.map((msg, idx) => {
-          if (msg.role === 'NARRATION') {
-            return (
-              <div key={msg.id || idx} className="flex justify-center my-4">
-                <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
-                  <p className="text-xs text-gray-400 text-center italic leading-relaxed">{msg.content}</p>
-                </div>
-              </div>
-            )
-          }
-          if (msg.role === 'GENERATED_IMAGE') {
-            if (msg.status === 'PENDING' || msg.status === 'RETRYING' || !msg.content) {
-              return (
-                <div key={msg.id || idx} className="flex justify-center mt-3">
-                  <div className="max-w-[75%] rounded-2xl overflow-hidden bg-gray-800/60 flex flex-col items-center justify-center py-10 px-6">
-                    <div className="animate-spin w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full mb-3" />
-                    <span className="text-[13px] text-gray-400">{msg.status === 'RETRYING' ? t('chat.retryingImage') : t('chat.generatingImage')}</span>
-                  </div>
-                </div>
-              )
-            }
-            return (
-              <div key={msg.id || idx} className="flex justify-center mt-3">
-                <div className="max-w-[75%] rounded-2xl overflow-hidden relative" onClick={() => setLightboxUrl(msg.content)}>
-                  <img src={msg.content} alt="" className="w-full object-cover cursor-pointer" loading="lazy" />
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      <line x1="11" y1="8" x2="11" y2="14" />
-                      <line x1="8" y1="11" x2="14" y2="11" />
-                    </svg>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      api.put(`/conversations/${id}/background`, { backgroundImage: msg.content })
-                        .then(() => setBackgroundImage(msg.content))
-                        .catch(() => {})
-                    }}
-                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg bg-black/60 text-white/80 hover:text-white text-[11px]"
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                    {t('gallery.changeBg')}
-                  </button>
-                </div>
-              </div>
-            )
-          }
+        {visibleMessages.map((msg, i) => {
+          const idx = visibleStart + i
           const prevMsg = messages[idx - 1]
           const nextMsg = messages[idx + 1]
           const isConsecutive = prevMsg?.role === msg.role
@@ -736,66 +1037,27 @@ export default function Chat() {
             formatChatTime(msg.createdAt) !== formatChatTime(nextMsg.createdAt)
           )
           return (
-            <div key={msg.id || idx} className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'} ${isConsecutive ? '' : 'mt-3'}`}>
-              {msg.role === 'CHARACTER' && (
-                <div className="w-7 flex-shrink-0 mr-2">
-                  {!isConsecutive ? (
-                    <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => profileUrl && setLightboxUrl(profileUrl)}>
-                      {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-              <div className="max-w-[75%]">
-                {msg.role === 'CHARACTER' && !isConsecutive && <p className="text-xs text-gray-400 mb-1 font-medium">{character.name}</p>}
-                {msg.feedImage && (
-                  <div className="mb-1.5 rounded-2xl rounded-tr-none overflow-hidden">
-                    <img
-                      src={msg.feedImage}
-                      alt=""
-                      className="w-full aspect-square object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-                <div className="flex items-end gap-1.5">
-                  <div className={`text-sm leading-relaxed px-3.5 py-2.5 ${msg.role === 'USER' ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-none'}`}>
-                    {msg.content}
-                  </div>
-                  {msg.role === 'CHARACTER' && msg.audioUrl && (
-                    <button
-                      onClick={() => playingAudioIdx === idx ? stopAudio() : playAudio(msg.audioUrl, idx)}
-                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-800/60 hover:bg-gray-700/60 transition-colors"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      {playingAudioIdx === idx ? (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-                      ) : (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
-                      )}
-                    </button>
-                  )}
-                </div>
-                {idx === lastCharIdx && latestResponseAudios.length >= 2 && (
-                  <button
-                    onClick={() => isPlayingAll ? stopAllPlayback() : playAllLatestAudios(latestResponseAudios)}
-                    className={`mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${isPlayingAll ? 'bg-red-600/20 hover:bg-red-600/30 border-red-600/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 border-emerald-600/40'}`}
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    {isPlayingAll ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="#f87171"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
-                    ) : (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                    )}
-                    <span className={`text-[10px] font-medium ${isPlayingAll ? 'text-red-400' : 'text-emerald-400'}`}>{isPlayingAll ? t('chat.playAllStop', { defaultValue: '중지' }) : t('chat.playAll', { defaultValue: '전체 재생' })}</span>
-                  </button>
-                )}
-                {showTime && <p className={`text-[10px] text-gray-600 mt-1 px-1 ${msg.role === 'USER' ? 'text-right' : ''}`}>{formatChatTime(msg.createdAt)}</p>}
-                {msg.affinityUp && <p className="text-[11px] text-pink-400 mt-1 px-1">{t('chat.affinityUp', { name: character.name })}</p>}
-              </div>
-            </div>
+            <MessageBubble
+              key={msg.id || idx}
+              msg={msg}
+              msgIdx={idx}
+              isConsecutive={isConsecutive}
+              showTime={showTime}
+              profileUrl={profileUrl}
+              characterName={character.name}
+              isLastChar={idx === lastCharIdx}
+              latestResponseAudios={latestResponseAudios}
+              isPlayingAll={isPlayingAll}
+              isThisPlayingAudio={playingAudioIdx === idx}
+              onLightbox={setLightboxUrl}
+              onPlayAudio={playAudio}
+              onStopAudio={stopAudio}
+              onSetBackground={handleSetBackground}
+              onPlayAll={playAllLatestAudios}
+              onStopAll={stopAllPlayback}
+              onAppear={handleBubbleAppear}
+              t={t}
+            />
           )
         })}
         {showTyping && (
@@ -935,7 +1197,16 @@ export default function Chat() {
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <textarea value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+          <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+          <button
+            onClick={handleInsertParens}
+            type="button"
+            title={t('chat.insertActionParens', { defaultValue: '행동 묘사 ( ) 추가' })}
+            className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-[15px] font-mono leading-none">( )</span>
+          </button>
           {suggestedReplies.length > 0 && (
             <button onClick={() => setShowSuggestions((prev) => !prev)} className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${showSuggestions ? 'bg-indigo-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'}`} style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="9" y1="10" x2="15" y2="10" /></svg>
