@@ -18,6 +18,43 @@ function getImageUrl(filePath) {
   return null
 }
 
+// 한글 음절(가-힣)을 자모 단계로 분해. 예: '상' → ['ㅅ', '사', '상'], '가' → ['ㄱ', '가'] (받침 없음)
+const HANGUL_INITIALS = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+const HANGUL_SYL_BASE = 0xAC00
+const HANGUL_SYL_END = 0xD7A3
+function decomposeJamoStages(ch) {
+  const code = ch.charCodeAt(0)
+  if (code < HANGUL_SYL_BASE || code > HANGUL_SYL_END) return [ch]
+  const offset = code - HANGUL_SYL_BASE
+  const initial = Math.floor(offset / (21 * 28))
+  const vowel = Math.floor((offset % (21 * 28)) / 28)
+  const finalConsonant = offset % 28
+  const stages = [HANGUL_INITIALS[initial]]
+  // 초성 + 중성 (받침 없는 음절)
+  stages.push(String.fromCharCode(HANGUL_SYL_BASE + initial * 21 * 28 + vowel * 28))
+  // 받침까지 (있을 때만 한 단계 더)
+  if (finalConsonant > 0) stages.push(ch)
+  return stages
+}
+function getTypingStateAt(text, step) {
+  let count = 0
+  let prefix = ''
+  for (const ch of text) {
+    const stages = decomposeJamoStages(ch)
+    for (const stage of stages) {
+      if (count === step) return prefix + stage
+      count++
+    }
+    prefix += ch
+  }
+  return text
+}
+function getTotalTypingSteps(text) {
+  let total = 0
+  for (const ch of text) total += decomposeJamoStages(ch).length
+  return total
+}
+
 // 캐릭터: 《...》 = 행동 묘사. 유저: (...) = 행동 묘사. 같은 버블 안에서 흐릿한 색으로 표시.
 function parseMessageSegments(content, role) {
   if (!content || typeof content !== 'string') return [{ type: 'text', value: content || '' }]
@@ -69,6 +106,39 @@ function getAffinityLabelKey(affinity) {
   return 'affinityDeep'
 }
 
+// 자모 단위 타이프라이터 애니메이션 훅. shouldAnimate가 true로 전환된 시점에 활성화 → 끝까지 재생.
+// shouldAnimate가 처음에 false였다가 나중에 true가 되어도 정상 발동 (딜레이 큐 시나리오 지원).
+const TYPING_SPEED_MS = 18
+function useJamoTypewriter(fullText, shouldAnimate) {
+  const [active, setActive] = useState(shouldAnimate === true)
+  const [step, setStep] = useState(0)
+
+  // shouldAnimate가 true가 되는 순간 활성화 (한 번만, one-way)
+  useEffect(() => {
+    if (shouldAnimate && !active) {
+      setActive(true)
+      setStep(0)
+    }
+  }, [shouldAnimate, active])
+
+  const totalSteps = useMemo(
+    () => (active ? getTotalTypingSteps(fullText || '') : 0),
+    [fullText, active],
+  )
+
+  useEffect(() => {
+    if (!active) return
+    if (step >= totalSteps) return
+    const t = setTimeout(() => setStep((s) => s + 1), TYPING_SPEED_MS)
+    return () => clearTimeout(t)
+  }, [active, step, totalSteps])
+
+  // shouldAnimate=true이지만 아직 active 전환 전 (한 프레임) → 빈 문자열로 깜빡임 방지
+  if (shouldAnimate && !active) return ''
+  if (active && step < totalSteps) return getTypingStateAt(fullText || '', step)
+  return fullText || ''
+}
+
 // 메시지 한 개를 렌더링하는 메모이즈된 컴포넌트.
 // 부모(Chat) 리렌더에 의한 입력 lag를 차단하기 위해 React.memo로 감싸 불필요한 재렌더를 막는다.
 const MessageBubble = memo(function MessageBubble({
@@ -88,19 +158,50 @@ const MessageBubble = memo(function MessageBubble({
   onSetBackground,
   onPlayAll,
   onStopAll,
+  onAppear,
   t,
 }) {
+  // 순차 애니메이션: _animateDelay가 지나야 visible. 그 전엔 null 렌더링으로 자리도 차지 안 함.
+  const wantAnimate =
+    (msg.role === 'CHARACTER' || msg.role === 'NARRATION') &&
+    (msg.streaming === true || msg._animate === true)
+  const delayMs = wantAnimate ? Math.max(0, msg._animateDelay || 0) : 0
+  const [delayElapsed, setDelayElapsed] = useState(delayMs === 0)
+
+  useEffect(() => {
+    if (delayElapsed) return
+    if (delayMs <= 0) {
+      setDelayElapsed(true)
+      return
+    }
+    const t = setTimeout(() => setDelayElapsed(true), delayMs)
+    return () => clearTimeout(t)
+  }, [delayMs, delayElapsed])
+
+  // 등장 시점에 부모에게 알림 (스크롤 따라가기용)
+  useEffect(() => {
+    if (delayElapsed && wantAnimate && onAppear) onAppear()
+  }, [delayElapsed, wantAnimate, onAppear])
+
   // hooks는 early return 전에 호출되어야 함 (Rules of Hooks)
+  // delayElapsed 후에만 shouldAnimate=true → 자모 타이프라이터 활성화
+  const animatedContent = useJamoTypewriter(
+    msg.content || '',
+    delayElapsed && wantAnimate,
+  )
   const segments = useMemo(() => {
     if (msg.role !== 'CHARACTER' && msg.role !== 'USER') return null
-    return parseMessageSegments(msg.content, msg.role)
-  }, [msg.content, msg.role])
+    return parseMessageSegments(animatedContent, msg.role)
+  }, [animatedContent, msg.role])
+
+  // 딜레이가 끝나기 전엔 DOM에서 빠져 있어야 순차 등장 효과가 자연스러움
+  if (wantAnimate && !delayElapsed) return null
 
   if (msg.role === 'NARRATION') {
     return (
       <div className="flex justify-center my-4">
         <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
-          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{msg.content}</p>
+          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{animatedContent}</p>
         </div>
       </div>
     )
@@ -227,6 +328,7 @@ export default function Chat() {
   const scrollContainerRef = useRef(null)
   const topSentinelRef = useRef(null)
   const [input, setInput] = useState('')
+  const textareaRef = useRef(null)
   const [sending, setSending] = useState(false)
   const [showTyping, setShowTyping] = useState(false)
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
@@ -479,36 +581,33 @@ export default function Chat() {
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
-          case 'narration': {
-            setMessages((prev) => {
-              const withoutTemp = prev.some((m) => m.id === tempUserMsg.id)
-                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
-                : prev
-              return [...withoutTemp, { role: 'NARRATION', content: data.content, streaming: true }]
-            })
-            break
-          }
+          case 'narration':
           case 'message': {
-            setShowTyping(false)
+            // 순차 애니메이션을 위해 streaming 버블은 더 이상 추가하지 않음.
+            // tempUserMsg → confirmedUserMsg 교체만 처리하고, typing 표시는 'done'까지 유지.
             setMessages((prev) => {
-              const withoutTemp = prev.some((m) => m.id === tempUserMsg.id)
-                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
-                : prev
-              return [...withoutTemp, { role: 'CHARACTER', content: data.content, streaming: true }]
+              if (!prev.some((m) => m.id === tempUserMsg.id)) return prev
+              return [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
             })
-            // 다음 메시지를 위해 다시 typing 표시
-            setTimeout(() => setShowTyping(true), 0)
             break
           }
           case 'audio': {
-            // 서버에서 TTS 생성 완료 시 즉시 큐에 추가하여 순차 재생
+            // 서버 TTS 도착 — 큐에만 적재. 실제 재생은 'done'에서 첫 버블 등장과 함께 시작.
             audioQueueRef.current.push(data.audioUrl)
-            playFromQueue()
             break
           }
           case 'done': {
             const { responseMessages } = data
-            const charMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
+            const rawCharMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
+            // 순차 등장: 각 버블에 누적 delay 부여 (이전 버블의 타이핑 시간 + 짧은 호흡)
+            const PAUSE_BETWEEN_MS = 250
+            let cumulativeMs = 0
+            const charMsgs = rawCharMsgs.map((m) => {
+              const delay = cumulativeMs
+              const typingMs = getTotalTypingSteps(m.content || '') * TYPING_SPEED_MS
+              cumulativeMs += typingMs + PAUSE_BETWEEN_MS
+              return { ...m, _animate: true, _animateDelay: delay }
+            })
             // 호감도가 오른 경우 마지막 캐릭터 메시지에 표시
             const lastChar = [...charMsgs].reverse().find((m) => m.role === 'CHARACTER')
             if (data.affinityChange > 0 && lastChar) {
@@ -516,9 +615,8 @@ export default function Chat() {
               charMsgs[lastIdx] = { ...charMsgs[lastIdx], affinityUp: true }
             }
             setMessages((prev) => {
-              // streaming 버블과 tempUserMsg 제거, confirmedUserMsg는 유지
-              const cleaned = prev.filter((m) => !m.streaming && m.id !== tempUserMsg.id)
-              // confirmedUserMsg가 아직 없으면 추가
+              // tempUserMsg 제거, confirmedUserMsg는 유지 (streaming 필터는 더 이상 의미 없음)
+              const cleaned = prev.filter((m) => m.id !== tempUserMsg.id)
               const hasUser = cleaned.some((m) => m === confirmedUserMsg || (m.role === 'USER' && m.content === text && m.createdAt === confirmedUserMsg.createdAt))
               return [
                 ...cleaned,
@@ -531,6 +629,8 @@ export default function Chat() {
             if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
             setShowTyping(false)
             setSending(false)
+            // 첫 버블이 등장할 때 큐에 쌓인 오디오 재생 시작 (TTS-bubble 동기)
+            if (audioQueueRef.current.length > 0) playFromQueue()
             window.gtag?.('event', 'chat_message', { conversation_id: id })
             // 보이스 사용 시 무료 횟수 갱신
             if (voiceMode && character?.voiceId && canUseVoice) {
@@ -737,6 +837,33 @@ export default function Chat() {
       .catch(() => {})
   }, [id])
 
+  // 순차 등장 시 새 버블이 보이게 자동 스크롤
+  const handleBubbleAppear = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  // 입력창 커서 위치에 () 삽입. 선택 영역이 있으면 그 영역을 (괄호로) 감쌈.
+  const handleInsertParens = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart ?? input.length
+    const end = textarea.selectionEnd ?? start
+    const before = input.slice(0, start)
+    const middle = input.slice(start, end)
+    const after = input.slice(end)
+    const newValue = `${before}(${middle})${after}`
+    if (newValue.length > 300) return
+    setInput(newValue)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      // 선택 영역이 있으면 닫는 괄호 다음, 없으면 괄호 안쪽에 커서 위치
+      const cursorPos = end === start ? start + 1 : end + 1
+      textarea.setSelectionRange(cursorPos, cursorPos)
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+    })
+  }, [input])
+
   // 채팅 투어 (early return 위에 hook 호출 — Rules of Hooks)
   const tourActive = !!user && !user.onboardingState?.chatTour
   const tourSteps = useMemo(() => [
@@ -928,6 +1055,7 @@ export default function Chat() {
               onSetBackground={handleSetBackground}
               onPlayAll={playAllLatestAudios}
               onStopAll={stopAllPlayback}
+              onAppear={handleBubbleAppear}
               t={t}
             />
           )
@@ -1069,7 +1197,16 @@ export default function Chat() {
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <textarea value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+          <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+          <button
+            onClick={handleInsertParens}
+            type="button"
+            title={t('chat.insertActionParens', { defaultValue: '행동 묘사 ( ) 추가' })}
+            className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-[15px] font-mono leading-none">( )</span>
+          </button>
           {suggestedReplies.length > 0 && (
             <button onClick={() => setShowSuggestions((prev) => !prev)} className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${showSuggestions ? 'bg-indigo-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'}`} style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="9" y1="10" x2="15" y2="10" /></svg>

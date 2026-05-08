@@ -73,6 +73,7 @@
     "affinityIntimate": "とても親密",
     "affinityDeep": "深い愛情",
     "loadingMore": "以前の会話を読み込み中...",
+    "insertActionParens": "行動描写 ( ) を追加",
     "pushTitle": "{{name}}の返信を見逃さないで",
     "pushDesc": "通知をオンにすると新しいメッセージをすぐ確認できます",
     "pushLater": "後で",

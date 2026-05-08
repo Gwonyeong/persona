@@ -73,6 +73,7 @@
     "affinityIntimate": "Very close",
     "affinityDeep": "Deep affection",
     "loadingMore": "Loading older messages...",
+    "insertActionParens": "Insert action parens ( )",
     "pushTitle": "Don't miss {{name}}'s replies",
     "pushDesc": "Turn on notifications to see new messages instantly",
     "pushLater": "Later",
