@@ -85,10 +85,7 @@
     "errorTTS": "音声生成に失敗しました",
     "ttsPlay": "再生",
     "ttsStop": "停止",
-    "generatingTTS": "音声を生成中...",
-    "voicePremiumTitle": "プレミアム機能",
-    "voicePremiumDesc": "音声モードはライトプラン以上でご利用いただけます。",
-    "voicePremiumCta": "プランを見る"
+    "generatingTTS": "音声を生成中..."
   },
   "myPage": {
     "title": "マイページ - Pesona",
@@ -123,6 +120,9 @@
     "dailyFeedLike": "フィードいいね3回",
     "dailyFeedLikeDesc": "フィード投稿にいいねしてください",
     "dailyFeedLikeProgress": "{{count}}/3",
+    "dailyChat": "キャラと5回チャット",
+    "dailyChatDesc": "今日キャラと5回会話してみよう",
+    "dailyChatProgress": "{{count}}/5",
     "tabDaily": "デイリー",
     "tabMission": "ミッション",
     "missionFeedback": "初フィードバック作成",
