@@ -20,6 +20,7 @@ import StorylinesOverview from './pages/admin/StorylinesOverview'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
+import AdminBroadcasts from './pages/admin/Broadcasts'
 import FinanceSubscriptions from './pages/admin/FinanceSubscriptions'
 import FinanceMaskPurchases from './pages/admin/FinanceMaskPurchases'
 import FinanceMaskStats from './pages/admin/FinanceMaskStats'
@@ -164,6 +165,7 @@ function App() {
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="banners" element={<AdminBanners />} />
+        <Route path="broadcasts" element={<AdminBroadcasts />} />
         <Route path="finance/subscriptions" element={<FinanceSubscriptions />} />
         <Route path="finance/mask-purchases" element={<FinanceMaskPurchases />} />
         <Route path="finance/mask-stats" element={<FinanceMaskStats />} />
