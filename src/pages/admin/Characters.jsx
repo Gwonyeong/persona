@@ -57,12 +57,29 @@ function TagSelector({ tags, onChange }) {
   )
 }
 
+const V2_PLACEHOLDER = `{
+  "blocks": [
+    { "type": "narration", "text": "비 내리는 오후, 카페 창가에 앉은 그녀는..." },
+    { "type": "image", "url": "https://..." },
+    { "type": "message", "text": "어, 왔구나? 《살짝 미소》", "emotion": "HAPPY", "audioUrl": "" }
+  ]
+}`
+
+const V2_LANGS = [
+  { key: 'ko', label: '한국어 (기본)' },
+  { key: 'en', label: 'English' },
+  { key: 'ja', label: '日本語' },
+]
+
 const EMPTY_FORM = {
   name: '',
   description: '',
   concept: '',
   personality: '',
   firstMessage: '',
+  firstMessageV2Text: { ko: '', en: '', ja: '' },
+  firstMessageV2Draft: false,
+  translations: null,  // 서버 원본 보존 (V2 외 필드 유지용)
   tags: [],
   customTags: '',
   initialAffinity: 0,
@@ -83,6 +100,9 @@ export default function Characters() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [tab, setTab] = useState('public') // 'public' | 'private'
+  const [v2Lang, setV2Lang] = useState('ko')
+  const [v2Busy, setV2Busy] = useState({ image: false, voice: false, translate: false, generate: false })
+  const [v2DragOverIdx, setV2DragOverIdx] = useState(null)
   const [nationality, setNationality] = useState('all') // 'all' | 'kr' | 'jp' | 'us'
   const [sortBy, setSortBy] = useState('conversations') // 'name' | 'conversations' | 'nationality'
   const navigate = useNavigate()
@@ -137,17 +157,32 @@ export default function Characters() {
   useEffect(() => { load() }, [])
 
   const openNew = () => {
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, firstMessageV2Text: { ko: '', en: '', ja: '' } })
+    setV2Lang('ko')
+    setV2Busy({ image: false, voice: false, translate: false, generate: false })
     setEditing('new')
   }
 
   const openEdit = (c) => {
+    const v2Text = { ko: '', en: '', ja: '' }
+    if (c.firstMessageV2) {
+      try { v2Text.ko = JSON.stringify(c.firstMessageV2, null, 2) } catch { /* keep '' */ }
+    }
+    if (c.translations?.en?.firstMessageV2) {
+      try { v2Text.en = JSON.stringify(c.translations.en.firstMessageV2, null, 2) } catch { /* keep '' */ }
+    }
+    if (c.translations?.ja?.firstMessageV2) {
+      try { v2Text.ja = JSON.stringify(c.translations.ja.firstMessageV2, null, 2) } catch { /* keep '' */ }
+    }
     setForm({
       name: c.name,
       description: c.description,
       concept: c.concept || '',
       personality: c.personality,
       firstMessage: c.firstMessage,
+      firstMessageV2Text: v2Text,
+      firstMessageV2Draft: !!c.firstMessageV2Draft,
+      translations: c.translations || null,
       tags: c.tags.filter((t) => t.includes(':')),
       customTags: c.tags.filter((t) => !t.includes(':')).join(', '),
       initialAffinity: c.initialAffinity || 0,
@@ -161,27 +196,67 @@ export default function Characters() {
       proactiveProbability: Math.round((c.proactiveProbability || 0.5) * 100),
       proactiveMaxCount: c.proactiveMaxCount || 3,
     })
+    setV2Lang('ko')
+    setV2Busy({ image: false, voice: false, translate: false, generate: false })
     setEditing(c)
   }
 
-  const save = async () => {
+  // asDraft=true면 V2를 임시 저장(채팅에서 V1 폴백). 명시 안 하면 form.firstMessageV2Draft 유지.
+  const save = async ({ asDraft } = {}) => {
+    // V2 JSON 파싱 (빈 문자열은 null 처리)
+    let firstMessageV2 = null
+    const parsedByLang = { ko: null, en: null, ja: null }
+    for (const lang of ['ko', 'en', 'ja']) {
+      const raw = (form.firstMessageV2Text?.[lang] || '').trim()
+      if (!raw) continue
+      try {
+        parsedByLang[lang] = JSON.parse(raw)
+      } catch (e) {
+        alert(`${lang.toUpperCase()} JSON 파싱 실패: ${e.message}`)
+        return
+      }
+    }
+    firstMessageV2 = parsedByLang.ko
+
+    // translations 병합: 기존 값 유지 + V2 lang 갱신
+    const existingTr = form.translations && typeof form.translations === 'object' ? form.translations : {}
+    const nextTranslations = { ...existingTr }
+    for (const lang of ['en', 'ja']) {
+      const v2 = parsedByLang[lang]
+      const langTr = { ...(existingTr[lang] || {}) }
+      if (v2) langTr.firstMessageV2 = v2
+      else delete langTr.firstMessageV2
+      if (Object.keys(langTr).length > 0) nextTranslations[lang] = langTr
+      else delete nextTranslations[lang]
+    }
+
+    const { firstMessageV2Text, translations: _trUnused, firstMessageV2Draft: _draftUnused, ...rest } = form
+    const draftFlag = asDraft === undefined ? !!form.firstMessageV2Draft : !!asDraft
     const data = {
-      ...form,
+      ...rest,
+      firstMessageV2,
+      firstMessageV2Draft: draftFlag,
+      translations: Object.keys(nextTranslations).length > 0 ? nextTranslations : null,
       tags: [
         ...form.tags,
         ...form.customTags.split(',').map((t) => t.trim()).filter(Boolean),
       ],
-      proactiveMinInterval: form.proactiveMinInterval * 60,  // 분 → 초
-      proactiveMaxInterval: form.proactiveMaxInterval * 60,  // 분 → 초
-      proactiveProbability: form.proactiveProbability / 100, // % → 0~1
+      proactiveMinInterval: form.proactiveMinInterval * 60,
+      proactiveMaxInterval: form.proactiveMaxInterval * 60,
+      proactiveProbability: form.proactiveProbability / 100,
       proactiveMaxCount: form.proactiveMaxCount,
       voiceId: form.voiceId.trim() || null,
     }
 
-    if (editing === 'new') {
-      await api.post('/admin/characters', data)
-    } else {
-      await api.put(`/admin/characters/${editing.id}`, data)
+    try {
+      if (editing === 'new') {
+        await api.post('/admin/characters', data)
+      } else {
+        await api.put(`/admin/characters/${editing.id}`, data)
+      }
+    } catch (e) {
+      alert(`저장 실패: ${e?.message || 'unknown'}`)
+      return
     }
 
     setEditing(null)
@@ -251,6 +326,219 @@ export default function Characters() {
       alert('홈 이미지 삭제 실패')
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  // V2 JSON 유효성 검사 + 파싱 결과 (현재 lang)
+  const { v2ParseError, v2Parsed } = (() => {
+    const raw = (form.firstMessageV2Text?.[v2Lang] || '').trim()
+    if (!raw) return { v2ParseError: null, v2Parsed: null }
+    try { return { v2ParseError: null, v2Parsed: JSON.parse(raw) } }
+    catch (e) { return { v2ParseError: e.message, v2Parsed: null } }
+  })()
+
+  // 현재 lang의 image 블록만 추출 (절대 인덱스 보존)
+  const v2ImageBlocks = (() => {
+    if (!v2Parsed || !Array.isArray(v2Parsed.blocks)) return []
+    return v2Parsed.blocks
+      .map((b, idx) => (b?.type === 'image' ? { idx, concept: b.concept || '', url: b.url || '' } : null))
+      .filter(Boolean)
+  })()
+
+  // 현재 lang의 message 블록 추출 (절대 인덱스 보존)
+  const v2MessageBlocks = (() => {
+    if (!v2Parsed || !Array.isArray(v2Parsed.blocks)) return []
+    return v2Parsed.blocks
+      .map((b, idx) => (b?.type === 'message' ? {
+        idx,
+        text: b.text || '',
+        emotion: b.emotion || 'NEUTRAL',
+        audioUrl: b.audioUrl || '',
+      } : null))
+      .filter(Boolean)
+  })()
+
+  // 특정 image 블록의 url 업데이트 → JSON 직렬화 → textarea 갱신
+  const setImageBlockUrl = (blockIdx, url) => {
+    if (!v2Parsed) return
+    const next = {
+      ...v2Parsed,
+      blocks: v2Parsed.blocks.map((b, i) => (i === blockIdx ? { ...b, url } : b)),
+    }
+    setForm((f) => ({
+      ...f,
+      firstMessageV2Text: { ...f.firstMessageV2Text, [v2Lang]: JSON.stringify(next, null, 2) },
+    }))
+  }
+
+  // image 블록별 업로드 — 업로드 후 해당 블록의 url을 자동으로 채움
+  const uploadV2ImageToBlock = async (blockIdx, file) => {
+    if (!editing || editing === 'new') {
+      alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
+      return
+    }
+    setV2Busy((s) => ({ ...s, image: true }))
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const { url } = await api.post(`/admin/characters/${editing.id}/first-message-v2/image`, fd)
+      setImageBlockUrl(blockIdx, url)
+    } catch (e) {
+      alert(`업로드 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setV2Busy((s) => ({ ...s, image: false }))
+    }
+  }
+
+  // V2 이미지 업로드 → URL 반환 (어드민이 직접 JSON에 붙여넣음)
+  const uploadV2Image = async (file) => {
+    if (!editing || editing === 'new') {
+      alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
+      return
+    }
+    setV2Busy((s) => ({ ...s, image: true }))
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const { url } = await api.post(`/admin/characters/${editing.id}/first-message-v2/image`, fd)
+      try { await navigator.clipboard.writeText(url) } catch { /* clipboard 권한 없을 수 있음 */ }
+      alert(`업로드 완료. URL이 클립보드에 복사됨:\n${url}`)
+    } catch (e) {
+      alert(`업로드 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setV2Busy((s) => ({ ...s, image: false }))
+    }
+  }
+
+  // V2 JSON 자동 생성 (Grok) — 캐릭터 정보 기반으로 ko JSON 생성, ko 탭 textarea 덮어씀
+  const generateV2WithGrok = async () => {
+    if (!editing || editing === 'new') {
+      alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
+      return
+    }
+    if (form.firstMessageV2Text.ko.trim() &&
+        !confirm('현재 ko 탭의 V2 JSON을 Grok 생성 결과로 덮어쓰시겠습니까?')) {
+      return
+    }
+    const hint = prompt('추가 지시 (선택, 비워두면 캐릭터 정보만으로 생성):\n예) 비 오는 날 카페에서 처음 만나는 장면', '') ?? null
+    if (hint === null) return  // 취소
+
+    setV2Busy((s) => ({ ...s, generate: true }))
+    try {
+      const { firstMessageV2 } = await api.post(
+        `/admin/characters/${editing.id}/first-message-v2/generate`,
+        { hint }
+      )
+      setForm((f) => ({
+        ...f,
+        firstMessageV2Text: { ...f.firstMessageV2Text, ko: JSON.stringify(firstMessageV2, null, 2) },
+      }))
+      setV2Lang('ko')
+      alert('Grok 생성 완료. ko 탭에 채워졌습니다.')
+    } catch (e) {
+      alert(`생성 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setV2Busy((s) => ({ ...s, generate: false }))
+    }
+  }
+
+  // V2 보이스 생성 — 현재 lang JSON의 message 블록마다 TTS 생성, audioUrl 채워서 textarea 갱신
+  const generateV2Voices = async () => {
+    if (!editing || editing === 'new') {
+      alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
+      return
+    }
+    const raw = (form.firstMessageV2Text?.[v2Lang] || '').trim()
+    if (!raw) { alert('JSON이 비어있습니다'); return }
+    let parsed
+    try { parsed = JSON.parse(raw) } catch (e) { alert(`JSON 파싱 실패: ${e.message}`); return }
+    if (!confirm(`${v2Lang.toUpperCase()} message 블록들의 보이스를 생성하시겠습니까?\n(기존 audioUrl이 덮어쓰기됩니다)`)) return
+
+    setV2Busy((s) => ({ ...s, voice: true }))
+    try {
+      const { firstMessageV2 } = await api.post(`/admin/characters/${editing.id}/first-message-v2/voice`, {
+        lang: v2Lang,
+        firstMessageV2: parsed,
+      })
+      setForm((f) => ({
+        ...f,
+        firstMessageV2Text: { ...f.firstMessageV2Text, [v2Lang]: JSON.stringify(firstMessageV2, null, 2) },
+      }))
+      alert('보이스 생성 완료')
+    } catch (e) {
+      alert(`보이스 생성 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setV2Busy((s) => ({ ...s, voice: false }))
+    }
+  }
+
+  // 단일 message 블록만 보이스 재생성
+  const [v2VoiceBusyIdx, setV2VoiceBusyIdx] = useState(null)
+  const regenerateV2Voice = async (blockIdx) => {
+    if (!editing || editing === 'new') {
+      alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
+      return
+    }
+    const raw = (form.firstMessageV2Text?.[v2Lang] || '').trim()
+    if (!raw) { alert('JSON이 비어있습니다'); return }
+    let parsed
+    try { parsed = JSON.parse(raw) } catch (e) { alert(`JSON 파싱 실패: ${e.message}`); return }
+
+    setV2VoiceBusyIdx(blockIdx)
+    try {
+      const { firstMessageV2 } = await api.post(`/admin/characters/${editing.id}/first-message-v2/voice`, {
+        lang: v2Lang,
+        firstMessageV2: parsed,
+        blockIdx,
+      })
+      setForm((f) => ({
+        ...f,
+        firstMessageV2Text: { ...f.firstMessageV2Text, [v2Lang]: JSON.stringify(firstMessageV2, null, 2) },
+      }))
+    } catch (e) {
+      alert(`보이스 생성 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setV2VoiceBusyIdx(null)
+    }
+  }
+
+  // 특정 message 블록의 audioUrl 비우기 (재생성 전 클리어 등)
+  const clearV2BlockAudio = (blockIdx) => {
+    if (!v2Parsed) return
+    const next = {
+      ...v2Parsed,
+      blocks: v2Parsed.blocks.map((b, i) => (i === blockIdx ? { ...b, audioUrl: '' } : b)),
+    }
+    setForm((f) => ({
+      ...f,
+      firstMessageV2Text: { ...f.firstMessageV2Text, [v2Lang]: JSON.stringify(next, null, 2) },
+    }))
+  }
+
+  // 자동 번역 트리거 — 현재 ko 데이터 기준으로 en/ja translations 재생성
+  const triggerTranslate = async () => {
+    if (!editing || editing === 'new') {
+      alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
+      return
+    }
+    if (!confirm('ko 기준으로 en/ja 자동 번역을 실행합니다. 기존 번역(translations)이 덮어쓰기되며,\nV2의 image url은 보존되지만 audioUrl은 비워집니다. 계속할까요?')) return
+
+    setV2Busy((s) => ({ ...s, translate: true }))
+    try {
+      const { translations } = await api.post(`/admin/characters/${editing.id}/translate`, {})
+      const next = { ko: form.firstMessageV2Text.ko, en: '', ja: '' }
+      for (const lang of ['en', 'ja']) {
+        const v2 = translations?.[lang]?.firstMessageV2
+        if (v2) {
+          try { next[lang] = JSON.stringify(v2, null, 2) } catch { /* keep '' */ }
+        }
+      }
+      setForm((f) => ({ ...f, firstMessageV2Text: next, translations }))
+      alert('자동 번역 완료')
+    } catch (e) {
+      alert(`자동 번역 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setV2Busy((s) => ({ ...s, translate: false }))
     }
   }
 
@@ -575,13 +863,283 @@ export default function Characters() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 block mb-1">첫 대사</label>
+                <label className="text-sm text-gray-400 block mb-1">
+                  첫 대사 <span className="text-red-400 font-semibold">(deprecated)</span>
+                </label>
                 <textarea
                   value={form.firstMessage}
                   onChange={(e) => setForm({ ...form, firstMessage: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-20 resize-none"
-                  placeholder="대화 시작 시 캐릭터의 첫 메시지"
+                  className="w-full bg-gray-800/60 border border-gray-700 rounded-lg px-3 py-2 text-sm h-20 resize-none text-gray-400"
+                  placeholder="(V1) 대화 시작 시 캐릭터의 첫 메시지 — 아래 V2가 비어있을 때만 사용됩니다"
                 />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  V2 (`firstMessageV2`) 마이그레이션이 끝나면 제거 예정입니다. 신규 캐릭터는 아래 V2 사용을 권장합니다.
+                </p>
+              </div>
+
+              {/* 첫 등장 V2 (JSON) */}
+              <div className="border border-gray-700 rounded-lg p-3 bg-gray-900/40">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-200">첫 등장 V2 (JSON)</label>
+                    {form.firstMessageV2Draft && (
+                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-900/60 border border-amber-700 text-amber-300 font-medium">
+                        임시 저장 (채팅에서 V1 사용 중)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    {V2_LANGS.map((l) => (
+                      <button
+                        key={l.key}
+                        type="button"
+                        onClick={() => setV2Lang(l.key)}
+                        className={`px-2.5 py-1 text-xs rounded-md border ${
+                          v2Lang === l.key
+                            ? 'bg-indigo-600 border-indigo-500 text-white'
+                            : 'bg-gray-800 border-gray-700 text-gray-400'
+                        }`}
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <textarea
+                  value={form.firstMessageV2Text[v2Lang]}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      firstMessageV2Text: { ...form.firstMessageV2Text, [v2Lang]: e.target.value },
+                    })
+                  }
+                  className="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono h-56 resize-y"
+                  placeholder={V2_PLACEHOLDER}
+                  spellCheck={false}
+                />
+                {v2ParseError ? (
+                  <p className="text-[11px] text-red-400 mt-1">JSON 오류: {v2ParseError}</p>
+                ) : (
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    blocks: narration / image / message. message는 emotion·audioUrl 옵션.
+                  </p>
+                )}
+
+                {/* 이미지 블록별 업로드 패널 */}
+                {v2ImageBlocks.length > 0 && (
+                  <div className="mt-3 border border-gray-700 rounded-md bg-gray-950/40 p-2 space-y-2">
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      이미지 블록 ({v2ImageBlocks.length}개) — 파일을 끌어다 놓거나 업로드 버튼으로 url 자동 입력
+                    </p>
+                    {v2ImageBlocks.map((b) => (
+                      <div
+                        key={b.idx}
+                        onDragOver={(e) => {
+                          if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'copy'
+                          }
+                        }}
+                        onDragEnter={(e) => {
+                          if (Array.from(e.dataTransfer.types).includes('Files')) {
+                            e.preventDefault()
+                            setV2DragOverIdx(b.idx)
+                          }
+                        }}
+                        onDragLeave={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget)) setV2DragOverIdx(null)
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          setV2DragOverIdx(null)
+                          const file = e.dataTransfer.files?.[0]
+                          if (!file) return
+                          if (!file.type.startsWith('image/')) { alert('이미지 파일만 가능합니다'); return }
+                          uploadV2ImageToBlock(b.idx, file)
+                        }}
+                        className={`flex items-start gap-2 p-2 bg-gray-900 rounded border transition-colors ${
+                          v2DragOverIdx === b.idx
+                            ? 'border-indigo-400 bg-indigo-950/30 ring-1 ring-indigo-500/40'
+                            : 'border-gray-800'
+                        }`}
+                      >
+                        {b.url ? (
+                          <img
+                            src={b.url}
+                            alt=""
+                            className="w-14 h-14 rounded object-cover flex-shrink-0 bg-gray-800"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded flex-shrink-0 bg-gray-800 border border-dashed border-gray-700 flex items-center justify-center text-[10px] text-gray-500">
+                            no img
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] text-gray-300 line-clamp-2">
+                            {b.concept || <span className="italic text-gray-500">(컨셉 비어있음)</span>}
+                          </p>
+                          <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                            {b.url ? b.url : '— url 미설정'}
+                          </p>
+                          <div className="flex gap-1.5 mt-1.5">
+                            <label
+                              className={`px-2 py-1 text-[10px] rounded border cursor-pointer ${
+                                v2Busy.image
+                                  ? 'bg-gray-800 border-gray-700 text-gray-500'
+                                  : 'bg-gray-800 border-gray-600 text-gray-200 hover:border-indigo-500'
+                              }`}
+                              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                            >
+                              {b.url ? '교체' : '업로드'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={v2Busy.image}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0]
+                                  e.target.value = ''
+                                  if (f) uploadV2ImageToBlock(b.idx, f)
+                                }}
+                              />
+                            </label>
+                            {b.url && (
+                              <button
+                                type="button"
+                                onClick={() => setImageBlockUrl(b.idx, '')}
+                                className="px-2 py-1 text-[10px] rounded border border-gray-700 bg-gray-800 text-gray-400 hover:border-red-500 hover:text-red-300"
+                                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                              >
+                                url 비우기
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 메시지 블록별 보이스 패널 */}
+                {v2MessageBlocks.length > 0 && (
+                  <div className="mt-3 border border-gray-700 rounded-md bg-gray-950/40 p-2 space-y-2">
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      메시지 블록 ({v2MessageBlocks.length}개) — 보이스 재생성/미리듣기
+                    </p>
+                    {v2MessageBlocks.map((b) => {
+                      const busy = v2VoiceBusyIdx === b.idx
+                      return (
+                        <div key={b.idx} className="flex items-start gap-2 p-2 bg-gray-900 rounded border border-gray-800">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="px-1.5 py-0.5 text-[10px] rounded bg-gray-800 border border-gray-700 text-gray-300">
+                                {b.emotion}
+                              </span>
+                              <span className={`text-[10px] ${b.audioUrl ? 'text-green-400' : 'text-gray-500'}`}>
+                                {b.audioUrl ? '✓ 보이스 있음' : '— 보이스 없음'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-300 line-clamp-2 whitespace-pre-wrap">
+                              {b.text || <span className="italic text-gray-500">(텍스트 비어있음)</span>}
+                            </p>
+                            {b.audioUrl && (
+                              <audio
+                                src={b.audioUrl}
+                                controls
+                                preload="none"
+                                className="w-full mt-1.5 h-7"
+                                style={{ filter: 'brightness(0.9)' }}
+                              />
+                            )}
+                            <div className="flex gap-1.5 mt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => regenerateV2Voice(b.idx)}
+                                disabled={busy || v2VoiceBusyIdx !== null}
+                                className="px-2 py-1 text-[10px] rounded border border-gray-600 bg-gray-800 text-gray-200 hover:border-indigo-500 disabled:opacity-50"
+                                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                              >
+                                {busy ? '생성 중…' : (b.audioUrl ? '재생성' : '생성')}
+                              </button>
+                              {b.audioUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => clearV2BlockAudio(b.idx)}
+                                  disabled={v2VoiceBusyIdx !== null}
+                                  className="px-2 py-1 text-[10px] rounded border border-gray-700 bg-gray-800 text-gray-400 hover:border-red-500 hover:text-red-300 disabled:opacity-50"
+                                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                                >
+                                  audioUrl 비우기
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={generateV2WithGrok}
+                    disabled={v2Busy.generate}
+                    className="px-3 py-1.5 text-xs rounded-md border border-purple-600 bg-purple-900/40 text-purple-200 hover:border-purple-400 disabled:opacity-50"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {v2Busy.generate ? 'Grok 생성 중…' : '✨ Grok로 V2 JSON 생성 (ko)'}
+                  </button>
+
+                  <label
+                    className={`px-3 py-1.5 text-xs rounded-md border cursor-pointer ${
+                      v2Busy.image ? 'bg-gray-800 border-gray-700 text-gray-500' : 'bg-gray-800 border-gray-600 text-gray-200 hover:border-indigo-500'
+                    }`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {v2Busy.image ? '업로드 중…' : '이미지 업로드 (URL 복사)'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={v2Busy.image}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        e.target.value = ''
+                        if (f) uploadV2Image(f)
+                      }}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={generateV2Voices}
+                    disabled={v2Busy.voice || !!v2ParseError}
+                    className="px-3 py-1.5 text-xs rounded-md border border-gray-600 bg-gray-800 text-gray-200 hover:border-indigo-500 disabled:opacity-50"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {v2Busy.voice ? '보이스 일괄 생성 중…' : `보이스 일괄 생성 (${v2Lang.toUpperCase()})`}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={triggerTranslate}
+                    disabled={v2Busy.translate}
+                    className="px-3 py-1.5 text-xs rounded-md border border-gray-600 bg-gray-800 text-gray-200 hover:border-indigo-500 disabled:opacity-50"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {v2Busy.translate ? '번역 중…' : '자동 번역 (ko → en/ja)'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  Grok 생성: 캐릭터 정보 기반으로 ko V2 JSON 자동 작성 (image 블록 2~3개, concept 한국어 묘사 포함, url은 비어있음).<br />
+                  이미지 블록 업로드: 위 "이미지 블록" 패널에 파일을 드래그하거나 업로드 버튼 사용 → 해당 블록 url 자동 채움.<br />
+                  이미지 업로드 (URL 복사): JSON 외 자유 업로드. 파일 → URL을 클립보드에 복사.<br />
+                  보이스 일괄 생성: 현재 탭의 모든 message 블록에 한 번에 TTS 생성. 개별 재생성은 위 "메시지 블록" 패널의 재생성 버튼 사용.<br />
+                  자동 번역: ko 기준으로 en/ja translations 재생성. 이미지 url·concept은 보존, audioUrl은 비워짐.
+                </p>
               </div>
 
               <div>
@@ -715,7 +1273,7 @@ export default function Characters() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex justify-end gap-2 mt-6 flex-wrap">
               <button
                 onClick={() => setEditing(null)}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-white"
@@ -724,11 +1282,20 @@ export default function Characters() {
                 취소
               </button>
               <button
-                onClick={save}
+                onClick={() => save({ asDraft: true })}
+                className="px-4 py-2 bg-amber-700 text-amber-50 text-sm rounded-lg hover:bg-amber-600"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                title="V2를 저장하되 채팅에서는 V1을 사용 (작업 중 상태)"
+              >
+                임시 저장 (V2)
+              </button>
+              <button
+                onClick={() => save({ asDraft: false })}
                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                title="V2가 있으면 채팅에 V2 적용 (발행)"
               >
-                저장
+                저장 (발행)
               </button>
             </div>
           </div>
