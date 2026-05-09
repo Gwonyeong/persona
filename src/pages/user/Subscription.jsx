@@ -276,6 +276,11 @@ export default function Subscription() {
       {/* 라이트 하이라이트 */}
       <div className="mt-5 p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
         <p className="text-sm font-bold text-indigo-300 mb-2">{t('subscription.lightBenefitsTitle')}</p>
+        <div className="mb-3 px-3 py-2 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
+          <p className="text-xs font-bold text-yellow-300 text-center">
+            🎁 {t('subscription.instantMasks')}
+          </p>
+        </div>
         <ul className="space-y-1.5">
           <li className="text-xs text-gray-400 flex items-start gap-2">
             <span className="text-indigo-400 mt-0.5">&#10003;</span>
