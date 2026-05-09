@@ -146,7 +146,8 @@
     "free": "Free",
     "light": "Light",
     "perMonth": "/mo",
-    "trial": "Free for 1 week",
+    "trial": "Free for 3 days",
+    "instantMasks": "Get 50 masks instantly!",
     "startFree": "Start Free Trial",
     "manageSubscription": "Manage Subscription",
     "googlePlayError": "Google Play billing is not available.",
@@ -163,7 +164,7 @@
     "lightBenefit2": "Chat with all characters freely",
     "lightBenefit3": "Unlock bold image content",
     "lightBenefit4": "Ad-free clean experience",
-    "lightTrialNote": "First week is free! Cancel during trial and you won't be charged.",
+    "lightTrialNote": "First 3 days are free! Cancel during trial and you won't be charged.",
     "feature": {
       "chat": "Chat",
       "dailyMasks": "Daily Masks",
@@ -329,7 +330,7 @@
     "reviewButton": "Leave a Review",
     "reviewLater": "Maybe later",
     "freeLimitReached": "Free plan can chat with up to {{limit}} characters",
-    "freeLimitCta": "Start 7-day free trial"
+    "freeLimitCta": "Start 3-day free trial"
   },
   "masks": {
     "pkg30": "60",

@@ -146,7 +146,8 @@
     "free": "無料",
     "light": "ライト",
     "perMonth": "/月",
-    "trial": "初週無料",
+    "trial": "初3日間無料",
+    "instantMasks": "マスク50個 即時支給！",
     "startFree": "無料で始める",
     "manageSubscription": "サブスク管理",
     "googlePlayError": "Google Play決済を利用できません。",
@@ -163,7 +164,7 @@
     "lightBenefit2": "全キャラクターと自由に会話",
     "lightBenefit3": "大胆な画像コンテンツを解放",
     "lightBenefit4": "広告なしのすっきり体験",
-    "lightTrialNote": "初週は無料！体験期間中に解約すれば料金は発生しません。",
+    "lightTrialNote": "初3日間は無料！体験期間中に解約すれば料金は発生しません。",
     "feature": {
       "chat": "チャット",
       "dailyMasks": "デイリーマスク",
@@ -329,7 +330,7 @@
     "reviewButton": "レビューを書く",
     "reviewLater": "後で",
     "freeLimitReached": "無料プランは最大{{limit}}名のキャラクターとチャットできます",
-    "freeLimitCta": "7日間無料体験"
+    "freeLimitCta": "3日間無料体験"
   },
   "masks": {
     "pkg30": "60個",

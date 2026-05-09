@@ -146,7 +146,8 @@
     "free": "무료",
     "light": "라이트",
     "perMonth": "/월",
-    "trial": "첫 1주일 무료",
+    "trial": "첫 3일 무료",
+    "instantMasks": "마스크 50개 즉시 지급!",
     "startFree": "무료로 시작하기",
     "manageSubscription": "구독 관리",
     "googlePlayError": "Google Play 결제를 사용할 수 없습니다.",
@@ -163,7 +164,7 @@
     "lightBenefit2": "모든 캐릭터와 자유롭게 대화",
     "lightBenefit3": "더 과감한 이미지 콘텐츠 잠금 해제",
     "lightBenefit4": "광고 없이 깔끔한 경험",
-    "lightTrialNote": "첫 1주일은 무료! 체험 기간 내 해지하면 요금이 청구되지 않아요.",
+    "lightTrialNote": "첫 3일은 무료! 체험 기간 내 해지하면 요금이 청구되지 않아요.",
     "feature": {
       "chat": "채팅",
       "dailyMasks": "일일 가면 지급",
@@ -329,7 +330,7 @@
     "reviewButton": "후기 남기기",
     "reviewLater": "다음에 할게요",
     "freeLimitReached": "무료 요금제는 최대 {{limit}}명의 캐릭터와 채팅할 수 있어요",
-    "freeLimitCta": "7일 무료 체험하기"
+    "freeLimitCta": "3일 무료 체험하기"
   },
   "masks": {
     "pkg30": "60개",
