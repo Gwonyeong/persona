@@ -8,6 +8,7 @@ import useStore from '../../store/useStore'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview } from '../../lib/review'
+import LoginModal from '../../components/LoginModal'
 
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
@@ -93,6 +94,15 @@ export default function MaskShop() {
   const [checkinClaimed, setCheckinClaimed] = useState(null)
   const [claimingCheckin, setClaimingCheckin] = useState(false)
   const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+
+  const requireLogin = () => {
+    if (!token) {
+      setShowLoginModal(true)
+      return true
+    }
+    return false
+  }
 
   useEffect(() => {
     const native = isNativeBillingAvailable()
@@ -121,6 +131,7 @@ export default function MaskShop() {
   }, [])
 
   const handleSubscribe = async () => {
+    if (requireLogin()) return
     if (currentTier === 'LIGHT') return
     setSubLoading(true)
     setSubError('')
@@ -157,6 +168,7 @@ export default function MaskShop() {
   }
 
   const handleRestore = async () => {
+    if (requireLogin()) return
     setRestoring(true)
     setSubError('')
     try {
@@ -202,6 +214,7 @@ export default function MaskShop() {
   }, [token])
 
   const handlePurchase = async () => {
+    if (requireLogin()) return
     setPurchasing(true)
     setPurchaseError('')
     try {
@@ -513,6 +526,7 @@ export default function MaskShop() {
               {/* 출석체크 */}
               <button
                 onClick={async () => {
+                  if (requireLogin()) return
                   if (checkinClaimed || claimingCheckin) return
                   setClaimingCheckin(true)
                   try {
@@ -554,6 +568,7 @@ export default function MaskShop() {
               {/* 캐릭터와 5회 채팅 데일리 */}
               <button
                 onClick={async () => {
+                  if (requireLogin()) return
                   if (!dailyChatReward || dailyChatReward.claimed || dailyChatReward.chatCount < 5) {
                     if (!dailyChatReward?.claimed && (!dailyChatReward || dailyChatReward.chatCount < 5)) {
                       navigate('/')
@@ -602,6 +617,7 @@ export default function MaskShop() {
               {adMobReady && (
                 <button
                   onClick={async () => {
+                    if (requireLogin()) return
                     if (!adRewardAvailable || adLoading) return
                     setAdLoading(true)
                     try {
@@ -651,6 +667,7 @@ export default function MaskShop() {
               {/* 피드 좋아요 3개 데일리 */}
               <button
                 onClick={async () => {
+                  if (requireLogin()) return
                   if (!feedLikeReward || feedLikeReward.claimed || feedLikeReward.likeCount < 3) {
                     if (!feedLikeReward?.claimed && (!feedLikeReward || feedLikeReward.likeCount < 3)) {
                       navigate('/feed')
@@ -711,6 +728,7 @@ export default function MaskShop() {
               ) : (
                 <button
                   onClick={async () => {
+                    if (requireLogin()) return
                     if (claimingMission) return
                     setClaimingMission('review')
                     try {
@@ -736,6 +754,13 @@ export default function MaskShop() {
             </div>
           )}
         </div>
+      )}
+
+      {showLoginModal && (
+        <LoginModal
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={() => setShowLoginModal(false)}
+        />
       )}
     </div>
   )
