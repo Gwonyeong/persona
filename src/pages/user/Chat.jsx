@@ -161,47 +161,24 @@ const MessageBubble = memo(function MessageBubble({
   onAppear,
   t,
 }) {
-  // 순차 애니메이션: _animateDelay가 지나야 visible. 그 전엔 null 렌더링으로 자리도 차지 안 함.
-  const wantAnimate =
-    (msg.role === 'CHARACTER' || msg.role === 'NARRATION') &&
-    (msg.streaming === true || msg._animate === true)
-  const delayMs = wantAnimate ? Math.max(0, msg._animateDelay || 0) : 0
-  const [delayElapsed, setDelayElapsed] = useState(delayMs === 0)
-
+  // 라이브 스트리밍: 서버가 delta 이벤트로 content를 점진적으로 갱신하므로 별도 자모 애니메이션 불필요.
+  // 새 버블이 등장할 때 부모에게 알려 스크롤 따라가기.
+  const isStreamingBubble = msg._streaming === true
   useEffect(() => {
-    if (delayElapsed) return
-    if (delayMs <= 0) {
-      setDelayElapsed(true)
-      return
-    }
-    const t = setTimeout(() => setDelayElapsed(true), delayMs)
-    return () => clearTimeout(t)
-  }, [delayMs, delayElapsed])
+    if (isStreamingBubble && onAppear) onAppear()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreamingBubble])
 
-  // 등장 시점에 부모에게 알림 (스크롤 따라가기용)
-  useEffect(() => {
-    if (delayElapsed && wantAnimate && onAppear) onAppear()
-  }, [delayElapsed, wantAnimate, onAppear])
-
-  // hooks는 early return 전에 호출되어야 함 (Rules of Hooks)
-  // delayElapsed 후에만 shouldAnimate=true → 자모 타이프라이터 활성화
-  const animatedContent = useJamoTypewriter(
-    msg.content || '',
-    delayElapsed && wantAnimate,
-  )
   const segments = useMemo(() => {
     if (msg.role !== 'CHARACTER' && msg.role !== 'USER') return null
-    return parseMessageSegments(animatedContent, msg.role)
-  }, [animatedContent, msg.role])
-
-  // 딜레이가 끝나기 전엔 DOM에서 빠져 있어야 순차 등장 효과가 자연스러움
-  if (wantAnimate && !delayElapsed) return null
+    return parseMessageSegments(msg.content || '', msg.role)
+  }, [msg.content, msg.role])
 
   if (msg.role === 'NARRATION') {
     return (
       <div className="flex justify-center my-4">
         <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
-          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{animatedContent}</p>
+          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{msg.content || ''}</p>
         </div>
       </div>
     )
@@ -352,13 +329,14 @@ export default function Chat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
-  const [showVoicePremiumModal, setShowVoicePremiumModal] = useState(false)
   const [generatingTTS, setGeneratingTTS] = useState(false)
   const [playingAudioIdx, setPlayingAudioIdx] = useState(null)
   const audioRef = useRef(null)
   const audioQueueRef = useRef([])
   const isPlayingQueueRef = useRef(false)
   const playbackTimeoutRef = useRef(null)
+  // 라이브 큐: 다음 애니메이션이 시작될 시각(ms 타임스탬프). 새 버블은 이 시각까지 대기.
+  const nextAnimStartRef = useRef(0)
   const [isPlayingAll, setIsPlayingAll] = useState(false)
   const [errorToast, setErrorToast] = useState(null)
   const errorTimerRef = useRef(null)
@@ -366,13 +344,8 @@ export default function Chat() {
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
-  const subscription = useStore((s) => s.subscription)
   const user = useStore((s) => s.user)
   const setUser = useStore((s) => s.setUser)
-  const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
-  const [currentUser, setCurrentUser] = useState(null)
-  // 보이스 사용 자격: 유료 OR 무료 잔여(freeVoiceUses)
-  const canUseVoice = !isFreeTier || (currentUser?.freeVoiceUses || 0) > 0
   const { t } = useTranslation()
 
   // 페이지 이탈 시 사운드 재생 정리
@@ -444,7 +417,6 @@ export default function Chat() {
   useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
   useBackHandler(showSelfieModal, () => setShowSelfieModal(false))
   useBackHandler(showReport, () => setShowReport(false))
-  useBackHandler(showVoicePremiumModal, () => setShowVoicePremiumModal(false))
 
   const showError = (msg) => {
     setErrorToast(msg)
@@ -475,9 +447,6 @@ export default function Chat() {
         initialLoadRef.current = false
       })
     })
-    if (token) {
-      api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
-    }
   }, [id, token])
 
   // 채팅 페이지에 있는 동안 주기적으로 읽음 처리 (heartbeat)
@@ -577,65 +546,113 @@ export default function Chat() {
     const confirmedUserMsg = { role: 'USER', content: text, createdAt: new Date().toISOString(), feedImage }
     const body = { content: text }
     if (feedToSend) body.feedPostId = feedToSend.id
-    if (voiceMode && character?.voiceId && canUseVoice) body.voiceWithChat = true
+    if (voiceMode && character?.voiceId) body.voiceWithChat = true
+    // 이번 응답 라운드 식별자 — 'message'로 추가한 버블을 'done' 시점에 메타데이터와 매칭하기 위함
+    const roundId = `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
-          case 'narration':
-          case 'message': {
-            // 순차 애니메이션을 위해 streaming 버블은 더 이상 추가하지 않음.
-            // tempUserMsg → confirmedUserMsg 교체만 처리하고, typing 표시는 'done'까지 유지.
+          case 'delta': {
+            // 라이브 모드: Grok 토큰 단위 스트리밍. 같은 idx에 대한 delta는 기존 버블의 content를 갱신.
+            const { idx, role, content, complete } = data
+            setShowTyping(false)
             setMessages((prev) => {
-              if (!prev.some((m) => m.id === tempUserMsg.id)) return prev
-              return [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
+              // 1) tempUserMsg → confirmedUserMsg 보장
+              const base = prev.some((m) => m.id === tempUserMsg.id)
+                ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
+                : prev
+              // 2) 같은 round + idx 의 기존 버블 찾아 갱신, 없으면 추가
+              const existingI = base.findIndex(
+                (m) => m._round === roundId && m._streamIdx === idx,
+              )
+              if (existingI >= 0) {
+                const updated = [...base]
+                updated[existingI] = {
+                  ...updated[existingI],
+                  role,
+                  content,
+                  _streaming: !complete,
+                }
+                return updated
+              }
+              return [
+                ...base,
+                {
+                  role,
+                  content,
+                  _round: roundId,
+                  _streamIdx: idx,
+                  _streaming: !complete,
+                },
+              ]
             })
             break
           }
           case 'audio': {
-            // 서버 TTS 도착 — 큐에만 적재. 실제 재생은 'done'에서 첫 버블 등장과 함께 시작.
+            // 서버 TTS 도착 — 즉시 큐에 추가하여 순차 재생 (라이브 모드에선 버블이 이미 등장한 뒤)
             audioQueueRef.current.push(data.audioUrl)
+            playFromQueue()
             break
           }
           case 'done': {
             const { responseMessages } = data
             const rawCharMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
-            // 순차 등장: 각 버블에 누적 delay 부여 (이전 버블의 타이핑 시간 + 짧은 호흡)
-            const PAUSE_BETWEEN_MS = 250
-            let cumulativeMs = 0
-            const charMsgs = rawCharMsgs.map((m) => {
-              const delay = cumulativeMs
-              const typingMs = getTotalTypingSteps(m.content || '') * TYPING_SPEED_MS
-              cumulativeMs += typingMs + PAUSE_BETWEEN_MS
-              return { ...m, _animate: true, _animateDelay: delay }
-            })
-            // 호감도가 오른 경우 마지막 캐릭터 메시지에 표시
-            const lastChar = [...charMsgs].reverse().find((m) => m.role === 'CHARACTER')
-            if (data.affinityChange > 0 && lastChar) {
-              const lastIdx = charMsgs.lastIndexOf(lastChar)
-              charMsgs[lastIdx] = { ...charMsgs[lastIdx], affinityUp: true }
+            // 호감도가 오른 경우 마지막 캐릭터 메시지에 affinityUp 부착할 인덱스
+            let lastCharIdxInCharMsgs = -1
+            for (let i = rawCharMsgs.length - 1; i >= 0; i--) {
+              if (rawCharMsgs[i].role === 'CHARACTER') { lastCharIdxInCharMsgs = i; break }
             }
             setMessages((prev) => {
-              // tempUserMsg 제거, confirmedUserMsg는 유지 (streaming 필터는 더 이상 의미 없음)
-              const cleaned = prev.filter((m) => m.id !== tempUserMsg.id)
-              const hasUser = cleaned.some((m) => m === confirmedUserMsg || (m.role === 'USER' && m.content === text && m.createdAt === confirmedUserMsg.createdAt))
-              return [
-                ...cleaned,
-                ...(!hasUser ? [confirmedUserMsg] : []),
-                ...charMsgs,
-              ]
+              const base = prev.filter((m) => m.id !== tempUserMsg.id)
+              const hasUser = base.some((m) => m === confirmedUserMsg || (m.role === 'USER' && m.content === text && m.createdAt === confirmedUserMsg.createdAt))
+              const withUser = hasUser ? base : [...base, confirmedUserMsg]
+              // delta로 적재된 라운드 버블에 메타데이터 병합 (_streamIdx 매칭)
+              const merged = withUser.map((m) => {
+                if (m._round === roundId && typeof m._streamIdx === 'number') {
+                  const final = rawCharMsgs[m._streamIdx]
+                  if (!final) return { ...m, _streaming: false }
+                  const isLast = m._streamIdx === lastCharIdxInCharMsgs
+                  return {
+                    ...m,
+                    role: final.role,
+                    content: final.content, // delta 누락분 보정 (서버 권위)
+                    emotion: final.emotion,
+                    suggestedReplies: final.suggestedReplies,
+                    createdAt: final.createdAt,
+                    audioUrl: final.audioUrl,
+                    _streaming: false,
+                    ...(isLast && data.affinityChange > 0 ? { affinityUp: true } : {}),
+                  }
+                }
+                return m
+              })
+              // 라운드에 등록된 _streamIdx 들의 집합
+              const seenIdx = new Set(
+                merged
+                  .filter((m) => m._round === roundId && typeof m._streamIdx === 'number')
+                  .map((m) => m._streamIdx),
+              )
+              // 스트리밍 누락분 (delta 실패 등) — 서버 응답에만 있는 메시지를 끝에 추가
+              for (let i = 0; i < rawCharMsgs.length; i++) {
+                if (seenIdx.has(i)) continue
+                const final = rawCharMsgs[i]
+                const isLast = i === lastCharIdxInCharMsgs
+                merged.push({
+                  ...final,
+                  _round: roundId,
+                  _streamIdx: i,
+                  _streaming: false,
+                  ...(isLast && data.affinityChange > 0 ? { affinityUp: true } : {}),
+                })
+              }
+              return merged
             })
-            const lastCharMsg = charMsgs[charMsgs.length - 1]
+            const lastCharMsg = rawCharMsgs[rawCharMsgs.length - 1]
             if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
             if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
             setShowTyping(false)
             setSending(false)
-            // 첫 버블이 등장할 때 큐에 쌓인 오디오 재생 시작 (TTS-bubble 동기)
-            if (audioQueueRef.current.length > 0) playFromQueue()
             window.gtag?.('event', 'chat_message', { conversation_id: id })
-            // 보이스 사용 시 무료 횟수 갱신
-            if (voiceMode && character?.voiceId && canUseVoice) {
-              api.get('/auth/me').then(({ user }) => setCurrentUser(user)).catch(() => {})
-            }
             if (!pushPromptShownRef.current && token) {
               getPushPermissionStatus().then((status) => {
                 if (status === 'default') {
@@ -1087,7 +1104,6 @@ export default function Chat() {
             <button
               onClick={() => {
                 if (tourActive && !character.voiceId) return
-                if (!canUseVoice) { setShowVoicePremiumModal(true); return }
                 setVoiceMode((v) => {
                   const next = !v
                   api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
@@ -1095,7 +1111,7 @@ export default function Chat() {
                 })
               }}
               disabled={!token || (tourActive && !character.voiceId)}
-              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${!canUseVoice ? 'bg-gray-800 opacity-50' : voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               data-onboarding-target="voice-btn"
             >
@@ -1213,10 +1229,8 @@ export default function Chat() {
             </button>
           )}
           <div className="relative flex-shrink-0">
-            {voiceMode && canUseVoice && (
-              (currentUser?.freeVoiceUses || 0) > 0
-                ? <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">{t('chat.voiceFreeRemaining', { count: currentUser.freeVoiceUses, defaultValue: '무료 {{count}}회' })}</span>
-                : <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">-5 🎭</span>
+            {voiceMode && (
+              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">-5 🎭</span>
             )}
             <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
@@ -1343,31 +1357,6 @@ export default function Chat() {
         </div>
       )}
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
-      {showVoicePremiumModal && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowVoicePremiumModal(false)} />
-          <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm text-center">
-            <p className="text-lg font-bold text-gray-100 mb-2">{t('chat.voicePremiumTitle')}</p>
-            <p className="text-sm text-gray-400 mb-6">{t('chat.voicePremiumDesc')}</p>
-            <div className="flex flex-col gap-2.5">
-              <button
-                onClick={() => { setShowVoicePremiumModal(false); navigate('/subscription') }}
-                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {t('chat.voicePremiumCta')}
-              </button>
-              <button
-                onClick={() => setShowVoicePremiumModal(false)}
-                className="px-6 py-2.5 bg-gray-800 text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-700 transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {showReport && (
         <ReportModal
           targetType="CONVERSATION"

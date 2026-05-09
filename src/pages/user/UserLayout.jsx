@@ -3,7 +3,6 @@ import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-do
 import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
 import LoginModal from '../../components/LoginModal'
-import FeedbackButton from '../../components/FeedbackButton'
 
 const TABS = [
   {
@@ -61,7 +60,6 @@ export default function UserLayout() {
   const [hasUnread, setHasUnread] = useState(false)
   const isChatPage = location.pathname.match(/^\/chats\/\d/)
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
-  const showFeedback = location.pathname === '/' || location.pathname === '/my'
 
   useEffect(() => {
     const handler = (e) => setHasUnread(e.detail > 0)
@@ -88,9 +86,6 @@ export default function UserLayout() {
           </footer>
         )}
       </main>
-
-      {/* 피드백 버튼 */}
-      {showFeedback && <FeedbackButton />}
 
       {/* 하단 탭바 (채팅 페이지에서는 키보드 애니메이션과 충돌하므로 숨김) */}
       {!isChatPage && (

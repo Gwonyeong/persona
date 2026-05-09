@@ -85,10 +85,7 @@
     "errorTTS": "Voice generation failed",
     "ttsPlay": "Play",
     "ttsStop": "Stop",
-    "generatingTTS": "Generating voice...",
-    "voicePremiumTitle": "Premium Feature",
-    "voicePremiumDesc": "Voice mode is available with the Light plan or higher.",
-    "voicePremiumCta": "View Plans"
+    "generatingTTS": "Generating voice..."
   },
   "myPage": {
     "title": "My Page - Pesona",
@@ -123,6 +120,9 @@
     "dailyFeedLike": "Like 3 Feed Posts",
     "dailyFeedLikeDesc": "Like posts on the feed",
     "dailyFeedLikeProgress": "{{count}}/3",
+    "dailyChat": "Chat with Character 5 Times",
+    "dailyChatDesc": "Have 5 chats with a character today",
+    "dailyChatProgress": "{{count}}/5",
     "tabDaily": "Daily",
     "tabMission": "Mission",
     "missionFeedback": "Write First Feedback",

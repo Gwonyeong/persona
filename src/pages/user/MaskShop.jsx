@@ -32,7 +32,6 @@ export default function MaskShop() {
     { key: 'characters', label: t('subscription.feature.characters') },
     { key: 'contentLevel', label: t('subscription.feature.contentLevel') },
     { key: 'adFree', label: t('subscription.feature.adFree') },
-    { key: 'voice', label: t('subscription.feature.voice', { defaultValue: '목소리' }) },
   ]
 
   const PLANS = [
@@ -48,7 +47,6 @@ export default function MaskShop() {
         contentLevel: t('subscription.featureValue.basic'),
         imageGen: t('subscription.featureValue.maskCost'),
         adFree: t('subscription.featureValue.none'),
-        voice: t('subscription.featureValue.none'),
       },
     },
     {
@@ -64,7 +62,6 @@ export default function MaskShop() {
         contentLevel: t('subscription.featureValue.boldImages'),
         imageGen: t('subscription.featureValue.maskCost'),
         adFree: true,
-        voice: t('subscription.featureValue.hqVoice', { defaultValue: '고품질 음성' }),
       },
     },
   ]
@@ -92,6 +89,7 @@ export default function MaskShop() {
   const [missions, setMissions] = useState(null)
   const [claimingMission, setClaimingMission] = useState(null)
   const [feedLikeReward, setFeedLikeReward] = useState(null)
+  const [dailyChatReward, setDailyChatReward] = useState(null)
   const [checkinClaimed, setCheckinClaimed] = useState(null)
   const [claimingCheckin, setClaimingCheckin] = useState(false)
   const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
@@ -198,6 +196,7 @@ export default function MaskShop() {
     api.get('/masks/ad-reward/available').then(({ available, remaining }) => { setAdRewardAvailable(available); setAdRewardRemaining(remaining) }).catch(() => {})
     api.get('/masks/missions').then(({ missions }) => setMissions(missions)).catch(() => {})
     api.get('/masks/feed-like-reward/available').then((data) => setFeedLikeReward(data)).catch(() => {})
+    api.get('/masks/daily-chat-reward/available').then((data) => setDailyChatReward(data)).catch(() => {})
     api.get('/masks/checkin/available').then(({ claimed }) => setCheckinClaimed(claimed)).catch(() => {})
     api.get('/masks/first-purchase-eligible').then(({ eligible }) => setFirstPurchaseEligible(eligible)).catch(() => {})
   }, [token])
@@ -552,6 +551,54 @@ export default function MaskShop() {
                 </div>
               </button>
 
+              {/* 캐릭터와 5회 채팅 데일리 */}
+              <button
+                onClick={async () => {
+                  if (!dailyChatReward || dailyChatReward.claimed || dailyChatReward.chatCount < 5) {
+                    if (!dailyChatReward?.claimed && (!dailyChatReward || dailyChatReward.chatCount < 5)) {
+                      navigate('/')
+                    }
+                    return
+                  }
+                  try {
+                    const result = await api.post('/masks/daily-chat-reward')
+                    if (!result.alreadyClaimed) setMasks(result.masks)
+                    setDailyChatReward((prev) => ({ ...prev, claimed: true }))
+                  } catch (e) {
+                    console.error('Daily chat reward error:', e)
+                  }
+                }}
+                disabled={dailyChatReward?.claimed}
+                className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
+                  dailyChatReward?.claimed
+                    ? 'border-gray-700 bg-gray-800/50'
+                    : dailyChatReward?.chatCount >= 5
+                      ? 'border-amber-500/50 bg-amber-500/10'
+                      : 'border-gray-700 bg-gray-800/50'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">💬</span>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-gray-100">{t('myPage.dailyChat')}</p>
+                    <p className="text-xs text-gray-400">{t('myPage.dailyChatDesc')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {dailyChatReward?.claimed ? (
+                    <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
+                  ) : dailyChatReward?.chatCount >= 5 ? (
+                    <>
+                      <span className="text-sm">🎭</span>
+                      <span className="text-sm font-bold text-amber-400">+3</span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-gray-400">{t('myPage.dailyChatProgress', { count: dailyChatReward?.chatCount ?? 0 })}</span>
+                  )}
+                </div>
+              </button>
+
               {adMobReady && (
                 <button
                   onClick={async () => {
@@ -656,59 +703,6 @@ export default function MaskShop() {
           {/* 미션 탭 */}
           {maskModalTab === 'mission' && (
             <div className="flex flex-col gap-2">
-              {/* 첫 피드백 작성 미션 */}
-              <div className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border transition-all ${
-                missions?.feedback?.claimed
-                  ? 'border-gray-700 bg-gray-800/50'
-                  : missions?.feedback?.completed
-                    ? 'border-amber-500/50 bg-amber-500/10'
-                    : 'border-gray-700 bg-gray-800/50'
-              }`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">📝</span>
-                  <div className="text-left">
-                    <p className="text-sm font-bold text-gray-100">{t('myPage.missionFeedback')}</p>
-                    <p className="text-xs text-gray-400">{t('myPage.missionFeedbackDesc')}</p>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 ml-2">
-                  {missions?.feedback?.claimed ? (
-                    <span className="text-xs text-gray-500">{t('myPage.missionClaimed')}</span>
-                  ) : missions?.feedback?.completed ? (
-                    <button
-                      onClick={async () => {
-                        if (claimingMission) return
-                        setClaimingMission('feedback')
-                        try {
-                          const result = await api.post('/masks/feedback-reward')
-                          if (!result.alreadyClaimed) {
-                            setMasks(result.masks)
-                          }
-                          setMissions((prev) => ({ ...prev, feedback: { ...prev.feedback, claimed: true } }))
-                        } catch (e) {
-                          console.error('Feedback reward error:', e)
-                        }
-                        setClaimingMission(null)
-                      }}
-                      disabled={claimingMission === 'feedback'}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-400 transition-colors"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <span>🎭</span>
-                      <span>+{missions.feedback.reward}</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => navigate('/feedback')}
-                      className="px-3 py-1.5 bg-gray-700 text-gray-300 text-xs font-medium rounded-lg hover:bg-gray-600 transition-colors"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      {t('myPage.missionFeedbackNotYet')}
-                    </button>
-                  )}
-                </div>
-              </div>
-
               {/* 앱 후기 작성 미션 */}
               {missions?.review?.claimed ? (
                 <div className="w-full flex items-center justify-center px-4 py-4 rounded-xl border border-gray-700 bg-gray-800/50">

@@ -21,7 +21,6 @@ export default function Subscription() {
     { key: 'contentLevel', label: t('subscription.feature.contentLevel') },
     { key: 'imageGen', label: t('subscription.feature.imageGen') },
     { key: 'adFree', label: t('subscription.feature.adFree') },
-    { key: 'voice', label: t('subscription.feature.voice', { defaultValue: '목소리' }) },
   ]
 
   const PLANS = [
@@ -37,7 +36,6 @@ export default function Subscription() {
         contentLevel: t('subscription.featureValue.basic'),
         imageGen: t('subscription.featureValue.maskCost'),
         adFree: t('subscription.featureValue.none'),
-        voice: t('subscription.featureValue.none'),
       },
     },
     {
@@ -53,7 +51,6 @@ export default function Subscription() {
         contentLevel: t('subscription.featureValue.boldImages'),
         imageGen: t('subscription.featureValue.maskCost'),
         adFree: true,
-        voice: t('subscription.featureValue.hqVoice', { defaultValue: '고품질 음성' }),
       },
     },
   ]
