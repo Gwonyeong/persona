@@ -2,6 +2,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import AssetLibraryModal from './AssetLibraryModal'
+import AssetPromptsTab from './AssetPromptsTab'
+import VoiceTab from './VoiceTab'
 
 // 라이브러리 kind → script 아이템 필드 매핑
 const SCRIPT_FIELD_BY_KIND = {
@@ -32,7 +34,8 @@ function countPlaceholders(s) {
   if (!s) return 0
   let n = 0
   if (isPlaceholderUrl(s.defaultBgm)) n++
-  ;(s.images || []).forEach((img) => { if (isPlaceholderUrl(img?.url)) n++ })
+  if (isPlaceholderUrl(s.thumbnailImage)) n++
+  if (isPlaceholderUrl(s.coverImage)) n++
   ;(s.nodes || []).forEach((node) => {
     if (Array.isArray(node?.script)) {
       node.script.forEach((it) => {
@@ -98,10 +101,6 @@ function serializeNodesForEditor(allNodes) {
         ...(c.maskCost ? { maskCost: c.maskCost } : {}),
         ...(c.affinityDelta ? { affinityDelta: c.affinityDelta } : {}),
         ...(c.translations ? { translations: c.translations } : {}),
-        // imageUnlocks → unlockStoryImageIds (admin GET response 형식 → POST/PUT body 형식)
-        ...(Array.isArray(c.imageUnlocks) && c.imageUnlocks.length > 0
-          ? { unlockStoryImageIds: c.imageUnlocks.map((u) => u.storyImageId) }
-          : {}),
         ...(branchMap.has(c.id) ? { branchNodes: branchMap.get(c.id).map(clean) } : {}),
       }))
     }
@@ -116,7 +115,7 @@ export default function StorylineEdit() {
   const navigate = useNavigate()
   const [storyline, setStoryline] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'json'
+  const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'assets' | 'voice' | 'json'
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [meta, setMeta] = useState({})
   const [availableScenarios, setAvailableScenarios] = useState([])
@@ -184,20 +183,51 @@ export default function StorylineEdit() {
       title: s.title,
       description: s.description,
       defaultBgm: s.defaultBgm,
+      ...(s.thumbnailImage !== undefined ? { thumbnailImage: s.thumbnailImage } : {}),
+      ...(s.coverImage !== undefined ? { coverImage: s.coverImage } : {}),
       status: s.status,
       sortOrder: s.sortOrder,
       assetLibrary: s.assetLibrary || { backgrounds: [], characters: [] },
+      ...(s.assetPrompts ? { assetPrompts: s.assetPrompts } : {}),
+      ...(s.assetUrls ? { assetUrls: s.assetUrls } : {}),
       guestCharacterIds: (s.characters || []).map((sc) => sc.characterId),
-      images: (s.images || []).map((img) => ({
-        tempId: img.id,
-        url: img.url,
-        ...(img.title ? { title: img.title } : {}),
-        ...(img.description ? { description: img.description } : {}),
-        unlockType: img.unlockType,
-        sortOrder: img.sortOrder,
-      })),
       nodes: serializeNodesForEditor(s.nodes || []),
     }
+  }
+
+  // 자산 프롬프트 업로드 응답 → storyline state 부분 패치
+  // 서버에서 oldValue → newUrl 일괄 치환을 마쳤으므로, 클라이언트도 같은 치환을 인메모리로 반영.
+  // 전체 load()를 호출하면 트리 재마운트로 스크롤이 맨 위로 점프하는 문제 회피.
+  function applyAssetUpload(response) {
+    if (!response || !response.oldValue || !response.url) return
+    const { oldValue, url: newUrl, assetUrls: nextAssetUrls } = response
+    const replaceUrl = (v) => (v === oldValue ? newUrl : v)
+    setStoryline((prev) => {
+      if (!prev) return prev
+      const nextNodes = (prev.nodes || []).map((n) => {
+        if (!Array.isArray(n.script)) return n
+        let nodeChanged = false
+        const nextScript = n.script.map((it) => {
+          if (!it || typeof it !== 'object') return it
+          let itemChanged = false
+          const next = { ...it }
+          for (const f of URL_FIELDS_IN_SCRIPT_ITEM) {
+            if (next[f] === oldValue) { next[f] = newUrl; itemChanged = true }
+          }
+          if (itemChanged) nodeChanged = true
+          return itemChanged ? next : it
+        })
+        return nodeChanged ? { ...n, script: nextScript } : n
+      })
+      return {
+        ...prev,
+        assetUrls: nextAssetUrls || { ...(prev.assetUrls || {}) },
+        thumbnailImage: replaceUrl(prev.thumbnailImage),
+        coverImage: replaceUrl(prev.coverImage),
+        defaultBgm: replaceUrl(prev.defaultBgm),
+        nodes: nextNodes,
+      }
+    })
   }
 
   // 챕터(노드) 자체의 필드 업데이트 — nodeType, resultTitle, resultBody 등
@@ -385,6 +415,55 @@ export default function StorylineEdit() {
     }, 3500)
   }
 
+  // 보이스 탭 — 모든 CHAPTER 노드(메인+분기)의 character 라인 일괄 생성
+  async function bulkGenerateVoiceForAll(opts = {}) {
+    const { overwrite = false } = opts
+    const chapters = (storyline?.nodes || []).filter((n) => n.nodeType === 'CHAPTER')
+    const targets = []
+    for (const ch of chapters) {
+      const script = Array.isArray(ch.script) ? ch.script : []
+      script.forEach((it, i) => {
+        if (it.mode === 'character' && (overwrite || !it.voiceUrl)) {
+          targets.push({ chapterId: ch.id, scriptIndex: i, item: it })
+        }
+      })
+    }
+    if (targets.length === 0) {
+      setStatusMsg({ type: 'error', text: '생성할 character 아이템이 없습니다' })
+      setTimeout(() => setStatusMsg(null), 2500)
+      return
+    }
+    if (!confirm(`총 ${targets.length}개 보이스를 생성합니다. (실패한 행은 그대로 둡니다)`)) return
+    setBulkVoiceProgress({ done: 0, total: targets.length, failures: [] })
+    const failures = []
+    let done = 0
+    const concurrency = 3
+    let cursor = 0
+    async function worker() {
+      while (cursor < targets.length) {
+        const myIdx = cursor++
+        const t = targets[myIdx]
+        try {
+          await generateVoiceForItem(t.chapterId, t.scriptIndex, t.item)
+        } catch (e) {
+          failures.push({ chapterId: t.chapterId, idx: t.scriptIndex, msg: e?.data?.error || e?.message || '실패' })
+        }
+        done++
+        setBulkVoiceProgress({ done, total: targets.length, failures: [...failures] })
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker))
+    if (failures.length === 0) {
+      setStatusMsg({ type: 'success', text: `${targets.length}개 보이스 생성 완료` })
+    } else {
+      setStatusMsg({ type: 'error', text: `${targets.length - failures.length}개 성공 · ${failures.length}개 실패` })
+    }
+    setTimeout(() => {
+      setStatusMsg(null)
+      setBulkVoiceProgress(null)
+    }, 3500)
+  }
+
   const saveMeta = async () => {
     setSaving(true)
     setStatusMsg(null)
@@ -457,6 +536,9 @@ export default function StorylineEdit() {
   const placeholderCount = countPlaceholders(storyline)
   const hasPlaceholders = placeholderCount > 0
   const isPublished = storyline.status === 'PUBLISHED'
+  const assetPromptCount = storyline.assetPrompts && typeof storyline.assetPrompts === 'object'
+    ? Object.keys(storyline.assetPrompts).length
+    : 0
 
   return (
     <div className="p-6">
@@ -531,6 +613,8 @@ export default function StorylineEdit() {
         {[
           { key: 'tree', label: '트리' },
           { key: 'meta', label: '메타데이터' },
+          { key: 'assets', label: `에셋${assetPromptCount > 0 ? ` (${assetPromptCount})` : ''}` },
+          { key: 'voice', label: '보이스' },
           { key: 'json', label: 'JSON 편집 (전체 교체)' },
         ].map((t) => (
           <button
@@ -764,6 +848,21 @@ export default function StorylineEdit() {
         </div>
       )}
 
+      {/* 에셋 탭 — assetPrompts 키별 카드, 업로드 시 placeholder 일괄 치환 */}
+      {tab === 'assets' && (
+        <AssetPromptsTab storyline={storyline} onAssetUploaded={applyAssetUpload} />
+      )}
+
+      {/* 보이스 탭 — 모든 CHAPTER character 라인 일괄 TTS 관리 */}
+      {tab === 'voice' && (
+        <VoiceTab
+          storyline={storyline}
+          onGenerateVoice={generateVoiceForItem}
+          onBulkGenerateAll={bulkGenerateVoiceForAll}
+          bulkVoiceProgress={bulkVoiceProgress}
+        />
+      )}
+
       {/* JSON 탭 */}
       {tab === 'json' && (
         <div className="space-y-3">
@@ -872,7 +971,7 @@ function getChapterPreview(chapter) {
   const script = Array.isArray(chapter.script) ? chapter.script : []
   const first = script[0]
   if (!first) return '(빈 챕터)'
-  return first.text || first.content || (first.mode === 'cg' ? '🖼️ CG' : '...')
+  return first.text || first.content || '...'
 }
 
 function StorylineTreeView({ storyline, selectedChapterId, onChapterClick }) {
@@ -910,21 +1009,16 @@ function StorylineTreeView({ storyline, selectedChapterId, onChapterClick }) {
 }
 
 // 챕터의 첫 효과를 추출 (썸네일용)
-function getChapterVisuals(chapter, storyline) {
+function getChapterVisuals(chapter) {
   if (chapter.nodeType === 'RESULT') return { isResult: true }
   const script = Array.isArray(chapter.script) ? chapter.script : []
   const firstBg = script.find((it) => it.backgroundImage)?.backgroundImage || null
   const firstChar = script.find((it) => it.characterImage)?.characterImage || null
-  // 첫 CG (bg/character 없을 때 fallback)
-  const firstCg = script.find((it) => it.mode === 'cg')
-  const cgImg = firstCg
-    ? (storyline?.images || []).find((i) => i.id === firstCg.storyImageId || i.tempId === firstCg.storyImageId)
-    : null
-  return { isResult: false, firstBg, firstChar, cgUrl: cgImg?.url || null }
+  return { isResult: false, firstBg, firstChar }
 }
 
-function ChapterThumb({ chapter, storyline, size = 'normal' }) {
-  const v = getChapterVisuals(chapter, storyline)
+function ChapterThumb({ chapter, size = 'normal' }) {
+  const v = getChapterVisuals(chapter)
   const widthClass = size === 'small' ? 'w-10' : 'w-14'
   const isChat = chapter.nodeType === 'CHAT'
 
@@ -953,8 +1047,6 @@ function ChapterThumb({ chapter, storyline, size = 'normal' }) {
     <div className={`relative flex-shrink-0 ${widthClass} aspect-[9/16] rounded overflow-hidden bg-gray-800 border border-gray-700`}>
       {v.firstBg ? (
         <img src={v.firstBg} className="absolute inset-0 w-full h-full object-cover" alt="" />
-      ) : v.cgUrl ? (
-        <img src={v.cgUrl} className="absolute inset-0 w-full h-full object-cover opacity-90" alt="" />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-b from-gray-800 to-gray-950" />
       )}
@@ -965,7 +1057,7 @@ function ChapterThumb({ chapter, storyline, size = 'normal' }) {
           alt=""
         />
       )}
-      {!v.firstBg && !v.firstChar && !v.cgUrl && (
+      {!v.firstBg && !v.firstChar && (
         <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-xs">—</div>
       )}
     </div>
@@ -1012,7 +1104,7 @@ function ChapterCard({ chapter, index, branchMap, selectedChapterId, onChapterCl
         style={{ outline: 'none' }}
       >
         <div className="flex gap-3 items-start">
-          <ChapterThumb chapter={chapter} storyline={storyline} size={isMain ? 'normal' : 'small'} />
+          <ChapterThumb chapter={chapter} size={isMain ? 'normal' : 'small'} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-xs text-gray-500 font-mono">
@@ -1031,7 +1123,6 @@ function ChapterCard({ chapter, index, branchMap, selectedChapterId, onChapterCl
                   {mode === 'narration' && '📖'}
                   {mode === 'character' && '💬'}
                   {mode === 'user' && '👤'}
-                  {mode === 'cg' && '🖼️'}
                   {mode === 'media' && '📷'}
                   {cnt}
                 </span>
@@ -1072,7 +1163,6 @@ function ChapterCard({ chapter, index, branchMap, selectedChapterId, onChapterCl
 function ChoiceRow({ choice, branchMap, selectedChapterId, onChapterClick, storyline }) {
   const branches = branchMap.get(choice.id) || []
   const isPremium = choice.choiceType === 'PREMIUM'
-  const unlockCount = (choice.imageUnlocks || []).length
 
   return (
     <div className={`px-4 py-2 ${isPremium ? 'bg-amber-950/30' : ''}`}>
@@ -1087,11 +1177,6 @@ function ChoiceRow({ choice, branchMap, selectedChapterId, onChapterClick, story
         {choice.affinityDelta !== 0 && (
           <span className={`text-[10px] font-medium ${choice.affinityDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {choice.affinityDelta > 0 ? '+' : ''}{choice.affinityDelta}
-          </span>
-        )}
-        {unlockCount > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 bg-purple-900/50 text-purple-300 rounded">
-            🖼️ {unlockCount}
           </span>
         )}
       </div>
@@ -1125,7 +1210,6 @@ const MODE_META = {
   narration: { icon: '📖', label: 'narration', bg: 'bg-gray-800/80', text: 'text-gray-200' },
   character: { icon: '💬', label: 'character', bg: 'bg-indigo-900/40', text: 'text-white' },
   user:      { icon: '👤', label: 'user',      bg: 'bg-emerald-900/40', text: 'text-white' },
-  cg:        { icon: '🖼️', label: 'cg',        bg: 'bg-amber-900/40', text: 'text-amber-100' },
   media:     { icon: '📷', label: 'media',     bg: 'bg-pink-900/30',   text: 'text-pink-100' },
 }
 
@@ -1323,11 +1407,6 @@ function ChapterDetailPanel({ chapter, storyline, onClose, onChapterPatch, onScr
                         )}
                       </div>
                       {c.description && <p className="text-xs text-gray-400 mb-1">{c.description}</p>}
-                      {Array.isArray(c.imageUnlocks) && c.imageUnlocks.length > 0 && (
-                        <p className="text-[10px] text-purple-300">
-                          🖼️ 해금 이미지 {c.imageUnlocks.length}장
-                        </p>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -1618,10 +1697,6 @@ function InsertGap({ onInsert, alwaysVisible = false }) {
 
 function ScriptItemRow({ item, index, storyline, chapter, onMediaClick, editable = false, onFieldChange, onRemove, onOpenPicker, onGenerateVoice }) {
   const meta = MODE_META[item.mode] || MODE_META.narration
-  const cgImage = item.mode === 'cg'
-    ? (storyline?.images || []).find((img) => img.id === item.storyImageId || img.tempId === item.storyImageId)
-    : null
-
   // 보이스 슬롯 노출 조건: CHAPTER 노드 + character 모드
   const voiceEligible = chapter?.nodeType === 'CHAPTER' && item.mode === 'character'
   const voiceId = voiceEligible ? resolveSpeakerVoiceId(chapter, storyline) : null
@@ -1721,26 +1796,10 @@ function ScriptItemRow({ item, index, storyline, chapter, onMediaClick, editable
         />
       )}
 
-      {/* CG 풀스크린 미리보기 */}
-      {item.mode === 'cg' && cgImage && (
-        <div className="mb-2">
-          {cgImage.title && (
-            <p className={`text-sm font-medium mb-1.5 ${meta.text}`}>🖼️ {cgImage.title}</p>
-          )}
-          <button
-            onClick={() => onMediaClick({ url: cgImage.url, type: 'image', label: cgImage.title || 'CG' })}
-            className="block w-full aspect-[9/16] max-h-80 rounded-lg overflow-hidden bg-gray-800 border border-gray-700 hover:border-amber-500 transition-colors"
-            style={{ outline: 'none' }}
-          >
-            <img src={cgImage.url} alt="" className="w-full h-full object-cover" />
-          </button>
-        </div>
-      )}
-
       {/* 배경 + 캐릭터 이미지 슬롯
          CHAPTER 노드: 항상 노출 (편집 흐름의 핵심)
          CHAT 노드: 값이 들어있을 때만 노출 (외부 JSON으로 들어온 placeholder/잔존 데이터 정리용) */}
-      {item.mode !== 'cg' && (() => {
+      {(() => {
         const isChat = chapter?.nodeType === 'CHAT'
         const showBg = !isChat || item.backgroundImage != null
         const showChar = !isChat || item.characterImage != null

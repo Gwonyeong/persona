@@ -457,16 +457,6 @@ export default function Storyline() {
   const currentBg = currentItem?.backgroundImage || null
   const currentCharImage = currentItem?.characterImage || null
 
-  // 서버 응답의 newlyUnlocked 이미지를 storyline.images에 반영 — 결과 화면 그리드에 즉시 노출되게
-  const markImagesUnlocked = (newlyUnlocked) => {
-    if (!newlyUnlocked?.length) return
-    const ids = new Set(newlyUnlocked.map((u) => u.id))
-    setStoryline((prev) => prev ? {
-      ...prev,
-      images: (prev.images || []).map((img) => ids.has(img.id) ? { ...img, unlocked: true } : img),
-    } : prev)
-  }
-
   // RESULT 도달 시 자동 완료
   useEffect(() => {
     if (completeCalled || !token || !sequence.length) return
@@ -474,12 +464,6 @@ export default function Storyline() {
     if (cur?.nodeType !== 'RESULT') return
     setCompleteCalled(true)
     api.post(`/storylines/${id}/complete`)
-      .then((res) => {
-        markImagesUnlocked(res?.unlockedImages)
-        if (res?.unlockedImages?.length > 0) {
-          setToast(`🖼️ ${res.unlockedImages.length}장 해금!`)
-        }
-      })
       .catch((e) => {
         console.error('Complete storyline failed:', e)
         setCompleteCalled(false)
@@ -582,13 +566,7 @@ export default function Storyline() {
           choiceId: choice.id,
           nextNodeId,
         })
-        markImagesUnlocked(res?.unlockedImages)
-        const unlockCount = res?.unlockedImages?.length || 0
-        if (unlockCount > 0) {
-          setToast(`저장 완료 · 🖼️ ${unlockCount}장 해금`)
-        } else {
-          setToast('저장 완료')
-        }
+        setToast('저장 완료')
         setLockedAtIndex(lockTarget)
         if (res.masks != null) setMasks(res.masks)
       } catch (e) {
@@ -657,21 +635,15 @@ export default function Storyline() {
   const isChapterNode = node.nodeType === 'CHAPTER'
   const isChatNode = node.nodeType === 'CHAT'
   const isResultNode = node.nodeType === 'RESULT'
-  const isCgItem = currentItem?.mode === 'cg'
 
   // 챕터 끝 + 선택지 있을 때 우측 탭 비활성화 (선택 강제)
   const hasChoices = hasScript && Array.isArray(node.choices) && node.choices.length > 0
   const waitingChoice = hasChoices && isAtLastItem
   const showTapZones = !isResultNode
 
-  // CG 아이템: storyImageId로 storyline.images 에서 매칭되는 이미지 찾음
-  const cgImage = isCgItem
-    ? (storyline.images || []).find((img) => img.id === currentItem.storyImageId)
-    : null
-
-  // 챗 누적 블록 — CHAT 노드 + 비-cg 아이템에서만
+  // 챗 누적 블록 — CHAT 노드에서만
   // choices 상태를 전달해서 이전 CHAT 노드의 선택지가 채팅 히스토리에 user 버블로 남도록
-  const rawChatBlock = isChatNode && currentItem && !isCgItem
+  const rawChatBlock = isChatNode && currentItem
     ? getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex, choices)
     : []
 
@@ -684,12 +656,10 @@ export default function Storyline() {
   const showUserAsButton = isChatNode && currentItem?.mode === 'user' && !userSent
   const chatBlock = showUserAsButton ? rawChatBlock.slice(0, -1) : rawChatBlock
 
-  // 비주얼 노벨 텍스트 박스 뷰 — CHAPTER 노드 + 비-cg 아이템
-  const isVnTextView = isChapterNode && currentItem && !isCgItem
-  // 채팅 뷰 — CHAT 노드 + 비-cg 아이템
-  const isChatView = isChatNode && currentItem && !isCgItem
-  // CG 뷰 — 어느 노드 타입이든 cg 아이템
-  const isCgView = (isChapterNode || isChatNode) && isCgItem
+  // 비주얼 노벨 텍스트 박스 뷰 — CHAPTER 노드
+  const isVnTextView = isChapterNode && currentItem
+  // 채팅 뷰 — CHAT 노드
+  const isChatView = isChatNode && currentItem
 
   return (
     <div
@@ -735,11 +705,6 @@ export default function Storyline() {
         <div className="absolute inset-x-0 flex items-end justify-center pointer-events-none" style={{ top: '8%', bottom: 'env(safe-area-inset-bottom)' }}>
           <img src={currentCharImage} alt="" className="max-h-full max-w-full object-contain drop-shadow-2xl" />
         </div>
-      )}
-
-      {/* CG 풀스크린 */}
-      {isCgView && cgImage && (
-        <img src={cgImage.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
       )}
 
       {/* fullMedia (script item 레벨, narration에서 가능) */}
@@ -791,17 +756,6 @@ export default function Storyline() {
           unlockedMedia={unlockedMedia}
           onUnlockRequest={(line) => setUnlockModal({ mediaUrl: line.mediaUrl, maskCost: line.maskCost || 0 })}
           onMediaPreview={(line) => setMediaLightbox({ url: line.mediaUrl, type: line.variant === 'video' ? 'video' : 'image' })}
-        />
-      )}
-
-      {isCgView && (
-        <CgView
-          image={cgImage}
-          showChoices={waitingChoice}
-          choices={node.choices}
-          masks={masks}
-          onChoice={handleChoiceClick}
-          selectingChoiceId={selectingChoiceId}
         />
       )}
 
@@ -1157,11 +1111,16 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
     : chatBlock
 
   const scrollRef = useRef(null)
-  useEffect(() => {
+  const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [chatBlock.length, showChoices, selectingChoiceId, userButton?.content])
+  }
+  // unlockedMedia: 프리미엄 해금 직후 잠금 오버레이가 사라지면서 버블 내부 이미지가 새로 로드됨 →
+  // 이미지가 자라면서 채팅 영역 하단이 뷰포트 밖으로 밀려 "상단만 잘려 보이는" 증상 → 스크롤 재정렬 필요.
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatBlock.length, showChoices, selectingChoiceId, userButton?.content, unlockedMedia])
 
   return (
     <div className="absolute inset-0">
@@ -1202,6 +1161,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                   isUnlocked={!!unlockedMedia && unlockedMedia.has(line.mediaUrl)}
                   onUnlockRequest={onUnlockRequest}
                   onPreview={onMediaPreview}
+                  onMediaLoaded={scrollToBottom}
                 />
               )
             }
@@ -1240,7 +1200,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                     >
                       {line.mediaType === 'video' ? (
                         <>
-                          <video src={line.mediaUrl} poster={posterMap?.get(line.mediaUrl) || undefined} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline />
+                          <video src={line.mediaUrl} poster={posterMap?.get(line.mediaUrl) || undefined} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline onLoadedData={scrollToBottom} />
                           <div className="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center bg-black/60 rounded-full">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="15 3 21 3 21 9" />
@@ -1251,7 +1211,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                           </div>
                         </>
                       ) : (
-                        <img src={line.mediaUrl} alt="" className="w-full max-h-[240px] object-cover" loading="lazy" />
+                        <img src={line.mediaUrl} alt="" className="w-full max-h-[240px] object-cover" loading="lazy" onLoad={scrollToBottom} />
                       )}
                     </div>
                   )}
@@ -1327,7 +1287,7 @@ function UserInputButton({ item, userName, onClick }) {
 // ───────────────────────────────────────────────────────────
 // 채팅 미디어 버블 — CHAT의 mode:'media' 아이템 (이미지/영상/프리미엄)
 // ───────────────────────────────────────────────────────────
-function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview }) {
+function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview, onMediaLoaded }) {
   const isVideo = line.variant === 'video'
   const isPremium = line.variant === 'premium'
   const locked = isPremium && !isUnlocked
@@ -1369,6 +1329,7 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
               autoPlay
               playsInline
               preload="metadata"
+              onLoadedData={onMediaLoaded}
             />
           ) : (
             <img
@@ -1376,6 +1337,7 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
               alt=""
               className={`w-full max-h-[280px] object-cover transition-all ${locked ? 'blur-sm scale-[1.02]' : ''}`}
               loading="lazy"
+              onLoad={onMediaLoaded}
             />
           )}
 
@@ -1401,39 +1363,6 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-// ───────────────────────────────────────────────────────────
-// CG 뷰 — 컬렉터블 풀스크린
-// ───────────────────────────────────────────────────────────
-function CgView({ image, showChoices, choices, masks, onChoice, selectingChoiceId }) {
-  return (
-    <div className="absolute inset-0">
-      {image?.title && (
-        <div
-          className="absolute left-0 right-0 z-20 px-5 pointer-events-none"
-          style={{ top: 'calc(env(safe-area-inset-top) + 70px)' }}
-        >
-          <div className="inline-block px-3 py-1 rounded-md text-xs font-bold bg-amber-600/90 text-white shadow-lg">
-            🖼️ {image.title}
-          </div>
-        </div>
-      )}
-      {showChoices && (
-        <div
-          className="absolute left-0 right-0 bottom-0 z-20 px-5 pointer-events-none"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
-        >
-          <ChoiceButtons
-            choices={choices}
-            masks={masks}
-            onChoice={onChoice}
-            selectingChoiceId={selectingChoiceId}
-          />
-        </div>
-      )}
     </div>
   )
 }
@@ -1489,11 +1418,9 @@ function ChoiceButtons({ choices, masks, onChoice, selectingChoiceId }) {
 }
 
 // ───────────────────────────────────────────────────────────
-// Result 뷰 — 결말 페이지 + 해금 이미지 그리드
+// Result 뷰 — 결말 페이지 + 프리미엄 미디어 그리드
 // ───────────────────────────────────────────────────────────
 function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClose, onRestart, onNextPart, onMediaClick }) {
-  const unlockedImages = (storyline.images || []).filter((img) => img.unlocked)
-
   return (
     <div
       className="absolute inset-0 overflow-auto bg-black"
@@ -1502,27 +1429,6 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
       <div className="px-6 max-w-md mx-auto">
         <p className="text-center text-xs text-indigo-400 font-semibold tracking-[0.3em] mb-3">FIN</p>
         <h2 className="text-center text-2xl font-bold text-white mb-8">{node.resultTitle || storyline.title}</h2>
-
-        {/* 이 파트에서 해금한 이미지 */}
-        {unlockedImages.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
-              해금한 이미지 ({unlockedImages.length})
-            </h3>
-            <div className="grid grid-cols-3 gap-2">
-              {unlockedImages.map((img) => (
-                <button
-                  key={img.id}
-                  onClick={() => onMediaClick && onMediaClick({ url: img.url, type: 'image' })}
-                  className="aspect-[9/16] rounded-lg overflow-hidden relative bg-gray-900 border border-gray-800"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  <img src={img.url} alt={img.title || ''} className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {premiumMedia.length > 0 && (() => {
           const unlockedCount = premiumMedia.filter((m) => m.unlocked).length
