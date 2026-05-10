@@ -1111,11 +1111,16 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
     : chatBlock
 
   const scrollRef = useRef(null)
-  useEffect(() => {
+  const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [chatBlock.length, showChoices, selectingChoiceId, userButton?.content])
+  }
+  // unlockedMedia: 프리미엄 해금 직후 잠금 오버레이가 사라지면서 버블 내부 이미지가 새로 로드됨 →
+  // 이미지가 자라면서 채팅 영역 하단이 뷰포트 밖으로 밀려 "상단만 잘려 보이는" 증상 → 스크롤 재정렬 필요.
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatBlock.length, showChoices, selectingChoiceId, userButton?.content, unlockedMedia])
 
   return (
     <div className="absolute inset-0">
@@ -1156,6 +1161,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                   isUnlocked={!!unlockedMedia && unlockedMedia.has(line.mediaUrl)}
                   onUnlockRequest={onUnlockRequest}
                   onPreview={onMediaPreview}
+                  onMediaLoaded={scrollToBottom}
                 />
               )
             }
@@ -1194,7 +1200,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                     >
                       {line.mediaType === 'video' ? (
                         <>
-                          <video src={line.mediaUrl} poster={posterMap?.get(line.mediaUrl) || undefined} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline />
+                          <video src={line.mediaUrl} poster={posterMap?.get(line.mediaUrl) || undefined} className="w-full max-h-[240px] object-cover bg-black" muted loop autoPlay playsInline onLoadedData={scrollToBottom} />
                           <div className="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center bg-black/60 rounded-full">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="15 3 21 3 21 9" />
@@ -1205,7 +1211,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                           </div>
                         </>
                       ) : (
-                        <img src={line.mediaUrl} alt="" className="w-full max-h-[240px] object-cover" loading="lazy" />
+                        <img src={line.mediaUrl} alt="" className="w-full max-h-[240px] object-cover" loading="lazy" onLoad={scrollToBottom} />
                       )}
                     </div>
                   )}
@@ -1281,7 +1287,7 @@ function UserInputButton({ item, userName, onClick }) {
 // ───────────────────────────────────────────────────────────
 // 채팅 미디어 버블 — CHAT의 mode:'media' 아이템 (이미지/영상/프리미엄)
 // ───────────────────────────────────────────────────────────
-function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview }) {
+function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview, onMediaLoaded }) {
   const isVideo = line.variant === 'video'
   const isPremium = line.variant === 'premium'
   const locked = isPremium && !isUnlocked
@@ -1323,6 +1329,7 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
               autoPlay
               playsInline
               preload="metadata"
+              onLoadedData={onMediaLoaded}
             />
           ) : (
             <img
@@ -1330,6 +1337,7 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
               alt=""
               className={`w-full max-h-[280px] object-cover transition-all ${locked ? 'blur-sm scale-[1.02]' : ''}`}
               loading="lazy"
+              onLoad={onMediaLoaded}
             />
           )}
 
