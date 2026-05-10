@@ -317,11 +317,6 @@ export default function StorylineEdit() {
   // dirty 변경사항(script 편집)을 replace API로 일괄 저장
   async function saveAllChanges() {
     if (!storyline) return
-    // PUBLISHED 상태 + placeholder 잔존 → 클라이언트 가드 (서버도 동일 검증)
-    if (storyline.status === 'PUBLISHED' && countPlaceholders(storyline) > 0) {
-      alert('PUBLISHED 상태에서는 PLACEHOLDER URL이 남아있는 채로 저장할 수 없습니다.\n메타데이터 탭에서 일단 DRAFT로 바꾸거나, 모든 슬롯을 실제 URL로 교체해 주세요.')
-      return
-    }
     if (!confirm('변경사항을 저장할까요?\n\n노드/선택지/유저 진행 기록을 삭제하고 새로 생성합니다.')) return
     setSaving(true)
     setStatusMsg(null)
@@ -468,10 +463,6 @@ export default function StorylineEdit() {
     setSaving(true)
     setStatusMsg(null)
     try {
-      // PUBLISHED로 전환 시도 시 placeholder 잔존 클라이언트 가드
-      if (meta.status === 'PUBLISHED' && countPlaceholders(storyline) > 0) {
-        throw new Error('PLACEHOLDER URL이 남아있어 PUBLISHED로 저장할 수 없습니다. 모든 슬롯의 미디어를 실제 URL로 교체해 주세요.')
-      }
       const payload = {
         title: meta.title,
         description: meta.description || null,
@@ -597,11 +588,11 @@ export default function StorylineEdit() {
           <div className="flex items-start gap-2">
             <span className="text-lg leading-none">⚠️</span>
             <div className="flex-1 min-w-0">
-              <p className={`text-sm font-bold ${isPublished ? 'text-red-200' : 'text-amber-200'}`}>
-                수정이 필요합니다! — {placeholderCount}개의 PLACEHOLDER URL
+              <p className={`text-sm font-bold ${isPublished ? 'text-amber-200' : 'text-amber-200'}`}>
+                {placeholderCount}개의 PLACEHOLDER URL이 남아있습니다
               </p>
-              <p className={`text-[11px] mt-0.5 ${isPublished ? 'text-red-300/80' : 'text-amber-300/80'}`}>
-                트리 카드의 ⚠ 배지로 어느 챕터에 placeholder가 남아있는지 확인하세요. PUBLISHED 상태로 저장하려면 모두 교체되어야 합니다.
+              <p className={`text-[11px] mt-0.5 ${isPublished ? 'text-amber-300/80' : 'text-amber-300/80'}`}>
+                트리 카드의 ⚠ 배지로 어느 챕터에 남아있는지 확인하세요. 에셋 탭에서 자산 업로드 시 일괄 치환됩니다. (PUBLISHED 저장은 가능 — placeholder가 화면에 그대로 노출될 뿐)
               </p>
             </div>
           </div>
