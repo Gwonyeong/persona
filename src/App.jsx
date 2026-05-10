@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
@@ -84,6 +84,8 @@ function App() {
   }, [location.pathname])
 
   // Capacitor 네이티브 뒤로가기 버튼 처리
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -93,6 +95,8 @@ function App() {
       App.addListener('backButton', ({ canGoBack }) => {
         if (canGoBack) {
           window.history.back()
+        } else if (/^\/chats\/[^/]+$/.test(window.location.pathname)) {
+          navigateRef.current('/chats', { replace: true })
         } else {
           App.minimizeApp()
         }
