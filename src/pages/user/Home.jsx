@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
@@ -74,6 +74,14 @@ export default function Home() {
     if (sort !== 'default') params.set('sort', sort)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
   }, [search, sort, i18nInstance.language])
+
+  const charactersWithRandomTags = useMemo(() => {
+    return characters.map((c) => {
+      const displayTags = c.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0]))
+      const shuffled = [...displayTags].sort(() => Math.random() - 0.5)
+      return { ...c, randomTags: shuffled.slice(0, 2) }
+    })
+  }, [characters])
 
   return (
     <div className="px-4 pt-4 pb-2">
@@ -176,13 +184,13 @@ export default function Home() {
       </div>
 
       {/* 캐릭터 그리드 */}
-      {filterByTags(characters).length === 0 ? (
+      {filterByTags(charactersWithRandomTags).length === 0 ? (
         <div className="text-center text-gray-500 py-20">
           <p>{t('home.emptyCharacters')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {filterByTags(characters).map((c) => {
+          {filterByTags(charactersWithRandomTags).map((c) => {
             const thumb = c.styles?.[0]?.images?.[0]
             const homeMedia = reducedData ? null : c.homeImage
             const thumbUrl = getImageUrl(homeMedia) || getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
@@ -246,9 +254,8 @@ export default function Home() {
                 {/* 그라데이션 오버레이 + 정보 */}
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-14">
                   <p className="font-semibold text-sm truncate text-white">{c.name}</p>
-                  <p className="text-xs text-gray-300 mt-0.5 line-clamp-2">{c.description}</p>
                   <div className="flex gap-1 mt-1.5 flex-wrap">
-                    {c.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0])).map((tag) => (
+                    {c.randomTags.map((tag) => (
                       <span key={tag} className="px-1.5 py-0.5 bg-white/15 rounded text-[10px] text-gray-200">
                         {getTagLabel(tag, tagCategories)}
                       </span>
