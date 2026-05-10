@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import AssetLibraryModal from './AssetLibraryModal'
 import AssetPromptsTab from './AssetPromptsTab'
+import VoiceTab from './VoiceTab'
 
 // 라이브러리 kind → script 아이템 필드 매핑
 const SCRIPT_FIELD_BY_KIND = {
@@ -114,7 +115,7 @@ export default function StorylineEdit() {
   const navigate = useNavigate()
   const [storyline, setStoryline] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'assets' | 'json'
+  const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'assets' | 'voice' | 'json'
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [meta, setMeta] = useState({})
   const [availableScenarios, setAvailableScenarios] = useState([])
@@ -414,6 +415,55 @@ export default function StorylineEdit() {
     }, 3500)
   }
 
+  // 보이스 탭 — 모든 CHAPTER 노드(메인+분기)의 character 라인 일괄 생성
+  async function bulkGenerateVoiceForAll(opts = {}) {
+    const { overwrite = false } = opts
+    const chapters = (storyline?.nodes || []).filter((n) => n.nodeType === 'CHAPTER')
+    const targets = []
+    for (const ch of chapters) {
+      const script = Array.isArray(ch.script) ? ch.script : []
+      script.forEach((it, i) => {
+        if (it.mode === 'character' && (overwrite || !it.voiceUrl)) {
+          targets.push({ chapterId: ch.id, scriptIndex: i, item: it })
+        }
+      })
+    }
+    if (targets.length === 0) {
+      setStatusMsg({ type: 'error', text: '생성할 character 아이템이 없습니다' })
+      setTimeout(() => setStatusMsg(null), 2500)
+      return
+    }
+    if (!confirm(`총 ${targets.length}개 보이스를 생성합니다. (실패한 행은 그대로 둡니다)`)) return
+    setBulkVoiceProgress({ done: 0, total: targets.length, failures: [] })
+    const failures = []
+    let done = 0
+    const concurrency = 3
+    let cursor = 0
+    async function worker() {
+      while (cursor < targets.length) {
+        const myIdx = cursor++
+        const t = targets[myIdx]
+        try {
+          await generateVoiceForItem(t.chapterId, t.scriptIndex, t.item)
+        } catch (e) {
+          failures.push({ chapterId: t.chapterId, idx: t.scriptIndex, msg: e?.data?.error || e?.message || '실패' })
+        }
+        done++
+        setBulkVoiceProgress({ done, total: targets.length, failures: [...failures] })
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker))
+    if (failures.length === 0) {
+      setStatusMsg({ type: 'success', text: `${targets.length}개 보이스 생성 완료` })
+    } else {
+      setStatusMsg({ type: 'error', text: `${targets.length - failures.length}개 성공 · ${failures.length}개 실패` })
+    }
+    setTimeout(() => {
+      setStatusMsg(null)
+      setBulkVoiceProgress(null)
+    }, 3500)
+  }
+
   const saveMeta = async () => {
     setSaving(true)
     setStatusMsg(null)
@@ -564,6 +614,7 @@ export default function StorylineEdit() {
           { key: 'tree', label: '트리' },
           { key: 'meta', label: '메타데이터' },
           { key: 'assets', label: `에셋${assetPromptCount > 0 ? ` (${assetPromptCount})` : ''}` },
+          { key: 'voice', label: '보이스' },
           { key: 'json', label: 'JSON 편집 (전체 교체)' },
         ].map((t) => (
           <button
@@ -800,6 +851,16 @@ export default function StorylineEdit() {
       {/* 에셋 탭 — assetPrompts 키별 카드, 업로드 시 placeholder 일괄 치환 */}
       {tab === 'assets' && (
         <AssetPromptsTab storyline={storyline} onAssetUploaded={applyAssetUpload} />
+      )}
+
+      {/* 보이스 탭 — 모든 CHAPTER character 라인 일괄 TTS 관리 */}
+      {tab === 'voice' && (
+        <VoiceTab
+          storyline={storyline}
+          onGenerateVoice={generateVoiceForItem}
+          onBulkGenerateAll={bulkGenerateVoiceForAll}
+          bulkVoiceProgress={bulkVoiceProgress}
+        />
       )}
 
       {/* JSON 탭 */}
