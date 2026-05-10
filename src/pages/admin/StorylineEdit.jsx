@@ -711,19 +711,17 @@ export default function StorylineEdit() {
                 className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
               >
                 <option value="DRAFT">DRAFT (비공개)</option>
-                <option value="TEST">TEST (ADMIN 전용 — PLACEHOLDER 허용)</option>
-                <option value="PUBLISHED" disabled={hasPlaceholders}>
-                  PUBLISHED (공개){hasPlaceholders ? ' — PLACEHOLDER 수정 후 가능' : ''}
-                </option>
+                <option value="TEST">TEST (ADMIN 전용)</option>
+                <option value="PUBLISHED">PUBLISHED (공개)</option>
               </select>
               {meta.status === 'PUBLISHED' && hasPlaceholders && (
-                <p className="text-[11px] text-red-400 mt-1.5">
-                  ⚠️ PLACEHOLDER URL이 {placeholderCount}개 남아있어 저장 시 거부됩니다. 트리 탭에서 모두 교체해 주세요.
+                <p className="text-[11px] text-amber-400 mt-1.5">
+                  ⚠️ PLACEHOLDER URL이 {placeholderCount}개 남아있어 그대로 화면에 노출될 수 있습니다.
                 </p>
               )}
               {meta.status === 'TEST' && (
                 <p className="text-[11px] text-amber-400 mt-1.5">
-                  TEST 상태는 ADMIN 유저에게만 노출됩니다. PLACEHOLDER가 남아있어도 저장됩니다.
+                  TEST 상태는 ADMIN 유저에게만 노출됩니다.
                 </p>
               )}
             </Field>
