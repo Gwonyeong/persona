@@ -311,8 +311,6 @@ export default function Chat() {
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState(null)
-  const [suggestedReplies, setSuggestedReplies] = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
@@ -434,7 +432,6 @@ export default function Chat() {
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
-      if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
       // 호감도 해금 임계치 로드
       api.get(`/characters/${conv.characterId}/gallery`).then(({ galleryContents }) => {
         affinityThresholdsRef.current = (galleryContents || [])
@@ -534,8 +531,6 @@ export default function Chat() {
     const feedToSend = attachedFeed
     setInput('')
     setSending(true)
-    setShowSuggestions(false)
-    setSuggestedReplies([])
     setAttachedFeed(null)
     setShowGalleryTooltip(false)
     const feedImage = feedToSend?.images?.[0]?.filePath || null
@@ -617,7 +612,6 @@ export default function Chat() {
                     role: final.role,
                     content: final.content, // delta 누락분 보정 (서버 권위)
                     emotion: final.emotion,
-                    suggestedReplies: final.suggestedReplies,
                     createdAt: final.createdAt,
                     audioUrl: final.audioUrl,
                     _streaming: false,
@@ -649,7 +643,6 @@ export default function Chat() {
             })
             const lastCharMsg = rawCharMsgs[rawCharMsgs.length - 1]
             if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
-            if (lastCharMsg?.suggestedReplies?.length) setSuggestedReplies(lastCharMsg.suggestedReplies)
             setShowTyping(false)
             setSending(false)
             window.gtag?.('event', 'chat_message', { conversation_id: id })
@@ -678,9 +671,6 @@ export default function Chat() {
             }
             if (data.characterStatus) {
               setCharacterStatus(data.characterStatus)
-            }
-            if (data.wantsPhoto) {
-              setShowSelfieModal(true)
             }
             break
           }
@@ -1211,15 +1201,6 @@ export default function Chat() {
             </button>
           </div>
         )}
-        {showSuggestions && suggestedReplies.length > 0 && (
-          <div className="mb-2 flex flex-col gap-1.5">
-            {suggestedReplies.map((reply, i) => (
-              <button key={i} onClick={() => { setInput(reply); setShowSuggestions(false) }} className="text-left text-sm px-3.5 py-2 bg-gray-800 border border-gray-700 rounded-xl text-gray-200 hover:bg-gray-700 hover:border-indigo-500 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
-                {reply}
-              </button>
-            ))}
-          </div>
-        )}
         <div className="flex gap-2 items-end">
           <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
           <button
@@ -1231,11 +1212,6 @@ export default function Chat() {
           >
             <span className="text-[15px] font-mono leading-none">( )</span>
           </button>
-          {suggestedReplies.length > 0 && (
-            <button onClick={() => setShowSuggestions((prev) => !prev)} className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors ${showSuggestions ? 'bg-indigo-600 text-white' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500'}`} style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><line x1="9" y1="10" x2="15" y2="10" /></svg>
-            </button>
-          )}
           <div className="relative flex-shrink-0">
             {voiceMode && (
               <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">-5 🎭</span>
