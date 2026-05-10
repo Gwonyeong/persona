@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import AssetLibraryModal from './AssetLibraryModal'
+import AssetPromptsTab from './AssetPromptsTab'
 
 // 라이브러리 kind → script 아이템 필드 매핑
 const SCRIPT_FIELD_BY_KIND = {
@@ -116,7 +117,7 @@ export default function StorylineEdit() {
   const navigate = useNavigate()
   const [storyline, setStoryline] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'json'
+  const [tab, setTab] = useState('tree') // 'tree' | 'meta' | 'assets' | 'json'
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [meta, setMeta] = useState({})
   const [availableScenarios, setAvailableScenarios] = useState([])
@@ -184,9 +185,13 @@ export default function StorylineEdit() {
       title: s.title,
       description: s.description,
       defaultBgm: s.defaultBgm,
+      ...(s.thumbnailImage !== undefined ? { thumbnailImage: s.thumbnailImage } : {}),
+      ...(s.coverImage !== undefined ? { coverImage: s.coverImage } : {}),
       status: s.status,
       sortOrder: s.sortOrder,
       assetLibrary: s.assetLibrary || { backgrounds: [], characters: [] },
+      ...(s.assetPrompts ? { assetPrompts: s.assetPrompts } : {}),
+      ...(s.assetUrls ? { assetUrls: s.assetUrls } : {}),
       guestCharacterIds: (s.characters || []).map((sc) => sc.characterId),
       images: (s.images || []).map((img) => ({
         tempId: img.id,
@@ -198,6 +203,45 @@ export default function StorylineEdit() {
       })),
       nodes: serializeNodesForEditor(s.nodes || []),
     }
+  }
+
+  // 자산 프롬프트 업로드 응답 → storyline state 부분 패치
+  // 서버에서 oldValue → newUrl 일괄 치환을 마쳤으므로, 클라이언트도 같은 치환을 인메모리로 반영.
+  // 전체 load()를 호출하면 트리 재마운트로 스크롤이 맨 위로 점프하는 문제 회피.
+  function applyAssetUpload(response) {
+    if (!response || !response.oldValue || !response.url) return
+    const { oldValue, url: newUrl, assetUrls: nextAssetUrls } = response
+    const replaceUrl = (v) => (v === oldValue ? newUrl : v)
+    setStoryline((prev) => {
+      if (!prev) return prev
+      const nextNodes = (prev.nodes || []).map((n) => {
+        if (!Array.isArray(n.script)) return n
+        let nodeChanged = false
+        const nextScript = n.script.map((it) => {
+          if (!it || typeof it !== 'object') return it
+          let itemChanged = false
+          const next = { ...it }
+          for (const f of URL_FIELDS_IN_SCRIPT_ITEM) {
+            if (next[f] === oldValue) { next[f] = newUrl; itemChanged = true }
+          }
+          if (itemChanged) nodeChanged = true
+          return itemChanged ? next : it
+        })
+        return nodeChanged ? { ...n, script: nextScript } : n
+      })
+      const nextImages = (prev.images || []).map((img) =>
+        img?.url === oldValue ? { ...img, url: newUrl } : img
+      )
+      return {
+        ...prev,
+        assetUrls: nextAssetUrls || { ...(prev.assetUrls || {}) },
+        thumbnailImage: replaceUrl(prev.thumbnailImage),
+        coverImage: replaceUrl(prev.coverImage),
+        defaultBgm: replaceUrl(prev.defaultBgm),
+        nodes: nextNodes,
+        images: nextImages,
+      }
+    })
   }
 
   // 챕터(노드) 자체의 필드 업데이트 — nodeType, resultTitle, resultBody 등
@@ -457,6 +501,9 @@ export default function StorylineEdit() {
   const placeholderCount = countPlaceholders(storyline)
   const hasPlaceholders = placeholderCount > 0
   const isPublished = storyline.status === 'PUBLISHED'
+  const assetPromptCount = storyline.assetPrompts && typeof storyline.assetPrompts === 'object'
+    ? Object.keys(storyline.assetPrompts).length
+    : 0
 
   return (
     <div className="p-6">
@@ -531,6 +578,7 @@ export default function StorylineEdit() {
         {[
           { key: 'tree', label: '트리' },
           { key: 'meta', label: '메타데이터' },
+          { key: 'assets', label: `에셋${assetPromptCount > 0 ? ` (${assetPromptCount})` : ''}` },
           { key: 'json', label: 'JSON 편집 (전체 교체)' },
         ].map((t) => (
           <button
@@ -762,6 +810,11 @@ export default function StorylineEdit() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* 에셋 탭 — assetPrompts 키별 카드, 업로드 시 placeholder 일괄 치환 */}
+      {tab === 'assets' && (
+        <AssetPromptsTab storyline={storyline} onAssetUploaded={applyAssetUpload} />
       )}
 
       {/* JSON 탭 */}
