@@ -27,6 +27,32 @@ function detectMediaType(url) {
   return 'image'
 }
 
+// 구조화된 프롬프트(예: CG_*)의 필드별 라벨 + 이모지. 모르는 키는 그대로 노출.
+const FIELD_LABELS = {
+  reference:  { emoji: '🎯', label: '레퍼런스' },
+  background: { emoji: '🌆', label: '배경' },
+  camera:     { emoji: '📷', label: '카메라' },
+  outfit:     { emoji: '👕', label: '의상' },
+  pose:       { emoji: '🧍', label: '자세' },
+  motion:     { emoji: '🎬', label: '모션' },
+  expression: { emoji: '😶', label: '표정' },
+  lighting:   { emoji: '💡', label: '조명' },
+  composition:{ emoji: '🖼', label: '구도' },
+  mood:       { emoji: '🎭', label: '무드' },
+}
+
+// 프롬프트 객체를 클립보드에 복사할 단일 텍스트로 변환 (라벨 포함)
+function flattenPromptForCopy(prompt) {
+  if (typeof prompt === 'string') return prompt
+  if (!prompt || typeof prompt !== 'object') return ''
+  return Object.entries(prompt)
+    .map(([k, v]) => {
+      const meta = FIELD_LABELS[k] || { label: k }
+      return `[${meta.label}] ${typeof v === 'string' ? v : JSON.stringify(v)}`
+    })
+    .join('\n\n')
+}
+
 export default function AssetPromptsTab({ storyline, onAssetUploaded }) {
   const prompts = storyline?.assetPrompts && typeof storyline.assetPrompts === 'object' ? storyline.assetPrompts : null
   const urls = storyline?.assetUrls && typeof storyline.assetUrls === 'object' ? storyline.assetUrls : {}
@@ -116,14 +142,12 @@ function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUpl
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [lastReplacements, setLastReplacements] = useState(null)
-  const [showFullPrompt, setShowFullPrompt] = useState(false)
   const [copied, setCopied] = useState(false)
   const [dragActive, setDragActive] = useState(false)
 
   const mediaType = url ? detectMediaType(url) : null
-  const promptText = typeof prompt === 'string' ? prompt : JSON.stringify(prompt, null, 2)
-  const truncated = promptText.length > 220 && !showFullPrompt
-  const displayPrompt = truncated ? promptText.slice(0, 220) + '…' : promptText
+  const isStructured = prompt && typeof prompt === 'object' && !Array.isArray(prompt)
+  const promptText = isStructured ? flattenPromptForCopy(prompt) : (typeof prompt === 'string' ? prompt : JSON.stringify(prompt))
 
   const uploadFile = async (file) => {
     if (!file) return
@@ -213,18 +237,27 @@ function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUpl
             )}
           </div>
 
-          <div className="bg-gray-950 border border-gray-800 rounded p-2">
-            <p className="text-[11px] text-gray-300 whitespace-pre-wrap leading-relaxed">{displayPrompt}</p>
-            <div className="mt-1.5 flex gap-2">
-              {promptText.length > 220 && (
-                <button
-                  onClick={() => setShowFullPrompt(!showFullPrompt)}
-                  className="text-[10px] text-indigo-400 hover:text-indigo-300"
-                  style={{ outline: 'none' }}
-                >
-                  {showFullPrompt ? '접기' : '더 보기'}
-                </button>
-              )}
+          <div className="bg-gray-950 border border-gray-800 rounded p-3">
+            {isStructured ? (
+              <div className="space-y-2.5">
+                {Object.entries(prompt).map(([fieldKey, fieldValue]) => {
+                  const meta = FIELD_LABELS[fieldKey] || { emoji: '·', label: fieldKey }
+                  const valueText = typeof fieldValue === 'string' ? fieldValue : JSON.stringify(fieldValue)
+                  return (
+                    <div key={fieldKey}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-xs">{meta.emoji}</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{meta.label}</span>
+                      </div>
+                      <p className="text-xs text-gray-200 whitespace-pre-wrap leading-relaxed pl-5">{valueText}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-200 whitespace-pre-wrap leading-relaxed">{promptText}</p>
+            )}
+            <div className="mt-2 flex gap-2">
               <button
                 onClick={handleCopyPrompt}
                 className="text-[10px] text-gray-500 hover:text-gray-300"
