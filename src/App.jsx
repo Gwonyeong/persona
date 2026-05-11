@@ -35,6 +35,7 @@ import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
 import MyPage from './pages/user/MyPage'
+import Login from './pages/user/Login'
 import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
@@ -178,6 +179,9 @@ function App() {
 
       {/* 공개 페이지 (인증 불필요) */}
       <Route path="/account/delete-info" element={<DeleteAccountInfo />} />
+
+      {/* 로그인 페이지 (풀스크린, 탭바 없음) */}
+      <Route path="/login" element={<Login />} />
 
       {/* 스토리 플레이어 (풀스크린, 탭바 없음) */}
       <Route path="/storylines/:id" element={<Storyline />} />

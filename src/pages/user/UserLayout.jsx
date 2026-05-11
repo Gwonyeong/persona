@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 const TABS = [
   {
@@ -56,7 +56,6 @@ export default function UserLayout() {
   const { token, subscription } = useStore()
   const location = useLocation()
   const navigate = useNavigate()
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
   const isChatPage = location.pathname.match(/^\/chats\/\d/)
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
@@ -112,7 +111,7 @@ export default function UserLayout() {
             )}
             {tab.requireAuth && !token ? (
               <button
-                onClick={() => setShowLoginModal(true)}
+                onClick={() => goToLogin(navigate)}
                 className="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs text-gray-500 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
@@ -144,8 +143,6 @@ export default function UserLayout() {
         ))}
       </nav>
       )}
-
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
   )
 }

@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
 import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
@@ -309,7 +308,6 @@ export default function Chat() {
   const [sending, setSending] = useState(false)
   const [showTyping, setShowTyping] = useState(false)
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
@@ -440,7 +438,6 @@ export default function Chat() {
 
   // 모달/오버레이 뒤로가기 처리
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
-  useBackHandler(showLoginModal, () => setShowLoginModal(false))
   useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
   useBackHandler(showGallery, () => setShowGallery(false))
   useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
@@ -1392,7 +1389,6 @@ export default function Chat() {
           </div>
         </div>
       )}
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
       {showReport && (
         <ReportModal
           targetType="CONVERSATION"

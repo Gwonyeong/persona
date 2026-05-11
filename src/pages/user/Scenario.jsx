@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 // 파트 썸네일 슬라이드 — 결과 페이지의 premiumMedia를 그대로 사용 (잠긴 항목은 약한 블러)
 const THUMB_SLIDE_INTERVAL_MS = 2000
@@ -17,8 +17,6 @@ export default function Scenario() {
   const [scenario, setScenario] = useState(null)
   const [parts, setParts] = useState([])
   const [error, setError] = useState(null)
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [pendingPartId, setPendingPartId] = useState(null)
   const [slideTick, setSlideTick] = useState(0)
 
   useEffect(() => {
@@ -37,8 +35,7 @@ export default function Scenario() {
 
   const handlePartClick = (s) => {
     if (!token) {
-      setPendingPartId(s.id)
-      setShowLoginModal(true)
+      goToLogin(navigate)
       return
     }
     navigate(`/storylines/${s.id}`)
@@ -184,18 +181,6 @@ export default function Scenario() {
             </div>
           )}
         </div>
-
-        {showLoginModal && (
-          <LoginModal
-            onClose={() => { setShowLoginModal(false); setPendingPartId(null) }}
-            onLoginSuccess={() => {
-              setShowLoginModal(false)
-              const target = pendingPartId
-              setPendingPartId(null)
-              if (target) navigate(`/storylines/${target}`)
-            }}
-          />
-        )}
       </div>
     </>
   )

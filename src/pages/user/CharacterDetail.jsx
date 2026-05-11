@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import { getTagInfo } from '../../lib/tagLabel'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -48,8 +48,6 @@ export default function CharacterDetail() {
     catch { return false }
   })
   const [isFollowing, setIsFollowing] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const pendingActionRef = useRef(null)
   const [activeTab, setActiveTab] = useState('feed')
   const [galleryContents, setGalleryContents] = useState([])
   const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
@@ -64,8 +62,7 @@ export default function CharacterDetail() {
   const storyTimerRef = useRef(null)
   const handleStorylineClick = (s) => {
     if (!token) {
-      pendingActionRef.current = `storyline:${s.id}`
-      setShowLoginModal(true)
+      goToLogin(navigate)
       return
     }
     navigate(`/storylines/${s.id}`)
@@ -131,7 +128,7 @@ export default function CharacterDetail() {
   }, [id, token])
 
   const toggleFollow = async () => {
-    if (!token) { setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     try {
       const { following } = await api.post(`/follows/${id}`)
       setIsFollowing(following)
@@ -145,7 +142,7 @@ export default function CharacterDetail() {
   }
 
   const startChat = async () => {
-    if (!token) { pendingActionRef.current = 'start'; setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     setStarting(true)
     try {
       const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id) })
@@ -167,7 +164,7 @@ export default function CharacterDetail() {
   }
 
   const resumeChat = () => {
-    if (!token) { pendingActionRef.current = 'resume'; setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     if (existingConv) navigate(`/chats/${existingConv.conversationId}`)
   }
 
@@ -782,17 +779,6 @@ export default function CharacterDetail() {
           </div>
         </div>
       )}
-
-      {showLoginModal && <LoginModal onClose={() => { setShowLoginModal(false); pendingActionRef.current = null }} onLoginSuccess={() => {
-        setShowLoginModal(false)
-        const action = pendingActionRef.current
-        pendingActionRef.current = null
-        if (action === 'start') startChat()
-        else if (action === 'resume') resumeChat()
-        else if (typeof action === 'string' && action.startsWith('storyline:')) {
-          navigate(`/storylines/${action.split(':')[1]}`)
-        }
-      }} />}
 
       <OnboardingSpotlight
         active={tourActive}

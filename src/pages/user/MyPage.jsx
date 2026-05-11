@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
 // import AdBanner from '../../components/AdBanner'
 
@@ -35,7 +35,6 @@ export default function MyPage() {
   const { token, masks, setMasks, clearAuth } = useStore()
   const navigate = useNavigate()
 
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [dbUser, setDbUser] = useState(null)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
@@ -123,13 +122,12 @@ export default function MyPage() {
           <p className="text-gray-300 font-semibold mb-2">{t('myPage.loginRequired')}</p>
           <p className="text-sm text-gray-500 mb-6">{t('myPage.loginRequiredDesc')}</p>
           <button
-            onClick={() => setShowLoginModal(true)}
+            onClick={() => goToLogin(navigate)}
             className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             {t('common.login')}
           </button>
-          {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
         </div>
       ) : (
       <>

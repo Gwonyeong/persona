@@ -216,7 +216,9 @@
   "login": {
     "title": "로그인이 필요해요",
     "description": "이 기능을 사용하려면 로그인해주세요.",
-    "googleLogin": "Google로 로그인"
+    "googleLogin": "Google로 로그인",
+    "heroSubtitle": "나를 이해해주는 AI 여자친구",
+    "termsAgreement": "진행함으로써 약관과 개인정보처리방침에 동의합니다."
   },
   "welcome": {
     "title": "안녕하세요~ 만나서 반가워요!",

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 export default function FeedbackList() {
   const { t } = useTranslation()
@@ -15,7 +15,6 @@ export default function FeedbackList() {
   const [totalPages, setTotalPages] = useState(1)
   const [sort, setSort] = useState('latest')
   const [loading, setLoading] = useState(true)
-  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -28,7 +27,7 @@ export default function FeedbackList() {
 
   const handleWrite = () => {
     if (!token) {
-      setShowLoginModal(true)
+      goToLogin(navigate)
       return
     }
     navigate('/feedback/write')
@@ -156,8 +155,6 @@ export default function FeedbackList() {
           ))}
         </div>
       )}
-
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
   )
 }

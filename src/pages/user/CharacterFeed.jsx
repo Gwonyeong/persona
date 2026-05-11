@@ -8,7 +8,7 @@ import useBackHandler from '../../hooks/useBackHandler'
 import FeedPostCard from '../../components/FeedPostCard'
 import CommentSheet from '../../components/CommentSheet'
 import Lightbox from '../../components/Lightbox'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -28,7 +28,6 @@ export default function CharacterFeed() {
   const [commentPostId, setCommentPostId] = useState(null)
   const [existingConv, setExistingConv] = useState(null)
   const [starting, setStarting] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const scrolledRef = useRef(false)
   const targetPostId = searchParams.get('postId')
 
@@ -47,7 +46,7 @@ export default function CharacterFeed() {
   useBackHandler(!!commentPostId, () => setCommentPostId(null))
 
   const handleSendMessage = async () => {
-    if (!token) { setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     if (existingConv) { navigate(`/chats/${existingConv.conversationId}`); return }
     setStarting(true)
     try {
@@ -182,8 +181,6 @@ export default function CharacterFeed() {
           onClose={() => setCommentPostId(null)}
         />
       )}
-
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} onLoginSuccess={() => setShowLoginModal(false)} />}
     </div>
   )
 }

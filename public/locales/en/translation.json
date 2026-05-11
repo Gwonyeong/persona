@@ -216,7 +216,9 @@
   "login": {
     "title": "Login Required",
     "description": "Please login to use this feature.",
-    "googleLogin": "Sign in with Google"
+    "googleLogin": "Sign in with Google",
+    "heroSubtitle": "Your AI girlfriend who truly understands you",
+    "termsAgreement": "By continuing, you agree to the Terms of Service and Privacy Policy."
   },
   "welcome": {
     "title": "Hi there~ So nice to meet you!",
