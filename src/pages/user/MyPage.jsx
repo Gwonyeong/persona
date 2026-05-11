@@ -6,6 +6,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
+import MaskIcon from '../../components/MaskIcon'
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -219,7 +220,7 @@ export default function MyPage() {
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
       >
         <div className="flex items-center gap-3">
-          <span className="text-2xl">🎭</span>
+          <MaskIcon className="text-2xl" />
           <div className="text-left">
             <p className="text-sm font-bold text-gray-100">{t('maskShop.heading')}</p>
             <p className="text-xs text-gray-400">{t('myPage.masksCount', { count: masks })}</p>

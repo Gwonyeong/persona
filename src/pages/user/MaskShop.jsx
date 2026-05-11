@@ -9,6 +9,7 @@ import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, co
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
+import MaskIcon from '../../components/MaskIcon'
 
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
@@ -277,7 +278,7 @@ export default function MaskShop() {
           <h1 className="text-xl font-bold">{t('maskShop.heading')}</h1>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-base">🎭</span>
+          <MaskIcon className="text-xl" />
           <span className="text-lg font-bold text-indigo-400">{masks}</span>
         </div>
       </div>
@@ -424,7 +425,7 @@ export default function MaskShop() {
         <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🎭</span>
+              <MaskIcon className="text-3xl" />
               <div>
                 <p className="text-sm font-bold text-gray-100">{t('myPage.masks')}</p>
                 <p className="text-xs text-gray-400">{t('myPage.masksDesc')}</p>
@@ -456,7 +457,7 @@ export default function MaskShop() {
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-base">🎭</span>
+                  <MaskIcon className="text-xl" />
                   <span className="font-semibold text-sm text-gray-100">{pkg.label}</span>
                   {firstPurchaseEligible && (
                     <span className="text-xs font-bold text-amber-400">
@@ -557,7 +558,7 @@ export default function MaskShop() {
                     <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
                   ) : (
                     <>
-                      <span className="text-sm">🎭</span>
+                      <MaskIcon className="text-lg" />
                       <span className="text-sm font-bold text-amber-400">+3</span>
                     </>
                   )}
@@ -604,7 +605,7 @@ export default function MaskShop() {
                     <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
                   ) : dailyChatReward?.chatCount >= 5 ? (
                     <>
-                      <span className="text-sm">🎭</span>
+                      <MaskIcon className="text-lg" />
                       <span className="text-sm font-bold text-amber-400">+3</span>
                     </>
                   ) : (
@@ -655,7 +656,7 @@ export default function MaskShop() {
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {adRewardAvailable && (
                       <>
-                        <span className="text-sm">🎭</span>
+                        <MaskIcon className="text-lg" />
                         <span className="text-sm font-bold text-amber-400">+5</span>
                       </>
                     )}
@@ -703,7 +704,7 @@ export default function MaskShop() {
                     <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
                   ) : feedLikeReward?.likeCount >= 3 ? (
                     <>
-                      <span className="text-sm">🎭</span>
+                      <MaskIcon className="text-lg" />
                       <span className="text-sm font-bold text-amber-400">+3</span>
                     </>
                   ) : (

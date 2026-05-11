@@ -6,6 +6,7 @@ import { api } from '../../lib/api'
 import { getTagInfo } from '../../lib/tagLabel'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
+import MaskIcon from '../../components/MaskIcon'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -682,7 +683,7 @@ export default function CharacterDetail() {
       {showReviewModal && (
         <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
           <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6 text-center">
-            <p className="text-4xl mb-4">🎭</p>
+            <p className="text-4xl mb-4"><MaskIcon /></p>
             <h3 className="text-lg font-bold text-white mb-2">{t('character.reviewTitle')}</h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-2 whitespace-pre-line">
               {t('character.reviewDesc', { name: character?.name })}

@@ -3,6 +3,7 @@ import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-do
 import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
+import MaskIcon from '../../components/MaskIcon'
 
 const TABS = [
   {
@@ -100,9 +101,7 @@ export default function UserLayout() {
                   className="absolute -top-5 w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  <svg width="28" height="28" viewBox="0 0 32 20" fill="white" fillRule="evenodd" style={{ transform: 'scaleY(-1)' }}>
-                    <path d="M0 10C0 5 3.5 0 8.5 0c2.5 0 4.5 1.2 7.5 4 3-2.8 5-4 7.5-4C28.5 0 32 5 32 10c0 2.5-1 4.5-2.8 6-1.2 1-2.8 1.8-4.2 2.2-1.5.4-2.8.3-3.8-.2-1.2-.6-2.2-1.8-3.5-3.8L16 11l-1.7 3.2c-1.3 2-2.3 3.2-3.5 3.8-1 .5-2.3.6-3.8.2C5.6 17.8 4 17 2.8 16 1 14.5 0 12.5 0 10zM7 7.5C5.5 7.5 4.2 8.5 3.8 10c-.3 1 .2 1.8 1 2.2 1 .5 2.3.3 3.4-.3 1.2-.7 2-1.7 2.3-2.8.3-1-.1-1.8-1-2.2-.5-.2-1.2-.2-1.8-.1l-.7.2zM25 7.5l-.7-.2c-.6-.1-1.3-.1-1.8.1-.9.4-1.3 1.2-1 2.2.3 1.1 1.1 2.1 2.3 2.8 1.1.6 2.4.8 3.4.3.8-.4 1.3-1.2 1-2.2-.4-1.5-1.7-2.5-3.2-2.5z" />
-                  </svg>
+                  <MaskIcon style={{ width: 44, height: 44 }} />
                   {subscription?.tier !== 'LIGHT' && (
                     <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900" />
                   )}

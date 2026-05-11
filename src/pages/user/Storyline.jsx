@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
+import MaskIcon from '../../components/MaskIcon'
 
 // 메인 + 분기 노드를 사용자 선택에 따라 평탄화한 sequence
 function computeSequence(allNodes, choices) {
@@ -944,7 +945,7 @@ export default function Storyline() {
                 className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-500 transition-colors text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {unlocking ? '해금 중...' : `🎭 ${unlockModal.maskCost} 지불`}
+                {unlocking ? '해금 중...' : <><MaskIcon /> {unlockModal.maskCost} 지불</>}
               </button>
             </div>
           </div>
@@ -1358,7 +1359,7 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
                 </svg>
               </div>
               <p className="text-[11px] text-white font-bold drop-shadow">탭해서 해금</p>
-              <p className="text-[10px] text-amber-200 mt-0.5 drop-shadow">🎭 {line.maskCost || 0}</p>
+              <p className="text-[10px] text-amber-200 mt-0.5 drop-shadow"><MaskIcon /> {line.maskCost || 0}</p>
             </div>
           )}
         </div>

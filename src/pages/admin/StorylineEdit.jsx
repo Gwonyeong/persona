@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import AssetLibraryModal from './AssetLibraryModal'
 import AssetPromptsTab from './AssetPromptsTab'
 import VoiceTab from './VoiceTab'
+import MaskIcon from '../../components/MaskIcon'
 
 // 라이브러리 kind → script 아이템 필드 매핑
 const SCRIPT_FIELD_BY_KIND = {
@@ -1160,7 +1161,7 @@ function ChoiceRow({ choice, branchMap, selectedChapterId, onChapterClick, story
         <span className="text-sm text-gray-200 flex-1 min-w-0">{choice.label}</span>
         {isPremium && (
           <span className="text-[10px] px-1.5 py-0.5 bg-amber-900/60 text-amber-200 border border-amber-700/60 rounded font-bold">
-            PREMIUM {choice.maskCost}🎭
+            PREMIUM {choice.maskCost}<MaskIcon />
           </span>
         )}
         {choice.affinityDelta !== 0 && (
@@ -1387,7 +1388,7 @@ function ChapterDetailPanel({ chapter, storyline, onClose, onChapterPatch, onScr
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className="text-sm text-gray-100 flex-1">{c.label}</span>
                         {c.choiceType === 'PREMIUM' && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-900/60 text-amber-200 border border-amber-700/60 rounded font-bold">PREMIUM {c.maskCost}🎭</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-900/60 text-amber-200 border border-amber-700/60 rounded font-bold">PREMIUM {c.maskCost}<MaskIcon /></span>
                         )}
                         {c.affinityDelta !== 0 && (
                           <span className={`text-[10px] ${c.affinityDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>

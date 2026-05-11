@@ -6,6 +6,7 @@ import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
 import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
+import MaskIcon from '../../components/MaskIcon'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -1263,7 +1264,7 @@ export default function Chat() {
           </button>
           <div className="relative flex-shrink-0">
             {voiceMode && (
-              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400">-5 🎭</span>
+              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-emerald-400 flex items-center gap-0.5">-5 <MaskIcon className="text-base" /></span>
             )}
             <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
