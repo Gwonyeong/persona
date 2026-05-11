@@ -8,7 +8,7 @@ import useStore from '../../store/useStore'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview } from '../../lib/review'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
@@ -94,11 +94,10 @@ export default function MaskShop() {
   const [checkinClaimed, setCheckinClaimed] = useState(null)
   const [claimingCheckin, setClaimingCheckin] = useState(false)
   const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
 
   const requireLogin = () => {
     if (!token) {
-      setShowLoginModal(true)
+      goToLogin(navigate)
       return true
     }
     return false
@@ -754,13 +753,6 @@ export default function MaskShop() {
             </div>
           )}
         </div>
-      )}
-
-      {showLoginModal && (
-        <LoginModal
-          onClose={() => setShowLoginModal(false)}
-          onLoginSuccess={() => setShowLoginModal(false)}
-        />
       )}
     </div>
   )

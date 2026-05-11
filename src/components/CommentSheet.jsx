@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import { timeAgo } from '../lib/timeFormat'
 import useStore from '../store/useStore'
-import LoginModal from './LoginModal'
+import { goToLogin } from '../lib/auth'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -92,10 +93,10 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
   const [replyTarget, setReplyTarget] = useState(null) // { commentIdx, lastReplyId }
   const [mounted, setMounted] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const overlayRef = useRef(null)
+  const navigate = useNavigate()
   const { token, user, masks, setMasks } = useStore()
 
   // 마운트 애니메이션 트리거
@@ -154,7 +155,7 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
 
   const submit = async () => {
     if (!input.trim() || sending) return
-    if (!token) { setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     const text = input.trim()
     setSending(true)
     setInput('')
@@ -369,8 +370,6 @@ export default function CommentSheet({ postId, characterName, characterThumbUrl,
           style={{ height: keyboardHeight }}
         />
       </div>
-
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
   )
 }

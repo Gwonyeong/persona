@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 import { timeAgo } from '../../lib/timeFormat'
 
 function getImageUrl(filePath) {
@@ -28,7 +28,6 @@ export default function ChatList() {
   const { token } = useStore()
   const [conversations, setConversations] = useState([])
   const [search, setSearch] = useState('')
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
@@ -106,13 +105,12 @@ export default function ChatList() {
           <p className="text-gray-300 font-semibold mb-1">{t('chatList.myMessages')}</p>
           <p className="text-sm text-gray-500 mb-5">{t('chatList.loginPrompt')}</p>
           <button
-            onClick={() => setShowLoginModal(true)}
+            onClick={() => goToLogin(navigate)}
             className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             {t('common.login')}
           </button>
-          {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
         </div>
       ) : (
         <>

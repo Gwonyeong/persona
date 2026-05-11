@@ -216,7 +216,9 @@
   "login": {
     "title": "ログインが必要です",
     "description": "この機能を利用するにはログインしてください。",
-    "googleLogin": "Googleでログイン"
+    "googleLogin": "Googleでログイン",
+    "heroSubtitle": "あなたを理解してくれるAI彼女",
+    "termsAgreement": "続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。"
   },
   "welcome": {
     "title": "こんにちは～ 会えて嬉しいです！",

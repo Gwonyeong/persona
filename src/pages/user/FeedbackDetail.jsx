@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import LoginModal from '../../components/LoginModal'
+import { goToLogin } from '../../lib/auth'
 
 export default function FeedbackDetail() {
   const { t } = useTranslation()
@@ -14,20 +14,19 @@ export default function FeedbackDetail() {
   const [feedback, setFeedback] = useState(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     api.get(`/feedbacks/${id}`).then((data) => setFeedback(data.feedback))
   }, [id])
 
   const handleLike = async () => {
-    if (!token) { setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     const data = await api.post(`/feedbacks/${id}/like`)
     setFeedback((prev) => ({ ...prev, liked: data.liked, likeCount: data.likeCount }))
   }
 
   const handleComment = async () => {
-    if (!token) { setShowLoginModal(true); return }
+    if (!token) { goToLogin(navigate); return }
     if (!comment.trim() || submitting) return
     setSubmitting(true)
     const data = await api.post(`/feedbacks/${id}/comments`, { content: comment.trim() })
@@ -174,8 +173,6 @@ export default function FeedbackDetail() {
           {t('feedback.commentSubmit')}
         </button>
       </div>
-
-      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
     </div>
   )
 }
