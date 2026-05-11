@@ -268,6 +268,37 @@ export default function Home() {
         </div>
       )}
 
+      {/* 사업자 정보 푸터 */}
+      <footer className="mt-8 pt-6 pb-4 border-t border-gray-800 text-[11px] text-gray-500 leading-relaxed">
+        <p className="font-semibold text-gray-400 mb-2">사업자 정보</p>
+        <dl className="space-y-1">
+          <div className="flex gap-2">
+            <dt className="w-20 flex-shrink-0 text-gray-600">상호</dt>
+            <dd>파드켓</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 flex-shrink-0 text-gray-600">대표자</dt>
+            <dd>조권영</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 flex-shrink-0 text-gray-600">사업자등록번호</dt>
+            <dd>467-15-02791</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 flex-shrink-0 text-gray-600">주소</dt>
+            <dd>서울특별시 마포구 월드컵북로6길 19-10</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 flex-shrink-0 text-gray-600">유선전화</dt>
+            <dd>010-5418-3486</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 flex-shrink-0 text-gray-600">통신판매신고번호</dt>
+            <dd>2025-서울마포-2857</dd>
+          </div>
+        </dl>
+      </footer>
+
       {/* 언어 선택 모달 */}
       {showLangModal && (
         <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
