@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
+import MaskIcon from './MaskIcon'
 
 const UNLOCK_COST = 5
 
@@ -70,7 +71,7 @@ export default function GalleryUnlockModal({ content, characterId, onClose, onUn
         {/* 비용 */}
         <div className="flex items-center justify-between px-4 py-3 bg-gray-800/60 rounded-xl mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🎭</span>
+            <MaskIcon className="text-lg" />
             <span className="text-sm text-gray-300">{t('gallery.unlockCost')}</span>
           </div>
           <span className="text-sm font-bold text-indigo-400">{t('myPage.masksCount', { count: UNLOCK_COST })}</span>

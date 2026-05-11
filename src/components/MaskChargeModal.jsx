@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../lib/billing'
+import MaskIcon from './MaskIcon'
 
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
@@ -120,7 +121,7 @@ export default function MaskChargeModal({ onClose }) {
       <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
         {/* 헤더 */}
         <div className="text-center mb-5">
-          <div className="text-3xl mb-2">🎭</div>
+          <div className="text-3xl mb-2"><MaskIcon /></div>
           <p className="text-lg font-bold text-gray-100">{t('masks.chargeTitle')}</p>
           <p className="text-sm text-gray-400 mt-1">
             {t('masks.currentBalance', { count: masks })}
@@ -153,7 +154,7 @@ export default function MaskChargeModal({ onClose }) {
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
               <div className="flex items-center gap-2.5">
-                <span className="text-lg">🎭</span>
+                <MaskIcon className="text-lg" />
                 <span className="font-semibold text-gray-100">{pkg.label}</span>
                 {firstPurchaseEligible && (
                   <span className="px-1.5 py-0.5 bg-amber-500 rounded text-[10px] font-bold text-white">

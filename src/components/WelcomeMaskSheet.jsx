@@ -5,6 +5,7 @@ import useStore from '../store/useStore'
 import useBackHandler from '../hooks/useBackHandler'
 import { HOST_NAME, HOST_AVATAR } from '../lib/onboardingHost'
 import { loadVoices, playVoiceByKey, stopVoice } from '../lib/onboardingVoices'
+import MaskIcon from './MaskIcon'
 
 const SIGNUP_BONUS_MASKS = 30
 const ONBOARDING_KEY = 'welcomeSheet'
@@ -51,7 +52,7 @@ export default function WelcomeMaskSheet() {
               style={{ boxShadow: '0 0 24px 6px rgba(99, 102, 241, 0.35)' }}
             />
             <div className="absolute -bottom-1 -right-1 px-2 py-0.5 bg-indigo-600 rounded-full text-xs font-bold text-white shadow-lg flex items-center gap-1">
-              <span>🎭</span>
+              <MaskIcon />
               <span>+{SIGNUP_BONUS_MASKS}</span>
             </div>
           </div>
