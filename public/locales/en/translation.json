@@ -85,7 +85,8 @@
     "errorTTS": "Voice generation failed",
     "ttsPlay": "Play",
     "ttsStop": "Stop",
-    "generatingTTS": "Generating voice..."
+    "generatingTTS": "Generating voice...",
+    "excitedTooltip": "Pesona is feeling aroused."
   },
   "myPage": {
     "title": "My Page - Pesona",
