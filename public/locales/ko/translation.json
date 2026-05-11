@@ -85,7 +85,8 @@
     "errorTTS": "음성 생성에 실패했습니다",
     "ttsPlay": "재생",
     "ttsStop": "정지",
-    "generatingTTS": "음성 생성 중..."
+    "generatingTTS": "음성 생성 중...",
+    "excitedTooltip": "페소나가 흥분 상태가 됐어요."
   },
   "myPage": {
     "title": "마이페이지 - Pesona",

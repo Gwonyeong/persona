@@ -327,6 +327,10 @@ export default function Chat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
+  const [excitedTooltipVisible, setExcitedTooltipVisible] = useState(false)
+  const prevExcitedRef = useRef(false)
+  const voiceButtonRef = useRef(null)
+  const excitedTooltipRef = useRef(null)
   const [generatingTTS, setGeneratingTTS] = useState(false)
   const [playingAudioIdx, setPlayingAudioIdx] = useState(null)
   const audioRef = useRef(null)
@@ -345,6 +349,33 @@ export default function Chat() {
   const user = useStore((s) => s.user)
   const setUser = useStore((s) => s.setUser)
   const { t } = useTranslation()
+
+  // 캐릭터가 흥분 상태로 진입할 때 사운드 버튼 위에 툴팁 표시. 빠져나오면 자동 닫힘.
+  useEffect(() => {
+    const isExcited = !!characterStatus?.isExcited
+    if (!prevExcitedRef.current && isExcited) {
+      setExcitedTooltipVisible(true)
+    } else if (prevExcitedRef.current && !isExcited) {
+      setExcitedTooltipVisible(false)
+    }
+    prevExcitedRef.current = isExcited
+  }, [characterStatus?.isExcited])
+
+  // 툴팁이 떠 있는 동안 화면의 다른 부분을 터치하면 닫힘 (버튼·툴팁 자체 터치는 유지)
+  useEffect(() => {
+    if (!excitedTooltipVisible) return
+    const handleOutside = (e) => {
+      if (voiceButtonRef.current?.contains(e.target)) return
+      if (excitedTooltipRef.current?.contains(e.target)) return
+      setExcitedTooltipVisible(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [excitedTooltipVisible])
 
   // 페이지 이탈 시 사운드 재생 정리
   useEffect(() => {
@@ -1097,9 +1128,22 @@ export default function Chat() {
 
       <div className="relative flex-shrink-0">
         {/* 플로팅 버튼들 */}
-        <div className="absolute z-10 flex gap-2" style={{ right: 16, bottom: '100%', marginBottom: 12 }}>
+        <div className="absolute z-10" style={{ right: 16, bottom: '100%', marginBottom: 12 }}>
+          <div className="flex gap-2 justify-end">
           {(character.voiceId || tourActive) && (
+            <div className="relative">
+              {excitedTooltipVisible && characterStatus?.isExcited && (
+                <div
+                  ref={excitedTooltipRef}
+                  className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-red-600 text-white text-xs rounded-lg shadow-lg whitespace-nowrap animate-slide-down"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('chat.excitedTooltip')}
+                  <div className="absolute top-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-600" />
+                </div>
+              )}
             <button
+              ref={voiceButtonRef}
               onClick={() => {
                 if (tourActive && !character.voiceId) return
                 setVoiceMode((v) => {
@@ -1109,7 +1153,13 @@ export default function Chat() {
                 })
               }}
               disabled={!token || (tourActive && !character.voiceId)}
-              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${voiceMode ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400' : 'bg-gray-700 hover:bg-gray-600'} disabled:opacity-40`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                characterStatus?.isExcited
+                  ? 'bg-red-600 hover:bg-red-500 ring-2 ring-red-400'
+                  : voiceMode
+                    ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400'
+                    : 'bg-gray-700 hover:bg-gray-600'
+              } disabled:opacity-40`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               data-onboarding-target="voice-btn"
             >
@@ -1128,6 +1178,7 @@ export default function Chat() {
                 )}
               </svg>
             </button>
+            </div>
           )}
           <button
             onClick={() => {
@@ -1175,6 +1226,7 @@ export default function Chat() {
               </svg>
               {showGalleryBadge && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full" />}
             </button>
+          </div>
           </div>
         </div>
 
