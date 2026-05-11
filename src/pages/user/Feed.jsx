@@ -30,7 +30,6 @@ export default function Feed() {
   const { t, i18n } = useTranslation()
   const CAPTIONS = t('feed.defaultCaptions', { returnObjects: true }) || []
   const [characters, setCharacters] = useState([])
-  const [followedIds, setFollowedIds] = useState(null)
   const [followOnly, setFollowOnly] = useState(() => {
     try { return JSON.parse(localStorage.getItem('feedFilter_followOnly')) === true }
     catch { return false }
@@ -77,11 +76,6 @@ export default function Feed() {
   useEffect(() => {
     api.get('/characters').then(({ characters }) => setCharacters(characters))
   }, [i18n.language])
-
-  useEffect(() => {
-    if (!token) { setFollowedIds([]); return }
-    api.get('/follows').then(({ characterIds }) => setFollowedIds(characterIds)).catch(() => setFollowedIds([]))
-  }, [token])
 
   // 피드 포스트 fetch
   const fetchPosts = useCallback(async (cursor = null, reset = false) => {
@@ -210,28 +204,10 @@ export default function Feed() {
     return () => observerRef.current?.disconnect()
   }, [fetchPosts])
 
-  const followedCharacters = followedIds
-    ? characters.filter((c) => followedIds.includes(c.id))
-    : []
-
-  const storyCharacters = followedCharacters.map((c) => {
-    const style = c.styles?.[0]
-    const neutralImg = style?.images?.find((img) => img.emotion === 'NEUTRAL')
-    const fallbackImg = style?.images?.[0]
-    return {
-      ...c,
-      thumbUrl: getImageUrl((neutralImg || fallbackImg)?.filePath),
-    }
-  })
-
   // 온보딩 투어
   const tourSeen = !!user?.onboardingState?.feedTour
   const tourReady = !!user && !tourSeen && initialLoaded && feedPosts.length > 0
-  const hasStories = storyCharacters.length > 0
   const tourSteps = useMemo(() => [
-    ...(hasStories
-      ? [{ page: 'feedTour', key: 'stories', target: '[data-onboarding-target="stories"]', caption: t('feedTour.stories') }]
-      : []),
     {
       page: 'feedTour', key: 'like',
       target: '[data-onboarding-target="firstPost"]',
@@ -250,7 +226,7 @@ export default function Feed() {
       caption: t('feedTour.follow'),
       pointer: { selector: '[data-onboarding-pointer="follow"]', placement: 'top' },
     },
-  ], [hasStories, t])
+  ], [t])
   const completeTour = () => {
     setUser({
       ...user,
@@ -265,43 +241,6 @@ export default function Feed() {
       <div className="sticky top-0 z-10 bg-gray-950 px-4 pt-4 pb-2">
         <h1 className="text-xl font-bold">{t('feed.title')}</h1>
       </div>
-
-      {/* 스토리 */}
-      <div className="px-4 py-3" data-onboarding-target="stories">
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-          {storyCharacters.map((c) => {
-            return (
-              <button
-                key={c.id}
-                onClick={() => token ? goToChat(c) : navigate(`/characters/${c.id}`)}
-                className="flex flex-col items-center gap-1.5 flex-shrink-0"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div className="w-16 h-16 rounded-full p-[2px] bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400">
-                  <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
-                    {c.thumbUrl ? (
-                      <img
-                        src={c.thumbUrl}
-                        alt={c.name}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-gray-800 flex items-center justify-center">
-                        <span className="text-lg text-gray-500">?</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <span className="text-[11px] text-gray-300 w-16 text-center truncate">
-                  {c.name}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="border-t border-gray-800" />
 
       {/* 필터 */}
       <div className="px-4 py-2">
