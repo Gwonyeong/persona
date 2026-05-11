@@ -38,6 +38,7 @@ import MyPage from './pages/user/MyPage'
 import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
+import Refund from './pages/user/Refund'
 import DeleteAccount from './pages/user/DeleteAccount'
 import DeleteAccountInfo from './pages/user/DeleteAccountInfo'
 import PrivacyPolicy from './pages/user/PrivacyPolicy'
@@ -193,6 +194,7 @@ function App() {
         <Route path="/chats/:id" element={<Chat />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/refund" element={<Refund />} />
         <Route path="/account/delete" element={<DeleteAccount />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/subscription" element={<Subscription />} />

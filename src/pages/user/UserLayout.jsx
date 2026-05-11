@@ -80,6 +80,8 @@ export default function UserLayout() {
               <span>·</span>
               <Link to="/terms" className="hover:text-gray-300 transition-colors">{t('footer.terms')}</Link>
               <span>·</span>
+              <Link to="/refund" className="hover:text-gray-300 transition-colors">{t('footer.refund')}</Link>
+              <span>·</span>
               <Link to="/privacy" className="hover:text-gray-300 transition-colors">{t('footer.privacy')}</Link>
             </div>
             <p className="text-center text-[10px] text-gray-600 mt-2">© 2026 Pesona. All rights reserved.</p>
