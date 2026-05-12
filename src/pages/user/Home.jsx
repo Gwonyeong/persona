@@ -340,7 +340,7 @@ export default function Home() {
           </div>
           <div className="flex gap-2">
             <dt className="w-20 flex-shrink-0 text-gray-600">유선전화</dt>
-            <dd>010-5418-3486</dd>
+            <dd>070-8094-0654</dd>
           </div>
           <div className="flex gap-2">
             <dt className="w-20 flex-shrink-0 text-gray-600">통신판매신고번호</dt>
