@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
+import GiftBottomSheet from '../../components/GiftBottomSheet'
 import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
@@ -184,6 +185,25 @@ const MessageBubble = memo(function MessageBubble({
     )
   }
 
+  if (msg.role === 'GIFT') {
+    return (
+      <div className="flex justify-center my-4">
+        <div className="bg-pink-900/30 backdrop-blur-sm border border-pink-700/40 rounded-xl px-4 py-3 max-w-[85%] flex items-center gap-3">
+          {msg.giftImageUrl && (
+            <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-800">
+              <img src={msg.giftImageUrl} alt={msg.giftName || ''} className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="text-xs text-pink-200 leading-relaxed">
+            <span className="text-pink-300">🎁 </span>
+            <span className="text-pink-100 font-medium">{msg.giftName || ''}</span>
+            <span className="text-pink-300/80">을(를) 선물했습니다</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (msg.role === 'GENERATED_IMAGE') {
     if (msg.status === 'PENDING' || msg.status === 'RETRYING' || !msg.content) {
       return (
@@ -312,6 +332,7 @@ export default function Chat() {
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
+  const [showGiftSheet, setShowGiftSheet] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
   const [backgroundImage, setBackgroundImage] = useState(null)
   const [generatingImage, setGeneratingImage] = useState(false)
@@ -458,7 +479,7 @@ export default function Chat() {
       setBackgroundImage(conv.backgroundImage || null)
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
       setVoiceMode(!!conv.voiceMode)
-      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION'))
+      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       // 호감도 해금 임계치 로드
@@ -1128,6 +1149,21 @@ export default function Chat() {
         {/* 플로팅 버튼들 */}
         <div className="absolute z-10" style={{ right: 16, bottom: '100%', marginBottom: 12 }}>
           <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => setShowGiftSheet(true)}
+            disabled={!token}
+            className="w-11 h-11 rounded-full bg-pink-600 hover:bg-pink-500 disabled:opacity-40 flex items-center justify-center shadow-lg transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label="선물하기"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 12 20 22 4 22 4 12" />
+              <rect x="2" y="7" width="20" height="5" />
+              <line x1="12" y1="22" x2="12" y2="7" />
+              <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+              <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+            </svg>
+          </button>
           {(character.voiceId || tourActive) && (
             <div className="relative">
               {excitedTooltipVisible && characterStatus?.isExcited && (
@@ -1408,6 +1444,44 @@ export default function Chat() {
           onBackgroundChange={(url) => setBackgroundImage(url)}
           affinityBadge={showGalleryBadge}
           onAffinityBadgeClear={() => setShowGalleryBadge(false)}
+        />
+      )}
+      {showGiftSheet && (
+        <GiftBottomSheet
+          characterId={conversation.characterId}
+          characterName={character.name}
+          conversationId={conversation.id}
+          onClose={() => setShowGiftSheet(false)}
+          onGiftSent={({ message, thanksMessages = [], imageBubble, affinity }) => {
+            // 선물 GIFT 버블 → 캐릭터 감사 인사 → (있다면) 이미지 버블 순으로 append
+            setMessages((prev) => [
+              ...prev,
+              message,
+              ...thanksMessages,
+              ...(imageBubble ? [imageBubble] : []),
+            ])
+
+            // 호감도 반영
+            if (typeof affinity === 'number') {
+              setConversation((prev) => prev ? { ...prev, affinity } : prev)
+            }
+
+            // 이미지 버블이 추가됐다면 갤러리 버튼 툴팁 노출
+            if (imageBubble) {
+              setGalleryTooltipText('선물 이미지가 추가됐어요!')
+              setShowGalleryTooltip(true)
+              // 5초 후 자동으로 숨김
+              setTimeout(() => setShowGalleryTooltip(false), 5000)
+            }
+          }}
+          onOutfitApplied={({ messages: appliedMessages = [], characterStatus: newStatus }) => {
+            // 캐릭터 반응 메시지 append + characterStatus(복장 텍스트) 갱신
+            setMessages((prev) => [...prev, ...appliedMessages])
+            if (newStatus && typeof newStatus === 'object') {
+              setCharacterStatus(newStatus)
+              setConversation((prev) => prev ? { ...prev, characterStatus: newStatus } : prev)
+            }
+          }}
         />
       )}
       {lightboxUrl && (
