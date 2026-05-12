@@ -51,6 +51,8 @@ export default function CharacterDetail() {
   const [isFollowing, setIsFollowing] = useState(false)
   const [activeTab, setActiveTab] = useState('feed')
   const [galleryContents, setGalleryContents] = useState([])
+  const [giftUnlocks, setGiftUnlocks] = useState([])
+  const [giftViewer, setGiftViewer] = useState(null) // { gift, index }
   const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
@@ -95,6 +97,7 @@ export default function CharacterDetail() {
   })
   useBackHandler(showResetModal, () => setShowResetModal(false))
   useBackHandler(!!gallerySlideViewer, () => setGallerySlideViewer(null))
+  useBackHandler(!!giftViewer, () => setGiftViewer(null))
   useBackHandler(!!unlockTarget, () => setUnlockTarget(null))
   useBackHandler(showReport, () => setShowReport(false))
 
@@ -107,6 +110,9 @@ export default function CharacterDetail() {
     api.get(`/characters/${id}/gallery`)
       .then(({ galleryContents }) => setGalleryContents(galleryContents || []))
       .catch(() => setGalleryContents([]))
+    api.get(`/gifts/character/${id}/unlocks`)
+      .then(({ unlocks }) => setGiftUnlocks(unlocks || []))
+      .catch(() => setGiftUnlocks([]))
     api.get(`/characters/${id}/storylines`)
       .then(({ scenarios, storylines }) => {
         setScenarios(scenarios || [])
@@ -536,6 +542,21 @@ export default function CharacterDetail() {
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </button>
+            <button
+              onClick={() => setActiveTab('gift')}
+              className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'gift' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="tab-gift"
+              aria-label="선물"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 12 20 22 4 22 4 12" />
+                <rect x="2" y="7" width="20" height="5" />
+                <line x1="12" y1="22" x2="12" y2="7" />
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -630,6 +651,79 @@ export default function CharacterDetail() {
             onLockedClick={(content) => setUnlockTarget(content)}
           />
         )}
+
+        {/* 선물 갤러리 — 아이템별 섹션 */}
+        {activeTab === 'gift' && (
+          giftUnlocks.length === 0 ? (
+            <div className="text-center text-gray-500 py-16 px-6">
+              <p className="text-sm">아직 선물한 항목이 없습니다.</p>
+              <p className="text-xs text-gray-600 mt-1">채팅 화면의 🎁 버튼에서 선물할 수 있어요.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 py-3">
+              {giftUnlocks.map((u) => (
+                <section key={u.gift.id} className="px-3">
+                  {/* 헤더: 썸네일 + 이름 + 콘텐츠 개수 */}
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0">
+                      <img src={u.gift.imageUrl} alt={u.gift.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white font-medium truncate">{u.gift.name}</p>
+                      <p className="text-[11px] text-gray-500">
+                        해금 콘텐츠 {u.gift.contents?.length || 0}개
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 콘텐츠 그리드 */}
+                  {u.gift.contents?.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-[2px] bg-gray-900 rounded-lg overflow-hidden">
+                      {u.gift.contents.map((c, idx) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setGiftViewer({ gift: u.gift, index: idx })}
+                          className="aspect-square relative bg-gray-950 overflow-hidden"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          {c.type === 'VIDEO' ? (
+                            <>
+                              <video
+                                src={c.filePath}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="8 5 19 12 8 19" />
+                                  </svg>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <img
+                              src={c.filePath}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-gray-600 italic py-3 text-center bg-gray-900/50 rounded-lg">
+                      해금된 콘텐츠가 없습니다
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )
+        )}
       </div>
 
       {/* 스토리 뷰어 */}
@@ -661,6 +755,16 @@ export default function CharacterDetail() {
           title={gallerySlideViewer.title}
           description={gallerySlideViewer.description}
           onClose={() => setGallerySlideViewer(null)}
+        />
+      )}
+
+      {/* 선물 콘텐츠 뷰어 — 이미지/비디오 혼합. ImageSlideViewer 재사용 */}
+      {giftViewer && (
+        <ImageSlideViewer
+          images={giftViewer.gift.contents.map((c) => ({ filePath: c.filePath, type: c.type }))}
+          initialIndex={giftViewer.index}
+          title={`🎁 ${giftViewer.gift.name}`}
+          onClose={() => setGiftViewer(null)}
         />
       )}
 
