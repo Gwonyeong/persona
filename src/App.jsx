@@ -20,7 +20,6 @@ import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylinesOverview from './pages/admin/StorylinesOverview'
 import StorylineEdit from './pages/admin/StorylineEdit'
 import StoryAnalyticsPremium from './pages/admin/StoryAnalyticsPremium'
-import StoryAnalyticsProgress from './pages/admin/StoryAnalyticsProgress'
 import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
 import AdminBroadcasts from './pages/admin/Broadcasts'
@@ -173,7 +172,6 @@ function App() {
         <Route path="characters/:id/storylines" element={<CharacterStorylines />} />
         <Route path="storylines" element={<StorylinesOverview />} />
         <Route path="storylines/analytics/premium" element={<StoryAnalyticsPremium />} />
-        <Route path="storylines/analytics/progress" element={<StoryAnalyticsProgress />} />
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="banners" element={<AdminBanners />} />
