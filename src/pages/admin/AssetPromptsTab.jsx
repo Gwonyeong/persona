@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { api } from '../../lib/api'
+import { extractVideoPoster } from '../../lib/videoPoster'
 
 // 키 접두사 → 타입 메타. 그룹 헤더 + 카드 배지에 함께 사용.
 const TYPE_GROUPS = [
@@ -56,6 +57,7 @@ function flattenPromptForCopy(prompt) {
 export default function AssetPromptsTab({ storyline, onAssetUploaded }) {
   const prompts = storyline?.assetPrompts && typeof storyline.assetPrompts === 'object' ? storyline.assetPrompts : null
   const urls = storyline?.assetUrls && typeof storyline.assetUrls === 'object' ? storyline.assetUrls : {}
+  const posters = storyline?.assetPosters && typeof storyline.assetPosters === 'object' ? storyline.assetPosters : {}
 
   // 타입별로 그룹핑 — TYPE_GROUPS 순서를 유지
   const groups = useMemo(() => {
@@ -125,6 +127,7 @@ export default function AssetPromptsTab({ storyline, onAssetUploaded }) {
                   promptKey={key}
                   prompt={prompts[key]}
                   url={urls[key] || null}
+                  posterUrl={posters[key] || null}
                   group={group}
                   onAssetUploaded={onAssetUploaded}
                 />
@@ -137,15 +140,17 @@ export default function AssetPromptsTab({ storyline, onAssetUploaded }) {
   )
 }
 
-function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUploaded }) {
+function AssetPromptRow({ storylineId, promptKey, prompt, url, posterUrl, group, onAssetUploaded }) {
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
+  const [posterBackfilling, setPosterBackfilling] = useState(false)
   const [error, setError] = useState(null)
   const [lastReplacements, setLastReplacements] = useState(null)
   const [copied, setCopied] = useState(false)
   const [dragActive, setDragActive] = useState(false)
 
   const mediaType = url ? detectMediaType(url) : null
+  const isVideo = mediaType === 'video'
   const isStructured = prompt && typeof prompt === 'object' && !Array.isArray(prompt)
   const promptText = isStructured ? flattenPromptForCopy(prompt) : (typeof prompt === 'string' ? prompt : JSON.stringify(prompt))
 
@@ -157,6 +162,11 @@ function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUpl
     try {
       const fd = new FormData()
       fd.append('file', file)
+      // 비디오면 브라우저에서 첫 프레임을 jpeg로 추출해 함께 전송 — 썸네일 노출 시 영상 다운로드 회피
+      if ((file.type || '').startsWith('video/')) {
+        const poster = await extractVideoPoster(file)
+        if (poster) fd.append('poster', poster, 'poster.jpg')
+      }
       const res = await api.post(`/admin/storylines/${storylineId}/asset-prompts/${promptKey}/upload`, fd)
       setLastReplacements(res.replacements)
       // 응답을 부모로 넘겨 storyline state 부분 패치 — 전체 reload 안 함 (스크롤 유지)
@@ -166,6 +176,28 @@ function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUpl
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // 기존 비디오 자산에 포스터를 백필 — 신규 업로드와 동일 추출 로직을 URL 입력으로 재사용
+  const backfillPoster = async () => {
+    if (!url || !isVideo) return
+    setPosterBackfilling(true)
+    setError(null)
+    try {
+      const blob = await extractVideoPoster(url)
+      if (!blob) {
+        setError('첫 프레임을 추출할 수 없습니다 (CORS 또는 코덱 문제일 수 있어요).')
+        return
+      }
+      const fd = new FormData()
+      fd.append('poster', blob, 'poster.jpg')
+      const res = await api.post(`/admin/storylines/${storylineId}/asset-prompts/${promptKey}/poster`, fd)
+      onAssetUploaded?.({ assetPosters: res.assetPosters, posterOnly: true })
+    } catch (err) {
+      setError(err?.data?.error || err?.message || '포스터 생성 실패')
+    } finally {
+      setPosterBackfilling(false)
     }
   }
 
@@ -296,7 +328,13 @@ function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUpl
                     <img src={url} alt={promptKey} className="w-full h-full object-cover" />
                   )}
                   {mediaType === 'video' && (
-                    <video src={url} controls className="w-full h-full object-cover bg-black" />
+                    <video
+                      src={url}
+                      poster={posterUrl || undefined}
+                      controls
+                      preload="none"
+                      className="w-full h-full object-cover bg-black"
+                    />
                   )}
                 </>
               ) : (
@@ -305,6 +343,37 @@ function AssetPromptRow({ storylineId, promptKey, prompt, url, group, onAssetUpl
                   <p>파일을 여기에 드롭<br />또는 아래 버튼으로 선택</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 비디오 자산일 때만 노출되는 포스터 패널 — 미리보기 + 수동 생성/재생성 */}
+          {isVideo && (
+            <div className="bg-black/40 rounded border border-gray-800 overflow-hidden">
+              <div className="flex items-center justify-between px-2 py-1 border-b border-gray-800">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">포스터</span>
+                {posterUrl ? (
+                  <span className="text-[9px] text-emerald-400">✓ 생성됨</span>
+                ) : (
+                  <span className="text-[9px] text-amber-400">없음</span>
+                )}
+              </div>
+              <div className="aspect-[9/16] bg-black flex items-center justify-center">
+                {posterUrl ? (
+                  <img src={posterUrl} alt={`${promptKey} poster`} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-center text-gray-600 text-[10px] px-2">
+                    <p>첫 프레임이<br />아직 없어요</p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={backfillPoster}
+                disabled={posterBackfilling || uploading}
+                className="w-full px-2 py-1.5 text-[11px] bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {posterBackfilling ? '생성 중...' : posterUrl ? '🔁 포스터 재생성' : '🖼 포스터 생성'}
+              </button>
             </div>
           )}
 

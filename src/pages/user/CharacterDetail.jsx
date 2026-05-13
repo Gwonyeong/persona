@@ -441,25 +441,30 @@ export default function CharacterDetail() {
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
                     {/* 슬라이드쇼 — premiumMedia 항목들을 페이드 회전, 잠긴 항목은 약한 블러 */}
+                    {/* 비디오라도 포스터 이미지가 있으면 <img>로 렌더 — 영상 다운로드 회피.
+                        포스터 없는 레거시 비디오만 <video preload="metadata"> fallback. */}
                     {media.length > 0 ? (
                       media.map((m, idx) => {
                         const isActive = idx === activeIdx
                         const blur = !m.unlocked
                         const baseCls = `absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isActive ? 'opacity-100' : 'opacity-0'}`
-                        return m.type === 'video' ? (
-                          <video
-                            key={idx}
-                            src={m.url}
-                            className={baseCls}
-                            style={blur ? lockedMediaStyle : undefined}
-                            muted
-                            playsInline
-                            preload="metadata"
-                          />
-                        ) : (
+                        if (m.type === 'video' && !m.posterUrl) {
+                          return (
+                            <video
+                              key={idx}
+                              src={m.url}
+                              className={baseCls}
+                              style={blur ? lockedMediaStyle : undefined}
+                              muted
+                              playsInline
+                              preload="metadata"
+                            />
+                          )
+                        }
+                        return (
                           <img
                             key={idx}
-                            src={m.url}
+                            src={m.type === 'video' ? m.posterUrl : m.url}
                             alt=""
                             className={baseCls}
                             style={blur ? lockedMediaStyle : undefined}
