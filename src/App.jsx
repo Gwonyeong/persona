@@ -19,6 +19,7 @@ import Expressions from './pages/admin/Expressions'
 import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylinesOverview from './pages/admin/StorylinesOverview'
 import StorylineEdit from './pages/admin/StorylineEdit'
+import StoryAnalyticsPremium from './pages/admin/StoryAnalyticsPremium'
 import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
 import AdminBroadcasts from './pages/admin/Broadcasts'
@@ -170,6 +171,7 @@ function App() {
         <Route path="characters/:id/gifts" element={<CharacterGifts />} />
         <Route path="characters/:id/storylines" element={<CharacterStorylines />} />
         <Route path="storylines" element={<StorylinesOverview />} />
+        <Route path="storylines/analytics/premium" element={<StoryAnalyticsPremium />} />
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="banners" element={<AdminBanners />} />

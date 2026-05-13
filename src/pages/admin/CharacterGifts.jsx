@@ -32,6 +32,11 @@ export default function CharacterGifts() {
   const editThumbRef = useRef(null)
   const contentFileRef = useRef(null)
 
+  // 드래그앤드랍 hover 상태
+  const [dragOverNewThumb, setDragOverNewThumb] = useState(false)
+  const [dragOverEditThumb, setDragOverEditThumb] = useState(false)
+  const [dragOverContents, setDragOverContents] = useState(false)
+
   useEffect(() => {
     api.get('/admin/characters').then(({ characters }) => {
       const c = characters.find((ch) => ch.id === parseInt(id))
@@ -297,13 +302,32 @@ export default function CharacterGifts() {
                 />
                 <div
                   onClick={() => newImageRef.current?.click()}
-                  className="aspect-square w-32 mx-auto bg-gray-800 border-2 border-dashed border-gray-700 hover:border-gray-500 rounded-xl flex items-center justify-center cursor-pointer overflow-hidden"
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragOverNewThumb(true)
+                  }}
+                  onDragLeave={() => setDragOverNewThumb(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragOverNewThumb(false)
+                    const file = Array.from(e.dataTransfer.files || []).find((f) =>
+                      f.type.startsWith('image/'),
+                    )
+                    if (file) onNewImageChange(file)
+                  }}
+                  className={`aspect-square w-32 mx-auto bg-gray-800 border-2 border-dashed rounded-xl flex items-center justify-center cursor-pointer overflow-hidden transition-colors ${
+                    dragOverNewThumb
+                      ? 'border-indigo-500 bg-indigo-500/10'
+                      : 'border-gray-700 hover:border-gray-500'
+                  }`}
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   {newPreview ? (
                     <img src={newPreview} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-xs text-gray-500">클릭하여 선택</span>
+                    <span className="text-xs text-gray-500 text-center px-2">
+                      클릭 또는 드래그
+                    </span>
                   )}
                 </div>
               </div>
@@ -411,7 +435,22 @@ export default function CharacterGifts() {
                   />
                   <div
                     onClick={() => editThumbRef.current?.click()}
-                    className="w-32 aspect-square bg-gray-800 border border-gray-700 rounded-xl overflow-hidden cursor-pointer"
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setDragOverEditThumb(true)
+                    }}
+                    onDragLeave={() => setDragOverEditThumb(false)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragOverEditThumb(false)
+                      const file = Array.from(e.dataTransfer.files || []).find((f) =>
+                        f.type.startsWith('image/'),
+                      )
+                      if (file) onThumbReplace(file)
+                    }}
+                    className={`w-32 aspect-square bg-gray-800 border-2 ${
+                      dragOverEditThumb ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-700'
+                    } rounded-xl overflow-hidden cursor-pointer transition-colors`}
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
                     <img
@@ -420,7 +459,7 @@ export default function CharacterGifts() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <p className="text-[10px] text-gray-500 text-center mt-1">클릭하여 교체</p>
+                  <p className="text-[10px] text-gray-500 text-center mt-1">클릭 또는 드래그</p>
                 </div>
 
                 <div className="flex-1 space-y-2">
@@ -515,7 +554,28 @@ export default function CharacterGifts() {
             </div>
 
             {/* 해금 콘텐츠 */}
-            <div className="px-5 py-4">
+            <div
+              className={`px-5 py-4 transition-colors ${
+                dragOverContents ? 'bg-indigo-500/10' : ''
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (!addingContents) setDragOverContents(true)
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget)) return
+                setDragOverContents(false)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOverContents(false)
+                if (addingContents) return
+                const files = Array.from(e.dataTransfer.files || []).filter(
+                  (f) => f.type.startsWith('image/') || f.type.startsWith('video/'),
+                )
+                if (files.length > 0) addContents(files)
+              }}
+            >
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium text-white">해금 콘텐츠 ({detail.contents?.length || 0}개)</p>
                 <button
@@ -537,31 +597,48 @@ export default function CharacterGifts() {
               </div>
 
               {(!detail.contents || detail.contents.length === 0) ? (
-                <div className="text-center text-gray-500 py-8 text-xs">선물 시 해금될 콘텐츠를 추가하세요 (이미지 또는 동영상)</div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {detail.contents.map((c) => (
-                    <div key={c.id} className="relative aspect-square rounded-lg overflow-hidden group bg-gray-800">
-                      {c.type === 'VIDEO' ? (
-                        <video src={c.filePath} className="w-full h-full object-cover" muted />
-                      ) : (
-                        <img src={c.filePath} alt="" className="w-full h-full object-cover" />
-                      )}
-                      <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded uppercase">
-                        {c.type}
-                      </div>
-                      <button
-                        onClick={() => removeContent(c.id)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
+                <div
+                  className={`text-center py-8 text-xs border-2 border-dashed rounded-lg transition-colors ${
+                    dragOverContents
+                      ? 'border-indigo-500 text-indigo-300'
+                      : 'border-gray-700 text-gray-500'
+                  }`}
+                >
+                  {dragOverContents
+                    ? '여기에 놓아 업로드'
+                    : '선물 시 해금될 콘텐츠를 추가하세요 (이미지 또는 동영상 · 드래그앤드랍 지원)'}
                 </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    {detail.contents.map((c) => (
+                      <div key={c.id} className="relative aspect-square rounded-lg overflow-hidden group bg-gray-800">
+                        {c.type === 'VIDEO' ? (
+                          <video src={c.filePath} className="w-full h-full object-cover" muted />
+                        ) : (
+                          <img src={c.filePath} alt="" className="w-full h-full object-cover" />
+                        )}
+                        <div className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded uppercase">
+                          {c.type}
+                        </div>
+                        <button
+                          onClick={() => removeContent(c.id)}
+                          className="absolute top-1 right-1 w-6 h-6 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {dragOverContents && (
+                    <div className="mt-2 text-center py-3 text-xs border-2 border-dashed border-indigo-500 text-indigo-300 rounded-lg">
+                      여기에 놓아 업로드
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
