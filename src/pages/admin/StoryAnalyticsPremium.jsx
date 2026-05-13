@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../lib/api'
+import StoryTabsHeader from './StoryTabsHeader'
 
 const SORT_OPTIONS = [
   { key: 'masks', label: '마스크 수익 많은 순' },
@@ -148,17 +149,31 @@ export default function StoryAnalyticsPremium() {
     })
   }
 
-  if (loading) return <div className="p-6 text-gray-400">로딩 중...</div>
-  if (error) return <div className="p-6 text-red-400">에러: {error}</div>
+  if (loading)
+    return (
+      <div>
+        <StoryTabsHeader />
+        <div className="p-6 text-gray-400">로딩 중...</div>
+      </div>
+    )
+  if (error)
+    return (
+      <div>
+        <StoryTabsHeader />
+        <div className="p-6 text-red-400">에러: {error}</div>
+      </div>
+    )
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-white">스토리 프리미엄 통계</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          캐릭터별 묶음 — 프리미엄 선택지 채택 비율 + 마스크 해금 미디어 통계
-        </p>
-      </div>
+    <div>
+      <StoryTabsHeader />
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-white">스토리 프리미엄 통계</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            캐릭터별 묶음 — 프리미엄 선택지 채택 비율 + 마스크 해금 미디어 통계
+          </p>
+        </div>
 
       <div className="grid grid-cols-4 gap-3 mb-5">
         <SummaryCard
@@ -260,6 +275,7 @@ export default function StoryAnalyticsPremium() {
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }

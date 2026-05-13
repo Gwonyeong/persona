@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import StoryTabsHeader from './StoryTabsHeader'
 
 function formatTimeSince(dateString) {
   if (!dateString) return null
@@ -65,10 +66,12 @@ export default function StorylinesOverview() {
   }, [characters, tab, sortBy])
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">스토리 관리</h2>
-      </div>
+    <div>
+      <StoryTabsHeader />
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">스토리 관리</h2>
+        </div>
 
       {/* 정렬 */}
       <div className="flex items-center gap-2 mb-4">
@@ -180,6 +183,7 @@ export default function StorylinesOverview() {
             </tbody>
           </table>
         )}
+        </div>
       </div>
     </div>
   )

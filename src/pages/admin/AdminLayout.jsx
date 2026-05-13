@@ -11,7 +11,6 @@ const NAV_ITEMS = [
     children: [
       { to: '/admin/characters', label: '캐릭터 관리' },
       { to: '/admin/storylines', label: '스토리' },
-      { to: '/admin/storylines/analytics/premium', label: '스토리 프리미엄 통계' },
       { to: '/admin/base-images', label: '베이스 이미지' },
       { to: '/admin/affinity-images', label: '호감도 이미지' },
       { to: '/admin/expressions', label: '표정 이미지' },
