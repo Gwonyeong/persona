@@ -191,6 +191,7 @@ export default function StorylineEdit() {
       assetLibrary: s.assetLibrary || { backgrounds: [], characters: [] },
       ...(s.assetPrompts ? { assetPrompts: s.assetPrompts } : {}),
       ...(s.assetUrls ? { assetUrls: s.assetUrls } : {}),
+      ...(s.assetPosters ? { assetPosters: s.assetPosters } : {}),
       guestCharacterIds: (s.characters || []).map((sc) => sc.characterId),
       nodes: serializeNodesForEditor(s.nodes || []),
     }
@@ -200,8 +201,14 @@ export default function StorylineEdit() {
   // 서버에서 oldValue → newUrl 일괄 치환을 마쳤으므로, 클라이언트도 같은 치환을 인메모리로 반영.
   // 전체 load()를 호출하면 트리 재마운트로 스크롤이 맨 위로 점프하는 문제 회피.
   function applyAssetUpload(response) {
-    if (!response || !response.oldValue || !response.url) return
-    const { oldValue, url: newUrl, assetUrls: nextAssetUrls } = response
+    if (!response) return
+    // 포스터 백필 응답 — assetPosters만 갱신 (URL/노드 치환 없음)
+    if (response.posterOnly) {
+      setStoryline((prev) => (prev ? { ...prev, assetPosters: response.assetPosters || prev.assetPosters || {} } : prev))
+      return
+    }
+    if (!response.oldValue || !response.url) return
+    const { oldValue, url: newUrl, assetUrls: nextAssetUrls, assetPosters: nextAssetPosters } = response
     const replaceUrl = (v) => (v === oldValue ? newUrl : v)
     setStoryline((prev) => {
       if (!prev) return prev
@@ -223,6 +230,7 @@ export default function StorylineEdit() {
       return {
         ...prev,
         assetUrls: nextAssetUrls || { ...(prev.assetUrls || {}) },
+        assetPosters: nextAssetPosters !== undefined ? nextAssetPosters : (prev.assetPosters || {}),
         thumbnailImage: replaceUrl(prev.thumbnailImage),
         coverImage: replaceUrl(prev.coverImage),
         defaultBgm: replaceUrl(prev.defaultBgm),
