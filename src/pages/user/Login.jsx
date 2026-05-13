@@ -100,6 +100,7 @@ export default function Login() {
       <video
         className="absolute inset-0 w-full h-full object-cover"
         src="/login_bg.mp4"
+        poster="/login_bg.jpg"
         autoPlay
         muted
         loop
