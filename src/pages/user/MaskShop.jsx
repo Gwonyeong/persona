@@ -23,9 +23,9 @@ export default function MaskShop() {
   const navigate = useNavigate()
 
   const PACKAGES = [
-    { amount: 60, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
-    { amount: 200, price: t('pricing.masks100'), originalPrice: t('pricing.masks100Original'), discount: '40%', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
-    { amount: 700, price: t('pricing.masks300'), originalPrice: t('pricing.masks300Original'), discount: '20%', label: t('masks.pkg300'), productId: 'masks_300' },
+    { amount: 30, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
+    { amount: 120, price: t('pricing.masks100'), originalPrice: t('pricing.masks100Original'), discount: '50%', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
+    { amount: 450, price: t('pricing.masks300'), originalPrice: t('pricing.masks300Original'), discount: '50%', label: t('masks.pkg300'), productId: 'masks_300' },
   ]
 
   // 구독 관련 데이터

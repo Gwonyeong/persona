@@ -148,7 +148,7 @@
     "light": "라이트",
     "perMonth": "/월",
     "trial": "첫 3일 무료",
-    "instantMasks": "마스크 50개 즉시 지급!",
+    "instantMasks": "마스크 30개 즉시 지급!",
     "startFree": "무료로 시작하기",
     "manageSubscription": "구독 관리",
     "googlePlayError": "Google Play 결제를 사용할 수 없습니다.",
@@ -161,7 +161,7 @@
     "managedByGoogle": "구독은 Google Play를 통해 관리됩니다.",
     "cancelAnytime": "언제든 Play Store에서 해지할 수 있습니다.",
     "lightBenefitsTitle": "라이트 플랜의 혜택",
-    "lightBenefit1": "매일 가면 50개 지급 — 매일 꾸준히 대화하세요",
+    "lightBenefit1": "매일 가면 30개 지급 — 매일 꾸준히 대화하세요",
     "lightBenefit2": "모든 캐릭터와 자유롭게 대화",
     "lightBenefit3": "더 과감한 이미지 콘텐츠 잠금 해제",
     "lightBenefit4": "광고 없이 깔끔한 경험",
@@ -179,7 +179,7 @@
       "none": "-",
       "tenCharacters": "10명",
       "basic": "기본",
-      "thirtyPerDay": "50개/일",
+      "thirtyPerDay": "30개/일",
       "unlimited": "무제한",
       "boldImages": "과감한 이미지"
     }
@@ -336,9 +336,9 @@
     "freeLimitCta": "3일 무료 체험하기"
   },
   "masks": {
-    "pkg30": "60개",
-    "pkg100": "200개",
-    "pkg300": "700개",
+    "pkg30": "30개",
+    "pkg100": "120개",
+    "pkg300": "450개",
     "badgePopular": "인기",
     "badgeDiscount": "할인",
     "chargeTitle": "가면 충전",
@@ -452,12 +452,12 @@
   "pricing": {
     "free": "₩0",
     "light": "₩9,900",
-    "masks30": "₩1,000",
-    "masks100": "₩3,000",
-    "masks300": "₩8,000",
-    "masks30Original": "₩2,000",
-    "masks100Original": "₩5,000",
-    "masks300Original": "₩10,000"
+    "masks30": "₩1,400",
+    "masks100": "₩4,500",
+    "masks300": "₩12,000",
+    "masks30Original": "₩2,800",
+    "masks100Original": "₩9,000",
+    "masks300Original": "₩24,000"
   },
   "report": {
     "title": "신고하기",

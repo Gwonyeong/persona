@@ -16,9 +16,9 @@ export default function MaskChargeModal({ onClose }) {
   const { masks } = useStore()
 
   const PACKAGES = [
-    { amount: 60, price: t('pricing.masks30'), label: t('masks.pkg30'), productId: 'masks_30' },
-    { amount: 200, price: t('pricing.masks100'), label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
-    { amount: 700, price: t('pricing.masks300'), label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
+    { amount: 30, price: t('pricing.masks30'), label: t('masks.pkg30'), productId: 'masks_30' },
+    { amount: 120, price: t('pricing.masks100'), label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
+    { amount: 450, price: t('pricing.masks300'), label: t('masks.pkg300'), badge: t('masks.badgeDiscount'), productId: 'masks_300' },
   ]
   const [selected, setSelected] = useState(1)
   const [loading, setLoading] = useState(false)
