@@ -506,6 +506,24 @@
     "heading": "Mask Shop",
     "tabSubscription": "Subscribe",
     "tabShop": "Shop",
-    "tabFree": "Free"
+    "tabFree": "Free",
+    "promo": {
+      "heading": "What you can do with Masks",
+      "comingSoon": "Content coming soon",
+      "chat": {
+        "title": "Deeper chats with AI characters",
+        "description": "Affinity grows with every message — tone and behavior shift as you bond. Voice available too.",
+        "previewLabel": "Preview character voices",
+        "affinityLabel": "Glimpses you'll see as you bond"
+      },
+      "premium": {
+        "title": "Premium Stories",
+        "description": "Unlock premium choices and exclusive scenes in branching storylines."
+      },
+      "aiImage": {
+        "title": "AI Image Generation",
+        "description": "Instantly generate character images in the situations and expressions you want."
+      }
+    }
   }
 }

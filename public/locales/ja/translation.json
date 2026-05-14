@@ -506,6 +506,24 @@
     "heading": "マスクショップ",
     "tabSubscription": "購読",
     "tabShop": "ショップ",
-    "tabFree": "無料"
+    "tabFree": "無料",
+    "promo": {
+      "heading": "マスクでできること",
+      "comingSoon": "コンテンツ準備中",
+      "chat": {
+        "title": "AIキャラクターとの深い会話",
+        "description": "会話するほど親密度が上がり、口調や反応が変化します。音声でも楽しめます。",
+        "previewLabel": "キャラクターの声を試聴",
+        "affinityLabel": "親密になると見られる姿"
+      },
+      "premium": {
+        "title": "プレミアムストーリー",
+        "description": "分岐型ストーリーでプレミアム選択肢や未公開シーンを解放できます。"
+      },
+      "aiImage": {
+        "title": "AI画像生成",
+        "description": "望むシチュエーションや表情のキャラクター画像を即座に生成できます。"
+      }
+    }
   }
 }
