@@ -506,6 +506,24 @@
     "heading": "마스크 상점",
     "tabSubscription": "구독",
     "tabShop": "상점",
-    "tabFree": "무료"
+    "tabFree": "무료",
+    "promo": {
+      "heading": "마스크로 할 수 있는 것들",
+      "comingSoon": "콘텐츠 준비 중",
+      "chat": {
+        "title": "AI 캐릭터와의 깊은 대화",
+        "description": "대화할수록 친밀도가 오르고 말투와 행동이 달라져요. 음성으로도 들을 수 있어요.",
+        "previewLabel": "캐릭터 음성 미리 들어보기",
+        "affinityLabel": "친밀해지면 볼 수 있는 모습"
+      },
+      "premium": {
+        "title": "프리미엄 스토리",
+        "description": "분기형 스토리에서 프리미엄 선택지와 미공개 장면을 해금하세요."
+      },
+      "aiImage": {
+        "title": "AI 이미지 생성",
+        "description": "원하는 상황과 표정의 캐릭터 이미지를 즉시 생성할 수 있어요."
+      }
+    }
   }
 }

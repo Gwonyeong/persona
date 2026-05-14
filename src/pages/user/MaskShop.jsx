@@ -10,6 +10,7 @@ import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
+import ShopPromoSection from '../../components/ShopPromoSection'
 
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
@@ -422,6 +423,7 @@ export default function MaskShop() {
 
       {/* 상점 탭 */}
       {activeTab === 'shop' && (
+        <>
         <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -497,6 +499,8 @@ export default function MaskShop() {
             {purchasing ? t('common.processing') : t('myPage.purchase', { price: PACKAGES[selectedPkg].price })}
           </button>
         </div>
+        <ShopPromoSection />
+        </>
       )}
 
       {/* 무료 탭 */}
