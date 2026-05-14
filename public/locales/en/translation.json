@@ -148,7 +148,7 @@
     "light": "Light",
     "perMonth": "/mo",
     "trial": "Free for 3 days",
-    "instantMasks": "Get 50 masks instantly!",
+    "instantMasks": "Get 30 masks instantly!",
     "startFree": "Start Free Trial",
     "manageSubscription": "Manage Subscription",
     "googlePlayError": "Google Play billing is not available.",
@@ -161,7 +161,7 @@
     "managedByGoogle": "Subscription is managed through Google Play.",
     "cancelAnytime": "You can cancel anytime on Play Store.",
     "lightBenefitsTitle": "Light Plan Benefits",
-    "lightBenefit1": "50 masks daily — keep chatting every day",
+    "lightBenefit1": "30 masks daily — keep chatting every day",
     "lightBenefit2": "Chat with all characters freely",
     "lightBenefit3": "Unlock bold image content",
     "lightBenefit4": "Ad-free clean experience",
@@ -179,7 +179,7 @@
       "none": "-",
       "tenCharacters": "10",
       "basic": "Basic",
-      "thirtyPerDay": "50/day",
+      "thirtyPerDay": "30/day",
       "unlimited": "Unlimited",
       "boldImages": "Bold images"
     }
@@ -336,9 +336,9 @@
     "freeLimitCta": "Start 3-day free trial"
   },
   "masks": {
-    "pkg30": "60",
-    "pkg100": "200",
-    "pkg300": "700",
+    "pkg30": "30",
+    "pkg100": "120",
+    "pkg300": "450",
     "badgePopular": "Popular",
     "badgeDiscount": "Discount",
     "chargeTitle": "Get Masks",
@@ -454,10 +454,10 @@
     "light": "$6.99",
     "masks30": "$0.99",
     "masks100": "$2.99",
-    "masks300": "$5.99",
+    "masks300": "$7.99",
     "masks30Original": "$1.99",
-    "masks100Original": "$4.99",
-    "masks300Original": "$9.99"
+    "masks100Original": "$5.99",
+    "masks300Original": "$15.99"
   },
   "report": {
     "title": "Report",

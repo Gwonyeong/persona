@@ -148,7 +148,7 @@
     "light": "ライト",
     "perMonth": "/月",
     "trial": "初3日間無料",
-    "instantMasks": "マスク50個 即時支給！",
+    "instantMasks": "マスク30個 即時支給！",
     "startFree": "無料で始める",
     "manageSubscription": "サブスク管理",
     "googlePlayError": "Google Play決済を利用できません。",
@@ -161,7 +161,7 @@
     "managedByGoogle": "サブスクリプションはGoogle Playで管理されています。",
     "cancelAnytime": "いつでもPlay Storeから解約できます。",
     "lightBenefitsTitle": "ライトプランの特典",
-    "lightBenefit1": "毎日マスク50個支給 — 毎日たくさん会話しよう",
+    "lightBenefit1": "毎日マスク30個支給 — 毎日たくさん会話しよう",
     "lightBenefit2": "全キャラクターと自由に会話",
     "lightBenefit3": "大胆な画像コンテンツを解放",
     "lightBenefit4": "広告なしのすっきり体験",
@@ -179,7 +179,7 @@
       "none": "-",
       "tenCharacters": "10人",
       "basic": "基本",
-      "thirtyPerDay": "50個/日",
+      "thirtyPerDay": "30個/日",
       "unlimited": "無制限",
       "boldImages": "大胆な画像"
     }
@@ -336,9 +336,9 @@
     "freeLimitCta": "3日間無料体験"
   },
   "masks": {
-    "pkg30": "60個",
-    "pkg100": "200個",
-    "pkg300": "700個",
+    "pkg30": "30個",
+    "pkg100": "120個",
+    "pkg300": "450個",
     "badgePopular": "人気",
     "badgeDiscount": "割引",
     "chargeTitle": "マスクチャージ",
@@ -456,8 +456,8 @@
     "masks100": "¥480",
     "masks300": "¥1,280",
     "masks30Original": "¥320",
-    "masks100Original": "¥800",
-    "masks300Original": "¥1,600"
+    "masks100Original": "¥960",
+    "masks300Original": "¥2,560"
   },
   "report": {
     "title": "通報する",
