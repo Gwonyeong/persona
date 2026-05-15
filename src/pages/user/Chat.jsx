@@ -592,8 +592,30 @@ export default function Chat() {
     const body = { content: text }
     if (feedToSend) body.feedPostId = feedToSend.id
     if (voiceMode && character?.voiceId) body.voiceWithChat = true
-    // 이번 응답 라운드 식별자 — 'message'로 추가한 버블을 'done' 시점에 메타데이터와 매칭하기 위함
+
+    await performStreamRound({ body, text, tempUserMsg, confirmedUserMsg, retriesLeft: 1 })
+  }
+
+  // 한 라운드의 스트리밍 요청. mid-stream 실패 시 자기 자신을 재호출하여 자동 재시도.
+  const performStreamRound = async ({ body, text, tempUserMsg, confirmedUserMsg, retriesLeft }) => {
+    // 새 라운드마다 fresh roundId — 이전 라운드의 잔여 버블과 섞이지 않게.
     const roundId = `r${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+
+    // 실패 시 호출 — 이번 라운드 버블 제거 + 재시도 또는 에러 표시.
+    const handleRoundFailure = (data) => {
+      stopAllPlayback()
+      setMessages((prev) => prev.filter((m) => m._round !== roundId))
+      if (retriesLeft > 0) {
+        // 자동 재시도. typing indicator는 유지하여 유저에게 응답 진행 인상.
+        setShowTyping(true)
+        performStreamRound({ body, text, tempUserMsg, confirmedUserMsg, retriesLeft: retriesLeft - 1 })
+      } else {
+        setShowTyping(false)
+        setSending(false)
+        showError(data?.refunded ? t('chat.errorRefunded') : t('chat.errorSend'))
+      }
+    }
+
     try {
       await api.stream(`/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
@@ -726,24 +748,22 @@ export default function Chat() {
           }
           case 'error':
             console.error('Stream error:', data)
-            setMessages((prev) => prev.filter((m) => !m.streaming && m.id !== tempUserMsg.id))
-            setShowTyping(false)
-            setSending(false)
-            showError(data?.refunded ? t('chat.errorRefunded') : t('chat.errorSend'))
+            handleRoundFailure(data)
             break
         }
       })
     } catch (error) {
       console.error(error)
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id))
-      setShowTyping(false)
-      setSending(false)
+      // Insufficient masks는 재시도해도 의미 없음 — 즉시 mask shop으로.
       if (error.message?.includes('Insufficient masks')) {
+        setMessages((prev) => prev.filter((m) => m._round !== roundId && m.id !== tempUserMsg.id))
+        setShowTyping(false)
+        setSending(false)
         window.gtag?.('event', 'mask_depleted', { conversation_id: id })
         navigate('/mask-shop')
-      } else {
-        showError(t('chat.errorSend'))
+        return
       }
+      handleRoundFailure({ refunded: true })
     }
   }
 
