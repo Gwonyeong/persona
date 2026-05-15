@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 
-const PROMPT_DOC_PATH = 'server/docs/cowork-create-storyline-prompt.md'
-
 export default function CharacterStorylines() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -423,7 +421,7 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
 // 새 스토리 생성 모달 — 3가지 모드 (AI / JSON / 빈 스토리)
 // ──────────────────────────────────────────────────────────────
 function NewStorylineModal({ characterId, characterName, onClose, onCreated }) {
-  const [mode, setMode] = useState('ai') // 'ai' | 'json' | 'empty'
+  const [mode, setMode] = useState('ai') // 'ai' | 'empty'
   const [seedIdea, setSeedIdea] = useState('')
   const [jsonText, setJsonText] = useState('')
   const [emptyTitle, setEmptyTitle] = useState('')
@@ -435,7 +433,7 @@ function NewStorylineModal({ characterId, characterName, onClose, onCreated }) {
     setSubmitting(true)
     try {
       let body
-      if (mode === 'json' || mode === 'ai') {
+      if (mode === 'ai') {
         try {
           body = JSON.parse(jsonText)
         } catch (e) {
@@ -486,7 +484,6 @@ function NewStorylineModal({ characterId, characterName, onClose, onCreated }) {
         <div className="flex border-b border-gray-800">
           {[
             { key: 'ai', label: 'AI 생성' },
-            { key: 'json', label: 'JSON 직접 입력' },
             { key: 'empty', label: '빈 스토리' },
           ].map((t) => (
             <button
@@ -515,20 +512,6 @@ function NewStorylineModal({ characterId, characterName, onClose, onCreated }) {
               jsonText={jsonText}
               setJsonText={setJsonText}
             />
-          )}
-          {mode === 'json' && (
-            <div>
-              <p className="text-xs text-gray-400 mb-2">
-                전체 storyline JSON을 붙여넣으세요. 스키마는 <code className="text-indigo-400">{PROMPT_DOC_PATH}</code> 참조.
-              </p>
-              <textarea
-                value={jsonText}
-                onChange={(e) => setJsonText(e.target.value)}
-                placeholder='{ "title": "...", "nodes": [...] }'
-                rows={16}
-                className="w-full bg-gray-950 border border-gray-700 rounded-lg p-3 text-xs font-mono text-gray-200 focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
           )}
           {mode === 'empty' && (
             <div>
@@ -589,7 +572,6 @@ ${seedIdea || '(여기에 운영자가 시드 아이디어를 작성)'}
 
 [출력 규칙]
 - 단일 JSON 객체만 출력 (마크다운/주석 금지).
-- 스키마/가이드라인 전체는 server/docs/cowork-create-storyline-prompt.md 참조.
 - 미디어 URL은 운영자가 별도로 제공한 것만 사용. 임의 생성 금지.
 - 응답 JSON에 characterId 키를 넣지 마세요 (URL 파라미터로 처리됨).
 
