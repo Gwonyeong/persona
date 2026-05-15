@@ -86,7 +86,15 @@
     "ttsPlay": "再生",
     "ttsStop": "停止",
     "generatingTTS": "音声を生成中...",
-    "excitedTooltip": "ペソナが興奮状態になりました。"
+    "excitedTooltip": "ペソナが興奮状態になりました。",
+    "modelSelectorTitle": "チャットモデルを選択",
+    "modelSelectorDesc": "高度モデルはより豊かな返答を生成しますが、マスクを多く消費します。",
+    "modelBasic": "ベーシック",
+    "modelBasicDesc": "ペソナとの日常チャット",
+    "modelAdvanced": "アドバンス",
+    "modelAdvancedDesc": "ペソナのより豊かな感情表現と自然な話し方",
+    "maskCostLabel": "マスク {{count}}個",
+    "maskCostWithVoice": "マスク {{count}}個 (ボイス込み)"
   },
   "myPage": {
     "title": "マイページ - Pesona",

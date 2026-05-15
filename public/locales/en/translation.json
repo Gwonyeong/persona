@@ -86,7 +86,15 @@
     "ttsPlay": "Play",
     "ttsStop": "Stop",
     "generatingTTS": "Generating voice...",
-    "excitedTooltip": "Pesona is feeling aroused."
+    "excitedTooltip": "Pesona is feeling aroused.",
+    "modelSelectorTitle": "Choose chat model",
+    "modelSelectorDesc": "Advanced produces richer responses but costs more masks.",
+    "modelBasic": "Basic",
+    "modelBasicDesc": "Everyday chat with Pesona",
+    "modelAdvanced": "Advanced",
+    "modelAdvancedDesc": "Richer emotional expression and more natural speech from Pesona",
+    "maskCostLabel": "{{count}} mask(s)",
+    "maskCostWithVoice": "{{count}} mask(s) (with voice)"
   },
   "myPage": {
     "title": "My Page - Pesona",

@@ -86,7 +86,15 @@
     "ttsPlay": "재생",
     "ttsStop": "정지",
     "generatingTTS": "음성 생성 중...",
-    "excitedTooltip": "페소나가 흥분 상태가 됐어요."
+    "excitedTooltip": "페소나가 흥분 상태가 됐어요.",
+    "modelSelectorTitle": "채팅 모델 선택",
+    "modelSelectorDesc": "고급 모델은 더 풍부한 응답을 생성하지만 마스크를 더 많이 사용해요.",
+    "modelBasic": "기본",
+    "modelBasicDesc": "페소나와의 일상 채팅",
+    "modelAdvanced": "고급",
+    "modelAdvancedDesc": "페소나의 더 풍부한 감정표현, 자연스러운 화법",
+    "maskCostLabel": "마스크 {{count}}개",
+    "maskCostWithVoice": "마스크 {{count}}개 (보이스 포함)"
   },
   "myPage": {
     "title": "마이페이지 - Pesona",
