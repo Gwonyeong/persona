@@ -178,7 +178,6 @@
       "chat": "Chat",
       "dailyMasks": "Daily Masks",
       "characters": "Characters",
-      "contentLevel": "Content Level",
       "imageGen": "Image Gen",
       "adFree": "Ad-Free"
     },
@@ -188,8 +187,7 @@
       "tenCharacters": "10",
       "basic": "Basic",
       "thirtyPerDay": "30/day",
-      "unlimited": "Unlimited",
-      "boldImages": "Bold images"
+      "unlimited": "Unlimited"
     }
   },
   "deleteAccount": {

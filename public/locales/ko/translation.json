@@ -178,7 +178,6 @@
       "chat": "채팅",
       "dailyMasks": "일일 가면 지급",
       "characters": "대화 캐릭터",
-      "contentLevel": "콘텐츠 수위",
       "imageGen": "이미지 생성",
       "adFree": "광고 제거"
     },
@@ -188,8 +187,7 @@
       "tenCharacters": "10명",
       "basic": "기본",
       "thirtyPerDay": "30개/일",
-      "unlimited": "무제한",
-      "boldImages": "과감한 이미지"
+      "unlimited": "무제한"
     }
   },
   "deleteAccount": {

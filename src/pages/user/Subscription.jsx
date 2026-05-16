@@ -18,7 +18,6 @@ export default function Subscription() {
     { key: 'chat', label: t('subscription.feature.chat') },
     { key: 'dailyMasks', label: t('subscription.feature.dailyMasks') },
     { key: 'characters', label: t('subscription.feature.characters') },
-    { key: 'contentLevel', label: t('subscription.feature.contentLevel') },
     { key: 'imageGen', label: t('subscription.feature.imageGen') },
     { key: 'adFree', label: t('subscription.feature.adFree') },
   ]
@@ -33,7 +32,6 @@ export default function Subscription() {
         chat: t('subscription.featureValue.maskCost'),
         dailyMasks: t('subscription.featureValue.none'),
         characters: t('subscription.featureValue.tenCharacters'),
-        contentLevel: t('subscription.featureValue.basic'),
         imageGen: t('subscription.featureValue.maskCost'),
         adFree: t('subscription.featureValue.none'),
       },
@@ -48,7 +46,6 @@ export default function Subscription() {
         chat: t('subscription.featureValue.maskCost'),
         dailyMasks: t('subscription.featureValue.thirtyPerDay'),
         characters: t('subscription.featureValue.unlimited'),
-        contentLevel: t('subscription.featureValue.boldImages'),
         imageGen: t('subscription.featureValue.maskCost'),
         adFree: true,
       },
