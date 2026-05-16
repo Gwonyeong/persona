@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
 import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
@@ -332,10 +332,15 @@ export default function MaskShop() {
 
             {/* 혜택 리스트 */}
             <ul className="space-y-2 mb-4">
-              {[1, 2, 3, 4].map((i) => (
+              {[1, 2, 4].map((i) => (
                 <li key={i} className="text-xs text-gray-200 flex items-start gap-2">
                   <span className="text-indigo-400 mt-0.5">&#10003;</span>
-                  <span>{t(`subscription.lightBenefit${i}`)}</span>
+                  <span className="inline-flex items-center gap-1 flex-wrap">
+                    <Trans
+                      i18nKey={`subscription.lightBenefit${i}`}
+                      components={{ mask: <MaskIcon className="text-sm" /> }}
+                    />
+                  </span>
                 </li>
               ))}
             </ul>
