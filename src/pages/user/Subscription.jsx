@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
+import MaskIcon from '../../components/MaskIcon'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import {
@@ -279,22 +280,17 @@ export default function Subscription() {
           </p>
         </div>
         <ul className="space-y-1.5">
-          <li className="text-xs text-gray-400 flex items-start gap-2">
-            <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>{t('subscription.lightBenefit1')}</span>
-          </li>
-          <li className="text-xs text-gray-400 flex items-start gap-2">
-            <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>{t('subscription.lightBenefit2')}</span>
-          </li>
-          <li className="text-xs text-gray-400 flex items-start gap-2">
-            <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>{t('subscription.lightBenefit3')}</span>
-          </li>
-          <li className="text-xs text-gray-400 flex items-start gap-2">
-            <span className="text-indigo-400 mt-0.5">&#10003;</span>
-            <span>{t('subscription.lightBenefit4')}</span>
-          </li>
+          {[1, 2, 4].map((i) => (
+            <li key={i} className="text-xs text-gray-400 flex items-start gap-2">
+              <span className="text-indigo-400 mt-0.5">&#10003;</span>
+              <span className="inline-flex items-center gap-1 flex-wrap">
+                <Trans
+                  i18nKey={`subscription.lightBenefit${i}`}
+                  components={{ mask: <MaskIcon className="text-sm" /> }}
+                />
+              </span>
+            </li>
+          ))}
         </ul>
         <p className="text-xs text-green-400/80 mt-3">
           {t('subscription.lightTrialNote')}
