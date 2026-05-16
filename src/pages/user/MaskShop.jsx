@@ -12,6 +12,8 @@ import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
 import ShopPromoSection from '../../components/ShopPromoSection'
 
+const YOONHARIN_IMAGE_URL = 'https://zstwgwszakivdnhwbuei.supabase.co/storage/v1/object/public/pesona/dev/sprites/25/NEUTRAL.png'
+
 async function verifyOnServer(productId, purchaseToken) {
   const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
   useStore.getState().setMasks(result.masks)
@@ -27,46 +29,6 @@ export default function MaskShop() {
     { amount: 30, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
     { amount: 120, price: t('pricing.masks100'), originalPrice: t('pricing.masks100Original'), discount: '50%', label: t('masks.pkg100'), badge: t('masks.badgePopular'), productId: 'masks_100' },
     { amount: 450, price: t('pricing.masks300'), originalPrice: t('pricing.masks300Original'), discount: '50%', label: t('masks.pkg300'), productId: 'masks_300' },
-  ]
-
-  // 구독 관련 데이터
-  const FEATURES = [
-    { key: 'dailyMasks', label: t('subscription.feature.dailyMasks') },
-    { key: 'characters', label: t('subscription.feature.characters') },
-    { key: 'contentLevel', label: t('subscription.feature.contentLevel') },
-    { key: 'adFree', label: t('subscription.feature.adFree') },
-  ]
-
-  const PLANS = [
-    {
-      id: null,
-      tier: 'FREE',
-      name: t('subscription.free'),
-      price: t('pricing.free'),
-      features: {
-        chat: t('subscription.featureValue.maskCost'),
-        dailyMasks: t('subscription.featureValue.none'),
-        characters: t('subscription.featureValue.tenCharacters'),
-        contentLevel: t('subscription.featureValue.basic'),
-        imageGen: t('subscription.featureValue.maskCost'),
-        adFree: t('subscription.featureValue.none'),
-      },
-    },
-    {
-      id: 'light_plan',
-      tier: 'LIGHT',
-      name: t('subscription.light'),
-      price: t('pricing.light'),
-      trial: t('subscription.trial'),
-      features: {
-        chat: t('subscription.featureValue.maskCost'),
-        dailyMasks: t('subscription.featureValue.thirtyPerDay'),
-        characters: t('subscription.featureValue.unlimited'),
-        contentLevel: t('subscription.featureValue.boldImages'),
-        imageGen: t('subscription.featureValue.maskCost'),
-        adFree: true,
-      },
-    },
   ]
 
   const currentTier = subscription?.tier || 'FREE'
@@ -197,12 +159,6 @@ export default function MaskShop() {
     window.open('https://play.google.com/store/account/subscriptions?sku=light_plan&package=com.pesona.app', '_blank')
   }
 
-  const renderCell = (value) => {
-    if (value === true) return <span className="text-green-400 text-sm font-bold">&#10003;</span>
-    if (value === '-') return <span className="text-gray-600">-</span>
-    return <span className="text-gray-200 text-xs">{value}</span>
-  }
-
   useEffect(() => {
     if (!token) return
     api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
@@ -308,100 +264,108 @@ export default function MaskShop() {
       {/* 구독 탭 */}
       {activeTab === 'subscription' && (
         <>
-          {/* 비교 테이블 */}
-          <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
-            {/* 플랜 헤더 */}
-            <div className="grid grid-cols-3 border-b border-gray-800">
-              <div className="p-3" />
-              {PLANS.map((plan) => {
-                const isCurrent = currentTier === plan.tier
-                const isLight = plan.tier === 'LIGHT'
-                return (
-                  <div key={plan.tier} className={`p-3 text-center ${isLight ? 'bg-indigo-500/5' : ''}`}>
-                    {isCurrent && (
-                      <span className="inline-block px-1.5 py-0.5 bg-green-600/80 rounded text-[9px] font-bold text-white mb-1">
-                        {t('subscription.current')}
-                      </span>
-                    )}
-                    <p className={`text-sm font-bold ${isLight ? 'text-indigo-300' : 'text-gray-100'}`}>{plan.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {plan.price}
-                      {plan.id && <span className="text-gray-600">{t('subscription.perMonth')}</span>}
-                    </p>
-                    {plan.trial && !isCurrent && (
-                      <p className="text-[10px] text-green-400 font-semibold mt-1">{plan.trial}</p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* 기능 행 */}
-            {FEATURES.map((feature, i) => (
-              <div key={feature.key} className={`grid grid-cols-3 ${i < FEATURES.length - 1 ? 'border-b border-gray-800/50' : ''}`}>
-                <div className="p-3 flex items-center">
-                  <span className="text-xs text-gray-400 font-medium">{feature.label}</span>
-                </div>
-                {PLANS.map((plan) => (
-                  <div key={plan.tier} className={`p-3 flex items-center justify-center ${plan.tier === 'LIGHT' ? 'bg-indigo-500/5' : ''}`}>
-                    {renderCell(plan.features[feature.key])}
-                  </div>
-                ))}
+          {/* 무료 박스 */}
+          <div className="bg-gray-900 rounded-2xl border border-gray-800 p-5">
+            <div className="flex items-baseline justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <p className="text-base font-bold text-gray-100">{t('subscription.free')}</p>
+                {currentTier === 'FREE' && (
+                  <span className="inline-block px-1.5 py-0.5 bg-green-600/80 rounded text-[9px] font-bold text-white">
+                    {t('subscription.current')}
+                  </span>
+                )}
               </div>
-            ))}
-
-            {/* CTA 버튼 행 */}
-            <div className="grid grid-cols-3 border-t border-gray-800 p-3 gap-2">
-              <div />
-              <div />
-              {currentTier === 'LIGHT' ? (
-                <button
-                  onClick={manageSubscription}
-                  className="py-2.5 text-xs font-medium text-gray-400 bg-gray-800 rounded-lg border border-gray-700"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {t('subscription.manageSubscription')}
-                </button>
-              ) : (
-                <button
-                  onClick={handleSubscribe}
-                  disabled={subLoading}
-                  className="py-2.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {subLoading ? t('common.processing') : t('subscription.startFree')}
-                </button>
-              )}
+              <p className="text-sm text-gray-400">{t('pricing.free')}</p>
             </div>
+            <p className="text-xs text-gray-500 mb-4">{t('subscription.freeBoxTagline')}</p>
+            <ul className="space-y-2">
+              <li className="text-xs text-gray-300 flex items-center gap-2">
+                <span className="text-gray-500">&#10003;</span>
+                <span>{t('subscription.feature.characters')} · {t('subscription.featureValue.tenCharacters')}</span>
+              </li>
+              <li className="text-xs text-gray-300 flex items-center gap-2">
+                <span className="text-gray-500">&#10003;</span>
+                <span>{t('subscription.feature.chat')} · {t('subscription.featureValue.maskCost')}</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 라이트 박스 */}
+          <div className="mt-4 bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-indigo-500/15 rounded-2xl border border-indigo-500/30 p-5">
+            <div className="flex items-baseline justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <p className="text-base font-bold text-indigo-300">{t('subscription.light')}</p>
+                {currentTier === 'LIGHT' && (
+                  <span className="inline-block px-1.5 py-0.5 bg-green-600/80 rounded text-[9px] font-bold text-white">
+                    {t('subscription.current')}
+                  </span>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-gray-100">
+                  {t('pricing.light')}
+                  <span className="text-gray-500 font-normal text-xs">{t('subscription.perMonth')}</span>
+                </p>
+                {currentTier !== 'LIGHT' && (
+                  <p className="text-[10px] text-green-400 font-semibold mt-0.5">{t('subscription.trial')}</p>
+                )}
+              </div>
+            </div>
+
+            {/* 윤하린 + 가입 보너스 말풍선 */}
+            <div className="flex items-end gap-2 my-4">
+              <img
+                src={YOONHARIN_IMAGE_URL}
+                alt=""
+                className="w-14 h-14 rounded-full object-cover border-2 border-indigo-500/40 shrink-0 bg-indigo-500/10"
+                onError={(e) => { e.currentTarget.style.visibility = 'hidden' }}
+              />
+              <div className="relative flex-1 bg-indigo-500/25 border border-indigo-400/40 rounded-2xl rounded-bl-sm px-3 py-2">
+                <div className="flex items-center gap-1.5">
+                  <MaskIcon className="text-base shrink-0" />
+                  <p className="text-xs text-indigo-50 leading-snug font-medium">
+                    {t('subscription.signupBonusBubble')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 혜택 리스트 */}
+            <ul className="space-y-2 mb-4">
+              {[1, 2, 3, 4].map((i) => (
+                <li key={i} className="text-xs text-gray-200 flex items-start gap-2">
+                  <span className="text-indigo-400 mt-0.5">&#10003;</span>
+                  <span>{t(`subscription.lightBenefit${i}`)}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* CTA */}
+            {currentTier === 'LIGHT' ? (
+              <button
+                onClick={manageSubscription}
+                className="w-full py-3 text-sm font-medium text-gray-300 bg-gray-800 rounded-lg border border-gray-700"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('subscription.manageSubscription')}
+              </button>
+            ) : (
+              <button
+                onClick={handleSubscribe}
+                disabled={subLoading}
+                className="w-full py-3 text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg transition-colors disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {subLoading ? t('common.processing') : t('subscription.startFree')}
+              </button>
+            )}
+
+            <p className="text-[10px] text-green-400/80 text-center mt-3">{t('subscription.lightTrialNote')}</p>
           </div>
 
           {subError && (
             <p className="text-sm text-red-400 text-center mt-4">{subError}</p>
           )}
-
-          {/* 라이트 혜택 */}
-          <div className="mt-4 p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
-            <p className="text-sm font-bold text-indigo-300 mb-2">{t('subscription.lightBenefitsTitle')}</p>
-            <ul className="space-y-1.5">
-              <li className="text-xs text-gray-400 flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">&#10003;</span>
-                <span>{t('subscription.lightBenefit1')}</span>
-              </li>
-              <li className="text-xs text-gray-400 flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">&#10003;</span>
-                <span>{t('subscription.lightBenefit2')}</span>
-              </li>
-              <li className="text-xs text-gray-400 flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">&#10003;</span>
-                <span>{t('subscription.lightBenefit3')}</span>
-              </li>
-              <li className="text-xs text-gray-400 flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">&#10003;</span>
-                <span>{t('subscription.lightBenefit4')}</span>
-              </li>
-            </ul>
-            <p className="text-xs text-green-400/80 mt-3">{t('subscription.lightTrialNote')}</p>
-          </div>
 
           {/* 하단 링크 */}
           <div className="mt-4 flex flex-col items-center gap-3">

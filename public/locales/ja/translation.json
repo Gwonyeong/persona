@@ -174,11 +174,12 @@
     "lightBenefit3": "大胆な画像コンテンツを解放",
     "lightBenefit4": "広告なしのすっきり体験",
     "lightTrialNote": "初3日間は無料！体験期間中に解約すれば料金は発生しません。",
+    "freeBoxTagline": "10人のキャラクターと気軽に始めよう",
+    "signupBonusBubble": "登録後すぐにマスク30個プレゼント！",
     "feature": {
       "chat": "チャット",
       "dailyMasks": "デイリーマスク",
       "characters": "キャラクター",
-      "contentLevel": "コンテンツレベル",
       "imageGen": "画像生成",
       "adFree": "広告非表示"
     },
@@ -188,8 +189,7 @@
       "tenCharacters": "10人",
       "basic": "基本",
       "thirtyPerDay": "30個/日",
-      "unlimited": "無制限",
-      "boldImages": "大胆な画像"
+      "unlimited": "無制限"
     }
   },
   "deleteAccount": {
