@@ -8,6 +8,7 @@ import GiftBottomSheet from '../../components/GiftBottomSheet'
 import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
+import CallSheet from '../../components/CallSheet'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -346,6 +347,7 @@ export default function Chat() {
   const [characterStatus, setCharacterStatus] = useState(null)
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
+  const [showCall, setShowCall] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
   const [chatModel, setChatModel] = useState('BASIC') // 'BASIC' (Mistral) | 'ADVANCED' (Grok 4.3)
   const [showModelSheet, setShowModelSheet] = useState(false)
@@ -1020,6 +1022,19 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
+        {character.voiceId && (
+          <button
+            onClick={() => setShowCall(true)}
+            className="text-gray-400 hover:text-indigo-300 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            title={t('chat.call.start')}
+            aria-label={t('chat.call.start')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+          </button>
+        )}
         <button
           onClick={() => setShowReport(true)}
           className="text-gray-500 hover:text-red-400 transition-colors ml-1"
@@ -1592,6 +1607,13 @@ export default function Chat() {
           </div>
         </div>
       )}
+      <CallSheet
+        open={showCall}
+        onClose={() => setShowCall(false)}
+        conversationId={conversation?.id}
+        character={character}
+        profileUrl={profileUrl}
+      />
     </div>
   )
 }
