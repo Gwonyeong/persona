@@ -105,6 +105,7 @@
       "lightOnlyDesc": "通話機能はライトプラン以上で\n利用できます。",
       "viewSubscription": "3日間無料で始める",
       "freeCount": "あと{{count}}回無料",
+      "updateRequired": "通話を利用するにはアプリを更新してください",
       "permissionDenied": "マイクの権限が必要です",
       "permissionHint": "デバイスの設定でマイクを許可してください",
       "connecting": "接続中...",

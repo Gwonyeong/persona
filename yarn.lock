@@ -37,6 +37,11 @@
   resolved "https://registry.npmjs.org/@capacitor/push-notifications/-/push-notifications-8.0.3.tgz"
   integrity sha512-jmBBoJvOzmzem8YoO9dQJBPFiM1bksTNAoV7yksCBN10BybAOtmBF19vFPt/jr2KGAirnPZz0ne2X0OH/rRGtg==
 
+"@capawesome/capacitor-app-update@^8.0.3":
+  version "8.0.3"
+  resolved "https://registry.npmjs.org/@capawesome/capacitor-app-update/-/capacitor-app-update-8.0.3.tgz"
+  integrity sha512-5pS9I+i2TuUl8b6L3h2WsWF/PE68exzoc9CciXK/I2SdB2fIkdxObrYBeYS2Z09ndCGqJgx4iwZJmhXwVcMh4w==
+
 "@capgo/capacitor-in-app-review@^8.1.2":
   version "8.1.2"
   resolved "https://registry.npmjs.org/@capgo/capacitor-in-app-review/-/capacitor-in-app-review-8.1.2.tgz"

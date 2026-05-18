@@ -105,6 +105,7 @@
       "lightOnlyDesc": "Calls are available on the Light plan\nor higher.",
       "viewSubscription": "Start 3-day free trial",
       "freeCount": "{{count}} free!",
+      "updateRequired": "Please update the app to use calls",
       "permissionDenied": "Microphone permission required",
       "permissionHint": "Please allow microphone access in your device settings",
       "connecting": "Connecting...",
