@@ -1,0 +1,271 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import useCall from '../hooks/useCall'
+
+const COST_PER_TURN = 5
+
+const BUTTON_RESET = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
+
+// Chat.jsx의 동일 함수와 일치. 호감도 라벨 i18n 키 매핑.
+function getAffinityLabelKey(affinity) {
+  if (affinity <= -50) return 'affinityVeryHostile'
+  if (affinity <= -20) return 'affinityHostile'
+  if (affinity <= -5) return 'affinityUncomfortable'
+  if (affinity <= 5) return 'affinityNeutral'
+  if (affinity <= 20) return 'affinitySlightLike'
+  if (affinity <= 50) return 'affinityLike'
+  if (affinity <= 80) return 'affinityIntimate'
+  return 'affinityDeep'
+}
+
+function PhaseLabel({ phase, mode, t }) {
+  switch (phase) {
+    case 'connecting':
+      return <span>{t('chat.call.connecting')}</span>
+    case 'listening':
+      return <span>{mode === 'ptt' ? t('chat.call.tapToTalk') : t('chat.call.listening')}</span>
+    case 'recording':
+      return <span className="text-red-300">{mode === 'ptt' ? t('chat.call.release') : t('chat.call.listening')}</span>
+    case 'sending':
+      return <span>{t('chat.call.thinking')}</span>
+    case 'speaking':
+      return <span className="text-indigo-300">{t('chat.call.speaking')}</span>
+    default:
+      return <span>{t('chat.call.ready')}</span>
+  }
+}
+
+export default function CallSheet({ open, onClose, conversationId, character, profileUrl, characterStatus, affinity = 0, callMode = 'continue' }) {
+  const { t } = useTranslation()
+  const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
+  const [errorMsg, setErrorMsg] = useState(null)
+  const [inputLevel, setInputLevel] = useState(0)
+  const levelRafRef = useRef(null)
+  const isSimple = callMode === 'simple'
+
+  const {
+    phase,
+    transcript,
+    aiText,
+    error,
+    connect,
+    disconnect,
+    startTalking,
+    stopTalking,
+  } = useCall({
+    conversationId,
+    mode,
+    callMode,
+    onError: (err) => {
+      const map = {
+        PERMISSION_DENIED: t('chat.call.permissionDenied'),
+        SUBSCRIPTION_REQUIRED: t('chat.call.needLight'),
+        INSUFFICIENT_MASKS: t('chat.call.errorInsufficientMasks'),
+        EMPTY_TRANSCRIPT: t('chat.call.errorEmpty'),
+      }
+      setErrorMsg(map[err.code] || t('chat.call.errorSend'))
+    },
+  })
+
+  // 입력 레벨 시각화 — open && 마이크 활성일 때만 RAF 루프
+  useEffect(() => {
+    if (!open) return
+    let raf = null
+    let mounted = true
+    const tick = () => {
+      if (!mounted) return
+      // useCall이 노출하는 분석기가 있다면 직접 측정 (간소화: hook에서 getInputLevel을 노출함)
+      // 여기서는 phase 기반 fallback. 정확한 RMS를 원하면 useCall.getInputLevel() 사용.
+      setInputLevel((prev) => {
+        // 자연스러운 페이드: phase에 따라 목표값 결정
+        const target = phase === 'recording' ? 1 : phase === 'listening' ? 0.25 : 0.1
+        return prev + (target - prev) * 0.12
+      })
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => { mounted = false; if (raf) cancelAnimationFrame(raf) }
+  }, [open, phase])
+
+  // 열릴 때 자동 연결, 닫힐 때 자동 종료
+  useEffect(() => {
+    if (open) {
+      setErrorMsg(null)
+      connect()
+    }
+    return () => {
+      if (!open) {
+        disconnect()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // unmount 시 무조건 disconnect
+  useEffect(() => () => { disconnect() }, [disconnect])
+
+  if (!open) return null
+
+  const isConnecting = phase === 'connecting'
+  const canSpeak = phase === 'listening' || phase === 'recording'
+  const isFatal = errorMsg && (phase === 'idle' || !canSpeak)
+
+  const ringScale = 1 + inputLevel * 0.4
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">
+            {t('chat.call.title', { name: character?.name || '' })}
+          </span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSimple ? 'bg-gray-700/60 text-gray-300' : 'bg-indigo-500/30 text-indigo-200'}`}>
+            {isSimple ? t('chat.call.modeSimple') : t('chat.call.modeContinue')}
+          </span>
+        </div>
+        <button
+          onClick={() => { disconnect(); onClose?.() }}
+          className="text-gray-400 hover:text-white text-xs"
+          style={BUTTON_RESET}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
+        <div className="relative flex items-center justify-center">
+          <div
+            className="absolute rounded-full bg-indigo-500/20 transition-transform duration-150"
+            style={{ width: 220, height: 220, transform: `scale(${ringScale})` }}
+          />
+          <div
+            className="absolute rounded-full bg-indigo-500/30 transition-transform duration-150"
+            style={{ width: 180, height: 180, transform: `scale(${1 + inputLevel * 0.25})` }}
+          />
+          <div className="relative w-36 h-36 rounded-full overflow-hidden border-2 border-white/20 bg-gray-800">
+            {profileUrl ? (
+              <img src={profileUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-500">?</div>
+            )}
+          </div>
+        </div>
+
+        <div className="text-center">
+          <p className="text-xl font-semibold text-white">{character?.name}</p>
+          {!isSimple && characterStatus?.isExcited && (
+            <p className="mt-1 inline-block text-[10px] font-medium text-red-200 bg-red-500/30 border border-red-500/40 rounded-full px-2 py-0.5">
+              {t('chat.excitedTooltip')}
+            </p>
+          )}
+          <p className="text-sm text-gray-300 mt-2">
+            <PhaseLabel phase={phase} mode={mode} t={t} />
+          </p>
+        </div>
+
+        {/* 캐릭터 상태 카드 — continue 모드에서만 표시 (simple 모드는 컨텍스트 무시) */}
+        {!isSimple && (characterStatus || affinity !== undefined) && (
+          <div className="w-full max-w-sm grid grid-cols-2 gap-1.5 text-[11px]">
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusMood')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.mood || '-'}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusLocation')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.location || '-'}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusActivity')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.activity || '-'}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusOutfit')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.outfit || '-'}</div>
+            </div>
+            <div className="col-span-2 bg-white/5 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+              <span className="text-gray-500 text-[10px]">{t('chat.statusAffinity')}</span>
+              <span className="text-pink-300">
+                ❤️ {affinity} <span className="text-gray-400">· {t(`chat.${getAffinityLabelKey(affinity)}`)}</span>
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="w-full max-w-sm min-h-[64px] flex flex-col items-center gap-2">
+          {transcript && (
+            <div className="text-xs text-gray-400 text-center">
+              <span className="text-gray-500">{t('chat.call.you')}: </span>
+              {transcript}
+            </div>
+          )}
+          {aiText && (
+            <div className="text-sm text-white text-center bg-white/10 rounded-2xl px-4 py-2">
+              {aiText}
+            </div>
+          )}
+          {errorMsg && (
+            <div className="text-xs text-red-300 text-center">{errorMsg}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="px-6 pb-6 flex flex-col items-center gap-4">
+        {/* 모드 토글 */}
+        <div className="flex bg-white/10 rounded-full p-1 text-xs">
+          <button
+            onClick={() => setMode('ptt')}
+            className={`px-4 py-1.5 rounded-full transition-colors ${mode === 'ptt' ? 'bg-white text-gray-900' : 'text-gray-300'}`}
+            style={BUTTON_RESET}
+          >
+            {t('chat.call.modePtt')}
+          </button>
+          <button
+            onClick={() => setMode('vad')}
+            className={`px-4 py-1.5 rounded-full transition-colors ${mode === 'vad' ? 'bg-white text-gray-900' : 'text-gray-300'}`}
+            style={BUTTON_RESET}
+          >
+            {t('chat.call.modeVad')}
+          </button>
+        </div>
+
+        {/* 메인 액션 */}
+        <div className="flex items-center gap-4">
+          {/* PTT 모드일 때만 마이크 버튼 표시. VAD는 자동이라 hands-free. */}
+          {mode === 'ptt' && (
+            <button
+              onPointerDown={(e) => { e.preventDefault(); startTalking() }}
+              onPointerUp={(e) => { e.preventDefault(); stopTalking() }}
+              onPointerCancel={() => stopTalking()}
+              onPointerLeave={() => { if (phase === 'recording') stopTalking() }}
+              disabled={!canSpeak || isConnecting}
+              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all select-none disabled:opacity-40 ${phase === 'recording' ? 'bg-red-500 scale-110 shadow-[0_0_40px_rgba(239,68,68,0.6)]' : 'bg-white'}`}
+              style={{ ...BUTTON_RESET, touchAction: 'none' }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={phase === 'recording' ? 'white' : '#111'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="2" width="6" height="12" rx="3" />
+                <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
+            </button>
+          )}
+
+          <button
+            onClick={() => { disconnect(); onClose?.() }}
+            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg"
+            style={BUTTON_RESET}
+            aria-label={t('chat.call.end')}
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" transform="rotate(135 12 12)" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-gray-500">
+          {t('chat.call.costPerTurn', { count: COST_PER_TURN })} · {t('chat.call.secured')}
+        </p>
+      </div>
+    </div>
+  )
+}

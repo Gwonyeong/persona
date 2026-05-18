@@ -8,6 +8,7 @@ import GiftBottomSheet from '../../components/GiftBottomSheet'
 import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
+import CallSheet from '../../components/CallSheet'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -346,6 +347,9 @@ export default function Chat() {
   const [characterStatus, setCharacterStatus] = useState(null)
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
+  const [showCallChooser, setShowCallChooser] = useState(false)
+  // null 이면 통화 닫힘, 'simple'|'continue' 이면 CallSheet 오픈.
+  const [activeCallMode, setActiveCallMode] = useState(null)
   const [voiceMode, setVoiceMode] = useState(false)
   const [chatModel, setChatModel] = useState('BASIC') // 'BASIC' (Mistral) | 'ADVANCED' (Grok 4.3)
   const [showModelSheet, setShowModelSheet] = useState(false)
@@ -1020,6 +1024,19 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
+        {character.voiceId && user?.role === 'ADMIN' && (
+          <button
+            onClick={() => setShowCallChooser(true)}
+            className="text-gray-400 hover:text-indigo-300 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            title={t('chat.call.start')}
+            aria-label={t('chat.call.start')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+          </button>
+        )}
         <button
           onClick={() => setShowReport(true)}
           className="text-gray-500 hover:text-red-400 transition-colors ml-1"
@@ -1589,6 +1606,49 @@ export default function Chat() {
             onClick={() => setErrorToast(null)}
           >
             {errorToast}
+          </div>
+        </div>
+      )}
+      <CallSheet
+        open={!!activeCallMode}
+        onClose={() => setActiveCallMode(null)}
+        conversationId={conversation?.id}
+        character={character}
+        profileUrl={profileUrl}
+        characterStatus={characterStatus}
+        affinity={conversation?.affinity ?? 0}
+        callMode={activeCallMode || 'continue'}
+      />
+
+      {/* 통화 모드 선택 바텀시트 */}
+      {showCallChooser && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowCallChooser(false)}>
+          <div
+            className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up"
+            style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white text-base font-semibold mb-1">{t('chat.call.chooseTitle')}</h3>
+            <p className="text-gray-400 text-xs mb-4">{t('chat.call.chooseDesc')}</p>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => { setActiveCallMode('continue'); setShowCallChooser(false) }}
+                className="text-left bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-3 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="text-indigo-200 font-medium text-sm">{t('chat.call.modeContinue')}</div>
+                <div className="text-gray-400 text-xs mt-1">{t('chat.call.modeContinueDesc')}</div>
+              </button>
+              <button
+                onClick={() => { setActiveCallMode('simple'); setShowCallChooser(false) }}
+                className="text-left bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="text-gray-100 font-medium text-sm">{t('chat.call.modeSimple')}</div>
+                <div className="text-gray-400 text-xs mt-1">{t('chat.call.modeSimpleDesc')}</div>
+              </button>
+            </div>
           </div>
         </div>
       )}
