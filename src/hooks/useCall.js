@@ -196,6 +196,8 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     let lastUserText = null
     let lastAiText = null
     let lastAudioUrl = null
+    let lastFreeCallUses = null
+    let consumedFreeUse = false
 
     const handleEvent = (type, payload) => {
       if (type === 'transcript') {
@@ -219,6 +221,10 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         // 다음 턴 질문 확률 업데이트 (서버에서 계산해 반환)
         if (typeof payload.nextQuestionChance === 'number') {
           questionChanceRef.current = payload.nextQuestionChance
+        }
+        if (typeof payload.freeCallUses === 'number') {
+          lastFreeCallUses = payload.freeCallUses
+          consumedFreeUse = !!payload.consumedFreeUse
         }
         // 그 외 처리는 stream close 후 audio 재생까지 끝낸 다음
       }
@@ -270,7 +276,13 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       sessionHistoryRef.current.push({ role: 'assistant', content: lastAiText })
     }
 
-    onTurnComplete?.({ userText: lastUserText, charText: lastAiText, audioUrl: lastAudioUrl })
+    onTurnComplete?.({
+      userText: lastUserText,
+      charText: lastAiText,
+      audioUrl: lastAudioUrl,
+      freeCallUses: lastFreeCallUses,
+      consumedFreeUse,
+    })
 
     // 다음 턴 준비
     setPhase((p) => (p === 'idle' ? p : 'listening'))

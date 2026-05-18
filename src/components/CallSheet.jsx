@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useCall from '../hooks/useCall'
+import useStore from '../store/useStore'
 
 const COST_PER_TURN = 5
 
@@ -35,13 +36,20 @@ function PhaseLabel({ phase, mode, t }) {
   }
 }
 
-export default function CallSheet({ open, onClose, conversationId, character, profileUrl, characterStatus, affinity = 0, callMode = 'continue' }) {
+export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversationId, character, profileUrl, characterStatus, affinity = 0, callMode = 'continue' }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
   const [errorMsg, setErrorMsg] = useState(null)
   const [inputLevel, setInputLevel] = useState(0)
   const levelRafRef = useRef(null)
   const isSimple = callMode === 'simple'
+
+  const user = useStore((s) => s.user)
+  const setUser = useStore((s) => s.setUser)
+  const subscriptionTier = useStore((s) => s.subscription?.tier) || 'FREE'
+  const canCallUnlimited = subscriptionTier === 'LIGHT' || user?.role === 'ADMIN'
+  const remainingFreeCalls = user?.freeCallUses ?? 0
+  const showFreeCallBadge = !canCallUnlimited && remainingFreeCalls > 0
 
   const {
     phase,
@@ -64,6 +72,16 @@ export default function CallSheet({ open, onClose, conversationId, character, pr
         EMPTY_TRANSCRIPT: t('chat.call.errorEmpty'),
       }
       setErrorMsg(map[err.code] || t('chat.call.errorSend'))
+    },
+    onTurnComplete: ({ freeCallUses, consumedFreeUse }) => {
+      // 무료 횟수 차감되었을 경우, store에 즉시 반영해 배지 카운트가 실시간 업데이트되도록 한다
+      if (consumedFreeUse && typeof freeCallUses === 'number' && user) {
+        setUser({ ...user, freeCallUses })
+      }
+      // 무료 통화 사용한 FREE 유저가 0회 도달 → 시트 닫고 부모에게 알림
+      if (consumedFreeUse && freeCallUses === 0) {
+        onFreeUsesExhausted?.()
+      }
     },
   })
 
@@ -233,21 +251,34 @@ export default function CallSheet({ open, onClose, conversationId, character, pr
         <div className="flex items-center gap-4">
           {/* PTT 모드일 때만 마이크 버튼 표시. VAD는 자동이라 hands-free. */}
           {mode === 'ptt' && (
-            <button
-              onPointerDown={(e) => { e.preventDefault(); startTalking() }}
-              onPointerUp={(e) => { e.preventDefault(); stopTalking() }}
-              onPointerCancel={() => stopTalking()}
-              onPointerLeave={() => { if (phase === 'recording') stopTalking() }}
-              disabled={!canSpeak || isConnecting}
-              className={`w-20 h-20 rounded-full flex items-center justify-center transition-all select-none disabled:opacity-40 ${phase === 'recording' ? 'bg-red-500 scale-110 shadow-[0_0_40px_rgba(239,68,68,0.6)]' : 'bg-white'}`}
-              style={{ ...BUTTON_RESET, touchAction: 'none' }}
-            >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={phase === 'recording' ? 'white' : '#111'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="2" width="6" height="12" rx="3" />
-                <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            </button>
+            <div className="relative">
+              {showFreeCallBadge && phase !== 'recording' && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow whitespace-nowrap pointer-events-none">
+                  {t('chat.call.freeCount', { count: remainingFreeCalls })}
+                </span>
+              )}
+              <button
+                onPointerDown={(e) => { e.preventDefault(); startTalking() }}
+                onPointerUp={(e) => { e.preventDefault(); stopTalking() }}
+                onPointerCancel={() => stopTalking()}
+                onPointerLeave={() => { if (phase === 'recording') stopTalking() }}
+                disabled={!canSpeak || isConnecting}
+                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all select-none disabled:opacity-40 ${
+                  phase === 'recording'
+                    ? 'bg-red-500 scale-110 shadow-[0_0_40px_rgba(239,68,68,0.6)]'
+                    : showFreeCallBadge
+                      ? 'bg-emerald-300 shadow-[0_0_24px_rgba(110,231,183,0.5)]'
+                      : 'bg-white'
+                }`}
+                style={{ ...BUTTON_RESET, touchAction: 'none' }}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={phase === 'recording' ? 'white' : '#111'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+              </button>
+            </div>
           )}
 
           <button
