@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
+import { Capacitor } from '@capacitor/core'
 import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
@@ -41,6 +42,7 @@ export default function Home() {
   const [showLangModal, setShowLangModal] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+  const [appVersion, setAppVersion] = useState(null)
   const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
   const reducedData = usePrefersReducedData()
   const navigate = useNavigate()
@@ -71,6 +73,18 @@ export default function Home() {
       api.get('/notifications/unread-count').then(({ count }) => setUnreadNotifCount(count)).catch(() => {})
     }
   }, [token])
+
+  // 앱 버전 — 어느 빌드를 깔았는지 디버깅용으로 노출 (네이티브에서만 정확한 versionName/build를 알 수 있음)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      import('@capacitor/app')
+        .then(({ App }) => App.getInfo())
+        .then((info) => setAppVersion(`v${info.version} (${info.build})`))
+        .catch(() => setAppVersion('app'))
+    } else {
+      setAppVersion('web')
+    }
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -365,6 +379,9 @@ export default function Home() {
             <dd>2025-서울마포-2857</dd>
           </div>
         </dl>
+        {appVersion && (
+          <p className="mt-3 text-center text-[10px] text-gray-700">Pesona {appVersion}</p>
+        )}
       </footer>
 
       {/* 언어 선택 모달 */}
