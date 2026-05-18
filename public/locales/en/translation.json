@@ -178,6 +178,7 @@
     "testNotificationDesc": "Tap to send a test notification",
     "reviewTest": "Review Dialog Test",
     "adminPage": "Admin Page",
+    "inquiry": "Contact Us",
     "deleteAccount": "Delete Account"
   },
   "subscription": {
@@ -538,6 +539,31 @@
     "comments": "Comments",
     "deleteConfirm": "Are you sure you want to delete?",
     "loginRequired": "Login required"
+  },
+  "inquiry": {
+    "title": "Contact Us",
+    "metaTitle": "Contact - Pesona",
+    "notice": "Your message is delivered directly to the team. You can check the reply on this page.",
+    "write": "New Inquiry",
+    "writeTitle": "New Inquiry",
+    "empty": "No inquiries yet.\nFeel free to ask us anything!",
+    "titlePlaceholder": "Enter a title",
+    "contentPlaceholder": "Describe your question or issue",
+    "submit": "Send",
+    "titleRequired": "Title is required",
+    "contentRequired": "Content is required",
+    "statusPending": "Pending",
+    "statusAnswered": "Answered",
+    "replyLabel": "Reply from Team",
+    "waitingReply": "Waiting for a reply.",
+    "deleteConfirm": "Are you sure you want to delete?",
+    "loginRequired": "Login required"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications yet.",
+    "markAllRead": "Mark all read",
+    "justNow": "Just now"
   },
   "maskShop": {
     "title": "Mask Shop",

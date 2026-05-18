@@ -178,6 +178,7 @@
     "testNotificationDesc": "탭하여 테스트 알림 보내기",
     "reviewTest": "후기 다이얼로그 테스트",
     "adminPage": "어드민 페이지",
+    "inquiry": "문의",
     "deleteAccount": "회원 탈퇴"
   },
   "subscription": {
@@ -538,6 +539,31 @@
     "comments": "댓글",
     "deleteConfirm": "정말 삭제하시겠습니까?",
     "loginRequired": "로그인이 필요합니다"
+  },
+  "inquiry": {
+    "title": "문의",
+    "metaTitle": "문의 - Pesona",
+    "notice": "운영진에게 직접 전달됩니다. 답변은 이 페이지에서 확인할 수 있어요.",
+    "write": "문의하기",
+    "writeTitle": "문의 작성",
+    "empty": "아직 문의 내역이 없습니다.\n궁금한 점을 문의해주세요!",
+    "titlePlaceholder": "제목을 입력하세요",
+    "contentPlaceholder": "문의 내용을 입력하세요",
+    "submit": "전송",
+    "titleRequired": "제목을 입력해주세요",
+    "contentRequired": "내용을 입력해주세요",
+    "statusPending": "대기 중",
+    "statusAnswered": "답변완료",
+    "replyLabel": "운영진 답변",
+    "waitingReply": "답변을 기다리는 중입니다.",
+    "deleteConfirm": "정말 삭제하시겠습니까?",
+    "loginRequired": "로그인이 필요합니다"
+  },
+  "notifications": {
+    "title": "알림",
+    "empty": "받은 알림이 없습니다.",
+    "markAllRead": "모두 읽음",
+    "justNow": "방금"
   },
   "maskShop": {
     "title": "마스크 상점",
