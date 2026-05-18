@@ -347,7 +347,9 @@ export default function Chat() {
   const [characterStatus, setCharacterStatus] = useState(null)
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
-  const [showCall, setShowCall] = useState(false)
+  const [showCallChooser, setShowCallChooser] = useState(false)
+  // null 이면 통화 닫힘, 'simple'|'continue' 이면 CallSheet 오픈.
+  const [activeCallMode, setActiveCallMode] = useState(null)
   const [voiceMode, setVoiceMode] = useState(false)
   const [chatModel, setChatModel] = useState('BASIC') // 'BASIC' (Mistral) | 'ADVANCED' (Grok 4.3)
   const [showModelSheet, setShowModelSheet] = useState(false)
@@ -1022,9 +1024,9 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
-        {character.voiceId && (
+        {character.voiceId && user?.role === 'ADMIN' && (
           <button
-            onClick={() => setShowCall(true)}
+            onClick={() => setShowCallChooser(true)}
             className="text-gray-400 hover:text-indigo-300 transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             title={t('chat.call.start')}
@@ -1608,12 +1610,48 @@ export default function Chat() {
         </div>
       )}
       <CallSheet
-        open={showCall}
-        onClose={() => setShowCall(false)}
+        open={!!activeCallMode}
+        onClose={() => setActiveCallMode(null)}
         conversationId={conversation?.id}
         character={character}
         profileUrl={profileUrl}
+        characterStatus={characterStatus}
+        affinity={conversation?.affinity ?? 0}
+        callMode={activeCallMode || 'continue'}
       />
+
+      {/* 통화 모드 선택 바텀시트 */}
+      {showCallChooser && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowCallChooser(false)}>
+          <div
+            className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up"
+            style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-white text-base font-semibold mb-1">{t('chat.call.chooseTitle')}</h3>
+            <p className="text-gray-400 text-xs mb-4">{t('chat.call.chooseDesc')}</p>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => { setActiveCallMode('continue'); setShowCallChooser(false) }}
+                className="text-left bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-3 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="text-indigo-200 font-medium text-sm">{t('chat.call.modeContinue')}</div>
+                <div className="text-gray-400 text-xs mt-1">{t('chat.call.modeContinueDesc')}</div>
+              </button>
+              <button
+                onClick={() => { setActiveCallMode('simple'); setShowCallChooser(false) }}
+                className="text-left bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="text-gray-100 font-medium text-sm">{t('chat.call.modeSimple')}</div>
+                <div className="text-gray-400 text-xs mt-1">{t('chat.call.modeSimpleDesc')}</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

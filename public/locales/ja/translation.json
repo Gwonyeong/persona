@@ -118,7 +118,13 @@
       "errorInsufficientMasks": "マスクが足りません",
       "you": "あなた",
       "muteSelf": "マイクをミュート",
-      "secured": "通話内容はチャット履歴に保存されます"
+      "secured": "通話内容はチャット履歴に保存されます",
+      "chooseTitle": "通話モードを選択",
+      "chooseDesc": "どの方式で通話するか選んでください",
+      "modeContinue": "続けて通話",
+      "modeContinueDesc": "これまでのチャットとキャラ状態を引き継いで通話。通話内容はチャットにも蓄積されます",
+      "modeSimple": "シンプル通話",
+      "modeSimpleDesc": "過去の会話や状態を反映しない一回限りの通話。履歴・要約に残りません"
     }
   },
   "myPage": {

@@ -118,7 +118,13 @@
       "errorInsufficientMasks": "Not enough masks",
       "you": "You",
       "muteSelf": "Mute my microphone",
-      "secured": "Call transcript will be saved to chat history"
+      "secured": "Call transcript will be saved to chat history",
+      "chooseTitle": "Choose call mode",
+      "chooseDesc": "Pick how this call should be handled",
+      "modeContinue": "Continue chat",
+      "modeContinueDesc": "Carry over your chat history and character state. Call turns are appended to chat",
+      "modeSimple": "Quick call",
+      "modeSimpleDesc": "One-off call with no context. Nothing is added to chat history or summary"
     }
   },
   "myPage": {

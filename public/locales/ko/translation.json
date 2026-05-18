@@ -118,7 +118,13 @@
       "errorInsufficientMasks": "마스크가 부족해요",
       "you": "나",
       "muteSelf": "내 마이크 음소거",
-      "secured": "통화 내용은 채팅 기록에 저장돼요"
+      "secured": "통화 내용은 채팅 기록에 저장돼요",
+      "chooseTitle": "통화 모드 선택",
+      "chooseDesc": "어떤 방식으로 통화할지 골라주세요",
+      "modeContinue": "이어서 통화",
+      "modeContinueDesc": "지금까지의 채팅과 캐릭터 상태를 이어받아 통화. 통화 내용은 채팅에도 누적돼요",
+      "modeSimple": "단순 통화",
+      "modeSimpleDesc": "이전 대화·상태와 상관없이 일회성으로 통화만. 채팅 기록·요약에 반영되지 않아요"
     }
   },
   "myPage": {

@@ -45,11 +45,12 @@ function pickMimeType() {
  *
  * @param {object} options
  * @param {number} options.conversationId
- * @param {'ptt'|'vad'} options.mode  - PTT / VAD 토글
+ * @param {'ptt'|'vad'} options.mode  - PTT / VAD 토글 (마이크 입력 방식)
+ * @param {'simple'|'continue'} [options.callMode='continue']  - 서버 측 통화 모드. simple=컨텍스트 무시, continue=채팅 흐름 이어가기
  * @param {function} [options.onTurnComplete]  - 한 턴 완료 시 ({ userText, charText, audioUrl })
  * @param {function} [options.onError]  - ({ code, message })
  */
-export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, onError } = {}) {
+export default function useCall({ conversationId, mode = 'ptt', callMode = 'continue', onTurnComplete, onError } = {}) {
   const [phase, setPhase] = useState('idle')
   const [transcript, setTranscript] = useState(null)
   const [aiText, setAiText] = useState(null)
@@ -61,6 +62,12 @@ export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, 
   const mimeTypeRef = useRef('')
   const audioRef = useRef(null) // 재생용 Audio 엘리먼트 (재사용)
   const abortRef = useRef(null) // 진행 중 fetch abort용
+  // simple 모드 전용 in-memory 통화 히스토리. connect 시 초기화, disconnect 시 휘발.
+  // continue 모드에서는 서버가 conversation.messages를 직접 보므로 사용 안 함.
+  const sessionHistoryRef = useRef([])
+  // 캐릭터가 능동적으로 질문할 확률(0~100). 통화 세션 단위로 관리.
+  // 매 턴 서버로 전송 → 서버 응답의 nextQuestionChance로 업데이트.
+  const questionChanceRef = useRef(30)
 
   // VAD 관련
   const audioCtxRef = useRef(null)
@@ -136,6 +143,13 @@ export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, 
     const token = useStore.getState().token
     const fd = new FormData()
     fd.append('audio', audioBlob, `call-${Date.now()}.${mimeTypeRef.current.includes('mp4') ? 'm4a' : 'webm'}`)
+    fd.append('mode', callMode)
+    if (callMode === 'simple' && sessionHistoryRef.current.length > 0) {
+      // 통화 세션 내부의 직전 발화들을 LLM에 함께 전달.
+      // 서버가 길이 제한·검증 후 사용하므로 클라는 raw 누적치 그대로 전송.
+      fd.append('sessionHistory', JSON.stringify(sessionHistoryRef.current))
+    }
+    fd.append('questionChance', String(questionChanceRef.current))
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -202,7 +216,11 @@ export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, 
         setError(p)
         onError?.(p)
       } else if (type === 'done') {
-        // 처리는 stream close 후 audio 재생까지 끝낸 다음
+        // 다음 턴 질문 확률 업데이트 (서버에서 계산해 반환)
+        if (typeof payload.nextQuestionChance === 'number') {
+          questionChanceRef.current = payload.nextQuestionChance
+        }
+        // 그 외 처리는 stream close 후 audio 재생까지 끝낸 다음
       }
     }
 
@@ -246,6 +264,12 @@ export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, 
       }
     }
 
+    // 통화 세션 in-memory 히스토리 누적 (simple 모드용). 양쪽 모두 있을 때만.
+    if (lastUserText && lastAiText) {
+      sessionHistoryRef.current.push({ role: 'user', content: lastUserText })
+      sessionHistoryRef.current.push({ role: 'assistant', content: lastAiText })
+    }
+
     onTurnComplete?.({ userText: lastUserText, charText: lastAiText, audioUrl: lastAudioUrl })
 
     // 다음 턴 준비
@@ -253,7 +277,7 @@ export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, 
     // VAD 모드면 silence 카운터 리셋
     silenceStartedAtRef.current = null
     speechStartedAtRef.current = null
-  }, [conversationId, onError, onTurnComplete])
+  }, [conversationId, callMode, onError, onTurnComplete])
 
   const playAudio = useCallback((url) => {
     return new Promise((resolve) => {
@@ -355,6 +379,10 @@ export default function useCall({ conversationId, mode = 'ptt', onTurnComplete, 
     setTranscript(null)
     setAiText(null)
     setPhase('connecting')
+    // 세션 시작 시 simple 모드 in-memory 히스토리 초기화 (통화 간 누수 방지).
+    sessionHistoryRef.current = []
+    // 질문 확률도 매 통화 세션마다 30%로 리셋.
+    questionChanceRef.current = 30
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       const payload = { code: 'UNSUPPORTED', message: 'mediaDevices not supported' }

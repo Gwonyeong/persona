@@ -2,9 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useCall from '../hooks/useCall'
 
-const COST_PER_TURN = 4
+const COST_PER_TURN = 5
 
 const BUTTON_RESET = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
+
+// Chat.jsx의 동일 함수와 일치. 호감도 라벨 i18n 키 매핑.
+function getAffinityLabelKey(affinity) {
+  if (affinity <= -50) return 'affinityVeryHostile'
+  if (affinity <= -20) return 'affinityHostile'
+  if (affinity <= -5) return 'affinityUncomfortable'
+  if (affinity <= 5) return 'affinityNeutral'
+  if (affinity <= 20) return 'affinitySlightLike'
+  if (affinity <= 50) return 'affinityLike'
+  if (affinity <= 80) return 'affinityIntimate'
+  return 'affinityDeep'
+}
 
 function PhaseLabel({ phase, mode, t }) {
   switch (phase) {
@@ -23,12 +35,13 @@ function PhaseLabel({ phase, mode, t }) {
   }
 }
 
-export default function CallSheet({ open, onClose, conversationId, character, profileUrl }) {
+export default function CallSheet({ open, onClose, conversationId, character, profileUrl, characterStatus, affinity = 0, callMode = 'continue' }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
   const [errorMsg, setErrorMsg] = useState(null)
   const [inputLevel, setInputLevel] = useState(0)
   const levelRafRef = useRef(null)
+  const isSimple = callMode === 'simple'
 
   const {
     phase,
@@ -42,6 +55,7 @@ export default function CallSheet({ open, onClose, conversationId, character, pr
   } = useCall({
     conversationId,
     mode,
+    callMode,
     onError: (err) => {
       const map = {
         PERMISSION_DENIED: t('chat.call.permissionDenied'),
@@ -99,12 +113,17 @@ export default function CallSheet({ open, onClose, conversationId, character, pr
   const ringScale = 1 + inputLevel * 0.4
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-gradient-to-b from-gray-900 via-indigo-950 to-black"
+    <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-xs text-gray-400">
-          {t('chat.call.title', { name: character?.name || '' })}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">
+            {t('chat.call.title', { name: character?.name || '' })}
+          </span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSimple ? 'bg-gray-700/60 text-gray-300' : 'bg-indigo-500/30 text-indigo-200'}`}>
+            {isSimple ? t('chat.call.modeSimple') : t('chat.call.modeContinue')}
+          </span>
+        </div>
         <button
           onClick={() => { disconnect(); onClose?.() }}
           className="text-gray-400 hover:text-white text-xs"
@@ -135,10 +154,43 @@ export default function CallSheet({ open, onClose, conversationId, character, pr
 
         <div className="text-center">
           <p className="text-xl font-semibold text-white">{character?.name}</p>
+          {!isSimple && characterStatus?.isExcited && (
+            <p className="mt-1 inline-block text-[10px] font-medium text-red-200 bg-red-500/30 border border-red-500/40 rounded-full px-2 py-0.5">
+              {t('chat.excitedTooltip')}
+            </p>
+          )}
           <p className="text-sm text-gray-300 mt-2">
             <PhaseLabel phase={phase} mode={mode} t={t} />
           </p>
         </div>
+
+        {/* 캐릭터 상태 카드 — continue 모드에서만 표시 (simple 모드는 컨텍스트 무시) */}
+        {!isSimple && (characterStatus || affinity !== undefined) && (
+          <div className="w-full max-w-sm grid grid-cols-2 gap-1.5 text-[11px]">
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusMood')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.mood || '-'}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusLocation')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.location || '-'}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusActivity')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.activity || '-'}</div>
+            </div>
+            <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+              <div className="text-gray-500 text-[10px]">{t('chat.statusOutfit')}</div>
+              <div className="text-gray-100 truncate">{characterStatus?.outfit || '-'}</div>
+            </div>
+            <div className="col-span-2 bg-white/5 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+              <span className="text-gray-500 text-[10px]">{t('chat.statusAffinity')}</span>
+              <span className="text-pink-300">
+                ❤️ {affinity} <span className="text-gray-400">· {t(`chat.${getAffinityLabelKey(affinity)}`)}</span>
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="w-full max-w-sm min-h-[64px] flex flex-col items-center gap-2">
           {transcript && (
