@@ -18,7 +18,9 @@ const NAV_ITEMS = [
   },
   { to: '/admin/banners', label: '광고 배너' },
   { to: '/admin/broadcasts', label: '푸시 알림' },
+  { to: '/admin/notifications', label: '인앱 알림' },
   { to: '/admin/users', label: '유저 관리' },
+  { to: '/admin/inquiries', label: '문의 관리' },
   {
     key: 'finance',
     label: '재무',

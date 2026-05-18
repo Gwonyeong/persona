@@ -178,6 +178,7 @@
     "testNotificationDesc": "タップしてテスト通知を送信",
     "reviewTest": "レビューダイアログテスト",
     "adminPage": "管理者ページ",
+    "inquiry": "お問い合わせ",
     "deleteAccount": "アカウント削除"
   },
   "subscription": {
@@ -538,6 +539,31 @@
     "comments": "コメント",
     "deleteConfirm": "本当に削除しますか？",
     "loginRequired": "ログインが必要です"
+  },
+  "inquiry": {
+    "title": "お問い合わせ",
+    "metaTitle": "お問い合わせ - Pesona",
+    "notice": "運営に直接届きます。返信はこのページで確認できます。",
+    "write": "新規お問い合わせ",
+    "writeTitle": "お問い合わせ作成",
+    "empty": "お問い合わせ履歴はまだありません。\nお気軽にお問い合わせください！",
+    "titlePlaceholder": "タイトルを入力",
+    "contentPlaceholder": "お問い合わせ内容を入力",
+    "submit": "送信",
+    "titleRequired": "タイトルを入力してください",
+    "contentRequired": "内容を入力してください",
+    "statusPending": "受付中",
+    "statusAnswered": "回答済み",
+    "replyLabel": "運営からの返信",
+    "waitingReply": "返信をお待ちください。",
+    "deleteConfirm": "本当に削除しますか？",
+    "loginRequired": "ログインが必要です"
+  },
+  "notifications": {
+    "title": "お知らせ",
+    "empty": "お知らせはありません。",
+    "markAllRead": "すべて既読",
+    "justNow": "たった今"
   },
   "maskShop": {
     "title": "マスクショップ",

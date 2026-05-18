@@ -40,6 +40,7 @@ export default function Home() {
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
   const reducedData = usePrefersReducedData()
   const navigate = useNavigate()
@@ -67,6 +68,7 @@ export default function Home() {
   useEffect(() => {
     if (token) {
       api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
+      api.get('/notifications/unread-count').then(({ count }) => setUnreadNotifCount(count)).catch(() => {})
     }
   }, [token])
 
@@ -170,6 +172,22 @@ export default function Home() {
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </button>
+            {token && (
+              <button
+                onClick={() => navigate('/notifications')}
+                aria-label={t('notifications.title')}
+                className="relative w-8 h-8 flex items-center justify-center rounded-full text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+                {unreadNotifCount > 0 && (
+                  <span className="absolute bottom-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500 ring-1 ring-gray-950" />
+                )}
+              </button>
+            )}
             {token && (
               <button
                 onClick={() => navigate('/mask-shop')}
