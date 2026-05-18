@@ -106,7 +106,7 @@
       "viewSubscription": "3日間無料で始める",
       "freeCount": "あと{{count}}回無料",
       "permissionDenied": "マイクの権限が必要です",
-      "permissionHint": "ブラウザの設定でマイクを許可してください",
+      "permissionHint": "デバイスの設定でマイクを許可してください",
       "connecting": "接続中...",
       "ready": "通話中",
       "listening": "聞いています...",
