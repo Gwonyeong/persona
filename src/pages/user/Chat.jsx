@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import { ensureMicPermission } from '../../lib/microphone'
+import { ensureAppUpToDate } from '../../lib/appUpdate'
 import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
 import GiftBottomSheet from '../../components/GiftBottomSheet'
@@ -386,6 +387,19 @@ export default function Chat() {
     if (!canCallUnlimited && remainingFreeCalls <= 0) {
       setShowLightOnlyModal(true)
       return
+    }
+    // 통화 진입 전 Play Store 업데이트 체크 — 새 버전이 있으면 IMMEDIATE 풀스크린 업데이트 UI 트리거.
+    // 유저가 업데이트를 수락하면 앱이 재시작되어 이 코드는 반환되지 않고, 거부/실패 시 UPDATE_REQUIRED throw.
+    try {
+      await ensureAppUpToDate()
+    } catch (err) {
+      if (err?.code === 'UPDATE_REQUIRED') {
+        setErrorToast(t('chat.call.updateRequired'))
+        if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+        errorTimerRef.current = setTimeout(() => setErrorToast(null), 4000)
+        return
+      }
+      // 그 외 unexpected 에러는 차단하지 않고 통과
     }
     // 통화 시트 열기 전에 마이크 권한 확보 — user activation이 살아있는 탭 핸들러 안에서 요청해야
     // Android WebView가 시스템 다이얼로그를 안정적으로 띄운다.
