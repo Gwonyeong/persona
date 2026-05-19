@@ -58,7 +58,10 @@ export default function UserLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [hasUnread, setHasUnread] = useState(false)
-  const isChatPage = location.pathname.match(/^\/chats\/\d/)
+  const isChatPage =
+    location.pathname.match(/^\/chats\/\d/) ||
+    location.pathname.match(/^\/group-chats\/\d/) ||
+    location.pathname === '/group-chats/new'
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
 
   useEffect(() => {
