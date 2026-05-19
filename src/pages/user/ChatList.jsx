@@ -98,7 +98,7 @@ export default function ChatList() {
           {token && (
             <button
               onClick={() => navigate('/group-chats/new')}
-              className="w-9 h-9 flex items-center justify-center rounded-full text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+              className="relative w-9 h-9 flex items-center justify-center rounded-full text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               title={t('groupChat.newGroupButton')}
             >
@@ -108,6 +108,9 @@ export default function ChatList() {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
+              <span className="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold leading-none rounded-sm bg-indigo-600 text-white tracking-tight">
+                Beta
+              </span>
             </button>
           )}
           {token && (conversations.length > 0 || groupChats.length > 0) && (
