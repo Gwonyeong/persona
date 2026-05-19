@@ -409,6 +409,23 @@ export default function GroupChat() {
           <div className="text-center text-sm text-gray-500 py-10">{t('groupChat.emptyMessages')}</div>
         )}
         {renderableMessages.map((msg, idx) => {
+          // 연속 버블 그룹핑: 같은 작가(USER끼리 또는 같은 characterId)에 같은 분이면 한 그룹.
+          // 그룹 내 첫 버블만 아바타/이름 표시, 마지막 버블만 시간 표시.
+          const prevMsg = renderableMessages[idx - 1]
+          const nextMsg = renderableMessages[idx + 1]
+          const sameAuthor = (a, b) => {
+            if (!a || !b || a.role !== b.role) return false
+            if (a.role === 'NARRATION') return false
+            if (a.role === 'CHARACTER') return a.characterId === b.characterId
+            return a.role === 'USER'
+          }
+          const sameMinute = (a, b) => {
+            if (!a?.createdAt || !b?.createdAt) return false
+            return formatChatTime(a.createdAt) === formatChatTime(b.createdAt)
+          }
+          const isConsecutivePrev = sameAuthor(prevMsg, msg) && sameMinute(prevMsg, msg)
+          const isLastInGroup = !sameAuthor(msg, nextMsg) || !sameMinute(msg, nextMsg)
+
           if (msg.role === 'NARRATION') {
             return (
               <div key={idx} className="my-3 mx-4 px-3 py-2 bg-gray-900/70 rounded-lg text-center text-xs text-gray-300 italic leading-relaxed">
@@ -429,7 +446,9 @@ export default function GroupChat() {
                         : s.value}
                     </span>
                   ))}
-                  <div className="text-[10px] text-indigo-200/70 mt-0.5 text-right">{formatChatTime(msg.createdAt)}</div>
+                  {isLastInGroup && (
+                    <div className="text-[10px] text-indigo-200/70 mt-0.5 text-right">{formatChatTime(msg.createdAt)}</div>
+                  )}
                 </div>
               </div>
             )
@@ -441,11 +460,18 @@ export default function GroupChat() {
             const segs = parseMessageSegments(msg.content, 'CHARACTER')
             return (
               <div key={idx} className="flex items-start gap-2">
-                <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                  {avatar && <img src={avatar} alt="" className="w-full h-full object-cover" />}
+                {/* 아바타 — 그룹의 첫 버블에만 표시. 연속이면 동일 너비 공백 spacer로 정렬 유지 */}
+                <div className="w-8 flex-shrink-0">
+                  {!isConsecutivePrev && (
+                    <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
+                      {avatar && <img src={avatar} alt="" className="w-full h-full object-cover" />}
+                    </div>
+                  )}
                 </div>
                 <div className="max-w-[75%]">
-                  <div className="text-xs text-gray-400 mb-0.5">{character?.name || '...'}</div>
+                  {!isConsecutivePrev && (
+                    <div className="text-xs text-gray-400 mb-0.5">{character?.name || '...'}</div>
+                  )}
                   <div className="px-3 py-2 rounded-2xl rounded-tl-md bg-gray-800 text-white text-sm leading-relaxed whitespace-pre-wrap">
                     {segs.map((s, i) => (
                       <span key={i}>
@@ -459,7 +485,9 @@ export default function GroupChat() {
                       <audio controls src={msg.audioUrl} className="block mt-1 w-full h-8" />
                     )}
                   </div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">{formatChatTime(msg.createdAt)}</div>
+                  {isLastInGroup && (
+                    <div className="text-[10px] text-gray-500 mt-0.5">{formatChatTime(msg.createdAt)}</div>
+                  )}
                 </div>
               </div>
             )
@@ -481,6 +509,11 @@ export default function GroupChat() {
 
         {/* 스트리밍 중인 버블 — done 이벤트로 실제 메시지에 머지될 때까지 렌더 */}
         {streamingBubbles.map((b, idx) => {
+          // 스트리밍 버블도 같은 캐릭터 연속이면 아바타·이름 1회만.
+          // (모두 한 응답에서 나온 거라 시간 비교 불필요.)
+          const prevB = streamingBubbles[idx - 1]
+          const isConsecutivePrev = !!prevB && prevB.role === 'CHARACTER' && b.role === 'CHARACTER' && prevB.characterId === b.characterId
+
           if (b.role === 'NARRATION') {
             return (
               <div key={`s-${b.turnIdx}-${b.bubbleIdx}`} className="my-3 mx-4 px-3 py-2 bg-gray-900/70 rounded-lg text-center text-xs text-gray-300 italic leading-relaxed">
@@ -495,11 +528,17 @@ export default function GroupChat() {
           const segs = parseMessageSegments(b.content, 'CHARACTER')
           return (
             <div key={`s-${b.turnIdx}-${b.bubbleIdx}`} className="flex items-start gap-2">
-              <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                {avatar && <img src={avatar} alt="" className="w-full h-full object-cover" />}
+              <div className="w-8 flex-shrink-0">
+                {!isConsecutivePrev && (
+                  <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
+                    {avatar && <img src={avatar} alt="" className="w-full h-full object-cover" />}
+                  </div>
+                )}
               </div>
               <div className="max-w-[75%]">
-                <div className="text-xs text-gray-400 mb-0.5">{character?.name || '...'}</div>
+                {!isConsecutivePrev && (
+                  <div className="text-xs text-gray-400 mb-0.5">{character?.name || '...'}</div>
+                )}
                 <div className="px-3 py-2 rounded-2xl rounded-tl-md bg-gray-800 text-white text-sm leading-relaxed whitespace-pre-wrap">
                   {segs.map((s, i) => (
                     <span key={i}>
