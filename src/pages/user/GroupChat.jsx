@@ -209,6 +209,12 @@ export default function GroupChat() {
         messages: (prev.messages || []).filter((m) => m !== userMsg),
       }) : prev)
       setStreamingBubbles([])
+      // 마스크 부족(402) → 마스크 상점으로 이동. 재시도해도 의미 없으므로 즉시 분기.
+      if (err.message?.includes('Insufficient masks')) {
+        setSending(false)
+        navigate('/mask-shop')
+        return
+      }
     } finally {
       setSending(false)
     }
