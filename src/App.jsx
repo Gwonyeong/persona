@@ -41,6 +41,7 @@ import Chat from './pages/user/Chat'
 import GroupChatNew from './pages/user/GroupChatNew'
 import GroupChat from './pages/user/GroupChat'
 import MyPage from './pages/user/MyPage'
+import AdultVerify from './pages/user/AdultVerify'
 import Login from './pages/user/Login'
 import Feed from './pages/user/Feed'
 import About from './pages/user/About'
@@ -206,6 +207,7 @@ function App() {
         <Route path="/feed" element={<Feed />} />
         <Route path="/chats" element={<ChatList />} />
         <Route path="/my" element={<MyPage />} />
+        <Route path="/adult-verify" element={<AdultVerify />} />
         <Route path="/characters/:id" element={<CharacterDetail />} />
         <Route path="/characters/:id/feed" element={<CharacterFeed />} />
         <Route path="/scenarios/:id" element={<Scenario />} />

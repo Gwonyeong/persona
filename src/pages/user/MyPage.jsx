@@ -253,6 +253,28 @@ export default function MyPage() {
             </div>
           </button>
         )}
+        {dbUser?.role === 'ADMIN' && (
+          <button
+            onClick={() => navigate('/adult-verify')}
+            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className="text-gray-200">
+              {t('myPage.adultVerify')}
+              <span className="ml-1.5 text-[10px] text-amber-400/80">(admin)</span>
+            </span>
+            <div className="flex items-center gap-2">
+              {dbUser?.adultVerified && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600/20 text-emerald-400 border border-emerald-600/40">
+                  {t('adultVerify.statusVerified')}
+                </span>
+              )}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+          </button>
+        )}
         <button
           onClick={() => navigate('/inquiry')}
           className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"

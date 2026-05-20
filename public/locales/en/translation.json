@@ -184,7 +184,39 @@
     "reviewTest": "Review Dialog Test",
     "adminPage": "Admin Page",
     "inquiry": "Contact Us",
+    "adultVerify": "Adult Verification",
     "deleteAccount": "Delete Account"
+  },
+  "adultVerify": {
+    "title": "Adult Verification",
+    "heading": "Verify your identity to access adult content",
+    "description": "Complete mobile identity verification to unlock 19+ content.\nThis service uses Danal (via PortOne) identity verification.",
+    "policyTitle": "Notice",
+    "policy": {
+      "adultOnly": "Only users aged 19+ can be verified.",
+      "koreanOnly": "Currently supports Korean carriers only (SKT/KT/LGU+ and MVNOs).",
+      "oneAccount": "Only one account per identity is allowed.",
+      "dailyLimit": "Up to 5 verification attempts per day.",
+      "dataPolicy": "Verification data is encrypted with AES-256 and anonymized after 1 year."
+    },
+    "start": "Start Verification",
+    "verifying": "Verifying...",
+    "statusVerified": "Verified",
+    "verifiedDesc": "Your identity has been verified. You can access all content.",
+    "error": {
+      "alreadyVerified": "This account is already verified.",
+      "dailyLimit": "Daily verification limit (5) reached. Please try again tomorrow.",
+      "foreigner": "Foreigners are not eligible for verification.",
+      "underage": "Users under 19 cannot use this service.",
+      "diDuplicate": "This identity is already registered to another account.",
+      "notVerified": "Identity verification was not completed.",
+      "birthMissing": "Could not retrieve birth date information.",
+      "diMissing": "Verification information is missing.",
+      "portone": "Verification service error occurred.",
+      "notFound": "Verification record not found.",
+      "cancelled": "Verification was cancelled.",
+      "unknown": "An unknown error occurred."
+    }
   },
   "subscription": {
     "title": "Subscription Plan",
