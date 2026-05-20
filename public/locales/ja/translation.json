@@ -184,7 +184,39 @@
     "reviewTest": "レビューダイアログテスト",
     "adminPage": "管理者ページ",
     "inquiry": "お問い合わせ",
+    "adultVerify": "成人認証",
     "deleteAccount": "アカウント削除"
+  },
+  "adultVerify": {
+    "title": "成人認証",
+    "heading": "本人認証で成人コンテンツをご利用ください",
+    "description": "携帯電話本人認証を完了すると18禁コンテンツがロック解除されます。\nダナル(PortOne)本人認証サービスを使用します。",
+    "policyTitle": "ご案内",
+    "policy": {
+      "adultOnly": "満19歳以上のみ認証可能です。",
+      "koreanOnly": "現在は韓国の通信事業者(SKT/KT/LGU+および格安SIM)のみ対応しています。",
+      "oneAccount": "同一名義につき1アカウントのみ認証可能です。",
+      "dailyLimit": "1日最大5回まで認証を試行できます。",
+      "dataPolicy": "認証結果はAES-256で暗号化されて保管され、1年後に匿名化されます。"
+    },
+    "start": "本人認証を開始",
+    "verifying": "認証中...",
+    "statusVerified": "認証済み",
+    "verifiedDesc": "成人認証が完了しました。すべてのコンテンツをご利用いただけます。",
+    "error": {
+      "alreadyVerified": "このアカウントは既に認証済みです。",
+      "dailyLimit": "本日の認証試行回数(5回)を使い切りました。明日再度お試しください。",
+      "foreigner": "外国人の方は本人認証の対象外です。",
+      "underage": "満19歳未満の方はご利用いただけません。",
+      "diDuplicate": "この名義は既に他のアカウントで認証されています。",
+      "notVerified": "本人認証が完了していません。",
+      "birthMissing": "生年月日情報を取得できませんでした。",
+      "diMissing": "認証情報が不足しています。",
+      "portone": "本人認証サービスでエラーが発生しました。",
+      "notFound": "認証情報が見つかりません。",
+      "cancelled": "本人認証がキャンセルされました。",
+      "unknown": "不明なエラーが発生しました。"
+    }
   },
   "subscription": {
     "title": "サブスクリプション",
