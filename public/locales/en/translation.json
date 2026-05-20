@@ -189,20 +189,12 @@
   },
   "adultVerify": {
     "title": "Adult Verification",
-    "heading": "Verify your identity to access adult content",
-    "description": "Complete mobile identity verification to unlock 19+ content.\nThis service uses Danal (via PortOne) identity verification.",
-    "policyTitle": "Notice",
-    "policy": {
-      "adultOnly": "Only users aged 19+ can be verified.",
-      "koreanOnly": "Currently supports Korean carriers only (SKT/KT/LGU+ and MVNOs).",
-      "oneAccount": "Only one account per identity is allowed.",
-      "dailyLimit": "Up to 5 verification attempts per day.",
-      "dataPolicy": "Verification data is encrypted with AES-256 and anonymized after 1 year."
-    },
+    "heading": "Adult verification lets you turn Safety Mode off!",
+    "description": "With Safety Mode off, you can have deeper conversations with characters and see more of their hidden side.",
     "start": "Start Verification",
     "verifying": "Verifying...",
     "statusVerified": "Verified",
-    "verifiedDesc": "Your identity has been verified. You can access all content.",
+    "verifiedDesc": "You can now turn Safety Mode off!",
     "error": {
       "alreadyVerified": "This account is already verified.",
       "dailyLimit": "Daily verification limit (5) reached. Please try again tomorrow.",
@@ -217,6 +209,52 @@
       "cancelled": "Verification was cancelled.",
       "unknown": "An unknown error occurred."
     }
+  },
+  "chatSettings": {
+    "title": "Chat Settings",
+    "spriteMode": {
+      "heading": "Emotion Image Display",
+      "description": "Choose how character emotion images are shown.",
+      "options": {
+        "BUBBLE": {
+          "title": "Default",
+          "desc": "Show as a small image inside the message bubble. Appears once per round to avoid clutter."
+        },
+        "FULL": {
+          "title": "Full",
+          "desc": "Show as a full-width 9:16 image at the end of each round. Maximum visual impact."
+        },
+        "OFF": {
+          "title": "Off",
+          "desc": "Hide emotion images entirely. Only text and background remain visible."
+        }
+      }
+    }
+  },
+  "emotions": {
+    "NEUTRAL": "Neutral",
+    "HAPPY": "Happy",
+    "ANGRY": "Angry",
+    "SAD": "Sad",
+    "SHY": "Shy",
+    "WORRIED": "Worried",
+    "AROUSED_TEASE": "Tease",
+    "AROUSED_TOPLESS": "Topless",
+    "AROUSED_NUDE": "Nude",
+    "AROUSED_FOREPLAY": "Foreplay",
+    "AROUSED_INSERT": "Insert",
+    "AROUSED_INSERT_ALT": "Insert (Alt)",
+    "AROUSED_CLIMAX": "Climax",
+    "AROUSED_AFTERGLOW": "Afterglow"
+  },
+  "safetyMode": {
+    "labelOn": "Safety Mode",
+    "labelOff": "Safety Mode",
+    "tooltipOn": "Adult content blocked",
+    "tooltipOff": "Adult content allowed",
+    "verifyRequired": "Adult verification required",
+    "confirmOff": "Turning Safety Mode off enables NSFW expressions. Continue?",
+    "turnedOff": "Safety Mode turned off"
   },
   "subscription": {
     "title": "Subscription Plan",

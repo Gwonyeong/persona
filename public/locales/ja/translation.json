@@ -189,20 +189,12 @@
   },
   "adultVerify": {
     "title": "成人認証",
-    "heading": "本人認証で成人コンテンツをご利用ください",
-    "description": "携帯電話本人認証を完了すると18禁コンテンツがロック解除されます。\nダナル(PortOne)本人認証サービスを使用します。",
-    "policyTitle": "ご案内",
-    "policy": {
-      "adultOnly": "満19歳以上のみ認証可能です。",
-      "koreanOnly": "現在は韓国の通信事業者(SKT/KT/LGU+および格安SIM)のみ対応しています。",
-      "oneAccount": "同一名義につき1アカウントのみ認証可能です。",
-      "dailyLimit": "1日最大5回まで認証を試行できます。",
-      "dataPolicy": "認証結果はAES-256で暗号化されて保管され、1年後に匿名化されます。"
-    },
+    "heading": "成人認証でセーフティモードをオフにできます!",
+    "description": "セーフティモードをオフにすると、キャラクターとより深い会話ができ、キャラクターのより深い姿を見ることができます",
     "start": "本人認証を開始",
     "verifying": "認証中...",
     "statusVerified": "認証済み",
-    "verifiedDesc": "成人認証が完了しました。すべてのコンテンツをご利用いただけます。",
+    "verifiedDesc": "これでセーフティモードをオフにできます!",
     "error": {
       "alreadyVerified": "このアカウントは既に認証済みです。",
       "dailyLimit": "本日の認証試行回数(5回)を使い切りました。明日再度お試しください。",
@@ -217,6 +209,52 @@
       "cancelled": "本人認証がキャンセルされました。",
       "unknown": "不明なエラーが発生しました。"
     }
+  },
+  "chatSettings": {
+    "title": "チャット設定",
+    "spriteMode": {
+      "heading": "表情画像の表示方式",
+      "description": "キャラクターの表情画像をどのように表示するか選択してください。",
+      "options": {
+        "BUBBLE": {
+          "title": "デフォルト",
+          "desc": "メッセージバブル内に小さく表示。1ラウンドにつき1回だけ表示されます。"
+        },
+        "FULL": {
+          "title": "全体",
+          "desc": "ラウンド終了時に画面幅いっぱいの9:16画像で表示。視覚的インパクトが最大です。"
+        },
+        "OFF": {
+          "title": "オフ",
+          "desc": "表情画像を表示しません。テキストと背景のみ表示されます。"
+        }
+      }
+    }
+  },
+  "emotions": {
+    "NEUTRAL": "通常",
+    "HAPPY": "笑顔",
+    "ANGRY": "怒り",
+    "SAD": "悲しみ",
+    "SHY": "照れ",
+    "WORRIED": "心配",
+    "AROUSED_TEASE": "誘惑",
+    "AROUSED_TOPLESS": "上半身露出",
+    "AROUSED_NUDE": "全裸",
+    "AROUSED_FOREPLAY": "前戯",
+    "AROUSED_INSERT": "挿入",
+    "AROUSED_INSERT_ALT": "挿入(体位2)",
+    "AROUSED_CLIMAX": "絶頂",
+    "AROUSED_AFTERGLOW": "余韻"
+  },
+  "safetyMode": {
+    "labelOn": "セーフティモード",
+    "labelOff": "セーフティモード",
+    "tooltipOn": "アダルトコンテンツ非表示",
+    "tooltipOff": "アダルトコンテンツ許可中",
+    "verifyRequired": "成人認証が必要です",
+    "confirmOff": "セーフティモードをオフにするとNSFW表現が有効になります。続行しますか?",
+    "turnedOff": "セーフティモードがオフになりました"
   },
   "subscription": {
     "title": "サブスクリプション",

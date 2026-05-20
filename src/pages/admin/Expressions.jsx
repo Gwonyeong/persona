@@ -5,34 +5,69 @@ import { api } from '../../lib/api'
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 const PAGE_SIZE = 10
 
-const EMOTIONS = [
+// 일반 표정 (Safety Mode ON에서도 노출)
+const SFW_EMOTIONS = [
   { key: 'NEUTRAL', label: '기본' },
   { key: 'HAPPY', label: '웃음' },
   { key: 'ANGRY', label: '화남' },
   { key: 'SAD', label: '슬픔' },
-  { key: 'SURPRISED', label: '놀람' },
-  { key: 'SHY', label: '부끄러움' },
-  { key: 'ANNOYED', label: '짜증' },
-  { key: 'WORRIED', label: '걱정' },
-  { key: 'PLAYFUL', label: '장난' },
-  { key: 'EXCITED', label: '설렘' },
+  { key: 'SHY', label: '설렘' },
+]
+
+// 흥분 표정 (NSFW) — 성인 인증 + Safety Mode OFF 유저에게만 출력
+// desc는 운영자가 어떤 컨셉의 이미지를 업로드해야 하는지 안내.
+const NSFW_EMOTIONS = [
+  { key: 'AROUSED_TEASE', label: '도발', desc: '옷 흐트러짐 · 살짝 노출 (어깨·허벅지·속옷 비침) · 도발적 미소' },
+  { key: 'AROUSED_TOPLESS', label: '상의 노출', desc: '가슴 노출, 하의는 착용한 상태' },
+  { key: 'AROUSED_NUDE', label: '전라', desc: '완전 노출 · 행위 전 정지 포즈' },
+  { key: 'AROUSED_FOREPLAY', label: '애무', desc: '키스 · 터치 · 구강 등 전희 단계' },
+  { key: 'AROUSED_INSERT', label: '삽입', desc: '결합 컷 · 정상위 권장 (가장 범용)' },
+  { key: 'AROUSED_INSERT_ALT', label: '삽입(체위2)', desc: '후배위 / 기승위 등 변형 체위' },
+  { key: 'AROUSED_CLIMAX', label: '절정', desc: '정점 순간 · 눈물 그렁 · 입 벌어짐 · 무방비 표정' },
+  { key: 'AROUSED_AFTERGLOW', label: '여운', desc: '마무리 · 나른함 · 풀린 표정 · 절정 후 정적' },
+]
+
+const EMOTION_TABS = {
+  sfw: { label: '일반', emotions: SFW_EMOTIONS },
+  nsfw: { label: '흥분 (NSFW)', emotions: NSFW_EMOTIONS },
+}
+
+// 'bg'는 emotions를 안 쓰고 별도 컴포넌트로 렌더링.
+const TABS = [
+  { id: 'sfw', label: '일반' },
+  { id: 'nsfw', label: '흥분 (NSFW)' },
+  { id: 'bg', label: '배경' },
 ]
 
 export default function Expressions() {
   const [characters, setCharacters] = useState(null)
   const [filter, setFilter] = useState('ALL') // ALL | INCOMPLETE | NO_STYLE
   const [page, setPage] = useState(1)
+  const [tab, setTab] = useState('sfw') // sfw | nsfw | bg
+  const currentEmotions = tab === 'bg' ? [] : EMOTION_TABS[tab].emotions
 
   useEffect(() => {
     api.get('/admin/expressions-overview').then(({ characters }) => setCharacters(characters || []))
   }, [])
 
-  const updateImage = (characterId, emotion, image) => {
+  // 같은 (styleId, emotion)에 여러 이미지 허용 — 추가/삭제 별도 핸들러.
+  const addImage = (characterId, image) => {
     setCharacters((prev) =>
       prev.map((c) => {
         if (c.id !== characterId || !c.defaultStyle) return c
-        const others = c.defaultStyle.images.filter((i) => i.emotion !== emotion)
-        const next = image ? [...others, { id: image.id, emotion, filePath: image.filePath }] : others
+        const next = [
+          ...c.defaultStyle.images,
+          { id: image.id, emotion: image.emotion, filePath: image.filePath },
+        ]
+        return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
+      }),
+    )
+  }
+  const removeImage = (characterId, imageId) => {
+    setCharacters((prev) =>
+      prev.map((c) => {
+        if (c.id !== characterId || !c.defaultStyle) return c
+        const next = c.defaultStyle.images.filter((i) => i.id !== imageId)
         return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
       }),
     )
@@ -41,13 +76,19 @@ export default function Expressions() {
   const filtered = useMemo(() => {
     if (!characters) return []
     if (filter === 'INCOMPLETE') {
-      return characters.filter(
-        (c) => c.defaultStyle && c.defaultStyle.images.length < EMOTIONS.length,
-      )
+      // 현재 탭의 emotion 중 1장도 없는 게 있으면 미완성 (다중 이미지 모드)
+      const tabKeys = new Set(currentEmotions.map((e) => e.key))
+      return characters.filter((c) => {
+        if (!c.defaultStyle) return false
+        const filledEmotions = new Set(
+          c.defaultStyle.images.filter((i) => tabKeys.has(i.emotion)).map((i) => i.emotion),
+        )
+        return filledEmotions.size < currentEmotions.length
+      })
     }
     if (filter === 'NO_STYLE') return characters.filter((c) => !c.defaultStyle)
     return characters
-  }, [characters, filter])
+  }, [characters, filter, currentEmotions])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -64,30 +105,71 @@ export default function Expressions() {
             기본 스타일(첫 번째 스타일) 기준 · 캐릭터 {characters.length}명
           </p>
         </div>
-        <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
-          {[
-            { id: 'ALL', label: '전체' },
-            { id: 'INCOMPLETE', label: '미완성' },
-            { id: 'NO_STYLE', label: '스타일 없음' },
-          ].map((f) => (
-            <button
-              key={f.id}
-              onClick={() => {
-                setFilter(f.id)
-                setPage(1)
-              }}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                filter === f.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-              style={NO_OUTLINE}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          {/* 탭: 일반 / NSFW / 배경 */}
+          <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
+            {TABS.map((def) => (
+              <button
+                key={def.id}
+                onClick={() => {
+                  setTab(def.id)
+                  setPage(1)
+                }}
+                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  tab === def.id
+                    ? def.id === 'nsfw'
+                      ? 'bg-pink-600 text-white'
+                      : def.id === 'bg'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-indigo-600 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                style={NO_OUTLINE}
+              >
+                {def.label}
+              </button>
+            ))}
+          </div>
+          {/* 필터 (표정 탭에서만) */}
+          {tab !== 'bg' && (
+            <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
+              {[
+                { id: 'ALL', label: '전체' },
+                { id: 'INCOMPLETE', label: '미완성' },
+                { id: 'NO_STYLE', label: '스타일 없음' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setFilter(f.id)
+                    setPage(1)
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    filter === f.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                  style={NO_OUTLINE}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {tab === 'nsfw' && (
+        <div className="mb-4 bg-pink-950/30 border border-pink-800/40 rounded-xl px-4 py-3">
+          <p className="text-xs text-pink-200 leading-relaxed">
+            <span className="font-semibold">흥분 단계 가이드</span> — 서사 진행 순서로 배치되어 있습니다.
+            도발 → 노출 → 행위 → 절정 → 여운. 각 열의 안내를 보고 캐릭터별로 적합한 이미지를 업로드하세요.
+            모든 슬롯을 채울 필요는 없습니다 — 캐릭터 컨셉에 맞는 단계만 채우면 AI가 자동으로 매칭합니다.
+          </p>
+        </div>
+      )}
+
+      {tab === 'bg' ? (
+        <BackgroundsTab />
+      ) : filtered.length === 0 ? (
         <div className="text-center text-gray-500 py-16">표시할 캐릭터가 없습니다.</div>
       ) : (
         <>
@@ -98,19 +180,29 @@ export default function Expressions() {
                   <th className="sticky left-0 z-10 bg-gray-900 text-left text-xs font-medium text-gray-400 px-4 py-3 min-w-[180px]">
                     캐릭터
                   </th>
-                  {EMOTIONS.map((e) => (
+                  {currentEmotions.map((e) => (
                     <th
                       key={e.key}
-                      className="text-center text-xs font-medium text-gray-400 px-2 py-3 min-w-[88px]"
+                      className={`text-center text-xs font-medium text-gray-400 px-2 py-3 align-top ${e.desc ? 'min-w-[140px]' : 'min-w-[88px]'}`}
+                      title={e.desc || undefined}
                     >
-                      {e.label}
+                      <div className="text-gray-200">{e.label}</div>
+                      {e.desc && (
+                        <p className="mt-1 text-[10px] text-gray-500 font-normal leading-snug whitespace-normal">{e.desc}</p>
+                      )}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paged.map((c) => (
-                  <CharacterRow key={c.id} character={c} onUpdateImage={updateImage} />
+                  <CharacterRow
+                    key={c.id}
+                    character={c}
+                    emotions={currentEmotions}
+                    onAddImage={(img) => addImage(c.id, img)}
+                    onRemoveImage={(imageId) => removeImage(c.id, imageId)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -149,11 +241,15 @@ export default function Expressions() {
   )
 }
 
-function CharacterRow({ character, onUpdateImage }) {
+function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
   const style = character.defaultStyle
+  // 한 emotion에 여러 이미지 가능 — 배열로 그룹화.
   const imagesByEmotion = useMemo(() => {
     const map = {}
-    if (style) for (const img of style.images) map[img.emotion] = img
+    if (style) for (const img of style.images) {
+      if (!map[img.emotion]) map[img.emotion] = []
+      map[img.emotion].push(img)
+    }
     return map
   }, [style])
 
@@ -188,14 +284,16 @@ function CharacterRow({ character, onUpdateImage }) {
         </div>
       </td>
 
-      {EMOTIONS.map((e) => (
+      {emotions.map((e) => (
         <td key={e.key} className="px-2 py-3 text-center">
           {style ? (
             <EmotionCell
               styleId={style.id}
               emotion={e.key}
-              image={imagesByEmotion[e.key]}
-              onChange={(img) => onUpdateImage(character.id, e.key, img)}
+              emotionLabel={e.label}
+              images={imagesByEmotion[e.key] || []}
+              onAdd={onAddImage}
+              onRemove={onRemoveImage}
             />
           ) : (
             <div className="w-16 h-16 mx-auto rounded-md bg-gray-800/40 border border-dashed border-gray-700/50" />
@@ -206,10 +304,387 @@ function CharacterRow({ character, onUpdateImage }) {
   )
 }
 
-function EmotionCell({ styleId, emotion, image, onChange }) {
+function EmotionCell({ styleId, emotion, emotionLabel, images, onAdd, onRemove }) {
   const [uploading, setUploading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const [managerOpen, setManagerOpen] = useState(false)
+
+  const hasImages = images.length > 0
+  const firstImage = hasImages ? images[0] : null
+
+  const uploadFile = async (file) => {
+    if (!file || !file.type?.startsWith('image/')) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('emotion', emotion)
+      formData.append('description', '')
+      const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, formData)
+      onAdd({ ...uploaded, emotion })
+    } catch (error) {
+      console.error('Expression upload error:', error)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const triggerUploadDirect = () => {
+    if (uploading) return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0]
+      if (file) await uploadFile(file)
+    }
+    input.click()
+  }
+
+  const handleClick = () => {
+    if (uploading) return
+    // 이미지가 있으면 매니저 열기, 없으면 바로 업로드 picker
+    if (hasImages) setManagerOpen(true)
+    else triggerUploadDirect()
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (uploading) return
+    if (!dragOver) setDragOver(true)
+  }
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }
+  const handleDrop = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    if (uploading) return
+    const file = e.dataTransfer?.files?.[0]
+    if (file) await uploadFile(file)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        disabled={uploading}
+        className={`relative w-16 h-16 mx-auto rounded-md overflow-hidden border-2 flex items-center justify-center transition-colors group ${
+          dragOver
+            ? 'border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-500/40'
+            : `border-dashed ${hasImages ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-700 hover:border-indigo-500 bg-gray-800/40'}`
+        } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        style={NO_OUTLINE}
+        title={hasImages ? `${images.length}장 — 클릭하여 관리 / 드래그하여 추가` : '클릭 또는 드래그하여 업로드'}
+      >
+        {uploading ? (
+          <span className="text-[10px] text-gray-400">업로드중</span>
+        ) : firstImage ? (
+          <>
+            <img src={firstImage.filePath} alt={emotion} className="w-full h-full object-cover" loading="lazy" />
+            {images.length > 1 && (
+              <span className="absolute bottom-0.5 right-0.5 text-[9px] font-semibold px-1 py-0.5 rounded bg-black/70 text-white pointer-events-none">
+                +{images.length - 1}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-2xl text-gray-600">+</span>
+        )}
+      </button>
+
+      {managerOpen && (
+        <EmotionSlotManager
+          emotion={emotion}
+          emotionLabel={emotionLabel}
+          images={images}
+          onClose={() => setManagerOpen(false)}
+          onUpload={uploadFile}
+          uploading={uploading}
+          onRemove={onRemove}
+        />
+      )}
+    </>
+  )
+}
+
+function EmotionSlotManager({ emotion, emotionLabel, images, onClose, onUpload, uploading, onRemove }) {
+  const [removingId, setRemovingId] = useState(null)
 
   const triggerUpload = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files || [])
+      for (const f of files) await onUpload(f)
+    }
+    input.click()
+  }
+
+  const handleRemove = async (imageId) => {
+    if (!confirm('이 이미지를 삭제하시겠습니까?')) return
+    setRemovingId(imageId)
+    try {
+      await api.delete(`/admin/images/${imageId}`)
+      onRemove(imageId)
+    } catch (err) {
+      console.error('Remove image error:', err)
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-white">{emotionLabel} <span className="text-gray-500 text-[11px]">({emotion})</span></h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">총 {images.length}장 · 채팅에서 랜덤으로 1장 선택됨</p>
+          </div>
+          <button
+            onClick={triggerUpload}
+            disabled={uploading}
+            className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            {uploading ? '업로드 중...' : '+ 이미지 추가'}
+          </button>
+        </div>
+
+        {images.length === 0 ? (
+          <p className="text-center text-sm text-gray-500 py-10">아직 이미지가 없습니다.</p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+            {images.map((img) => (
+              <div key={img.id} className="relative group rounded-md overflow-hidden bg-gray-800">
+                <div className="aspect-[3/4]">
+                  <img src={img.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <button
+                  onClick={() => handleRemove(img.id)}
+                  disabled={removingId === img.id}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center disabled:opacity-50"
+                  style={NO_OUTLINE}
+                  title="삭제"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 pt-3 border-t border-gray-800 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            style={NO_OUTLINE}
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// 배경 탭 — 라이브러리(전역 풀) + 캐릭터별 할당
+// ============================================
+
+function BackgroundsTab() {
+  const [library, setLibrary] = useState(null)
+  const [assignments, setAssignments] = useState(null) // [{id, name, profileImage, backgrounds: [{id, order, background:{id,filePath,tags}}]}]
+  const [pickerForCharacter, setPickerForCharacter] = useState(null)
+  const [libraryDragOver, setLibraryDragOver] = useState(false)
+  const [batchUploading, setBatchUploading] = useState(false)
+
+  const reloadLibrary = () =>
+    api.get('/admin/background-library').then(({ items }) => setLibrary(items || []))
+  const reloadAssignments = () =>
+    api
+      .get('/admin/background-assignments-overview')
+      .then(({ characters }) => setAssignments(characters || []))
+
+  useEffect(() => {
+    reloadLibrary()
+    reloadAssignments()
+  }, [])
+
+  const handleUpload = async (file, tags) => {
+    const fd = new FormData()
+    fd.append('image', file)
+    fd.append('tags', JSON.stringify(tags))
+    await api.post('/admin/background-library', fd)
+    await reloadLibrary()
+  }
+
+  // 드래그앤드롭: 여러 파일 동시 업로드. 태그는 한 번 prompt로 받아 모든 파일에 공통 적용.
+  const handleDropFiles = async (files) => {
+    const imageFiles = Array.from(files).filter((f) => f.type?.startsWith('image/'))
+    if (imageFiles.length === 0) return
+    const tagInput = prompt(
+      `태그를 콤마(,)로 구분해 입력하세요 (${imageFiles.length}개 파일에 공통 적용. 예: 카페, 실내, 낮)`,
+      '',
+    )
+    if (tagInput === null) return // 취소
+    const tags = tagInput.split(',').map((t) => t.trim()).filter(Boolean)
+    setBatchUploading(true)
+    try {
+      for (const file of imageFiles) {
+        try {
+          await handleUpload(file, tags)
+        } catch (err) {
+          console.error('Background upload error:', err)
+        }
+      }
+    } finally {
+      setBatchUploading(false)
+    }
+  }
+
+  const handleLibraryDragOver = (e) => {
+    e.preventDefault()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    if (!libraryDragOver) setLibraryDragOver(true)
+  }
+  const handleLibraryDragLeave = (e) => {
+    e.preventDefault()
+    // 자식 요소 위로 이동한 경우 무시
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setLibraryDragOver(false)
+  }
+  const handleLibraryDrop = async (e) => {
+    e.preventDefault()
+    setLibraryDragOver(false)
+    if (e.dataTransfer?.files?.length) {
+      await handleDropFiles(e.dataTransfer.files)
+    }
+  }
+
+  const handleDeleteLibrary = async (id) => {
+    if (!confirm('이 배경 이미지를 라이브러리에서 삭제할까요? 할당된 모든 캐릭터에서도 제거됩니다.')) return
+    await api.delete(`/admin/background-library/${id}`)
+    await Promise.all([reloadLibrary(), reloadAssignments()])
+  }
+
+  const handleUpdateTags = async (id, tags) => {
+    await api.patch(`/admin/background-library/${id}`, { tags })
+    await reloadLibrary()
+  }
+
+  const handleAssign = async (characterId, backgroundIds) => {
+    await api.post(`/admin/characters/${characterId}/backgrounds`, { backgroundIds })
+    await reloadAssignments()
+    setPickerForCharacter(null)
+  }
+
+  const handleUnassign = async (characterId, backgroundId) => {
+    await api.delete(`/admin/characters/${characterId}/backgrounds/${backgroundId}`)
+    await reloadAssignments()
+  }
+
+  if (!library || !assignments) return <div className="text-gray-400">로딩 중...</div>
+
+  return (
+    <>
+      {/* 라이브러리 — 영역 전체가 drop zone */}
+      <section
+        className={`mb-8 rounded-xl transition-colors ${
+          libraryDragOver ? 'bg-amber-500/10 ring-2 ring-amber-500/40 p-3' : ''
+        }`}
+        onDragOver={handleLibraryDragOver}
+        onDragEnter={handleLibraryDragOver}
+        onDragLeave={handleLibraryDragLeave}
+        onDrop={handleLibraryDrop}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-white">배경 라이브러리</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              전역 풀 · {library.length}개 · 이미지를 이 영역에 드래그하면 일괄 업로드
+              {batchUploading && <span className="ml-2 text-amber-400">업로드 중...</span>}
+            </p>
+          </div>
+          <LibraryUploadButton onUpload={handleUpload} />
+        </div>
+
+        {library.length === 0 ? (
+          <div className="bg-gray-900/60 border border-dashed border-gray-700 rounded-xl p-8 text-center text-sm text-gray-500">
+            아직 등록된 배경이 없습니다. 우측 상단 버튼을 누르거나 이미지를 드래그해서 추가하세요.
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+            {library.map((bg) => (
+              <LibraryCard
+                key={bg.id}
+                bg={bg}
+                onDelete={() => handleDeleteLibrary(bg.id)}
+                onUpdateTags={(tags) => handleUpdateTags(bg.id, tags)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 캐릭터별 할당 */}
+      <section>
+        <h3 className="text-sm font-semibold text-white mb-3">캐릭터별 배경 할당</h3>
+        <div className="bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">
+          {assignments.map((c) => (
+            <CharacterBackgroundRow
+              key={c.id}
+              character={c}
+              onAddClick={() => setPickerForCharacter(c.id)}
+              onUnassign={(bid) => handleUnassign(c.id, bid)}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* 라이브러리 픽커 모달 */}
+      {pickerForCharacter && (
+        <LibraryPickerModal
+          library={library}
+          alreadyAssigned={
+            new Set(
+              (assignments.find((c) => c.id === pickerForCharacter)?.backgrounds || []).map(
+                (b) => b.background.id,
+              ),
+            )
+          }
+          onClose={() => setPickerForCharacter(null)}
+          onConfirm={(ids) => handleAssign(pickerForCharacter, ids)}
+        />
+      )}
+    </>
+  )
+}
+
+function LibraryUploadButton({ onUpload }) {
+  const [uploading, setUploading] = useState(false)
+  const trigger = () => {
     if (uploading) return
     const input = document.createElement('input')
     input.type = 'file'
@@ -217,61 +692,227 @@ function EmotionCell({ styleId, emotion, image, onChange }) {
     input.onchange = async (e) => {
       const file = e.target.files?.[0]
       if (!file) return
+      const tagInput = prompt('태그를 콤마(,)로 구분해 입력하세요 (예: 카페, 실내, 낮)', '') || ''
+      const tags = tagInput.split(',').map((t) => t.trim()).filter(Boolean)
       setUploading(true)
       try {
-        const formData = new FormData()
-        formData.append('image', file)
-        formData.append('emotion', emotion)
-        formData.append('description', '')
-        const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, formData)
-        onChange(uploaded)
-      } catch (error) {
-        console.error('Expression upload error:', error)
+        await onUpload(file, tags)
+      } catch (err) {
+        console.error('Background upload error:', err)
       } finally {
         setUploading(false)
       }
     }
     input.click()
   }
+  return (
+    <button
+      onClick={trigger}
+      disabled={uploading}
+      className="px-3 py-1.5 rounded-md text-sm bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50"
+      style={NO_OUTLINE}
+    >
+      {uploading ? '업로드 중...' : '+ 배경 업로드'}
+    </button>
+  )
+}
 
-  const remove = async (ev) => {
-    ev.stopPropagation()
-    if (!image) return
-    if (!confirm('이 표정 이미지를 삭제하시겠습니까?')) return
-    await api.delete(`/admin/images/${image.id}`)
-    onChange(null)
+function LibraryCard({ bg, onDelete, onUpdateTags }) {
+  const [editing, setEditing] = useState(false)
+  const [tagInput, setTagInput] = useState((bg.tags || []).join(', '))
+
+  const saveTags = async () => {
+    const tags = tagInput.split(',').map((t) => t.trim()).filter(Boolean)
+    await onUpdateTags(tags)
+    setEditing(false)
   }
 
   return (
-    <button
-      type="button"
-      onClick={triggerUpload}
-      disabled={uploading}
-      className={`relative w-16 h-16 mx-auto rounded-md overflow-hidden border-2 border-dashed flex items-center justify-center transition-colors group ${
-        image ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-700 hover:border-indigo-500 bg-gray-800/40'
-      } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-      style={NO_OUTLINE}
-      title={image ? '클릭하여 교체' : '클릭하여 업로드'}
-    >
-      {uploading ? (
-        <span className="text-[10px] text-gray-400">업로드중</span>
-      ) : image ? (
-        <>
-          <img src={image.filePath} alt={emotion} className="w-full h-full object-cover" loading="lazy" />
-          <span
-            onClick={remove}
-            className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/70 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-            title="삭제"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </span>
-        </>
-      ) : (
-        <span className="text-2xl text-gray-600">+</span>
-      )}
-    </button>
+    <div className="group relative rounded-lg overflow-hidden bg-gray-800/40 border border-gray-700/50">
+      <div className="aspect-[4/3] bg-gray-800 overflow-hidden">
+        <img src={bg.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
+      </div>
+      <div className="p-2">
+        {editing ? (
+          <div className="flex flex-col gap-1.5">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              placeholder="태그 (콤마 구분)"
+              className="w-full text-[11px] bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-200"
+              style={NO_OUTLINE}
+            />
+            <div className="flex gap-1">
+              <button
+                onClick={saveTags}
+                className="flex-1 text-[10px] py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded"
+                style={NO_OUTLINE}
+              >저장</button>
+              <button
+                onClick={() => { setEditing(false); setTagInput((bg.tags || []).join(', ')) }}
+                className="flex-1 text-[10px] py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded"
+                style={NO_OUTLINE}
+              >취소</button>
+            </div>
+          </div>
+        ) : (
+          <div onClick={() => setEditing(true)} className="cursor-pointer min-h-[20px]">
+            {bg.tags?.length ? (
+              <div className="flex flex-wrap gap-1">
+                {bg.tags.map((t) => (
+                  <span key={t} className="text-[10px] bg-gray-700/60 text-gray-200 px-1.5 py-0.5 rounded">{t}</span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[10px] text-gray-500 italic">+ 태그 추가</span>
+            )}
+          </div>
+        )}
+        <p className="text-[10px] text-gray-500 mt-1.5">{bg._count?.assignments ?? 0}개 캐릭터에 사용 중</p>
+      </div>
+      <button
+        onClick={onDelete}
+        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+        style={NO_OUTLINE}
+        title="삭제"
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+function CharacterBackgroundRow({ character, onAddClick, onUnassign }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-center gap-2.5 min-w-[160px]">
+        {character.profileImage ? (
+          <img src={character.profileImage} alt="" className="w-7 h-7 rounded-full object-cover bg-gray-800" />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-gray-800" />
+        )}
+        <div className="min-w-0">
+          <p className="text-sm text-white truncate">{character.name}</p>
+          {!character.isPublic && (
+            <span className="text-[10px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded">비공개</span>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 flex flex-wrap items-center gap-2">
+        {character.backgrounds.map((b) => (
+          <div key={b.background.id} className="relative group">
+            <div className="w-14 h-10 rounded-md overflow-hidden bg-gray-800 border border-gray-700/60">
+              <img src={b.background.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
+            </div>
+            <button
+              onClick={() => onUnassign(b.background.id)}
+              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              style={NO_OUTLINE}
+              title="해제"
+            >
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        ))}
+        <button
+          onClick={onAddClick}
+          className="w-14 h-10 rounded-md border border-dashed border-gray-600 hover:border-amber-500 text-gray-500 hover:text-amber-400 text-xs"
+          style={NO_OUTLINE}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function LibraryPickerModal({ library, alreadyAssigned, onClose, onConfirm }) {
+  const [selected, setSelected] = useState(() => new Set())
+  const toggle = (id) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-3xl max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-white">라이브러리에서 추가</h3>
+          <span className="text-[11px] text-gray-500">{selected.size}개 선택됨</span>
+        </div>
+
+        {library.length === 0 ? (
+          <p className="text-center text-sm text-gray-500 py-10">라이브러리가 비어 있습니다.</p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 mb-4">
+            {library.map((bg) => {
+              const isAssigned = alreadyAssigned.has(bg.id)
+              const isSelected = selected.has(bg.id)
+              return (
+                <button
+                  key={bg.id}
+                  onClick={() => !isAssigned && toggle(bg.id)}
+                  disabled={isAssigned}
+                  className={`relative aspect-[4/3] rounded-md overflow-hidden border-2 transition-all ${
+                    isAssigned
+                      ? 'border-gray-700 opacity-40 cursor-not-allowed'
+                      : isSelected
+                        ? 'border-amber-500'
+                        : 'border-transparent hover:border-gray-500'
+                  }`}
+                  style={NO_OUTLINE}
+                >
+                  <img src={bg.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  {isAssigned && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <span className="text-[10px] text-gray-300">이미 할당됨</span>
+                    </div>
+                  )}
+                  {isSelected && (
+                    <div className="absolute top-1 right-1 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                  )}
+                  {bg.tags?.length > 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
+                      <p className="text-[9px] text-white truncate">{bg.tags.slice(0, 3).join(', ')}</p>
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2 border-t border-gray-800">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            style={NO_OUTLINE}
+          >취소</button>
+          <button
+            onClick={() => onConfirm([...selected])}
+            disabled={selected.size === 0}
+            className="flex-1 py-2 text-sm text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
+            style={NO_OUTLINE}
+          >추가 ({selected.size})</button>
+        </div>
+      </div>
+    </div>
   )
 }
