@@ -1217,7 +1217,7 @@ export default function Chat() {
           )}
 
           {/* 액션 버튼 5개 — 상태 panel 바로 아래, 항상 표시 */}
-          <div className="flex gap-2 justify-end px-3 pt-2 pointer-events-auto">
+          <div className="flex flex-wrap gap-2 justify-end px-3 pt-2 pointer-events-auto">
             <button
               onClick={() => setShowGiftSheet(true)}
               disabled={!token}
@@ -1636,11 +1636,17 @@ export default function Chat() {
               </div>
             </div>
             <p className="text-white font-semibold text-center mb-1">{t('chat.imageGenTitle', { name: character.name })}</p>
-            <p className="text-gray-400 text-sm text-center mb-4">
+            <p className="text-gray-400 text-sm text-center mb-3">
               {t('chat.imageGenDesc', { name: character.name })}
               <br />
               <span className="text-purple-400 font-medium">{t('chat.imageGenCost', { count: 5 })}</span>
             </p>
+            <div className="flex items-start gap-2 px-3 py-2.5 mb-4 rounded-lg bg-gray-800/70 border border-gray-700">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <p className="text-[12px] text-gray-300 leading-snug">{t('chat.imageGenSafetyNotice')}</p>
+            </div>
             {previewFeedImages.length > 0 && (
               <div className="flex gap-2 justify-center mb-5">
                 {previewFeedImages.map((url, i) => (
@@ -1684,11 +1690,17 @@ export default function Chat() {
               </div>
             </div>
             <p className="text-white font-semibold text-center mb-1">{t('chat.selfieTitle', { name: character.name })}</p>
-            <p className="text-gray-400 text-sm text-center mb-5">
+            <p className="text-gray-400 text-sm text-center mb-3">
               {t('chat.selfieDesc')}
               <br />
               <span className="text-pink-400 font-medium">{t('chat.imageGenCost', { count: 5 })}</span>
             </p>
+            <div className="flex items-start gap-2 px-3 py-2.5 mb-4 rounded-lg bg-gray-800/70 border border-gray-700">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <p className="text-[12px] text-gray-300 leading-snug">{t('chat.imageGenSafetyNotice')}</p>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowSelfieModal(false)}

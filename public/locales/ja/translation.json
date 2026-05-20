@@ -57,6 +57,7 @@
     "imageGenTitle": "{{name}}に写真をお願いする",
     "imageGenDesc": "{{name}}が会話に合った写真を送ってくれます。",
     "imageGenCost": "マスク{{count}}個",
+    "imageGenSafetyNotice": "この機能はセーフティモードが自動適用され、まだ解除できません。",
     "selfieTitle": "{{name}}がセルフィーを送ろうとしています",
     "selfieDesc": "会話に合ったセルフィーを受け取りますか？",
     "statusMood": "気分",
