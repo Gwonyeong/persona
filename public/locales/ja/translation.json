@@ -210,6 +210,31 @@
       "unknown": "不明なエラーが発生しました。"
     }
   },
+  "emotions": {
+    "NEUTRAL": "通常",
+    "HAPPY": "笑顔",
+    "ANGRY": "怒り",
+    "SAD": "悲しみ",
+    "SHY": "照れ",
+    "WORRIED": "心配",
+    "AROUSED_TEASE": "誘惑",
+    "AROUSED_TOPLESS": "上半身露出",
+    "AROUSED_NUDE": "全裸",
+    "AROUSED_FOREPLAY": "前戯",
+    "AROUSED_INSERT": "挿入",
+    "AROUSED_INSERT_ALT": "挿入(体位2)",
+    "AROUSED_CLIMAX": "絶頂",
+    "AROUSED_AFTERGLOW": "余韻"
+  },
+  "safetyMode": {
+    "labelOn": "セーフティモード",
+    "labelOff": "セーフティモード",
+    "tooltipOn": "アダルトコンテンツ非表示",
+    "tooltipOff": "アダルトコンテンツ許可中",
+    "verifyRequired": "成人認証が必要です",
+    "confirmOff": "セーフティモードをオフにするとNSFW表現が有効になります。続行しますか?",
+    "turnedOff": "セーフティモードがオフになりました"
+  },
   "subscription": {
     "title": "サブスクリプション",
     "current": "現在",

@@ -210,6 +210,31 @@
       "unknown": "An unknown error occurred."
     }
   },
+  "emotions": {
+    "NEUTRAL": "Neutral",
+    "HAPPY": "Happy",
+    "ANGRY": "Angry",
+    "SAD": "Sad",
+    "SHY": "Shy",
+    "WORRIED": "Worried",
+    "AROUSED_TEASE": "Tease",
+    "AROUSED_TOPLESS": "Topless",
+    "AROUSED_NUDE": "Nude",
+    "AROUSED_FOREPLAY": "Foreplay",
+    "AROUSED_INSERT": "Insert",
+    "AROUSED_INSERT_ALT": "Insert (Alt)",
+    "AROUSED_CLIMAX": "Climax",
+    "AROUSED_AFTERGLOW": "Afterglow"
+  },
+  "safetyMode": {
+    "labelOn": "Safety Mode",
+    "labelOff": "Safety Mode",
+    "tooltipOn": "Adult content blocked",
+    "tooltipOff": "Adult content allowed",
+    "verifyRequired": "Adult verification required",
+    "confirmOff": "Turning Safety Mode off enables NSFW expressions. Continue?",
+    "turnedOff": "Safety Mode turned off"
+  },
   "subscription": {
     "title": "Subscription Plan",
     "current": "Current",

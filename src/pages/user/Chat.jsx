@@ -354,6 +354,9 @@ export default function Chat() {
   const [activeCallMode, setActiveCallMode] = useState(null)
   const [showLightOnlyModal, setShowLightOnlyModal] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
+  // Safety Mode: true=SFW 유지(기본), false=NSFW 허용. 인증된 유저만 OFF 가능.
+  const [safetyMode, setSafetyMode] = useState(true)
+  const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
   const [chatModel, setChatModel] = useState('ADVANCED') // 'BASIC' (Mistral) | 'ADVANCED' (Grok 4.3)
   const [showModelSheet, setShowModelSheet] = useState(false)
   const [excitedTooltipVisible, setExcitedTooltipVisible] = useState(false)
@@ -531,6 +534,7 @@ export default function Chat() {
       setBackgroundImage(conv.backgroundImage || null)
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
       setVoiceMode(!!conv.voiceMode)
+      setSafetyMode(conv.safetyMode !== false)
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
@@ -1069,6 +1073,44 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
+        {/* Safety Mode 토글 — 어드민만 노출 (테스트 단계). 인증·NSFW 정책에 따라 점진 공개 예정. */}
+        {user?.role === 'ADMIN' && (
+          <button
+            onClick={() => {
+              if (!user?.adultVerified) {
+                navigate('/adult-verify')
+                return
+              }
+              if (safetyMode) {
+                // OFF로 전환 — 확인 다이얼로그
+                setSafetyConfirmVisible(true)
+              } else {
+                // ON 으로 즉시 복귀
+                setSafetyMode(true)
+                api.patch(`/conversations/${id}/safety-mode`, { enabled: true }).catch(() => {})
+              }
+            }}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              !user?.adultVerified
+                ? 'text-gray-500 hover:text-gray-300 bg-gray-800/60'
+                : safetyMode
+                  ? 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/20'
+                  : 'text-pink-300 bg-pink-500/15 hover:bg-pink-500/20'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            title={!user?.adultVerified ? t('safetyMode.verifyRequired') : safetyMode ? t('safetyMode.tooltipOn') : t('safetyMode.tooltipOff')}
+          >
+            {!user?.adultVerified ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            ) : (
+              <span className="w-2 h-2 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
+            )}
+            <span>{safetyMode ? 'Safety ON' : 'Safety OFF'}</span>
+          </button>
+        )}
         {character.voiceId && user?.role === 'ADMIN' && (
           <button
             onClick={handleCallClick}
@@ -1682,6 +1724,53 @@ export default function Chat() {
         affinity={conversation?.affinity ?? 0}
         callMode={activeCallMode || 'continue'}
       />
+
+      {/* Safety Mode OFF 확인 다이얼로그 */}
+      {safetyConfirmVisible && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setSafetyConfirmVisible(false)}>
+          <div
+            className="bg-gray-900 border border-pink-700/40 rounded-2xl p-5 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-pink-600/20 border border-pink-500/40 flex items-center justify-center mb-3">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-300 whitespace-pre-line mb-5">{t('safetyMode.confirmOff')}</p>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => setSafetyConfirmVisible(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-xl transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('common.cancel', { defaultValue: '취소' })}
+                </button>
+                <button
+                  onClick={async () => {
+                    setSafetyConfirmVisible(false)
+                    setSafetyMode(false)
+                    try {
+                      await api.patch(`/conversations/${id}/safety-mode`, { enabled: false })
+                    } catch (err) {
+                      // 실패 시 ON으로 되돌리고 인증 필요면 인증 페이지로 유도
+                      setSafetyMode(true)
+                      if (err?.data?.error === 'ADULT_VERIFICATION_REQUIRED') navigate('/adult-verify')
+                    }
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-pink-600 hover:bg-pink-500 text-white text-sm font-semibold rounded-xl transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  Safety OFF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 무료 통화 횟수 소진 시 안내 모달 */}
       {showLightOnlyModal && (
