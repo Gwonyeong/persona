@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -6,8 +6,14 @@ import useStore from '../../store/useStore'
 
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
-// PortOne SDK는 CDN으로 동적 로드. (npm 의존성 추가 없이 운영. WebView에서도 동작)
+// PortOne SDK는 CDN으로 동적 로드. (npm 의존성 추가 없이 운영)
 const PORTONE_SDK_URL = 'https://cdn.portone.io/v2/browser-sdk.js'
+
+// Capacitor WebView 감지. WebView는 popup window를 못 띄우므로 redirect 모드로 전환.
+function isWebView() {
+  const ua = navigator.userAgent || ''
+  return /wv|WebView/i.test(ua) || (ua.includes('Android') && ua.includes('Version/'))
+}
 
 function loadPortoneSdk() {
   if (window.PortOne) return Promise.resolve(window.PortOne)
@@ -50,12 +56,61 @@ export default function AdultVerify() {
   const [verifying, setVerifying] = useState(false)
   const [errorKey, setErrorKey] = useState(null)
   const [errorRaw, setErrorRaw] = useState(null)
+  const handledReturnRef = useRef(false)
+
+  // PortOne redirect 모드에서 돌아오면 쿼리스트링에 identityVerificationId/code/message가 붙는다.
+  // 한 번만 처리하고 URL 정리.
+  useEffect(() => {
+    if (!token || handledReturnRef.current) return
+    const params = new URLSearchParams(window.location.search)
+    const returnIvId = params.get('identityVerificationId')
+    if (!returnIvId) return
+    handledReturnRef.current = true
+
+    const returnCode = params.get('code')
+    const returnMessage = params.get('message')
+    window.history.replaceState({}, '', window.location.pathname)
+
+    if (returnCode) {
+      setErrorKey('adultVerify.error.cancelled')
+      setErrorRaw(returnMessage || returnCode)
+      setLoading(false)
+      return
+    }
+
+    setVerifying(true)
+    api.post('/identity/confirm', { identityVerificationId: returnIvId })
+      .then((result) => {
+        setStatus({
+          verified: true,
+          verifiedAt: result.verifiedAt,
+          birthDate: result.birthDate,
+          gender: result.gender,
+        })
+      })
+      .catch((err) => {
+        const code = err?.data?.error
+        if (code && ERROR_TO_I18N[code]) {
+          setErrorKey(ERROR_TO_I18N[code])
+          setErrorRaw(err?.data?.message || null)
+        } else {
+          setErrorKey('adultVerify.error.unknown')
+          setErrorRaw(err?.message || null)
+        }
+      })
+      .finally(() => {
+        setVerifying(false)
+        setLoading(false)
+      })
+  }, [token])
 
   useEffect(() => {
     if (!token) {
       navigate('/login')
       return
     }
+    // redirect 복귀 처리가 진행 중이면 status 조회는 건너뜀 (handledReturnRef로 중복 방지)
+    if (handledReturnRef.current) return
     api.get('/identity/status')
       .then(setStatus)
       .catch(() => setStatus({ verified: false }))
@@ -73,6 +128,21 @@ export default function AdultVerify() {
 
       // 2. PortOne SDK 로드 + 본인인증 요청 (다날 채널, PASS 우선 + SMS 폴백)
       const PortOne = await loadPortoneSdk()
+
+      // WebView는 popup window를 못 띄움 → redirect 모드로 전환.
+      // 같은 페이지(/adult-verify)로 돌아오면 useEffect가 쿼리스트링을 잡아 /confirm 호출.
+      if (isWebView()) {
+        PortOne.requestIdentityVerification({
+          storeId,
+          identityVerificationId,
+          channelKey,
+          redirectUrl: window.location.origin + window.location.pathname,
+        })
+        // 페이지가 PortOne으로 navigate되므로 여기 이후 코드는 실행되지 않음.
+        return
+      }
+
+      // 일반 브라우저: popup 모드
       const sdkResult = await PortOne.requestIdentityVerification({
         storeId,
         identityVerificationId,
