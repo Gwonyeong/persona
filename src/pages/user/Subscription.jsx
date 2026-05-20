@@ -280,7 +280,7 @@ export default function Subscription() {
           </p>
         </div>
         <ul className="space-y-1.5">
-          {[1, 2, 4].map((i) => (
+          {[1, 2, 4, 5].map((i) => (
             <li key={i} className="text-xs text-gray-400 flex items-start gap-2">
               <span className="text-indigo-400 mt-0.5">&#10003;</span>
               <span className="inline-flex items-center gap-1 flex-wrap">
