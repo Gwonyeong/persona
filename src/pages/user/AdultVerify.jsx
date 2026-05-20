@@ -227,17 +227,6 @@ export default function AdultVerify() {
               </p>
             </div>
 
-            <div className="bg-gray-900/50 rounded-xl border border-gray-800/60 p-4 mb-4">
-              <p className="text-[11px] text-gray-500 mb-2">{t('adultVerify.policyTitle')}</p>
-              <ul className="text-[11px] text-gray-400 space-y-1.5 list-disc list-inside leading-relaxed">
-                <li>{t('adultVerify.policy.adultOnly')}</li>
-                <li>{t('adultVerify.policy.koreanOnly')}</li>
-                <li>{t('adultVerify.policy.oneAccount')}</li>
-                <li>{t('adultVerify.policy.dailyLimit')}</li>
-                <li>{t('adultVerify.policy.dataPolicy')}</li>
-              </ul>
-            </div>
-
             {errorKey && (
               <div className="bg-red-950/40 border border-red-800/50 rounded-xl px-4 py-3 mb-4">
                 <p className="text-xs text-red-300">{t(errorKey)}</p>

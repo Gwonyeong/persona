@@ -189,20 +189,12 @@
   },
   "adultVerify": {
     "title": "성인 인증",
-    "heading": "본인인증으로 성인 콘텐츠를 이용하세요",
-    "description": "휴대폰 본인인증을 완료하면 19금 콘텐츠가 잠금 해제됩니다.\n다날(PortOne) 본인인증 서비스를 사용합니다.",
-    "policyTitle": "안내 사항",
-    "policy": {
-      "adultOnly": "만 19세 이상만 인증 가능합니다.",
-      "koreanOnly": "현재는 국내 통신사(SKT/KT/LGU+ 및 알뜰폰)만 지원합니다.",
-      "oneAccount": "동일 명의로는 1개의 계정만 인증할 수 있습니다.",
-      "dailyLimit": "하루 최대 5회까지 인증을 시도할 수 있습니다.",
-      "dataPolicy": "인증 결과는 AES-256으로 암호화되어 보관되며, 1년 후 익명화됩니다."
-    },
+    "heading": "성인 인증으로 세이프티 모드를 off할 수 있어요!",
+    "description": "세이프티 모드를 off하면 캐릭터와 더 깊은 대화가 가능하고 캐릭터의 더 깊은 모습을 볼 수 있어요",
     "start": "본인인증 시작",
     "verifying": "인증 진행 중...",
     "statusVerified": "인증 완료",
-    "verifiedDesc": "성인 인증이 완료되었습니다. 모든 콘텐츠를 이용하실 수 있습니다.",
+    "verifiedDesc": "이제 세이프티 모드를 off할 수 있어요!",
     "error": {
       "alreadyVerified": "이미 인증이 완료된 계정입니다.",
       "dailyLimit": "오늘의 인증 시도 횟수(5회)를 모두 사용했습니다. 내일 다시 시도해주세요.",
