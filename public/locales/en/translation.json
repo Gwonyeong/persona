@@ -210,6 +210,27 @@
       "unknown": "An unknown error occurred."
     }
   },
+  "chatSettings": {
+    "title": "Chat Settings",
+    "spriteMode": {
+      "heading": "Emotion Image Display",
+      "description": "Choose how character emotion images are shown.",
+      "options": {
+        "BUBBLE": {
+          "title": "Default",
+          "desc": "Show as a small image inside the message bubble. Appears once per round to avoid clutter."
+        },
+        "FULL": {
+          "title": "Full",
+          "desc": "Show as a full-width 9:16 image at the end of each round. Maximum visual impact."
+        },
+        "OFF": {
+          "title": "Off",
+          "desc": "Hide emotion images entirely. Only text and background remain visible."
+        }
+      }
+    }
+  },
   "emotions": {
     "NEUTRAL": "Neutral",
     "HAPPY": "Happy",

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback, memo } from 'react'
+import { Fragment, useEffect, useState, useRef, useMemo, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -357,6 +357,8 @@ export default function Chat() {
   // Safety Mode: true=SFW 유지(기본), false=NSFW 허용. 인증된 유저만 OFF 가능.
   const [safetyMode, setSafetyMode] = useState(true)
   const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
+  // 표정 sprite 출력 모드: 'FULL' | 'BUBBLE'(기본) | 'OFF'. 설정 페이지에서 변경.
+  const [spriteMode, setSpriteMode] = useState('BUBBLE')
   const [chatModel, setChatModel] = useState('ADVANCED') // 'BASIC' (Mistral) | 'ADVANCED' (Grok 4.3)
   const [showModelSheet, setShowModelSheet] = useState(false)
   const [excitedTooltipVisible, setExcitedTooltipVisible] = useState(false)
@@ -386,6 +388,9 @@ export default function Chat() {
   const remainingFreeCalls = user?.freeCallUses ?? 0
   // FREE 티어 한정 — 무료 횟수가 남아있을 때만 강조 (LIGHT/ADMIN은 의미 없음)
   const showFreeCallBadge = !canCallUnlimited && remainingFreeCalls > 0
+  // 무료 보이스 채팅 잔여 횟수 — FREE 티어 한정, voiceWithChat 사용 시 +4 마스크 면제
+  const remainingFreeVoiceUses = user?.freeVoiceUses ?? 0
+  const canUseFreeVoice = subscriptionTier === 'FREE' && remainingFreeVoiceUses > 0
   const handleCallClick = async () => {
     if (!canCallUnlimited && remainingFreeCalls <= 0) {
       setShowLightOnlyModal(true)
@@ -535,6 +540,7 @@ export default function Chat() {
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
       setVoiceMode(!!conv.voiceMode)
       setSafetyMode(conv.safetyMode !== false)
+      setSpriteMode(['FULL', 'BUBBLE', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
@@ -800,6 +806,14 @@ export default function Chat() {
             }
             if (data.characterStatus) {
               setCharacterStatus(data.characterStatus)
+            }
+            // AI가 캐릭터 배경 풀에서 선택했으면 채팅 배경 자동 전환
+            if (data.backgroundImage !== undefined) {
+              setBackgroundImage(data.backgroundImage)
+            }
+            // 무료 보이스 사용 시 잔여 횟수 동기화 (서버 진실)
+            if (data.consumedFreeVoice && typeof data.freeVoiceUses === 'number' && user) {
+              setUser({ ...user, freeVoiceUses: data.freeVoiceUses })
             }
             break
           }
@@ -1073,48 +1087,43 @@ export default function Chat() {
             {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
           </div>
         </button>
-        {/* Safety Mode 토글 — 어드민만 노출 (테스트 단계). 인증·NSFW 정책에 따라 점진 공개 예정. */}
-        {user?.role === 'ADMIN' && (
-          <button
-            onClick={() => {
-              if (!user?.adultVerified) {
-                navigate('/adult-verify')
-                return
-              }
-              if (safetyMode) {
-                // OFF로 전환 — 확인 다이얼로그
-                setSafetyConfirmVisible(true)
-              } else {
-                // ON 으로 즉시 복귀
-                setSafetyMode(true)
-                api.patch(`/conversations/${id}/safety-mode`, { enabled: true }).catch(() => {})
-              }
-            }}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
-              !user?.adultVerified
-                ? 'text-gray-500 hover:text-gray-300 bg-gray-800/60'
-                : safetyMode
-                  ? 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/20'
-                  : 'text-pink-300 bg-pink-500/15 hover:bg-pink-500/20'
-            }`}
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            title={!user?.adultVerified ? t('safetyMode.verifyRequired') : safetyMode ? t('safetyMode.tooltipOn') : t('safetyMode.tooltipOff')}
-          >
-            {!user?.adultVerified ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            ) : (
-              <span className="w-2 h-2 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
-            )}
-            <span>{safetyMode ? 'Safety ON' : 'Safety OFF'}</span>
-          </button>
-        )}
-        {character.voiceId && user?.role === 'ADMIN' && (
+        <button
+          onClick={() => {
+            if (!user?.adultVerified) {
+              navigate('/adult-verify')
+              return
+            }
+            if (safetyMode) {
+              setSafetyConfirmVisible(true)
+            } else {
+              setSafetyMode(true)
+              api.patch(`/conversations/${id}/safety-mode`, { enabled: true }).catch(() => {})
+            }
+          }}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            !user?.adultVerified
+              ? 'text-gray-500 hover:text-gray-300 bg-gray-800/60'
+              : safetyMode
+                ? 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/20'
+                : 'text-pink-300 bg-pink-500/15 hover:bg-pink-500/20'
+          }`}
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          title={!user?.adultVerified ? t('safetyMode.verifyRequired') : safetyMode ? t('safetyMode.tooltipOn') : t('safetyMode.tooltipOff')}
+        >
+          {!user?.adultVerified ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          ) : (
+            <span className="w-2 h-2 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
+          )}
+          <span>{safetyMode ? 'Safety ON' : 'Safety OFF'}</span>
+        </button>
+        {character.voiceId && (
           <button
             onClick={handleCallClick}
-            className={`flex items-center gap-1 px-1.5 py-1 rounded-md transition-colors ${
+            className={`relative flex items-center gap-1 px-1.5 py-1 rounded-md transition-colors ${
               showFreeCallBadge
                 ? 'text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/15'
                 : 'text-gray-400 hover:text-indigo-300'
@@ -1131,6 +1140,9 @@ export default function Chat() {
                 {t('chat.call.freeCount', { count: remainingFreeCalls })}
               </span>
             )}
+            <span className="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold leading-none rounded-sm bg-indigo-600 text-white tracking-tight">
+              Beta
+            </span>
           </button>
         )}
         <button
@@ -1318,6 +1330,18 @@ export default function Chat() {
                 {showGalleryBadge && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full" />}
               </button>
             </div>
+            {/* 채팅 설정 페이지 진입 */}
+            <button
+              onClick={() => navigate(`/chats/${id}/settings`)}
+              className="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center shadow-lg transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label={t('chatSettings.title')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
             <button
               onClick={() => setShowModelSheet(true)}
               disabled={!token}
@@ -1338,7 +1362,7 @@ export default function Chat() {
           </div>
         </div>
 
-      <div ref={scrollContainerRef} className="h-full overflow-auto px-4 py-3 space-y-2" style={backgroundImage ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+      <div ref={scrollContainerRef} className="h-full overflow-auto px-4 py-3 space-y-2">
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
           profileUrl && (
@@ -1373,28 +1397,100 @@ export default function Chat() {
             !nextMsg || nextMsg.role !== msg.role || nextMsg.role === 'NARRATION' || nextMsg.role === 'GENERATED_IMAGE' ||
             formatChatTime(msg.createdAt) !== formatChatTime(nextMsg.createdAt)
           )
+          // 캐릭터 메시지의 emotion → currentStyle.images에서 sprite URL 찾기.
+          // spriteMode별 렌더 분기 — 모두 라운드 마지막 메시지 다음에 별도 행으로 출력.
+          //  - 'OFF'     : 미출력
+          //  - 'BUBBLE'  : 캐릭터 좌측 버블 형태 (max-w-[75%], 9:16, max-h 320)
+          //  - 'FULL'    : 풀폭 9:16
+          const isEndOfCharRound = msg.role === 'CHARACTER' && msg.emotion
+            && (!messages[idx + 1] || messages[idx + 1].role !== 'CHARACTER')
+          // 같은 emotion에 여러 이미지가 있을 수 있음 → 메시지별 결정적 랜덤(시드 = createdAt+idx)으로 1장 선택.
+          // 같은 메시지가 다시 렌더돼도 같은 이미지가 나오도록 안정성 확보.
+          const spriteUrl = (() => {
+            if (!isEndOfCharRound) return null
+            const candidates = currentStyle?.images?.filter((img) => img.emotion === msg.emotion) || []
+            if (candidates.length === 0) return null
+            if (candidates.length === 1) return candidates[0].filePath
+            const seed = String(msg.createdAt || '') + '|' + idx
+            let h = 0
+            for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0
+            return candidates[Math.abs(h) % candidates.length].filePath
+          })()
+          const bubbleComposite = (spriteMode === 'BUBBLE' && spriteUrl) ? spriteUrl : null
+          const fullComposite = (spriteMode === 'FULL' && spriteUrl) ? spriteUrl : null
           return (
-            <MessageBubble
-              key={msg.id || idx}
-              msg={msg}
-              msgIdx={idx}
-              isConsecutive={isConsecutive}
-              showTime={showTime}
-              profileUrl={profileUrl}
-              characterName={character.name}
-              isLastChar={idx === lastCharIdx}
-              latestResponseAudios={latestResponseAudios}
-              isPlayingAll={isPlayingAll}
-              isThisPlayingAudio={playingAudioIdx === idx}
-              onLightbox={setLightboxUrl}
-              onPlayAudio={playAudio}
-              onStopAudio={stopAudio}
-              onSetBackground={handleSetBackground}
-              onPlayAll={playAllLatestAudios}
-              onStopAll={stopAllPlayback}
-              onAppear={handleBubbleAppear}
-              t={t}
-            />
+            <Fragment key={msg.id || idx}>
+              <MessageBubble
+                msg={msg}
+                msgIdx={idx}
+                isConsecutive={isConsecutive}
+                showTime={showTime}
+                profileUrl={profileUrl}
+                characterName={character.name}
+                isLastChar={idx === lastCharIdx}
+                latestResponseAudios={latestResponseAudios}
+                isPlayingAll={isPlayingAll}
+                isThisPlayingAudio={playingAudioIdx === idx}
+                onLightbox={setLightboxUrl}
+                onPlayAudio={playAudio}
+                onStopAudio={stopAudio}
+                onSetBackground={handleSetBackground}
+                onPlayAll={playAllLatestAudios}
+                onStopAll={stopAllPlayback}
+                onAppear={handleBubbleAppear}
+                t={t}
+              />
+              {bubbleComposite && (
+                <div className="flex justify-start mt-2">
+                  {/* 아바타 자리 (연속 캐릭터 메시지처럼 비워둠) */}
+                  <div className="w-7 flex-shrink-0 mr-2" />
+                  <div className="max-w-[75%] w-[60%]">
+                    <div
+                      className="relative rounded-2xl rounded-tl-none overflow-hidden bg-gray-800 cursor-pointer"
+                      style={{ aspectRatio: '9 / 16', maxHeight: 320 }}
+                      onClick={() => setLightboxUrl({ url: bubbleComposite, bgUrl: backgroundImage })}
+                    >
+                      {backgroundImage && (
+                        <img
+                          src={backgroundImage}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      )}
+                      <img
+                        src={bubbleComposite}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {fullComposite && (
+                <div
+                  className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
+                  style={{ aspectRatio: '9 / 16' }}
+                  onClick={() => setLightboxUrl({ url: fullComposite, bgUrl: backgroundImage })}
+                >
+                  {backgroundImage && (
+                    <img
+                      src={backgroundImage}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <img
+                    src={fullComposite}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+            </Fragment>
           )
         })}
         {showTyping && (
@@ -1411,6 +1507,15 @@ export default function Chat() {
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
+          </div>
+        )}
+        {/* 텍스트 스트림 완료 후 done 이벤트 대기 — 마지막 버블 아래 작은 스피너 */}
+        {sending && !showTyping && !messages.some((m) => m._streaming) && (
+          <div className="flex justify-start mt-1.5 ml-9 items-center gap-1.5 text-gray-500">
+            <svg width="14" height="14" viewBox="0 0 24 24" className="animate-spin">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" fill="none" strokeDasharray="42 100" strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px]">{t('chat.finalizing', { defaultValue: '응답 마무리 중...' })}</span>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -1453,11 +1558,19 @@ export default function Chat() {
           </button>
           <div className="relative flex-shrink-0">
             {(() => {
-              const cost = (chatModel === 'ADVANCED' ? 3 : 1) + (voiceMode && character?.voiceId ? 4 : 0)
-              if (cost <= 1) return null
+              const voiceActive = voiceMode && character?.voiceId
+              // 무료 보이스 잔여 있을 때는 +4 면제
+              const voiceSurcharge = voiceActive && !canUseFreeVoice ? 4 : 0
+              const cost = (chatModel === 'ADVANCED' ? 3 : 1) + voiceSurcharge
+              if (cost <= 1 && !(voiceActive && canUseFreeVoice)) return null
               const color = chatModel === 'ADVANCED' ? 'text-amber-400' : 'text-emerald-400'
               return (
-                <span className={`absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap ${color} flex items-center gap-0.5`}>-{cost} <MaskIcon className="text-base" /></span>
+                <span className={`absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap ${color} flex items-center gap-0.5`}>
+                  -{cost} <MaskIcon className="text-base" />
+                  {voiceActive && canUseFreeVoice && (
+                    <span className="ml-1 text-sky-300">무료 {remainingFreeVoiceUses}</span>
+                  )}
+                </span>
               )
             })()}
             <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
@@ -1685,7 +1798,20 @@ export default function Chat() {
       )}
       {lightboxUrl && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>
-          <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
+          {typeof lightboxUrl === 'object' ? (
+            // 표정 sprite 합성 — bg + 투명 sprite 겹쳐 출력. 9:16 비율 유지.
+            <div
+              className="relative rounded-lg overflow-hidden bg-gray-900"
+              style={{ aspectRatio: '9 / 16', height: '90vh', maxWidth: '90vw' }}
+            >
+              {lightboxUrl.bgUrl && (
+                <img src={lightboxUrl.bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              )}
+              <img src={lightboxUrl.url} alt="" className="absolute inset-0 w-full h-full object-contain" />
+            </div>
+          ) : (
+            <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
+          )}
         </div>
       )}
       <OnboardingSpotlight

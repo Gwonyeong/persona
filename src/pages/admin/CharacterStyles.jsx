@@ -10,7 +10,6 @@ const EMOTIONS = [
   { key: 'SURPRISED', label: '놀람' },
   { key: 'SHY', label: '부끄러움' },
   { key: 'ANNOYED', label: '짜증' },
-  { key: 'WORRIED', label: '걱정' },
   { key: 'PLAYFUL', label: '장난' },
   { key: 'EXCITED', label: '설렘' },
 ]

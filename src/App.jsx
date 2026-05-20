@@ -38,6 +38,7 @@ import Scenario from './pages/user/Scenario'
 import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
+import ChatSettings from './pages/user/ChatSettings'
 import GroupChatNew from './pages/user/GroupChatNew'
 import GroupChat from './pages/user/GroupChat'
 import MyPage from './pages/user/MyPage'
@@ -212,6 +213,7 @@ function App() {
         <Route path="/characters/:id/feed" element={<CharacterFeed />} />
         <Route path="/scenarios/:id" element={<Scenario />} />
         <Route path="/chats/:id" element={<Chat />} />
+        <Route path="/chats/:id/settings" element={<ChatSettings />} />
         <Route path="/group-chats/new" element={<GroupChatNew />} />
         <Route path="/group-chats/:id" element={<GroupChat />} />
         <Route path="/about" element={<About />} />

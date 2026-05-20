@@ -11,8 +11,7 @@ const SFW_EMOTIONS = [
   { key: 'HAPPY', label: '웃음' },
   { key: 'ANGRY', label: '화남' },
   { key: 'SAD', label: '슬픔' },
-  { key: 'SHY', label: '부끄러움' },
-  { key: 'WORRIED', label: '걱정' },
+  { key: 'SHY', label: '설렘' },
 ]
 
 // 흥분 표정 (NSFW) — 성인 인증 + Safety Mode OFF 유저에게만 출력
@@ -51,12 +50,24 @@ export default function Expressions() {
     api.get('/admin/expressions-overview').then(({ characters }) => setCharacters(characters || []))
   }, [])
 
-  const updateImage = (characterId, emotion, image) => {
+  // 같은 (styleId, emotion)에 여러 이미지 허용 — 추가/삭제 별도 핸들러.
+  const addImage = (characterId, image) => {
     setCharacters((prev) =>
       prev.map((c) => {
         if (c.id !== characterId || !c.defaultStyle) return c
-        const others = c.defaultStyle.images.filter((i) => i.emotion !== emotion)
-        const next = image ? [...others, { id: image.id, emotion, filePath: image.filePath }] : others
+        const next = [
+          ...c.defaultStyle.images,
+          { id: image.id, emotion: image.emotion, filePath: image.filePath },
+        ]
+        return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
+      }),
+    )
+  }
+  const removeImage = (characterId, imageId) => {
+    setCharacters((prev) =>
+      prev.map((c) => {
+        if (c.id !== characterId || !c.defaultStyle) return c
+        const next = c.defaultStyle.images.filter((i) => i.id !== imageId)
         return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
       }),
     )
@@ -65,12 +76,14 @@ export default function Expressions() {
   const filtered = useMemo(() => {
     if (!characters) return []
     if (filter === 'INCOMPLETE') {
-      // 현재 탭의 emotion 풀 기준 미완성 판단
+      // 현재 탭의 emotion 중 1장도 없는 게 있으면 미완성 (다중 이미지 모드)
       const tabKeys = new Set(currentEmotions.map((e) => e.key))
       return characters.filter((c) => {
         if (!c.defaultStyle) return false
-        const filled = c.defaultStyle.images.filter((i) => tabKeys.has(i.emotion)).length
-        return filled < currentEmotions.length
+        const filledEmotions = new Set(
+          c.defaultStyle.images.filter((i) => tabKeys.has(i.emotion)).map((i) => i.emotion),
+        )
+        return filledEmotions.size < currentEmotions.length
       })
     }
     if (filter === 'NO_STYLE') return characters.filter((c) => !c.defaultStyle)
@@ -183,7 +196,13 @@ export default function Expressions() {
               </thead>
               <tbody>
                 {paged.map((c) => (
-                  <CharacterRow key={c.id} character={c} emotions={currentEmotions} onUpdateImage={updateImage} />
+                  <CharacterRow
+                    key={c.id}
+                    character={c}
+                    emotions={currentEmotions}
+                    onAddImage={(img) => addImage(c.id, img)}
+                    onRemoveImage={(imageId) => removeImage(c.id, imageId)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -222,11 +241,15 @@ export default function Expressions() {
   )
 }
 
-function CharacterRow({ character, emotions, onUpdateImage }) {
+function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
   const style = character.defaultStyle
+  // 한 emotion에 여러 이미지 가능 — 배열로 그룹화.
   const imagesByEmotion = useMemo(() => {
     const map = {}
-    if (style) for (const img of style.images) map[img.emotion] = img
+    if (style) for (const img of style.images) {
+      if (!map[img.emotion]) map[img.emotion] = []
+      map[img.emotion].push(img)
+    }
     return map
   }, [style])
 
@@ -267,8 +290,10 @@ function CharacterRow({ character, emotions, onUpdateImage }) {
             <EmotionCell
               styleId={style.id}
               emotion={e.key}
-              image={imagesByEmotion[e.key]}
-              onChange={(img) => onUpdateImage(character.id, e.key, img)}
+              emotionLabel={e.label}
+              images={imagesByEmotion[e.key] || []}
+              onAdd={onAddImage}
+              onRemove={onRemoveImage}
             />
           ) : (
             <div className="w-16 h-16 mx-auto rounded-md bg-gray-800/40 border border-dashed border-gray-700/50" />
@@ -279,9 +304,13 @@ function CharacterRow({ character, emotions, onUpdateImage }) {
   )
 }
 
-function EmotionCell({ styleId, emotion, image, onChange }) {
+function EmotionCell({ styleId, emotion, emotionLabel, images, onAdd, onRemove }) {
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [managerOpen, setManagerOpen] = useState(false)
+
+  const hasImages = images.length > 0
+  const firstImage = hasImages ? images[0] : null
 
   const uploadFile = async (file) => {
     if (!file || !file.type?.startsWith('image/')) return
@@ -292,7 +321,7 @@ function EmotionCell({ styleId, emotion, image, onChange }) {
       formData.append('emotion', emotion)
       formData.append('description', '')
       const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, formData)
-      onChange(uploaded)
+      onAdd({ ...uploaded, emotion })
     } catch (error) {
       console.error('Expression upload error:', error)
     } finally {
@@ -300,7 +329,7 @@ function EmotionCell({ styleId, emotion, image, onChange }) {
     }
   }
 
-  const triggerUpload = () => {
+  const triggerUploadDirect = () => {
     if (uploading) return
     const input = document.createElement('input')
     input.type = 'file'
@@ -312,12 +341,11 @@ function EmotionCell({ styleId, emotion, image, onChange }) {
     input.click()
   }
 
-  const remove = async (ev) => {
-    ev.stopPropagation()
-    if (!image) return
-    if (!confirm('이 표정 이미지를 삭제하시겠습니까?')) return
-    await api.delete(`/admin/images/${image.id}`)
-    onChange(null)
+  const handleClick = () => {
+    if (uploading) return
+    // 이미지가 있으면 매니저 열기, 없으면 바로 업로드 picker
+    if (hasImages) setManagerOpen(true)
+    else triggerUploadDirect()
   }
 
   const handleDragOver = (e) => {
@@ -341,42 +369,143 @@ function EmotionCell({ styleId, emotion, image, onChange }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={triggerUpload}
-      onDragOver={handleDragOver}
-      onDragEnter={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      disabled={uploading}
-      className={`relative w-16 h-16 mx-auto rounded-md overflow-hidden border-2 flex items-center justify-center transition-colors group ${
-        dragOver
-          ? 'border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-500/40'
-          : `border-dashed ${image ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-700 hover:border-indigo-500 bg-gray-800/40'}`
-      } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-      style={NO_OUTLINE}
-      title={image ? '클릭 또는 드래그하여 교체' : '클릭 또는 드래그하여 업로드'}
-    >
-      {uploading ? (
-        <span className="text-[10px] text-gray-400">업로드중</span>
-      ) : image ? (
-        <>
-          <img src={image.filePath} alt={emotion} className="w-full h-full object-cover" loading="lazy" />
-          <span
-            onClick={remove}
-            className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/70 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-            title="삭제"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </span>
-        </>
-      ) : (
-        <span className="text-2xl text-gray-600">+</span>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        disabled={uploading}
+        className={`relative w-16 h-16 mx-auto rounded-md overflow-hidden border-2 flex items-center justify-center transition-colors group ${
+          dragOver
+            ? 'border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-500/40'
+            : `border-dashed ${hasImages ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-700 hover:border-indigo-500 bg-gray-800/40'}`
+        } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        style={NO_OUTLINE}
+        title={hasImages ? `${images.length}장 — 클릭하여 관리 / 드래그하여 추가` : '클릭 또는 드래그하여 업로드'}
+      >
+        {uploading ? (
+          <span className="text-[10px] text-gray-400">업로드중</span>
+        ) : firstImage ? (
+          <>
+            <img src={firstImage.filePath} alt={emotion} className="w-full h-full object-cover" loading="lazy" />
+            {images.length > 1 && (
+              <span className="absolute bottom-0.5 right-0.5 text-[9px] font-semibold px-1 py-0.5 rounded bg-black/70 text-white pointer-events-none">
+                +{images.length - 1}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-2xl text-gray-600">+</span>
+        )}
+      </button>
+
+      {managerOpen && (
+        <EmotionSlotManager
+          emotion={emotion}
+          emotionLabel={emotionLabel}
+          images={images}
+          onClose={() => setManagerOpen(false)}
+          onUpload={uploadFile}
+          uploading={uploading}
+          onRemove={onRemove}
+        />
       )}
-    </button>
+    </>
+  )
+}
+
+function EmotionSlotManager({ emotion, emotionLabel, images, onClose, onUpload, uploading, onRemove }) {
+  const [removingId, setRemovingId] = useState(null)
+
+  const triggerUpload = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files || [])
+      for (const f of files) await onUpload(f)
+    }
+    input.click()
+  }
+
+  const handleRemove = async (imageId) => {
+    if (!confirm('이 이미지를 삭제하시겠습니까?')) return
+    setRemovingId(imageId)
+    try {
+      await api.delete(`/admin/images/${imageId}`)
+      onRemove(imageId)
+    } catch (err) {
+      console.error('Remove image error:', err)
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-white">{emotionLabel} <span className="text-gray-500 text-[11px]">({emotion})</span></h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">총 {images.length}장 · 채팅에서 랜덤으로 1장 선택됨</p>
+          </div>
+          <button
+            onClick={triggerUpload}
+            disabled={uploading}
+            className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            {uploading ? '업로드 중...' : '+ 이미지 추가'}
+          </button>
+        </div>
+
+        {images.length === 0 ? (
+          <p className="text-center text-sm text-gray-500 py-10">아직 이미지가 없습니다.</p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+            {images.map((img) => (
+              <div key={img.id} className="relative group rounded-md overflow-hidden bg-gray-800">
+                <div className="aspect-[3/4]">
+                  <img src={img.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <button
+                  onClick={() => handleRemove(img.id)}
+                  disabled={removingId === img.id}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center disabled:opacity-50"
+                  style={NO_OUTLINE}
+                  title="삭제"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 pt-3 border-t border-gray-800 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            style={NO_OUTLINE}
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
