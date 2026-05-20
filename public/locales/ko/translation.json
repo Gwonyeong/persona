@@ -57,6 +57,7 @@
     "imageGenTitle": "{{name}}에게 사진 요청하기",
     "imageGenDesc": "{{name}}이(가) 지금 대화에 어울리는 사진을 보내줍니다.",
     "imageGenCost": "마스크 {{count}}개",
+    "imageGenSafetyNotice": "이 기능은 세이프티 모드가 자동 적용되고 아직 해제할 수 없어요.",
     "selfieTitle": "{{name}}이(가) 셀카를 보내려고 해요",
     "selfieDesc": "대화 상황에 맞는 셀카를 받아볼까요?",
     "statusMood": "기분",

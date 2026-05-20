@@ -57,6 +57,7 @@
     "imageGenTitle": "Ask {{name}} for a photo",
     "imageGenDesc": "{{name}} will send you a photo that fits the conversation.",
     "imageGenCost": "{{count}} masks",
+    "imageGenSafetyNotice": "Safety mode is automatically applied to this feature and can't be turned off yet.",
     "selfieTitle": "{{name}} wants to send a selfie",
     "selfieDesc": "Receive a selfie that matches the conversation?",
     "statusMood": "Mood",
