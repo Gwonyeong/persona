@@ -9,6 +9,7 @@ export default function Notifications() {
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => {
     api
@@ -30,8 +31,10 @@ export default function Notifications() {
     return d.toLocaleDateString()
   }
 
-  const handleClick = async (n) => {
-    if (!n.isRead) {
+  const handleToggle = async (n) => {
+    const isExpanding = expandedId !== n.id
+    setExpandedId(isExpanding ? n.id : null)
+    if (isExpanding && !n.isRead) {
       try {
         await api.post(`/notifications/${n.id}/read`, {})
       } catch {}
@@ -39,6 +42,10 @@ export default function Notifications() {
         prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
       )
     }
+  }
+
+  const handleNavigate = (e, n) => {
+    e.stopPropagation()
     if (n.linkPath) navigate(n.linkPath)
   }
 
@@ -85,40 +92,77 @@ export default function Notifications() {
         <div className="text-center text-gray-500 py-20">{t('notifications.empty')}</div>
       ) : (
         <div className="flex flex-col gap-2">
-          {notifications.map((n) => (
-            <button
-              key={n.id}
-              onClick={() => handleClick(n)}
-              className={`text-left p-4 rounded-xl border transition-colors ${
-                n.isRead
-                  ? 'bg-gray-900 border-gray-800'
-                  : 'bg-indigo-600/10 border-indigo-500/30'
-              }`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <div className="flex items-start gap-3">
-                {n.imageUrl && (
-                  <img
-                    src={n.imageUrl}
-                    alt=""
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    {!n.isRead && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+          {notifications.map((n) => {
+            const isExpanded = expandedId === n.id
+            return (
+              <div
+                key={n.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleToggle(n)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleToggle(n)
+                  }
+                }}
+                className={`text-left p-4 rounded-xl border transition-colors cursor-pointer ${
+                  n.isRead
+                    ? 'bg-gray-900 border-gray-800'
+                    : 'bg-indigo-600/10 border-indigo-500/30'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <div className="flex items-start gap-3">
+                  {n.imageUrl && !isExpanded && (
+                    <img
+                      src={n.imageUrl}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {!n.isRead && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                      )}
+                      <p
+                        className={`font-semibold text-sm ${
+                          isExpanded ? '' : 'truncate'
+                        } ${n.isRead ? 'text-gray-200' : 'text-white'}`}
+                      >
+                        {n.title}
+                      </p>
+                    </div>
+                    {isExpanded && n.imageUrl && (
+                      <img
+                        src={n.imageUrl}
+                        alt=""
+                        className="w-full max-h-64 rounded-lg object-cover my-2"
+                      />
                     )}
-                    <p className={`font-semibold text-sm truncate ${n.isRead ? 'text-gray-200' : 'text-white'}`}>
-                      {n.title}
+                    <p
+                      className={`text-xs text-gray-300 whitespace-pre-line ${
+                        isExpanded ? '' : 'line-clamp-3 text-gray-400'
+                      }`}
+                    >
+                      {n.body}
                     </p>
+                    <p className="text-[11px] text-gray-500 mt-2">{formatDate(n.createdAt)}</p>
+                    {isExpanded && n.linkPath && (
+                      <button
+                        onClick={(e) => handleNavigate(e, n)}
+                        className="mt-3 w-full py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        {t('notifications.goToPage')}
+                      </button>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-400 whitespace-pre-line line-clamp-3">{n.body}</p>
-                  <p className="text-[11px] text-gray-500 mt-2">{formatDate(n.createdAt)}</p>
                 </div>
               </div>
-            </button>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
