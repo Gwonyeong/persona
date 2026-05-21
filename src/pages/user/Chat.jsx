@@ -1362,7 +1362,15 @@ export default function Chat() {
           </div>
         </div>
 
-      <div ref={scrollContainerRef} className="h-full overflow-auto px-4 py-3 space-y-2">
+      <div
+        ref={scrollContainerRef}
+        className="h-full overflow-auto px-4 py-3 space-y-2"
+        style={backgroundImage ? {
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        } : undefined}
+      >
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
           profileUrl && (
