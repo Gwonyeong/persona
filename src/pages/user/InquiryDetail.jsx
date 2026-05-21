@@ -77,15 +77,24 @@ export default function InquiryDetail() {
       </div>
 
       {inquiry.reply ? (
-        <div className="bg-indigo-600/5 rounded-xl border border-indigo-500/20 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold text-indigo-300">{t('inquiry.replyLabel')}</span>
-            {inquiry.repliedAt && (
-              <span className="text-xs text-gray-600">{formatDate(inquiry.repliedAt)}</span>
-            )}
+        <>
+          <div className="bg-indigo-600/5 rounded-xl border border-indigo-500/20 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-bold text-indigo-300">{t('inquiry.replyLabel')}</span>
+              {inquiry.repliedAt && (
+                <span className="text-xs text-gray-600">{formatDate(inquiry.repliedAt)}</span>
+              )}
+            </div>
+            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{inquiry.reply}</p>
           </div>
-          <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{inquiry.reply}</p>
-        </div>
+          {inquiry.grantedMasks > 0 && (
+            <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+              <p className="text-sm text-amber-200 leading-snug">
+                {t('inquiry.maskGrantThanks', { count: inquiry.grantedMasks })}
+              </p>
+            </div>
+          )}
+        </>
       ) : (
         <div className="bg-gray-900/50 rounded-xl border border-gray-800 p-4 text-center">
           <p className="text-sm text-gray-500">{t('inquiry.waitingReply')}</p>

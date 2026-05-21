@@ -698,13 +698,15 @@
     "replyLabel": "운영진 답변",
     "waitingReply": "답변을 기다리는 중입니다.",
     "deleteConfirm": "정말 삭제하시겠습니까?",
-    "loginRequired": "로그인이 필요합니다"
+    "loginRequired": "로그인이 필요합니다",
+    "maskGrantThanks": "Pesona를 사랑해주셔서 감사합니다! 마스크 {{count}}개가 지급되었어요"
   },
   "notifications": {
     "title": "알림",
     "empty": "받은 알림이 없습니다.",
     "markAllRead": "모두 읽음",
-    "justNow": "방금"
+    "justNow": "방금",
+    "goToPage": "이동하기"
   },
   "maskShop": {
     "title": "마스크 상점",

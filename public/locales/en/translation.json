@@ -698,13 +698,15 @@
     "replyLabel": "Reply from Team",
     "waitingReply": "Waiting for a reply.",
     "deleteConfirm": "Are you sure you want to delete?",
-    "loginRequired": "Login required"
+    "loginRequired": "Login required",
+    "maskGrantThanks": "Thank you for loving Pesona! You received {{count}} masks"
   },
   "notifications": {
     "title": "Notifications",
     "empty": "No notifications yet.",
     "markAllRead": "Mark all read",
-    "justNow": "Just now"
+    "justNow": "Just now",
+    "goToPage": "Go"
   },
   "maskShop": {
     "title": "Mask Shop",

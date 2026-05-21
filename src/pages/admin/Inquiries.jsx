@@ -9,6 +9,7 @@ export default function Inquiries() {
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
   const [replyText, setReplyText] = useState('')
+  const [maskAmount, setMaskAmount] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = () => {
@@ -30,28 +31,50 @@ export default function Inquiries() {
   const openDetail = (inq) => {
     setSelected(inq)
     setReplyText(inq.reply || '')
+    setMaskAmount('')
   }
 
   const closeDetail = () => {
     setSelected(null)
     setReplyText('')
+    setMaskAmount('')
   }
 
   const submitReply = async () => {
     if (!replyText.trim() || saving) return
+    const isFirstReply = selected.status !== 'ANSWERED'
+    const parsedMask = maskAmount === '' ? 0 : parseInt(maskAmount, 10)
+    if (maskAmount !== '' && (!Number.isInteger(parsedMask) || parsedMask < 0)) {
+      alert('마스크 수량이 올바르지 않습니다')
+      return
+    }
+    if (isFirstReply && parsedMask > 0) {
+      const userLabel = selected.user?.name || selected.user?.email || `유저 #${selected.user?.id}`
+      if (!window.confirm(`${userLabel}에게 답변과 함께 마스크 ${parsedMask}개를 지급합니다. 진행할까요?`)) return
+    }
     setSaving(true)
     try {
-      const { inquiry } = await api.post(`/inquiries/admin/${selected.id}/reply`, {
+      const { inquiry, grant } = await api.post(`/inquiries/admin/${selected.id}/reply`, {
         reply: replyText.trim(),
+        maskAmount: isFirstReply ? parsedMask : 0,
       })
-      setInquiries((list) => list.map((q) => (q.id === inquiry.id ? { ...q, ...inquiry } : q)))
-      setSelected({ ...selected, ...inquiry })
+      const nextGrants = grant
+        ? [...(selected.grants || []), grant]
+        : selected.grants || []
+      const merged = { ...selected, ...inquiry, grants: nextGrants }
+      setInquiries((list) =>
+        list.map((q) => (q.id === inquiry.id ? { ...q, ...inquiry, grants: nextGrants } : q))
+      )
+      setSelected(merged)
+      setMaskAmount('')
     } catch (err) {
       alert(err.message || '오류')
     } finally {
       setSaving(false)
     }
   }
+
+  const totalGranted = (selected?.grants || []).reduce((sum, g) => sum + g.amount, 0)
 
   return (
     <div className="p-6">
@@ -185,6 +208,12 @@ export default function Inquiries() {
                 </p>
               </div>
 
+              {totalGranted > 0 && (
+                <div className="mb-5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-amber-300">
+                  이 문의로 지급된 마스크: <span className="font-semibold">{totalGranted}개</span>
+                </div>
+              )}
+
               <div className="border-t border-gray-800 pt-4">
                 <p className="text-xs text-gray-500 mb-2">답변</p>
                 <textarea
@@ -197,23 +226,42 @@ export default function Inquiries() {
                 />
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-xs text-gray-600">{replyText.length}/2000</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={closeDetail}
-                      className="px-4 py-2 text-sm bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      닫기
-                    </button>
-                    <button
-                      onClick={submitReply}
-                      disabled={!replyText.trim() || saving}
-                      className="px-4 py-2 text-sm bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-40"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      {saving ? '저장 중...' : selected.status === 'ANSWERED' ? '답변 수정' : '답변 등록'}
-                    </button>
+                </div>
+
+                {selected.status !== 'ANSWERED' && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="text-xs text-gray-500 whitespace-nowrap">
+                      함께 지급할 마스크 (선택)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      value={maskAmount}
+                      onChange={(e) => setMaskAmount(e.target.value)}
+                      placeholder="0"
+                      className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:border-amber-500 focus:outline-none"
+                    />
+                    <span className="text-xs text-gray-500">개</span>
                   </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 mt-4">
+                  <button
+                    onClick={closeDetail}
+                    className="px-4 py-2 text-sm bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    닫기
+                  </button>
+                  <button
+                    onClick={submitReply}
+                    disabled={!replyText.trim() || saving}
+                    className="px-4 py-2 text-sm bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-40"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {saving ? '저장 중...' : selected.status === 'ANSWERED' ? '답변 수정' : '답변 완료'}
+                  </button>
                 </div>
               </div>
             </div>

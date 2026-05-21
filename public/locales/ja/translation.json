@@ -698,13 +698,15 @@
     "replyLabel": "運営からの返信",
     "waitingReply": "返信をお待ちください。",
     "deleteConfirm": "本当に削除しますか？",
-    "loginRequired": "ログインが必要です"
+    "loginRequired": "ログインが必要です",
+    "maskGrantThanks": "Pesonaを愛してくださりありがとうございます！マスク{{count}}個が付与されました"
   },
   "notifications": {
     "title": "お知らせ",
     "empty": "お知らせはありません。",
     "markAllRead": "すべて既読",
-    "justNow": "たった今"
+    "justNow": "たった今",
+    "goToPage": "移動する"
   },
   "maskShop": {
     "title": "マスクショップ",
