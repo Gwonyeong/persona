@@ -807,7 +807,7 @@ export default function Chat() {
             if (data.characterStatus) {
               setCharacterStatus(data.characterStatus)
             }
-            // AI가 캐릭터 배경 풀에서 선택했으면 채팅 배경 자동 전환
+            // AI가 선택한 배경은 표정 sprite의 backdrop으로만 사용 — 채팅방 자체 배경은 변경 X
             if (data.backgroundImage !== undefined) {
               setBackgroundImage(data.backgroundImage)
             }
@@ -1365,11 +1365,6 @@ export default function Chat() {
       <div
         ref={scrollContainerRef}
         className="h-full overflow-auto px-4 py-3 space-y-2"
-        style={backgroundImage ? {
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        } : undefined}
       >
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
