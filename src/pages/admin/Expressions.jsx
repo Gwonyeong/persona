@@ -1,9 +1,45 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import JSZip from 'jszip'
 import { api } from '../../lib/api'
+import { removeChromaBackground } from '../../lib/removeChromaBackground'
 
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 const PAGE_SIZE = 10
+
+// 서버 buildExpressionPrompt의 디폴트 구도 문구와 일치시킨다.
+const DEFAULT_COMPOSITION_KO = '정면(eye-level) 상반신 포트레이트, 인물 중앙 정렬, 레퍼런스와 동일한 크롭·조명'
+const DEFAULT_COMPOSITION_EN =
+  'eye-level head-and-shoulders portrait, character centered, identical framing and crop to the reference, same lighting style as the reference'
+
+// 배경 옵션 — server/src/lib/expressionPrompt.js와 동기화.
+const BACKGROUND_LINES = {
+  black:
+    'Background: a perfectly flat, solid, pure black (#000000, rgb(0,0,0)) background. No gradients, no shadows on the background, no patterns, no objects, no scenery, no environmental details. Pure flat black only, edge to edge.',
+  cyan:
+    'Background: a perfectly flat, solid, pure cyan (#00FFFF, rgb(0,255,255)) chroma-key background. No gradients, no shadows on the background, no patterns, no objects, no scenery, no environmental details. Pure flat cyan only, edge to edge. The character itself must NOT contain any cyan/turquoise/aqua color — only the background is cyan.',
+}
+
+// 서버 buildExpressionPrompt와 동일한 조립 순서로 전문(全文)을 만든다.
+// posePrompt는 운영자가 모달에서 추가 입력하는 값이라 기본 미리보기에서는 비움.
+function buildExpressionPromptPreview(emotion, { background = 'black', posePrompt = '' } = {}) {
+  const expr = EXPRESSION_PROMPTS[emotion] || 'a clear, distinct emotional expression matching the emotion label'
+  const trimmedPose = (posePrompt || '').trim()
+  const lines = [
+    'Strictly preserve the art style, character design, face shape, hair color, hairstyle, outfit, and body type of the provided reference image. Recreate the exact same character.',
+    `Change the facial expression to: ${expr}.`,
+    `Default composition: ${DEFAULT_COMPOSITION_EN}.`,
+  ]
+  if (trimmedPose) {
+    lines.push(
+      `Additional composition / pose guidance (this overrides the default above when it specifies a different framing, angle, or pose): ${trimmedPose}.`,
+    )
+  }
+  lines.push(BACKGROUND_LINES[background] || BACKGROUND_LINES.black)
+  lines.push('No text, no watermarks, no logos anywhere.')
+  return lines.join(' ')
+}
 
 // 일반 표정 (Safety Mode ON에서도 노출)
 const SFW_EMOTIONS = [
@@ -13,6 +49,28 @@ const SFW_EMOTIONS = [
   { key: 'SAD', label: '슬픔' },
   { key: 'SHY', label: '설렘' },
 ]
+
+// server/src/lib/expressionPrompt.js#EXPRESSION_DESCRIPTORS와 동기화. 서버 변경 시 같이 수정.
+const EXPRESSION_PROMPTS = {
+  NEUTRAL: 'calm, relaxed neutral expression, soft closed mouth, eyes looking forward, no strong emotion',
+  HAPPY: 'bright joyful smile with mouth slightly open, eyes warmly squinted from genuine happiness, cheeks lifted',
+  ANGRY: 'furrowed angry brow, narrowed glaring eyes, tightly pressed lips or a sharp scowl, intense irritation',
+  SAD: 'downturned mouth, glossy slightly tearful eyes, drooped eyelids, head tilted very slightly downward, sorrowful',
+  SURPRISED: 'eyes wide open, eyebrows raised high, mouth slightly opened in a small "oh" of surprise',
+  SHY: 'flustered, heart-fluttering expression of someone smitten with the person in front of them — clearly visible warm blush across the cheeks and nose bridge, eyes shyly glancing to the side or downward as if unable to hold the gaze, a soft bashful smile gently curling the lips, slightly tilted head, subtle look of infatuation and quiet excitement',
+  ANNOYED: 'slightly furrowed brow, sideways sulky glance, mouth set in a small displeased line, mildly annoyed',
+  WORRIED: 'softly furrowed concerned brow, slightly downturned mouth, anxious wide eyes, gentle worry',
+  PLAYFUL: 'mischievous closed-mouth smile or smirk, eyes glinting with playful intent, head tilted slightly',
+  EXCITED: 'wide bright open smile with eyes lit up, eager animated expression, joyful energy',
+  AROUSED_TEASE: 'flirty teasing smirk, half-lidded suggestive eyes, subtle blush, playful expression',
+  AROUSED_TOPLESS: 'soft heated expression, parted lips, half-lidded eyes, subtle blush',
+  AROUSED_NUDE: 'soft anticipatory expression, slightly parted lips, half-lidded eyes, light blush',
+  AROUSED_FOREPLAY: 'lost in sensation, eyes half-closed, mouth slightly open, deep blush',
+  AROUSED_INSERT: 'eyes squeezed shut or unfocused, mouth open in a quiet gasp, deep blush, intense expression',
+  AROUSED_INSERT_ALT: 'eyes half-closed, mouth open in a heated gasp, flushed cheeks, intense expression',
+  AROUSED_CLIMAX: 'eyes welling with tears or rolled slightly up, mouth open in a quiet cry, deep blush, defenseless expression at the peak',
+  AROUSED_AFTERGLOW: 'soft dazed expression, half-lidded peaceful eyes, faint smile, languid afterglow',
+}
 
 // 흥분 표정 (NSFW) — 성인 인증 + Safety Mode OFF 유저에게만 출력
 // desc는 운영자가 어떤 컨셉의 이미지를 업로드해야 하는지 안내.
@@ -167,6 +225,10 @@ export default function Expressions() {
         </div>
       )}
 
+      {tab !== 'bg' && (
+        <ExpressionPromptReference emotions={currentEmotions} />
+      )}
+
       {tab === 'bg' ? (
         <BackgroundsTab />
       ) : filtered.length === 0 ? (
@@ -241,8 +303,92 @@ export default function Expressions() {
   )
 }
 
+// 표정별 AI 생성에 실제로 사용되는 전문 프롬프트(영문)를 그대로 노출.
+// 일괄 생성 기준(배경 검정)으로 조립한다. 단일 생성 모달은 시안 배경을 쓰지만,
+// 표정 묘사·구도·금지사항 등 다른 라인은 동일하므로 운영자가 참고 가능.
+function ExpressionPromptReference({ emotions }) {
+  const [copiedKey, setCopiedKey] = useState(null)
+  const copyTimerRef = useRef(null)
+
+  useEffect(() => () => clearTimeout(copyTimerRef.current), [])
+
+  const copyPrompt = async (key, text) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // 구형 브라우저 / insecure context fallback.
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopiedKey(key)
+      clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopiedKey(null), 1500)
+    } catch (err) {
+      console.error('프롬프트 복사 실패:', err)
+    }
+  }
+
+  if (!emotions || emotions.length === 0) return null
+  return (
+    <details className="mb-4 bg-gray-900/60 border border-gray-800 rounded-xl overflow-hidden group">
+      <summary
+        className="cursor-pointer select-none px-4 py-3 text-sm text-gray-200 hover:bg-gray-800/40 flex items-center justify-between gap-2"
+        style={NO_OUTLINE}
+      >
+        <span>
+          <span className="font-semibold">🧠 AI 생성 프롬프트 전문</span>
+          <span className="text-[11px] text-gray-500 ml-2">
+            ({emotions.length}개 표정 · 일괄 생성 기준 — 검정 배경 · 클릭하면 복사)
+          </span>
+        </span>
+        <span className="text-[11px] text-gray-500 group-open:hidden">펼치기</span>
+        <span className="text-[11px] text-gray-500 hidden group-open:inline">접기</span>
+      </summary>
+      <div className="border-t border-gray-800 divide-y divide-gray-800/70">
+        {emotions.map((e) => {
+          const promptText = buildExpressionPromptPreview(e.key, { background: 'black' })
+          const isCopied = copiedKey === e.key
+          return (
+            <div key={e.key} className="px-4 py-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xs font-semibold text-white">{e.label}</span>
+                <span className="text-[10px] text-gray-500">{e.key}</span>
+                {isCopied && (
+                  <span className="text-[10px] text-emerald-400 ml-auto">✓ 복사됨</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => copyPrompt(e.key, promptText)}
+                title="클릭하여 클립보드로 복사"
+                className={`w-full text-left text-[11px] leading-relaxed whitespace-pre-wrap break-words rounded-md px-2 py-1.5 -mx-2 cursor-pointer transition-colors ${
+                  isCopied
+                    ? 'bg-emerald-500/10 text-emerald-100'
+                    : 'text-gray-300 hover:bg-gray-800/60 hover:text-white'
+                }`}
+                style={NO_OUTLINE}
+              >
+                {promptText}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </details>
+  )
+}
+
 function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
   const style = character.defaultStyle
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   // 한 emotion에 여러 이미지 가능 — 배열로 그룹화.
   const imagesByEmotion = useMemo(() => {
     const map = {}
@@ -253,58 +399,148 @@ function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
     return map
   }, [style])
 
+  const totalImages = useMemo(
+    () => Object.values(imagesByEmotion).reduce((sum, arr) => sum + arr.length, 0),
+    [imagesByEmotion],
+  )
+
+  // 캐릭터의 모든 표정 이미지를 emotion별 폴더로 묶어 ZIP 다운로드.
+  const downloadAllZip = async () => {
+    if (downloading || !style || totalImages === 0) return
+    setDownloading(true)
+    try {
+      const zip = new JSZip()
+      for (const e of emotions) {
+        const imgs = imagesByEmotion[e.key] || []
+        if (imgs.length === 0) continue
+        const folder = zip.folder(e.key)
+        for (let i = 0; i < imgs.length; i++) {
+          const img = imgs[i]
+          try {
+            const res = await fetch(img.filePath)
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const blob = await res.blob()
+            let ext = 'png'
+            try {
+              const urlPath = new URL(img.filePath).pathname
+              const last = urlPath.split('.').pop()?.toLowerCase()
+              if (last && /^(png|jpg|jpeg|webp|gif)$/.test(last)) ext = last
+            } catch {}
+            folder.file(`${e.key}_${String(i + 1).padStart(2, '0')}.${ext}`, blob)
+          } catch (err) {
+            console.error(`${e.key}_${i + 1} 다운로드 실패:`, err)
+          }
+        }
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(zipBlob)
+      const safeName = (character.name || 'character').replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
+      const styleName = (style.name || 'style').replace(/[^a-zA-Z0-9가-힣_-]/g, '_')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeName}_${styleName}_${Date.now()}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('전체 다운로드 실패:', err)
+      alert(`전체 다운로드 실패: ${err.message || err}`)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
-    <tr className="border-b border-gray-800/60 last:border-b-0">
-      <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 min-w-[180px]">
-        <div className="flex items-center gap-3">
-          {character.profileImage ? (
-            <img src={character.profileImage} alt="" className="w-8 h-8 rounded-full object-cover bg-gray-800" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-800" />
-          )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-medium text-white truncate">{character.name}</p>
-              {!character.isPublic && (
-                <span className="text-[10px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded">비공개</span>
+    <>
+      <tr className="border-b border-gray-800/60 last:border-b-0">
+        <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 min-w-[180px]">
+          <div className="flex items-center gap-3">
+            {character.profileImage ? (
+              <img src={character.profileImage} alt="" className="w-8 h-8 rounded-full object-cover bg-gray-800" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gray-800" />
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-medium text-white truncate">{character.name}</p>
+                {!character.isPublic && (
+                  <span className="text-[10px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded">비공개</span>
+                )}
+              </div>
+              {style ? (
+                <>
+                  <p className="text-[11px] text-gray-500 truncate">스타일: {style.name}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      onClick={() => setBatchOpen(true)}
+                      className="text-[10px] text-fuchsia-300 hover:text-fuchsia-200"
+                      style={NO_OUTLINE}
+                      title="일반 표정 5종을 한 번에 AI 생성"
+                    >
+                      ✨ 일괄 AI 생성
+                    </button>
+                    <button
+                      onClick={downloadAllZip}
+                      disabled={downloading || totalImages === 0}
+                      className="text-[10px] text-emerald-300 hover:text-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={NO_OUTLINE}
+                      title={totalImages === 0 ? '다운로드할 이미지가 없습니다' : `표정별 폴더로 묶어 ZIP 다운로드 (${totalImages}장)`}
+                    >
+                      {downloading ? '📦 압축 중...' : `📦 ZIP 다운로드 (${totalImages})`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <Link
+                  to={`/admin/characters/${character.id}/styles`}
+                  className="text-[11px] text-amber-400 hover:text-amber-300"
+                  style={NO_OUTLINE}
+                >
+                  스타일 추가하기 →
+                </Link>
               )}
             </div>
-            {style ? (
-              <p className="text-[11px] text-gray-500 truncate">스타일: {style.name}</p>
-            ) : (
-              <Link
-                to={`/admin/characters/${character.id}/styles`}
-                className="text-[11px] text-amber-400 hover:text-amber-300"
-                style={NO_OUTLINE}
-              >
-                스타일 추가하기 →
-              </Link>
-            )}
           </div>
-        </div>
-      </td>
-
-      {emotions.map((e) => (
-        <td key={e.key} className="px-2 py-3 text-center">
-          {style ? (
-            <EmotionCell
-              styleId={style.id}
-              emotion={e.key}
-              emotionLabel={e.label}
-              images={imagesByEmotion[e.key] || []}
-              onAdd={onAddImage}
-              onRemove={onRemoveImage}
-            />
-          ) : (
-            <div className="w-16 h-16 mx-auto rounded-md bg-gray-800/40 border border-dashed border-gray-700/50" />
-          )}
         </td>
-      ))}
-    </tr>
+
+        {emotions.map((e) => (
+          <td key={e.key} className="px-2 py-3 text-center">
+            {style ? (
+              <EmotionCell
+                characterId={character.id}
+                styleId={style.id}
+                emotion={e.key}
+                emotionLabel={e.label}
+                images={imagesByEmotion[e.key] || []}
+                onAdd={onAddImage}
+                onRemove={onRemoveImage}
+              />
+            ) : (
+              <div className="w-16 h-16 mx-auto rounded-md bg-gray-800/40 border border-dashed border-gray-700/50" />
+            )}
+          </td>
+        ))}
+      </tr>
+
+      {/* fixed-positioned 모달은 table 흐름 밖(document.body)에서 렌더링한다 */}
+      {batchOpen && style && createPortal(
+        <BatchExpressionGenerator
+          characterId={character.id}
+          styleId={style.id}
+          characterName={character.name}
+          onClose={() => setBatchOpen(false)}
+          onSaved={(images) => {
+            for (const img of images) onAddImage(img)
+          }}
+        />,
+        document.body,
+      )}
+    </>
   )
 }
 
-function EmotionCell({ styleId, emotion, emotionLabel, images, onAdd, onRemove }) {
+function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, onAdd, onRemove }) {
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
@@ -343,9 +579,8 @@ function EmotionCell({ styleId, emotion, emotionLabel, images, onAdd, onRemove }
 
   const handleClick = () => {
     if (uploading) return
-    // 이미지가 있으면 매니저 열기, 없으면 바로 업로드 picker
-    if (hasImages) setManagerOpen(true)
-    else triggerUploadDirect()
+    // 이미지 유무와 관계없이 매니저 열기 (업로드 + AI 생성 두 옵션 노출)
+    setManagerOpen(true)
   }
 
   const handleDragOver = (e) => {
@@ -404,6 +639,8 @@ function EmotionCell({ styleId, emotion, emotionLabel, images, onAdd, onRemove }
 
       {managerOpen && (
         <EmotionSlotManager
+          characterId={characterId}
+          styleId={styleId}
           emotion={emotion}
           emotionLabel={emotionLabel}
           images={images}
@@ -411,14 +648,17 @@ function EmotionCell({ styleId, emotion, emotionLabel, images, onAdd, onRemove }
           onUpload={uploadFile}
           uploading={uploading}
           onRemove={onRemove}
+          onAdd={onAdd}
         />
       )}
     </>
   )
 }
 
-function EmotionSlotManager({ emotion, emotionLabel, images, onClose, onUpload, uploading, onRemove }) {
+function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, images, onClose, onUpload, uploading, onRemove, onAdd }) {
   const [removingId, setRemovingId] = useState(null)
+  const [aiOpen, setAiOpen] = useState(false)
+  const [bgImage, setBgImage] = useState(null) // 배경 제거 모달에서 처리할 이미지
 
   const triggerUpload = () => {
     const input = document.createElement('input')
@@ -454,19 +694,30 @@ function EmotionSlotManager({ emotion, emotionLabel, images, onClose, onUpload, 
         className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-2xl max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2">
           <div>
             <h3 className="text-sm font-semibold text-white">{emotionLabel} <span className="text-gray-500 text-[11px]">({emotion})</span></h3>
             <p className="text-[11px] text-gray-500 mt-0.5">총 {images.length}장 · 채팅에서 랜덤으로 1장 선택됨</p>
           </div>
-          <button
-            onClick={triggerUpload}
-            disabled={uploading}
-            className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
-            style={NO_OUTLINE}
-          >
-            {uploading ? '업로드 중...' : '+ 이미지 추가'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setAiOpen(true)}
+              disabled={uploading}
+              className="px-3 py-1.5 rounded-md text-sm bg-fuchsia-600 hover:bg-fuchsia-500 text-white disabled:opacity-50"
+              style={NO_OUTLINE}
+              title="Grok 시안 배경 생성 + chroma key 배경 제거"
+            >
+              ✨ AI 생성
+            </button>
+            <button
+              onClick={triggerUpload}
+              disabled={uploading}
+              className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+              style={NO_OUTLINE}
+            >
+              {uploading ? '업로드 중...' : '+ 이미지 추가'}
+            </button>
+          </div>
         </div>
 
         {images.length === 0 ? (
@@ -478,6 +729,14 @@ function EmotionSlotManager({ emotion, emotionLabel, images, onClose, onUpload, 
                 <div className="aspect-[3/4]">
                   <img src={img.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
                 </div>
+                <button
+                  onClick={() => setBgImage(img)}
+                  className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-fuchsia-600 text-white text-[12px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  style={NO_OUTLINE}
+                  title="배경 제거 (시안 chroma key)"
+                >
+                  🪄
+                </button>
                 <button
                   onClick={() => handleRemove(img.id)}
                   disabled={removingId === img.id}
@@ -502,6 +761,862 @@ function EmotionSlotManager({ emotion, emotionLabel, images, onClose, onUpload, 
             style={NO_OUTLINE}
           >
             닫기
+          </button>
+        </div>
+      </div>
+
+      {aiOpen && (
+        <AiExpressionGenerator
+          characterId={characterId}
+          styleId={styleId}
+          emotion={emotion}
+          emotionLabel={emotionLabel}
+          onClose={() => setAiOpen(false)}
+          onSaved={(uploaded) => onAdd({ ...uploaded, emotion })}
+        />
+      )}
+
+      {bgImage && (
+        <BackgroundRemovalModal
+          image={bgImage}
+          styleId={styleId}
+          emotion={emotion}
+          emotionLabel={emotionLabel}
+          onClose={() => setBgImage(null)}
+          onReplaced={(oldId, newImage) => {
+            onRemove(oldId)
+            onAdd({ ...newImage, emotion })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================
+// 기존 저장된 표정 이미지의 chroma key 배경 제거 모달 (시안 #00FFFF)
+// 원본 + 처리 결과를 나란히 보여주고, 슬라이더로 임계값 조정 후 "교체"로 새 이미지로 업로드.
+// 교체 시 새 이미지를 업로드한 뒤 원본을 삭제 (실패해도 새 이미지는 살아남음).
+// ============================================
+function BackgroundRemovalModal({ image, styleId, emotion, emotionLabel, onClose, onReplaced }) {
+  const [tolerance, setTolerance] = useState(80)
+  const [processedUrl, setProcessedUrl] = useState(null)
+  const [processing, setProcessing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [detectedBg, setDetectedBg] = useState(null) // { r, g, b } — 코너에서 감지된 실제 배경색
+  const processedBlobRef = useRef(null)
+  const processedObjectUrlRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setProcessing(true)
+    setError(null)
+    removeChromaBackground(image.filePath, { tolerance })
+      .then(({ blob, bgColor }) => {
+        if (cancelled) return
+        if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current)
+        const url = URL.createObjectURL(blob)
+        processedBlobRef.current = blob
+        processedObjectUrlRef.current = url
+        setProcessedUrl(url)
+        setDetectedBg(bgColor)
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message || '처리 실패')
+      })
+      .finally(() => {
+        if (!cancelled) setProcessing(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [image.filePath, tolerance])
+
+  useEffect(() => () => {
+    if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current)
+  }, [])
+
+  const replace = async () => {
+    if (!processedBlobRef.current || processing || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const file = new File(
+        [processedBlobRef.current],
+        `bg-removed-${emotion.toLowerCase()}-${Date.now()}.png`,
+        { type: 'image/png' },
+      )
+      const fd = new FormData()
+      fd.append('image', file)
+      fd.append('emotion', emotion)
+      fd.append('description', '배경 제거 처리')
+      const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, fd)
+      try {
+        await api.delete(`/admin/images/${image.id}`)
+      } catch (delErr) {
+        // 삭제 실패해도 새 이미지는 살려두고 사용자에게 알림
+        console.error('원본 이미지 삭제 실패:', delErr)
+        setError('새 이미지는 저장됐지만 원본 삭제에 실패했습니다. 수동으로 삭제하세요.')
+      }
+      onReplaced(image.id, uploaded)
+      onClose()
+    } catch (e) {
+      setError(e.message || '교체 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const download = () => {
+    if (!processedObjectUrlRef.current) return
+    const a = document.createElement('a')
+    a.href = processedObjectUrlRef.current
+    a.download = `bg-removed-${emotion.toLowerCase()}-${Date.now()}.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+
+  const checkerStyle = {
+    backgroundColor: '#1f2937',
+    backgroundImage:
+      'linear-gradient(45deg, #374151 25%, transparent 25%), linear-gradient(-45deg, #374151 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #374151 75%), linear-gradient(-45deg, transparent 75%, #374151 75%)',
+    backgroundSize: '16px 16px',
+    backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-3xl max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4">
+          <h3 className="text-sm font-semibold text-white">🪄 배경 제거 — {emotionLabel} <span className="text-gray-500 text-[11px]">({emotion})</span></h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">처리 후 새 이미지로 업로드되고 원본은 자동 삭제됩니다.</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-md text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <p className="text-[11px] text-gray-400 mb-1.5">원본</p>
+            <div
+              className="rounded-lg overflow-hidden border border-gray-700 flex items-center justify-center"
+              style={{ minHeight: 280, backgroundColor: '#00FFFF' }}
+            >
+              <img src={image.filePath} alt="원본" className="max-w-full object-contain" style={{ maxHeight: 380 }} />
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] text-gray-400 mb-1.5">
+              처리 결과 {processing && <span className="text-gray-500">(처리 중...)</span>}
+            </p>
+            <div
+              className="rounded-lg overflow-hidden border border-gray-700 flex items-center justify-center"
+              style={{ minHeight: 280, ...checkerStyle }}
+            >
+              {processedUrl ? (
+                <img src={processedUrl} alt="처리" className="max-w-full object-contain" style={{ maxHeight: 380 }} />
+              ) : (
+                <div className="text-gray-500 text-sm">{processing ? '처리 중...' : ''}</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4 p-3 rounded-lg bg-gray-800/40 border border-gray-700/60 space-y-2">
+          <div className="text-[11px] text-gray-500 leading-relaxed">
+            이미지 코너에서 자동 감지한 배경색을 단색 chroma key로 제거합니다. <b className="text-gray-300">허용 오차</b>가 클수록 배경색에서 더 멀어진 픽셀도 같은 배경으로 간주합니다. 캐릭터가 함께 지워지면 낮추세요.
+          </div>
+          {detectedBg && (
+            <div className="flex items-center gap-2 text-[11px] text-gray-400">
+              <span>감지된 배경색:</span>
+              <span
+                className="inline-block w-4 h-4 rounded border border-gray-600"
+                style={{ backgroundColor: `rgb(${detectedBg.r}, ${detectedBg.g}, ${detectedBg.b})` }}
+              />
+              <span className="font-mono text-gray-500">rgb({detectedBg.r}, {detectedBg.g}, {detectedBg.b})</span>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <label className="text-[11px] text-gray-400 w-28 flex-shrink-0">허용 오차 ({tolerance})</label>
+            <input
+              type="range"
+              min={0}
+              max={441}
+              value={tolerance}
+              onChange={(e) => setTolerance(parseInt(e.target.value))}
+              className="flex-1 accent-fuchsia-500"
+            />
+          </div>
+        </div>
+
+        <div className="pt-3 border-t border-gray-800 flex flex-wrap justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            닫기
+          </button>
+          <button
+            onClick={download}
+            disabled={!processedUrl || saving || processing}
+            className="px-4 py-2 text-sm text-white bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            style={NO_OUTLINE}
+          >
+            PC 다운로드
+          </button>
+          <button
+            onClick={replace}
+            disabled={!processedUrl || saving || processing}
+            className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            style={NO_OUTLINE}
+          >
+            {saving ? '교체 중...' : '이 이미지로 교체'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// 레퍼런스 선택기 — 단일/일괄 모달 공통
+// reference: { profileImage: string|null, baseImages: string[] } | null
+// value: 'profile' | 'baseImages'
+// onChange: (newValue) => void
+// ============================================
+function ReferenceSelector({ reference, value, onChange }) {
+  if (!reference) {
+    return <div className="mb-4 text-[11px] text-gray-500">레퍼런스 정보 확인 중...</div>
+  }
+  const hasProfile = !!reference.profileImage
+  const hasBase = (reference.baseImages || []).length > 0
+
+  if (!hasProfile && !hasBase) {
+    return (
+      <div className="mb-4 px-3 py-2 bg-red-950/40 border border-red-800/50 rounded-md text-[11px] text-red-300">
+        프로필 이미지와 베이스 이미지가 모두 없습니다. AI 생성을 위해 둘 중 하나를 먼저 등록하세요.
+      </div>
+    )
+  }
+
+  const Option = ({ optionKey, label, urls, disabled }) => {
+    const selected = value === optionKey
+    return (
+      <button
+        type="button"
+        onClick={() => !disabled && onChange(optionKey)}
+        disabled={disabled}
+        className={`text-left rounded-lg p-2.5 border transition-colors ${
+          selected
+            ? 'border-fuchsia-500 bg-fuchsia-500/10'
+            : disabled
+              ? 'border-gray-800 bg-gray-900/30 opacity-50 cursor-not-allowed'
+              : 'border-gray-700 bg-gray-800/30 hover:border-gray-600'
+        }`}
+        style={NO_OUTLINE}
+      >
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span
+            className={`inline-block w-3 h-3 rounded-full border ${
+              selected ? 'bg-fuchsia-400 border-fuchsia-300' : 'border-gray-600'
+            }`}
+          />
+          <span className={`text-[12px] font-medium ${selected ? 'text-fuchsia-200' : 'text-gray-200'}`}>
+            {label}
+          </span>
+          <span className="text-[10px] text-gray-500">({urls.length}장)</span>
+        </div>
+        {urls.length > 0 ? (
+          <div className="flex gap-1.5 flex-wrap">
+            {urls.map((u, i) => (
+              <div key={i} className="w-14 h-14 rounded-md overflow-hidden bg-gray-800 border border-gray-700/60">
+                <img src={u} alt={`${optionKey}-${i}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-[10px] text-gray-500 py-2">등록된 이미지 없음</div>
+        )}
+      </button>
+    )
+  }
+
+  return (
+    <div className="mb-4">
+      <div className="text-[11px] text-gray-400 mb-1.5">레퍼런스 이미지 선택</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Option
+          optionKey="profile"
+          label="프로필 이미지"
+          urls={hasProfile ? [reference.profileImage] : []}
+          disabled={!hasProfile}
+        />
+        <Option
+          optionKey="baseImages"
+          label="베이스 이미지"
+          urls={reference.baseImages || []}
+          disabled={!hasBase}
+        />
+      </div>
+    </div>
+  )
+}
+
+// 디폴트 선택값 결정 — 둘 다 있으면 base, 하나만 있으면 그것, 아무것도 없으면 null
+function pickDefaultReferenceSource(reference) {
+  if (!reference) return null
+  if ((reference.baseImages || []).length > 0) return 'baseImages'
+  if (reference.profileImage) return 'profile'
+  return null
+}
+
+// ============================================
+// AI 생성 모달 — Grok image-to-image, 시안(#00FFFF) chroma key 배경 표정 이미지
+// 옵션으로 구도/자세 지시문(posePrompt) 입력 가능
+// ============================================
+
+function AiExpressionGenerator({ characterId, styleId, emotion, emotionLabel, onClose, onSaved }) {
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [result, setResult] = useState(null) // { generatedUrl }
+  const [posePrompt, setPosePrompt] = useState('')
+  const [reference, setReference] = useState(null) // { profileImage, baseImages: [] }
+  const [referenceSource, setReferenceSource] = useState(null) // 'profile' | 'baseImages'
+
+  // Chroma key 배경 제거 — 단색 hard cutoff (tolerance 이내는 투명, 초과는 불투명).
+  const [bgRemoveEnabled, setBgRemoveEnabled] = useState(true)
+  const [tolerance, setTolerance] = useState(80)
+  const [processedUrl, setProcessedUrl] = useState(null)
+  const [processing, setProcessing] = useState(false)
+  const [detectedBg, setDetectedBg] = useState(null)
+  const processedBlobRef = useRef(null)
+  const processedObjectUrlRef = useRef(null)
+
+  useEffect(() => {
+    api
+      .get(`/admin/expressions/reference-preview?characterId=${characterId}`)
+      .then((ref) => {
+        setReference(ref)
+        setReferenceSource(pickDefaultReferenceSource(ref))
+      })
+      .catch(() => setReference({ profileImage: null, baseImages: [] }))
+  }, [characterId])
+
+  // 결과 또는 threshold 변경 시 배경 제거 재처리
+  useEffect(() => {
+    if (!result?.generatedUrl) return
+    if (!bgRemoveEnabled) {
+      if (processedObjectUrlRef.current) {
+        URL.revokeObjectURL(processedObjectUrlRef.current)
+        processedObjectUrlRef.current = null
+      }
+      processedBlobRef.current = null
+      setProcessedUrl(null)
+      return
+    }
+    let cancelled = false
+    setProcessing(true)
+    removeChromaBackground(result.generatedUrl, { tolerance })
+      .then(({ blob, bgColor }) => {
+        if (cancelled) return
+        if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current)
+        const url = URL.createObjectURL(blob)
+        processedBlobRef.current = blob
+        processedObjectUrlRef.current = url
+        setProcessedUrl(url)
+        setDetectedBg(bgColor)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || '배경 제거 실패')
+      })
+      .finally(() => {
+        if (!cancelled) setProcessing(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [result?.generatedUrl, bgRemoveEnabled, tolerance])
+
+  // 모달 닫힐 때 ObjectURL 정리
+  useEffect(() => {
+    return () => {
+      if (processedObjectUrlRef.current) URL.revokeObjectURL(processedObjectUrlRef.current)
+    }
+  }, [])
+
+  const generate = async () => {
+    if (!referenceSource) {
+      setError('레퍼런스 이미지를 선택하세요.')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setResult(null)
+    try {
+      const data = await api.post('/admin/expressions/generate', {
+        characterId,
+        styleId,
+        emotion,
+        posePrompt: posePrompt.trim(),
+        referenceSource,
+      })
+      setResult(data)
+    } catch (err) {
+      setError(err.message || '생성 실패')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 배경 제거가 활성화돼 있으면 처리된 blob을, 아니면 원본을 가져온다.
+  const getSaveBlob = async () => {
+    if (bgRemoveEnabled && processedBlobRef.current) return processedBlobRef.current
+    const res = await fetch(result.generatedUrl)
+    return res.blob()
+  }
+
+  const save = async () => {
+    if (!result?.generatedUrl) return
+    if (bgRemoveEnabled && processing) {
+      setError('배경 제거 처리 중입니다. 잠시 후 다시 시도하세요.')
+      return
+    }
+    setSaving(true)
+    try {
+      const blob = await getSaveBlob()
+      const file = new File([blob], `ai-${emotion.toLowerCase()}-${Date.now()}.png`, { type: 'image/png' })
+      const fd = new FormData()
+      fd.append('image', file)
+      fd.append('emotion', emotion)
+      fd.append('description', bgRemoveEnabled ? 'AI 생성 (Grok, 배경 제거)' : 'AI 생성 (Grok)')
+      const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, fd)
+      onSaved(uploaded)
+      onClose()
+    } catch (err) {
+      setError(err.message || '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const download = async () => {
+    if (!result?.generatedUrl) return
+    try {
+      const blob = await getSaveBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ai-${emotion.toLowerCase()}-${Date.now()}.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.message || '다운로드 실패')
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-white">
+              ✨ AI 표정 생성 — {emotionLabel}{' '}
+              <span className="text-gray-500 text-[11px]">({emotion})</span>
+            </h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              NEUTRAL(기본) 이미지를 레퍼런스로 Grok이 시안(#00FFFF) 배경 표정 이미지를 생성합니다.
+            </p>
+          </div>
+          <button
+            onClick={generate}
+            disabled={loading || saving || !referenceSource}
+            className="px-4 py-2 text-sm bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-md disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            {loading ? '생성 중...' : result?.generatedUrl ? '다시 생성' : '생성'}
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-[11px] text-gray-400 mb-1.5">구도 / 자세</label>
+          <div className="bg-gray-800/50 border border-gray-700/60 rounded-md px-3 py-2 text-[11px] text-gray-400 mb-2">
+            <span className="text-gray-500">디폴트 (항상 적용):</span> {DEFAULT_COMPOSITION_KO}
+          </div>
+          <textarea
+            value={posePrompt}
+            onChange={(e) => setPosePrompt(e.target.value)}
+            placeholder="추가 지시 (선택) — 입력 시 디폴트보다 우선합니다. 예: 전신 구도 / 측면 각도 / 손을 흔드는 자세"
+            rows={2}
+            className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-600 resize-y"
+            style={NO_OUTLINE}
+          />
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-md text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        <ReferenceSelector
+          reference={reference}
+          value={referenceSource}
+          onChange={setReferenceSource}
+        />
+
+        {(result?.generatedUrl || loading) && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-gray-400">생성 결과</div>
+              {result?.generatedUrl && (
+                <label className="flex items-center gap-2 text-[12px] text-gray-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={bgRemoveEnabled}
+                    onChange={(e) => setBgRemoveEnabled(e.target.checked)}
+                    className="accent-fuchsia-500"
+                  />
+                  배경 제거 (시안)
+                  {processing && <span className="text-gray-500">(처리 중...)</span>}
+                </label>
+              )}
+            </div>
+
+            {result?.generatedUrl && bgRemoveEnabled && (
+              <div className="mb-3 p-3 rounded-lg bg-gray-800/40 border border-gray-700/60 space-y-2">
+                <div className="text-[11px] text-gray-400 leading-relaxed">
+                  이미지 코너에서 자동 감지한 배경색을 단색 chroma key로 제거합니다. <b className="text-gray-300">허용 오차</b>가 클수록 배경색에서 더 멀어진 픽셀도 같은 배경으로 간주합니다. 캐릭터가 함께 지워지면 낮추세요.
+                </div>
+                {detectedBg && (
+                  <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                    <span>감지된 배경색:</span>
+                    <span
+                      className="inline-block w-4 h-4 rounded border border-gray-600"
+                      style={{ backgroundColor: `rgb(${detectedBg.r}, ${detectedBg.g}, ${detectedBg.b})` }}
+                    />
+                    <span className="font-mono text-gray-500">rgb({detectedBg.r}, {detectedBg.g}, {detectedBg.b})</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <label className="text-[11px] text-gray-400 w-28 flex-shrink-0">허용 오차 ({tolerance})</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={441}
+                    value={tolerance}
+                    onChange={(e) => setTolerance(parseInt(e.target.value))}
+                    className="flex-1 accent-fuchsia-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div
+              className="rounded-lg overflow-hidden border border-gray-700 flex items-center justify-center"
+              style={{
+                minHeight: 320,
+                // 배경 제거 시 투명 영역 확인용 체커보드, 아니면 원본 시안 배경
+                backgroundColor: bgRemoveEnabled ? '#1f2937' : '#00FFFF',
+                backgroundImage: bgRemoveEnabled
+                  ? 'linear-gradient(45deg, #374151 25%, transparent 25%), linear-gradient(-45deg, #374151 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #374151 75%), linear-gradient(-45deg, transparent 75%, #374151 75%)'
+                  : undefined,
+                backgroundSize: bgRemoveEnabled ? '16px 16px' : undefined,
+                backgroundPosition: bgRemoveEnabled ? '0 0, 0 8px, 8px -8px, -8px 0px' : undefined,
+              }}
+            >
+              {result?.generatedUrl ? (
+                bgRemoveEnabled && processedUrl ? (
+                  <img src={processedUrl} alt="generated" className="max-w-full max-h-[480px] object-contain" />
+                ) : (
+                  <img src={result.generatedUrl} alt="generated" className="max-w-full max-h-[480px] object-contain" />
+                )
+              ) : (
+                <div className="text-gray-500 text-sm py-16">{loading ? '생성 중...' : ''}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 pt-3 border-t border-gray-800 flex flex-wrap justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            닫기
+          </button>
+          <button
+            onClick={download}
+            disabled={!result?.generatedUrl || saving || loading}
+            className="px-4 py-2 text-sm text-white bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            style={NO_OUTLINE}
+          >
+            PC 다운로드
+          </button>
+          <button
+            onClick={save}
+            disabled={!result?.generatedUrl || saving || loading}
+            className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg"
+            style={NO_OUTLINE}
+          >
+            {saving ? '저장 중...' : '이 이미지로 저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// 일괄 AI 생성 모달 — SFW emotion을 병렬 생성 + ZIP 다운로드 + 일괄 저장
+// NEUTRAL(기본)은 레퍼런스로 쓰이고, ANGRY(화남)는 사용 빈도가 낮아 일괄 생성에서 제외.
+// ============================================
+const BATCH_EMOTIONS = SFW_EMOTIONS.filter((e) => e.key !== 'NEUTRAL' && e.key !== 'ANGRY')
+
+function BatchExpressionGenerator({ characterId, styleId, characterName, onClose, onSaved }) {
+  const [posePrompt, setPosePrompt] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [zipping, setZipping] = useState(false)
+  // results: { [emotionKey]: { status: 'idle'|'loading'|'done'|'failed', generatedUrl?, error? } }
+  const [results, setResults] = useState({})
+  const [reference, setReference] = useState(null)
+  const [referenceSource, setReferenceSource] = useState(null)
+
+  // 일괄 생성은 검정 배경으로 바로 받는다. 별도 chroma key 후처리 없음.
+  const getEmotionBlob = async (generatedUrl) => {
+    const res = await fetch(generatedUrl)
+    return res.blob()
+  }
+
+  useEffect(() => {
+    api
+      .get(`/admin/expressions/reference-preview?characterId=${characterId}`)
+      .then((ref) => {
+        setReference(ref)
+        setReferenceSource(pickDefaultReferenceSource(ref))
+      })
+      .catch(() => setReference({ profileImage: null, baseImages: [] }))
+  }, [characterId])
+
+  const doneCount = Object.values(results).filter((r) => r?.status === 'done').length
+  const anyLoading = loading || Object.values(results).some((r) => r?.status === 'loading')
+
+  const generate = async () => {
+    if (!referenceSource) return
+    setLoading(true)
+    const initial = {}
+    for (const e of BATCH_EMOTIONS) initial[e.key] = { status: 'loading' }
+    setResults(initial)
+
+    await Promise.all(
+      BATCH_EMOTIONS.map(async (e) => {
+        try {
+          const data = await api.post('/admin/expressions/generate', {
+            characterId,
+            styleId,
+            emotion: e.key,
+            posePrompt: posePrompt.trim(),
+            referenceSource,
+            background: 'black',
+          })
+          setResults((prev) => ({
+            ...prev,
+            [e.key]: { status: 'done', generatedUrl: data.generatedUrl },
+          }))
+        } catch (err) {
+          setResults((prev) => ({
+            ...prev,
+            [e.key]: { status: 'failed', error: err.message || '생성 실패' },
+          }))
+        }
+      }),
+    )
+    setLoading(false)
+  }
+
+  const downloadZip = async () => {
+    setZipping(true)
+    try {
+      const zip = new JSZip()
+      for (const e of BATCH_EMOTIONS) {
+        const r = results[e.key]
+        if (r?.status !== 'done' || !r.generatedUrl) continue
+        const blob = await getEmotionBlob(r.generatedUrl)
+        zip.file(`${e.key}.png`, blob)
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(zipBlob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${characterName || 'expressions'}-${Date.now()}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('ZIP 생성 실패:', err)
+    } finally {
+      setZipping(false)
+    }
+  }
+
+  const saveAll = async () => {
+    setSaving(true)
+    const newImages = []
+    for (const e of BATCH_EMOTIONS) {
+      const r = results[e.key]
+      if (r?.status !== 'done' || !r.generatedUrl) continue
+      try {
+        const blob = await getEmotionBlob(r.generatedUrl)
+        const file = new File([blob], `ai-${e.key.toLowerCase()}-${Date.now()}.png`, {
+          type: 'image/png',
+        })
+        const fd = new FormData()
+        fd.append('image', file)
+        fd.append('emotion', e.key)
+        fd.append('description', 'AI 일괄 생성 (Grok, 검정 배경)')
+        const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, fd)
+        newImages.push({ ...uploaded, emotion: e.key })
+      } catch (err) {
+        console.error(`${e.key} 저장 실패:`, err)
+      }
+    }
+    if (newImages.length) onSaved(newImages)
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-5xl max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-white">
+              ✨ 일괄 AI 표정 생성 — {characterName}
+            </h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              NEUTRAL을 레퍼런스로 {BATCH_EMOTIONS.length}종({BATCH_EMOTIONS.map((e) => e.label).join('·')})을 병렬 생성. 검정 배경.
+            </p>
+          </div>
+          <button
+            onClick={generate}
+            disabled={anyLoading || saving || !referenceSource}
+            className="px-4 py-2 text-sm bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-md disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            {anyLoading ? '생성 중...' : doneCount > 0 ? '다시 생성' : `${BATCH_EMOTIONS.length}종 생성`}
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-[11px] text-gray-400 mb-1.5">구도 / 자세 ({BATCH_EMOTIONS.length}종 모두 공통 적용)</label>
+          <div className="bg-gray-800/50 border border-gray-700/60 rounded-md px-3 py-2 text-[11px] text-gray-400 mb-2">
+            <span className="text-gray-500">디폴트 (항상 적용):</span> {DEFAULT_COMPOSITION_KO}
+          </div>
+          <textarea
+            value={posePrompt}
+            onChange={(e) => setPosePrompt(e.target.value)}
+            placeholder="추가 지시 (선택) — 입력 시 디폴트보다 우선합니다. 예: 전신 구도 / 측면 각도 / 팔짱 자세"
+            rows={2}
+            className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-600 resize-y"
+            style={NO_OUTLINE}
+          />
+        </div>
+
+        <ReferenceSelector
+          reference={reference}
+          value={referenceSource}
+          onChange={setReferenceSource}
+        />
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+          {BATCH_EMOTIONS.map((e) => {
+            const r = results[e.key]
+            return (
+              <div key={e.key} className="bg-gray-800/40 border border-gray-700/50 rounded-lg overflow-hidden">
+                <div className="px-2.5 py-1.5 flex items-center justify-between bg-gray-800/70">
+                  <span className="text-xs text-white">{e.label}</span>
+                  <span className="text-[10px] text-gray-500">{e.key}</span>
+                </div>
+                <div
+                  className="aspect-[3/4] flex items-center justify-center"
+                  style={{ backgroundColor: '#000000' }}
+                >
+                  {!r ? (
+                    <span className="text-[10px] text-gray-600">대기</span>
+                  ) : r.status === 'loading' ? (
+                    <span className="text-[10px] text-gray-400 animate-pulse">생성 중...</span>
+                  ) : r.status === 'failed' ? (
+                    <span
+                      className="text-[10px] text-red-400 px-2 text-center"
+                      title={r.error}
+                    >
+                      실패{r.error ? `: ${r.error.slice(0, 40)}` : ''}
+                    </span>
+                  ) : r.generatedUrl ? (
+                    <img src={r.generatedUrl} alt={e.key} className="w-full h-full object-contain" />
+                  ) : null}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-gray-800 flex flex-wrap justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving || zipping}
+            className="px-4 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            닫기
+          </button>
+          <button
+            onClick={downloadZip}
+            disabled={doneCount === 0 || anyLoading || zipping || saving}
+            className="px-4 py-2 text-sm text-white bg-gray-700 hover:bg-gray-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            style={NO_OUTLINE}
+            title="완성된 결과만 ZIP으로 묶어 다운로드"
+          >
+            {zipping ? 'ZIP 생성 중...' : `ZIP 다운로드 (${doneCount})`}
+          </button>
+          <button
+            onClick={saveAll}
+            disabled={doneCount === 0 || anyLoading || saving || zipping}
+            className="px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+            style={NO_OUTLINE}
+          >
+            {saving ? '저장 중...' : `모두 저장 (${doneCount})`}
           </button>
         </div>
       </div>

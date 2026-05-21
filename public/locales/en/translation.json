@@ -230,6 +230,26 @@
           "desc": "Hide emotion images entirely. Only text and background remain visible."
         }
       }
+    },
+    "nickname": {
+      "heading": "How the character addresses you",
+      "description": "Choose what the character calls you in this chat.",
+      "fallbackName": "You",
+      "customPlaceholder": "e.g. Honey, Boss, your nickname",
+      "options": {
+        "NAME": {
+          "title": "By name ({{name}})",
+          "desc": "Use the name on your profile."
+        },
+        "OPPA": {
+          "title": "Call me \"Oppa\"",
+          "desc": "The character will call you \"오빠 (Oppa).\""
+        },
+        "CUSTOM": {
+          "title": "Custom",
+          "desc": "Enter any name you'd like to be called."
+        }
+      }
     }
   },
   "emotions": {
