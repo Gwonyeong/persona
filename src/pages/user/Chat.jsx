@@ -337,7 +337,10 @@ export default function Chat() {
   const [showGallery, setShowGallery] = useState(false)
   const [showGiftSheet, setShowGiftSheet] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
+  // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
   const [backgroundImage, setBackgroundImage] = useState(null)
+  // 캐릭터 표정 sprite 뒤 backdrop — AI가 scene에 따라 자동 선택. 채팅방 배경과 독립.
+  const [spriteBackgroundImage, setSpriteBackgroundImage] = useState(null)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [showGalleryTooltip, setShowGalleryTooltip] = useState(false)
   const [galleryTooltipText, setGalleryTooltipText] = useState('')
@@ -537,6 +540,7 @@ export default function Chat() {
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
       setBackgroundImage(conv.backgroundImage || null)
+      setSpriteBackgroundImage(conv.spriteBackgroundImage || null)
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
       setVoiceMode(!!conv.voiceMode)
       setSafetyMode(conv.safetyMode !== false)
@@ -807,9 +811,9 @@ export default function Chat() {
             if (data.characterStatus) {
               setCharacterStatus(data.characterStatus)
             }
-            // AI가 선택한 배경은 표정 sprite의 backdrop으로만 사용 — 채팅방 자체 배경은 변경 X
-            if (data.backgroundImage !== undefined) {
-              setBackgroundImage(data.backgroundImage)
+            // AI가 선택한 배경은 표정 sprite의 backdrop으로만 사용 — 채팅방 자체 배경(backgroundImage)은 건드리지 않음
+            if (data.spriteBackgroundImage !== undefined) {
+              setSpriteBackgroundImage(data.spriteBackgroundImage)
             }
             // 무료 보이스 사용 시 잔여 횟수 동기화 (서버 진실)
             if (data.consumedFreeVoice && typeof data.freeVoiceUses === 'number' && user) {
@@ -1365,6 +1369,11 @@ export default function Chat() {
       <div
         ref={scrollContainerRef}
         className="h-full overflow-auto px-4 py-3 space-y-2"
+        style={backgroundImage ? {
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        } : undefined}
       >
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
@@ -1451,11 +1460,11 @@ export default function Chat() {
                     <div
                       className="relative rounded-2xl rounded-tl-none overflow-hidden bg-gray-800 cursor-pointer"
                       style={{ aspectRatio: '9 / 16', maxHeight: 320 }}
-                      onClick={() => setLightboxUrl({ url: bubbleComposite, bgUrl: backgroundImage })}
+                      onClick={() => setLightboxUrl({ url: bubbleComposite, bgUrl: spriteBackgroundImage })}
                     >
-                      {backgroundImage && (
+                      {spriteBackgroundImage && (
                         <img
-                          src={backgroundImage}
+                          src={spriteBackgroundImage}
                           alt=""
                           className="absolute inset-0 w-full h-full object-cover"
                           loading="lazy"
@@ -1475,11 +1484,11 @@ export default function Chat() {
                 <div
                   className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
                   style={{ aspectRatio: '9 / 16' }}
-                  onClick={() => setLightboxUrl({ url: fullComposite, bgUrl: backgroundImage })}
+                  onClick={() => setLightboxUrl({ url: fullComposite, bgUrl: spriteBackgroundImage })}
                 >
-                  {backgroundImage && (
+                  {spriteBackgroundImage && (
                     <img
-                      src={backgroundImage}
+                      src={spriteBackgroundImage}
                       alt=""
                       className="absolute inset-0 w-full h-full object-cover"
                       loading="lazy"
