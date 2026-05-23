@@ -5,25 +5,36 @@ const SUBSCRIPTION_IDS = ['light_plan']
 
 let NativePurchases = null
 let PURCHASE_TYPE = null
+// MaskShop 컴포넌트가 페이지 이동으로 remount될 때마다 initBilling이 재호출되면
+// @capgo/native-purchases의 BillingClient lifecycle이 꼬여 hang하는 이슈가 있어,
+// 한 번 성공한 init 결과는 in-flight promise까지 모듈 레벨에 캐싱해 재호출 차단.
+let initPromise = null
 
 export function isNativeBillingAvailable() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
 }
 
-export async function initBilling() {
-  if (!isNativeBillingAvailable()) return false
+export function initBilling() {
+  if (initPromise) return initPromise
 
-  try {
-    const module = await import('@capgo/native-purchases')
-    NativePurchases = module.NativePurchases
-    PURCHASE_TYPE = module.PURCHASE_TYPE
+  initPromise = (async () => {
+    if (!isNativeBillingAvailable()) return false
 
-    const { isBillingSupported } = await NativePurchases.isBillingSupported()
-    return isBillingSupported
-  } catch (e) {
-    console.error('Billing init failed:', e)
-    return false
-  }
+    try {
+      const module = await import('@capgo/native-purchases')
+      NativePurchases = module.NativePurchases
+      PURCHASE_TYPE = module.PURCHASE_TYPE
+
+      const { isBillingSupported } = await NativePurchases.isBillingSupported()
+      return isBillingSupported
+    } catch (e) {
+      console.error('Billing init failed:', e)
+      initPromise = null
+      return false
+    }
+  })()
+
+  return initPromise
 }
 
 export async function getProducts() {
