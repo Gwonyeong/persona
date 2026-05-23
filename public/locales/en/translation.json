@@ -213,6 +213,20 @@
   },
   "chatSettings": {
     "title": "Chat Settings",
+    "chatMode": {
+      "heading": "Chat Mode",
+      "description": "Choose how messages are displayed. The character's response itself is unchanged — only the rendering differs.",
+      "options": {
+        "ROLEPLAY": {
+          "title": "Roleplay Mode",
+          "desc": "Show action descriptions (《...》) and narration alongside dialogue."
+        },
+        "NORMAL": {
+          "title": "Normal Chat Mode",
+          "desc": "Show only dialogue. Action descriptions and narration are hidden."
+        }
+      }
+    },
     "spriteMode": {
       "heading": "Emotion Image Display",
       "description": "Choose how character emotion images are shown.",
