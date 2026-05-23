@@ -7,6 +7,7 @@ import useStore from '../../store/useStore'
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
 const SPRITE_MODES = ['BUBBLE', 'FULL', 'OFF']
+const CHAT_MODES = ['ROLEPLAY', 'NORMAL']
 const NICKNAME_MODES = ['NAME', 'OPPA', 'CUSTOM']
 const OPPA_VALUE = '오빠'
 const NICKNAME_MAX = 20
@@ -25,10 +26,12 @@ export default function ChatSettings() {
   const { t } = useTranslation()
 
   const [spriteMode, setSpriteMode] = useState('BUBBLE')
+  const [chatMode, setChatMode] = useState('ROLEPLAY')
   const [nicknameMode, setNicknameMode] = useState('NAME')
   const [customNickname, setCustomNickname] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingChatMode, setSavingChatMode] = useState(false)
   const [savingNickname, setSavingNickname] = useState(false)
   const customInputRef = useRef(null)
 
@@ -40,6 +43,7 @@ export default function ChatSettings() {
     api.get(`/conversations/${id}/messages`)
       .then(({ conversation }) => {
         setSpriteMode(conversation?.spriteMode || 'BUBBLE')
+        setChatMode(conversation?.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
         const stored = conversation?.userNickname || ''
         const mode = resolveNicknameMode(stored)
         setNicknameMode(mode)
@@ -59,6 +63,19 @@ export default function ChatSettings() {
       console.error('Update sprite mode error:', err)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleChatModeSelect = async (mode) => {
+    if (savingChatMode || mode === chatMode) return
+    setSavingChatMode(true)
+    setChatMode(mode)
+    try {
+      await api.patch(`/conversations/${id}/chat-mode`, { mode })
+    } catch (err) {
+      console.error('Update chat mode error:', err)
+    } finally {
+      setSavingChatMode(false)
     }
   }
 
@@ -145,6 +162,40 @@ export default function ChatSettings() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+        <section>
+          <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.chatMode.heading')}</h2>
+          <p className="text-xs text-gray-500 mb-4">{t('chatSettings.chatMode.description')}</p>
+
+          <div className="space-y-2">
+            {CHAT_MODES.map((mode) => {
+              const selected = chatMode === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => handleChatModeSelect(mode)}
+                  disabled={savingChatMode}
+                  className={`w-full flex items-start gap-3 text-left p-4 rounded-xl border transition-colors ${
+                    selected
+                      ? 'bg-indigo-600/15 border-indigo-500/60'
+                      : 'bg-gray-900 border-gray-800 hover:border-gray-700'
+                  } ${savingChatMode ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  style={NO_OUTLINE}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                    selected ? 'border-indigo-400' : 'border-gray-600'
+                  }`}>
+                    {selected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">{t(`chatSettings.chatMode.options.${mode}.title`)}</p>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{t(`chatSettings.chatMode.options.${mode}.desc`)}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.spriteMode.heading')}</h2>
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.spriteMode.description')}</p>

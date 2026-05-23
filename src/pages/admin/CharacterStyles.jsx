@@ -71,13 +71,19 @@ export default function CharacterStyles() {
   const triggerUpload = (styleId, emotion) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = 'image/*,video/mp4,video/webm'
     input.onchange = (e) => {
       if (e.target.files[0]) {
         uploadImage(styleId, emotion, e.target.files[0])
       }
     }
     input.click()
+  }
+
+  const isVideoUrl = (url) => {
+    if (!url || typeof url !== 'string') return false
+    const clean = url.split('?')[0].toLowerCase()
+    return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v')
   }
 
   if (!character) return <div className="p-6 text-gray-400">로딩 중...</div>
@@ -155,11 +161,23 @@ export default function CharacterStyles() {
                       {isUploading ? (
                         <span className="text-xs text-gray-400">업로드중...</span>
                       ) : img ? (
-                        <img
-                          src={img.filePath}
-                          alt={label}
-                          className="w-full h-full object-cover"
-                        />
+                        isVideoUrl(img.filePath) ? (
+                          <video
+                            src={img.filePath}
+                            className="w-full h-full object-cover"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            src={img.filePath}
+                            alt={label}
+                            className="w-full h-full object-cover"
+                          />
+                        )
                       ) : (
                         <span className="text-2xl text-gray-600">+</span>
                       )}

@@ -8,6 +8,30 @@ import { removeChromaBackground } from '../../lib/removeChromaBackground'
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 const PAGE_SIZE = 10
 
+// 표정 sprite 미디어 — 비디오(mp4/webm/...)는 자동재생/루프/음소거로 미리보기.
+// 채팅 출력 시에도 동일하게 음소거로 재생됨.
+function isVideoUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const clean = url.split('?')[0].toLowerCase()
+  return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v')
+}
+function ExpressionThumb({ src, className = '' }) {
+  if (isVideoUrl(src)) {
+    return (
+      <video
+        src={src}
+        className={className}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+      />
+    )
+  }
+  return <img src={src} alt="" className={className} loading="lazy" />
+}
+
 // 서버 buildExpressionPrompt의 디폴트 구도 문구와 일치시킨다.
 const DEFAULT_COMPOSITION_KO = '정면(eye-level) 상반신 포트레이트, 인물 중앙 정렬, 레퍼런스와 동일한 크롭·조명'
 const DEFAULT_COMPOSITION_EN =
@@ -549,7 +573,9 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, onAd
   const firstImage = hasImages ? images[0] : null
 
   const uploadFile = async (file) => {
-    if (!file || !file.type?.startsWith('image/')) return
+    if (!file) return
+    // 이미지 또는 비디오만 허용 (서버 uploadSprite와 일치)
+    if (!file.type?.startsWith('image/') && !file.type?.startsWith('video/')) return
     setUploading(true)
     try {
       const formData = new FormData()
@@ -569,7 +595,7 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, onAd
     if (uploading) return
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = 'image/*,video/mp4,video/webm'
     input.onchange = async (e) => {
       const file = e.target.files?.[0]
       if (file) await uploadFile(file)
@@ -625,7 +651,7 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, onAd
           <span className="text-[10px] text-gray-400">업로드중</span>
         ) : firstImage ? (
           <>
-            <img src={firstImage.filePath} alt={emotion} className="w-full h-full object-cover" loading="lazy" />
+            <ExpressionThumb src={firstImage.filePath} className="w-full h-full object-cover" />
             {images.length > 1 && (
               <span className="absolute bottom-0.5 right-0.5 text-[9px] font-semibold px-1 py-0.5 rounded bg-black/70 text-white pointer-events-none">
                 +{images.length - 1}
@@ -663,7 +689,7 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
   const triggerUpload = () => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/*'
+    input.accept = 'image/*,video/mp4,video/webm'
     input.multiple = true
     input.onchange = async (e) => {
       const files = Array.from(e.target.files || [])
@@ -727,16 +753,18 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
             {images.map((img) => (
               <div key={img.id} className="relative group rounded-md overflow-hidden bg-gray-800">
                 <div className="aspect-[3/4]">
-                  <img src={img.filePath} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <ExpressionThumb src={img.filePath} className="w-full h-full object-cover" />
                 </div>
-                <button
-                  onClick={() => setBgImage(img)}
-                  className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-fuchsia-600 text-white text-[12px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                  style={NO_OUTLINE}
-                  title="배경 제거 (시안 chroma key)"
-                >
-                  🪄
-                </button>
+                {!isVideoUrl(img.filePath) && (
+                  <button
+                    onClick={() => setBgImage(img)}
+                    className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-fuchsia-600 text-white text-[12px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    style={NO_OUTLINE}
+                    title="배경 제거 (시안 chroma key)"
+                  >
+                    🪄
+                  </button>
+                )}
                 <button
                   onClick={() => handleRemove(img.id)}
                   disabled={removingId === img.id}

@@ -22,6 +22,32 @@ function getImageUrl(filePath) {
   return null
 }
 
+// sprite URL이 비디오인지 판별. Supabase 업로드 시 원본 확장자가 보존됨 (sprites/.../EMOTION_uid.mp4).
+function isVideoUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const clean = url.split('?')[0].toLowerCase()
+  return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v')
+}
+
+// 비디오면 <video>, 이미지면 <img>. sprite는 음소거 자동재생/루프.
+// 비율 무관하게 하단 정렬 (object-bottom) — 1:1 이미지 등도 9:16 프레임 하단에 붙어 출력됨.
+function SpriteMedia({ src, className = '' }) {
+  if (isVideoUrl(src)) {
+    return (
+      <video
+        src={src}
+        className={className}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+      />
+    )
+  }
+  return <img src={src} alt="" className={className} loading="lazy" />
+}
+
 // 한글 음절(가-힣)을 자모 단계로 분해. 예: '상' → ['ㅅ', '사', '상'], '가' → ['ㄱ', '가'] (받침 없음)
 const HANGUL_INITIALS = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 const HANGUL_SYL_BASE = 0xAC00
@@ -156,6 +182,7 @@ const MessageBubble = memo(function MessageBubble({
   latestResponseAudios,
   isPlayingAll,
   isThisPlayingAudio,
+  chatMode,
   onLightbox,
   onPlayAudio,
   onStopAudio,
@@ -173,12 +200,19 @@ const MessageBubble = memo(function MessageBubble({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStreamingBubble])
 
+  const isNormalMode = chatMode === 'NORMAL'
+
   const segments = useMemo(() => {
     if (msg.role !== 'CHARACTER' && msg.role !== 'USER') return null
-    return parseMessageSegments(msg.content || '', msg.role)
-  }, [msg.content, msg.role])
+    const parsed = parseMessageSegments(msg.content || '', msg.role)
+    // NORMAL 모드: action(《...》, (...)) 세그먼트는 숨기고 대사 텍스트만 남김.
+    if (isNormalMode) return parsed.filter((s) => s.type !== 'action')
+    return parsed
+  }, [msg.content, msg.role, isNormalMode])
 
   if (msg.role === 'NARRATION') {
+    // NORMAL 모드: 별도 NARRATION 메시지는 숨김.
+    if (isNormalMode) return null
     return (
       <div className="flex justify-center my-4">
         <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
@@ -245,6 +279,14 @@ const MessageBubble = memo(function MessageBubble({
         </div>
       </div>
     )
+  }
+
+  // NORMAL 모드에서 캐릭터/유저 메시지의 모든 세그먼트가 action(행동 묘사)이어서 필터링 후 본문이 비면 버블을 숨김.
+  // (단, 미디어/오디오 등 표시할 다른 요소가 있으면 유지)
+  if (isNormalMode && (msg.role === 'CHARACTER' || msg.role === 'USER')) {
+    const hasText = segments && segments.some((s) => (s.value || '').trim().length > 0)
+    const hasExtras = !!(msg.feedImage || (msg.role === 'CHARACTER' && msg.audioUrl))
+    if (!hasText && !hasExtras) return null
   }
 
   return (
@@ -362,6 +404,8 @@ export default function Chat() {
   const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
   // 표정 sprite 출력 모드: 'FULL' | 'BUBBLE'(기본) | 'OFF'. 설정 페이지에서 변경.
   const [spriteMode, setSpriteMode] = useState('BUBBLE')
+  // 메시지 출력 모드: 'ROLEPLAY'(기본) — 나레이션·행동까지 표시 / 'NORMAL' — 대사만 표시. 설정 페이지에서 변경.
+  const [chatMode, setChatMode] = useState('ROLEPLAY')
   const [chatModel, setChatModel] = useState('ADVANCED') // 'BASIC' (Mistral) | 'ADVANCED' (Grok 4.3)
   const [showModelSheet, setShowModelSheet] = useState(false)
   const [excitedTooltipVisible, setExcitedTooltipVisible] = useState(false)
@@ -545,6 +589,7 @@ export default function Chat() {
       setVoiceMode(!!conv.voiceMode)
       setSafetyMode(conv.safetyMode !== false)
       setSpriteMode(['FULL', 'BUBBLE', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
+      setChatMode(conv.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
@@ -1443,6 +1488,7 @@ export default function Chat() {
                 latestResponseAudios={latestResponseAudios}
                 isPlayingAll={isPlayingAll}
                 isThisPlayingAudio={playingAudioIdx === idx}
+                chatMode={chatMode}
                 onLightbox={setLightboxUrl}
                 onPlayAudio={playAudio}
                 onStopAudio={stopAudio}
@@ -1470,11 +1516,9 @@ export default function Chat() {
                           loading="lazy"
                         />
                       )}
-                      <img
+                      <SpriteMedia
                         src={bubbleComposite}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-contain"
-                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-contain object-bottom"
                       />
                     </div>
                   </div>
@@ -1494,11 +1538,9 @@ export default function Chat() {
                       loading="lazy"
                     />
                   )}
-                  <img
+                  <SpriteMedia
                     src={fullComposite}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-contain"
-                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-contain object-bottom"
                   />
                 </div>
               )}
@@ -1823,7 +1865,7 @@ export default function Chat() {
       {lightboxUrl && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>
           {typeof lightboxUrl === 'object' ? (
-            // 표정 sprite 합성 — bg + 투명 sprite 겹쳐 출력. 9:16 비율 유지.
+            // 표정 sprite 합성 — bg + 투명 sprite 겹쳐 출력. 9:16 비율 유지, sprite는 하단 정렬.
             <div
               className="relative rounded-lg overflow-hidden bg-gray-900"
               style={{ aspectRatio: '9 / 16', height: '90vh', maxWidth: '90vw' }}
@@ -1831,8 +1873,21 @@ export default function Chat() {
               {lightboxUrl.bgUrl && (
                 <img src={lightboxUrl.bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
               )}
-              <img src={lightboxUrl.url} alt="" className="absolute inset-0 w-full h-full object-contain" />
+              <SpriteMedia
+                src={lightboxUrl.url}
+                className="absolute inset-0 w-full h-full object-contain object-bottom"
+              />
             </div>
+          ) : isVideoUrl(lightboxUrl) ? (
+            <video
+              src={lightboxUrl}
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+              autoPlay
+              loop
+              muted
+              playsInline
+              controls
+            />
           ) : (
             <img src={lightboxUrl} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" />
           )}
