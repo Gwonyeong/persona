@@ -40,6 +40,8 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const { t } = useTranslation()
   const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
   const [errorMsg, setErrorMsg] = useState(null)
+  // 몰입 모드 — 우상단 X 클릭 시 true. 배경 sprite 만 남기고 모든 UI 숨김. 화면 탭하면 false 로 복귀.
+  const [uiHidden, setUiHidden] = useState(false)
   const isSimple = callMode === 'simple'
 
   const user = useStore((s) => s.user)
@@ -54,6 +56,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     transcript,
     aiText,
     aiEmotion,
+    sessionHistory,
     error,
     connect,
     disconnect,
@@ -88,6 +91,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   useEffect(() => {
     if (open) {
       setErrorMsg(null)
+      setUiHidden(false) // 이전 통화에서 숨김 상태였더라도 새 진입 시 항상 UI 노출
       connect()
     }
     return () => {
@@ -137,8 +141,11 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const isFatal = errorMsg && (phase === 'idle' || !canSpeak)
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div
+      className="absolute inset-0 z-50 flex flex-col bg-gray-950"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      onClick={() => { if (uiHidden) setUiHidden(false) }}
+    >
       {/* 캐릭터 표정 배경 — emotion 별 sprite. 두 슬롯 모두 DOM 상주, opacity 토글로 크로스페이드. */}
       <img
         src={spriteLayers.A || ''}
@@ -167,8 +174,8 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
         aria-hidden="true"
         draggable={false}
       />
-      {/* 가독성 위해 위에 어두운 그라데이션 오버레이. */}
-      {emotionSpriteUrl && (
+      {/* 가독성 위해 위에 어두운 그라데이션 오버레이. UI 가 숨겨진 상태에선 sprite 가 깨끗하게 보이도록 함께 숨김. */}
+      {emotionSpriteUrl && !uiHidden && (
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -178,6 +185,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
         />
       )}
 
+      {!uiHidden && (
       <div className="relative flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
@@ -196,14 +204,18 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           </span>
         </div>
         <button
-          onClick={() => { disconnect(); onClose?.() }}
+          onClick={(e) => { e.stopPropagation(); setUiHidden(true) }}
           className="text-gray-100 hover:text-white text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
           style={BUTTON_RESET}
+          aria-label="UI 숨기기"
+          title="UI 숨기기 — 다시 누르면 복귀"
         >
           ✕
         </button>
       </div>
+      )}
 
+      {!uiHidden && (
       <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-6">
         <div className="text-center">
           <p className="text-xl font-semibold text-white">{character?.name}</p>
@@ -245,25 +257,75 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           </div>
         )}
 
-        <div className="w-full max-w-sm min-h-[64px] flex flex-col items-center gap-2">
-          {transcript && (
-            <div className="text-xs text-gray-400 text-center">
-              <span className="text-gray-500">{t('chat.call.you')}: </span>
-              {transcript}
-            </div>
-          )}
-          {aiText && (
-            <div className="text-sm text-white text-center bg-white/10 rounded-2xl px-4 py-2">
-              {aiText}
-            </div>
-          )}
-          {errorMsg && (
-            <div className="text-xs text-red-300 text-center">{errorMsg}</div>
-          )}
-        </div>
+        {/* 별도 transcript/aiText 표시는 아래의 sessionHistory 박스로 통합됨. 에러만 인라인 노출. */}
+        {errorMsg && (
+          <div className="text-xs text-red-300 text-center">{errorMsg}</div>
+        )}
       </div>
+      )}
 
+      {!uiHidden && (
       <div className="relative px-6 pb-6 flex flex-col items-center gap-4">
+        {/* 통화 대화 기록 — 누적된 sessionHistory + 진행 중인 turn(transcript/aiText) 라이브 머지.
+            턴이 끝나면 useCall 이 sessionHistory 로 옮기고 transcript/aiText 를 null 로 비우므로 중복 없음.
+            assistant 메시지 중 audioUrl 이 있는 항목은 박스로 감싸고 클릭 시 해당 음성 재생. */}
+        {(() => {
+          const merged = [...sessionHistory]
+          if (transcript) merged.push({ role: 'user', content: transcript, live: true })
+          if (aiText) merged.push({ role: 'assistant', content: aiText, live: true })
+          if (merged.length === 0) return null
+          const tail = merged.slice(-5)
+          const playAudioMsg = (url) => {
+            if (!url) return
+            try {
+              const a = new Audio(url)
+              a.play().catch(() => {})
+            } catch {}
+          }
+          return (
+            <div
+              ref={(el) => { if (el) el.scrollTop = el.scrollHeight }}
+              className="w-full max-w-sm bg-black/40 rounded-xl p-3 max-h-[180px] overflow-y-auto space-y-1.5 text-xs"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {tail.map((m, i) => {
+                const isUser = m.role === 'user'
+                const label = isUser ? '나' : (character?.name || '캐릭터')
+                const canReplay = !isUser && !m.live && !!m.audioUrl
+                if (canReplay) {
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); playAudioMsg(m.audioUrl) }}
+                      className="w-full text-left bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/15 rounded-lg px-2.5 py-2 flex items-start gap-2 transition-colors cursor-pointer"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      title="다시 재생"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-pink-200 flex-shrink-0 mt-0.5" aria-hidden="true">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      <span className="leading-snug">
+                        <span className="text-pink-200 font-medium mr-1.5">{label}</span>
+                        <span className="text-gray-100">{m.content}</span>
+                      </span>
+                    </button>
+                  )
+                }
+                return (
+                  <div key={i} className={`leading-snug ${m.live ? 'opacity-90' : ''}`}>
+                    <span className={isUser ? 'text-emerald-300 font-medium mr-1.5' : 'text-pink-200 font-medium mr-1.5'}>
+                      {label}
+                    </span>
+                    <span className="text-gray-100">{m.content}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
+
         {/* 모드 토글 */}
         <div className="flex bg-white/10 rounded-full p-1 text-xs">
           <button
@@ -332,6 +394,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           {t('chat.call.costPerTurn', { count: COST_PER_TURN })} · {t('chat.call.secured')}
         </p>
       </div>
+      )}
     </div>
   )
 }
