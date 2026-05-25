@@ -1924,9 +1924,11 @@ export default function Chat() {
         }}
         conversationId={conversation?.id}
         character={character}
+        currentStyle={currentStyle}
         profileUrl={profileUrl}
         characterStatus={characterStatus}
         affinity={conversation?.affinity ?? 0}
+        safetyMode={safetyMode}
         callMode={activeCallMode || 'continue'}
       />
 

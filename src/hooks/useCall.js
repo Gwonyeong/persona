@@ -54,6 +54,8 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
   const [phase, setPhase] = useState('idle')
   const [transcript, setTranscript] = useState(null)
   const [aiText, setAiText] = useState(null)
+  // 서버가 LLM 응답 prefix 에서 추출한 캐릭터 감정. 표정 sprite 배경에 사용. 초기 NEUTRAL.
+  const [aiEmotion, setAiEmotion] = useState('NEUTRAL')
   const [error, setError] = useState(null)
 
   const streamRef = useRef(null)
@@ -139,6 +141,8 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     setPhase('sending')
     setTranscript(null)
     setAiText(null)
+    // 다음 emotion 이 도착하기 전까지는 직전 표정 유지 (배경이 깜빡이지 않게).
+    // 명시적으로 reset 하지 않음 — 서버는 매 턴 emotion 이벤트를 1회 송신해 자동 overwrite.
 
     const token = useStore.getState().token
     const fd = new FormData()
@@ -289,6 +293,12 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         lastAiText = payload.text || ''
         setAiText(lastAiText)
         setPhase('speaking') // 곧 오디오 도착 예정 → 미리 phase 전환해 UI 자연스럽게
+      } else if (type === 'emotion') {
+        // 서버가 [EMOTION:XXX] prefix 에서 추출한 캐릭터 감정 (NEUTRAL/HAPPY/.../AROUSED_*).
+        // 화면 배경 sprite 결정에 사용. safety OFF 일 때만 AROUSED_* 가능.
+        if (typeof payload.emotion === 'string' && payload.emotion) {
+          setAiEmotion(payload.emotion)
+        }
       } else if (type === 'audio') {
         lastAudioUrl = payload.audioUrl || null
       } else if (type === 'empty') {
@@ -578,6 +588,7 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     phase,
     transcript,
     aiText,
+    aiEmotion,
     error,
     connect,
     disconnect,
