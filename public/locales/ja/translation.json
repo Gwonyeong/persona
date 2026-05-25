@@ -797,6 +797,15 @@
     "withYou": "あなたと一緒",
     "elsewhere": "別の場所",
     "actionButton": "行動描写 (括弧)",
-    "excitedHint": "興奮状態"
+    "excitedHint": "興奮状態",
+    "finalizing": "応答を仕上げ中...",
+    "presenceMode": {
+      "disabledHint": "一緒にいるキャラクターがいません",
+      "switchToInPersonHint": "一緒にいるキャラクターとだけ会話する",
+      "switchToPhoneHint": "別の場所のキャラクターともメッセンジャーで会話する",
+      "switchedToInPerson": "🧑 一緒にいる友達とだけ話します",
+      "switchedToPhone": "📱 メッセンジャーモードに切り替えました",
+      "autoFallbackToast": "📱 一緒にいる友達がいないのでメッセンジャーモードに切り替えました"
+    }
   }
 }

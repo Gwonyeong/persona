@@ -797,6 +797,15 @@
     "withYou": "With you",
     "elsewhere": "Elsewhere",
     "actionButton": "Action (parentheses)",
-    "excitedHint": "Aroused"
+    "excitedHint": "Aroused",
+    "finalizing": "Finalizing response...",
+    "presenceMode": {
+      "disabledHint": "No one is with you right now",
+      "switchToInPersonHint": "Chat only with characters who are with you",
+      "switchToPhoneHint": "Chat with characters elsewhere via messenger",
+      "switchedToInPerson": "🧑 Only with characters who are here",
+      "switchedToPhone": "📱 Switched to messenger mode",
+      "autoFallbackToast": "📱 No one is with you — switched to messenger mode"
+    }
   }
 }
