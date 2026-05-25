@@ -12,6 +12,8 @@ import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import { getTagLabel } from '../../lib/tagLabel'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import RecentStoriesRow from '../../components/RecentStoriesRow'
+import FeaturedCharacterSlider from '../../components/FeaturedCharacterSlider'
+import RecentJoinedRow from '../../components/RecentJoinedRow'
 import MaskIcon from '../../components/MaskIcon'
 // import AdBanner from '../../components/AdBanner'
 
@@ -34,11 +36,39 @@ function isVideoUrl(url) {
 
 export default function Home() {
   const { t, i18n: i18nInstance } = useTranslation()
-  const { token, masks, setMasks } = useStore()
+  const { token, masks, setMasks, user, setSafetyMode } = useStore()
+  const adultVerified = !!user?.adultVerified
+  // 비로그인 유저도 항상 SAFE(ON)로 표시.
+  const safetyMode = !token ? true : user?.safetyMode !== false
+  const [safetyBusy, setSafetyBusy] = useState(false)
+
+  const toggleSafety = async () => {
+    if (!token) {
+      navigate('/login')
+      return
+    }
+    if (safetyMode && !adultVerified) {
+      // ON → OFF 시도하는데 미인증 → 본인인증 페이지로
+      navigate('/adult-verify')
+      return
+    }
+    if (safetyBusy) return
+    setSafetyBusy(true)
+    const next = !safetyMode
+    try {
+      const { safetyMode: confirmed } = await api.put('/auth/safety', { safetyMode: next })
+      setSafetyMode(confirmed)
+    } catch (e) {
+      // 서버에서 거부된 경우 (인증 만료 등)
+      console.warn('safety toggle failed', e)
+    } finally {
+      setSafetyBusy(false)
+    }
+  }
   const [characters, setCharacters] = useState([])
+  const [featuredCharacters, setFeaturedCharacters] = useState([])
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('default')
-  const [headerCollapsed, setHeaderCollapsed] = useState(false)
   const [showLangModal, setShowLangModal] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
@@ -56,16 +86,6 @@ export default function Home() {
       api.put('/auth/language', { language: code }).catch(() => {})
     }
   }
-
-  useEffect(() => {
-    const scrollEl = document.querySelector('.user-layout > main')
-    if (!scrollEl) return
-    const onScroll = () => {
-      setHeaderCollapsed(scrollEl.scrollTop > 0)
-    }
-    scrollEl.addEventListener('scroll', onScroll, { passive: true })
-    return () => scrollEl.removeEventListener('scroll', onScroll)
-  }, [])
 
   useEffect(() => {
     if (token) {
@@ -91,7 +111,16 @@ export default function Home() {
     if (search) params.set('search', search)
     if (sort !== 'default') params.set('sort', sort)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
-  }, [search, sort, i18nInstance.language])
+  }, [search, sort, i18nInstance.language, safetyMode])
+
+  // 1:1 슬라이더는 search/sort/filter와 무관 — AROUSED 이미지 보유 캐릭터를
+  // 가장 최근 흥분 이미지 업로드 시점 기준 최신순으로 로드.
+  useEffect(() => {
+    api
+      .get('/characters/featured?limit=5')
+      .then(({ characters }) => setFeaturedCharacters(characters || []))
+      .catch(() => setFeaturedCharacters([]))
+  }, [i18nInstance.language, safetyMode])
 
   const charactersWithRandomTags = useMemo(() => {
     return characters.map((c) => {
@@ -100,6 +129,24 @@ export default function Home() {
       return { ...c, randomTags: shuffled.slice(0, 2) }
     })
   }, [characters])
+
+  // 최근 합류 3명 — 가로 슬라이드에서만 노출, 하단 그리드에서는 제외
+  const recentJoined = useMemo(() => {
+    return [...charactersWithRandomTags]
+      .filter((c) => c.createdAt)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3)
+  }, [charactersWithRandomTags])
+
+  const recentJoinedIds = useMemo(
+    () => new Set(recentJoined.map((c) => c.id)),
+    [recentJoined]
+  )
+
+  const gridCharacters = useMemo(
+    () => charactersWithRandomTags.filter((c) => !recentJoinedIds.has(c.id)),
+    [charactersWithRandomTags, recentJoinedIds]
+  )
 
   return (
     <div className="relative px-4 pt-4 pb-2">
@@ -110,8 +157,8 @@ export default function Home() {
         <meta property="og:description" content={t('home.ogDescription')} />
       </Helmet>
 
-      {/* 헤더 + 검색 + 필터 + 광고 (sticky) */}
-      <div className="sticky top-0 z-10 bg-gray-950 pb-4 mb-4 -mx-4 px-4 border-b border-gray-700">
+      {/* 헤더 + 검색 + 필터 + 광고 */}
+      <div className="bg-gray-950 pb-4 mb-4 -mx-4 px-4 border-b border-gray-700">
         {/* 검색 모달 — 헤더 영역에 absolute로 떠 있음 (sticky 부모를 따라 항상 최상단) */}
         {showSearchModal && (
           <div
@@ -215,16 +262,11 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 검색바 + 장르 필터 (스크롤 방향에 따라 접힘) */}
-        <div
-          style={{ display: headerCollapsed ? 'none' : 'block' }}
-        >
-          {/* 광고 배너 (어드민 관리) */}
-          <HomeBannerSlider />
+        {/* 광고 배너 (어드민 관리) */}
+        <HomeBannerSlider />
 
-          {/* 최근 공개된 스토리 */}
-          <RecentStoriesRow />
-        </div>
+        {/* 최근 공개된 스토리 */}
+        <RecentStoriesRow />
 
         {/* 정렬 탭 + 필터 */}
         <div className="flex items-center gap-2 pb-2">
@@ -244,6 +286,34 @@ export default function Home() {
               </button>
             ))}
           </div>
+          <button
+            onClick={toggleSafety}
+            disabled={safetyBusy}
+            aria-label="Safety toggle"
+            title={safetyMode ? 'Safety ON' : 'Safety OFF'}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors flex-shrink-0 ${
+              safetyMode
+                ? 'bg-emerald-600/15 text-emerald-300 ring-1 ring-emerald-500/40'
+                : 'bg-rose-600/15 text-rose-300 ring-1 ring-rose-500/40'
+            } ${safetyBusy ? 'opacity-50' : ''}`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              {safetyMode ? (
+                <>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <polyline points="9 12 11 14 15 10" />
+                </>
+              ) : (
+                <>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                </>
+              )}
+            </svg>
+            <span>{safetyMode ? 'SAFE' : '19+'}</span>
+          </button>
           <div className="flex-1 min-w-0">
             <TagFilterBar
               selectedTags={selectedTags}
@@ -265,14 +335,26 @@ export default function Home() {
         />
       )}
 
-      {/* 캐릭터 그리드 */}
-      {filterByTags(charactersWithRandomTags).length === 0 ? (
+      {/* 추천 캐릭터 슬라이더 — AROUSED 표정 이미지 보유 캐릭터, 최신 업로드순 */}
+      <FeaturedCharacterSlider
+        characters={featuredCharacters}
+        reducedData={reducedData}
+      />
+
+      {/* 최근에 합류한 페소나들 — 최근 생성된 3명 가로 슬라이드 */}
+      <RecentJoinedRow
+        characters={recentJoined}
+        reducedData={reducedData}
+      />
+
+      {/* 캐릭터 그리드 — 최근 합류 3명 제외 */}
+      {filterByTags(gridCharacters).length === 0 ? (
         <div className="text-center text-gray-500 py-20">
           <p>{t('home.emptyCharacters')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          {filterByTags(charactersWithRandomTags).map((c) => {
+          {filterByTags(gridCharacters).map((c) => {
             const thumb = c.styles?.[0]?.images?.[0]
             const homeMedia = reducedData ? null : c.homeImage
             const thumbUrl = getImageUrl(homeMedia) || getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)

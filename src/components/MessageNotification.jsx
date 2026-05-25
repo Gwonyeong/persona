@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
-import useStore from '../store/useStore'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -12,11 +10,8 @@ function getImageUrl(filePath) {
 
 export default function MessageNotification() {
   const { t } = useTranslation()
-  const { token } = useStore()
   const navigate = useNavigate()
-  const location = useLocation()
   const [toast, setToast] = useState(null)
-  const prevUnreadRef = useRef(new Set())
   const recentlyExitedRef = useRef(new Map()) // conversationId → exitTimestamp
   const timerRef = useRef(null)
 
@@ -30,64 +25,10 @@ export default function MessageNotification() {
   }, [])
 
   useEffect(() => {
-    if (!token) return
-
-    const poll = async () => {
-      try {
-        const { unread } = await api.get('/conversations/unread')
-        const currentUnreadIds = new Set(unread.map((u) => u.conversationId))
-
-        // 현재 보고 있는 채팅방은 제외
-        const currentChatId = location.pathname.match(/^\/chats\/(\d+)/)?.[1]
-
-        const now = Date.now()
-        // 15초 지난 항목 정리
-        for (const [cid, at] of recentlyExitedRef.current) {
-          if (now - at > 15000) recentlyExitedRef.current.delete(cid)
-        }
-
-        // 새로 추가된 unread만 알림 (이전에 없었던 것)
-        const suppressedIds = new Set()
-        for (const item of unread) {
-          if (currentChatId && String(item.conversationId) === currentChatId) continue
-          // 최근 나간 채팅방은 토스트 무시 (but prevUnreadRef에 추가 안 함)
-          if (recentlyExitedRef.current.has(item.conversationId)) {
-            suppressedIds.add(item.conversationId)
-            continue
-          }
-          if (!prevUnreadRef.current.has(item.conversationId)) {
-            break
-          }
-        }
-
-        // 억제된 항목은 prevUnreadRef에서 제외 (15초 후 토스트 표시 가능하도록)
-        for (const id of suppressedIds) {
-          currentUnreadIds.delete(id)
-        }
-        prevUnreadRef.current = currentUnreadIds
-
-        // ChatList 등 다른 컴포넌트에 갱신 알림
-        window.dispatchEvent(new CustomEvent('conversations-updated'))
-        // 탭바 unread 뱃지용 (현재 보고 있는 채팅방 + 억제된 항목 제외)
-        const visibleUnreadCount = unread.filter((u) => {
-          if (currentChatId && String(u.conversationId) === currentChatId) return false
-          if (suppressedIds.has(u.conversationId)) return false
-          return true
-        }).length
-        window.dispatchEvent(new CustomEvent('unread-count', { detail: visibleUnreadCount }))
-      } catch {
-        // 에러 무시
-      }
-    }
-
-    poll()
-    const interval = setInterval(poll, 10000) // 10초마다 폴링
-
     return () => {
-      clearInterval(interval)
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [token, location.pathname])
+  }, [])
 
   if (!toast) return null
 
