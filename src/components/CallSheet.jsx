@@ -108,7 +108,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     const images = currentStyle?.images || []
     const available = images.map((i) => i.emotion).join(',')
     const matched = images.find((img) => img.emotion === aiEmotion)
-    console.log(`[CallSheet] aiEmotion=${aiEmotion}, matched=${matched ? 'YES' : 'NO (fallback)'}, available=[${available}], styleId=${currentStyle?.id || 'none'}`)
+    console.log(`[CallSheet] aiEmotion=${aiEmotion}, matched=${matched ? 'YES' : 'NO (fallback)'}, matchedUrl=${matched?.filePath || '(none)'}, available=[${available}], styleId=${currentStyle?.id || 'none'}`)
   }, [open, aiEmotion, currentStyle])
 
   if (!open) return null
@@ -118,29 +118,29 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const isFatal = errorMsg && (phase === 'idle' || !canSpeak)
 
   // 캐릭터 표정 sprite — aiEmotion 에 매칭되는 첫 이미지. 없으면 NEUTRAL fallback → profile.
+  // CharacterImage 의 URL 필드는 filePath (Supabase 절대 URL).
   const emotionSpriteUrl = (() => {
     const images = currentStyle?.images || []
     const matched = images.find((img) => img.emotion === aiEmotion)
-    if (matched?.url) return matched.url
+    if (matched?.filePath) return matched.filePath
     const neutral = images.find((img) => img.emotion === 'NEUTRAL')
-    return neutral?.url || profileUrl || null
+    return neutral?.filePath || profileUrl || null
   })()
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* 캐릭터 표정 배경 — emotion 별 sprite. 가독성 위해 위에 어두운 그라데이션 오버레이. */}
+      {/* 캐릭터 표정 배경 — emotion 별 sprite. <img> 로 깔아서 src 변경이 즉시 반영되도록 한다.
+          (background-image 는 CSS transition 안 되고 일부 브라우저에서 갱신이 늦은 케이스 있음) */}
       {emotionSpriteUrl && (
         <>
-          <div
-            className="absolute inset-0 pointer-events-none transition-[background-image] duration-300"
-            style={{
-              backgroundImage: `url(${emotionSpriteUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              filter: 'saturate(0.9)',
-            }}
+          <img
+            src={emotionSpriteUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+            style={{ filter: 'saturate(0.9)' }}
             aria-hidden="true"
+            draggable={false}
           />
           <div
             className="absolute inset-0 pointer-events-none"
