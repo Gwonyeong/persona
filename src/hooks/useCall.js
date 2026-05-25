@@ -497,10 +497,29 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     setTranscript(null)
     setAiText(null)
     setPhase('connecting')
-    // 세션 시작 시 simple 모드 in-memory 히스토리 초기화 (통화 간 누수 방지).
+    // 세션 시작 시 in-memory 히스토리 초기화. simple 모드는 곧 서버에서 누적분을 받아 덮어쓴다.
     sessionHistoryRef.current = []
     // 질문 확률도 매 통화 세션마다 30%로 리셋.
     questionChanceRef.current = 30
+
+    // simple 모드: 이전 통화 세션 히스토리를 서버에서 받아 LLM 컨텍스트로 사용.
+    // 실패해도 빈 세션으로 진행 (block X).
+    if (callMode === 'simple' && conversationId) {
+      try {
+        const token = useStore.getState().token
+        const res = await fetch(`${API_URL}/conversations/${conversationId}/call/session`, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data?.sessionHistory)) {
+            sessionHistoryRef.current = data.sessionHistory
+          }
+        }
+      } catch (err) {
+        console.warn('[Call] simple session fetch failed:', err)
+      }
+    }
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       const payload = { code: 'UNSUPPORTED', message: 'mediaDevices not supported' }
@@ -542,7 +561,7 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     }
 
     setPhase('listening')
-  }, [onError, phase, vadTick])
+  }, [onError, phase, vadTick, callMode, conversationId])
 
   const disconnect = useCallback(() => {
     setPhase('idle')
