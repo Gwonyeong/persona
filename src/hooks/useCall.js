@@ -199,11 +199,69 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     let lastFreeCallUses = null
     let consumedFreeUse = false
 
+    // === streaming audio queue (audio-chunk 이벤트용) ===
+    // 서버가 문장 단위 mp3 chunk 를 base64 로 보내면 도착 즉시 큐에 넣고 순차 재생.
+    // 첫 chunk 도착 시 phase='speaking' 으로 전환 → 텍스트 도착 전이라도 UI 갱신.
+    // SSE 스트림 종료 후 audioQueueChain 을 await 해서 끝까지 재생되도록 보장.
+    let audioQueueChain = Promise.resolve()
+    let firstAudioStarted = false
+    let aborted = false
+    const blobUrlsToRevoke = []
+
+    const base64ToBlobUrl = (base64) => {
+      const bin = atob(base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const blob = new Blob([bytes], { type: 'audio/mpeg' })
+      const url = URL.createObjectURL(blob)
+      blobUrlsToRevoke.push(url)
+      return url
+    }
+
+    const playOne = (url) => new Promise((resolve) => {
+      if (aborted) { resolve(); return }
+      if (!audioRef.current) audioRef.current = new Audio()
+      const audio = audioRef.current
+      audio.src = url
+      const onEnd = () => {
+        audio.removeEventListener('ended', onEnd)
+        audio.removeEventListener('error', onEnd)
+        resolve()
+      }
+      audio.addEventListener('ended', onEnd)
+      audio.addEventListener('error', onEnd)
+      audio.play().catch(() => resolve())
+    })
+
+    const enqueueAudioChunk = (base64) => {
+      if (aborted || !base64) return
+      const url = base64ToBlobUrl(base64)
+      audioQueueChain = audioQueueChain.then(() => {
+        if (aborted) return
+        if (!firstAudioStarted) {
+          firstAudioStarted = true
+          setPhase('speaking')
+        }
+        return playOne(url)
+      })
+    }
+
     const handleEvent = (type, payload) => {
       if (type === 'transcript') {
         lastUserText = payload.text || ''
         setTranscript(lastUserText)
+      } else if (type === 'text-delta') {
+        // streaming 경로 — LLM 토큰 누적 표시. payload.delta 는 raw delta.
+        if (typeof payload.delta === 'string' && payload.delta) {
+          lastAiText = (lastAiText || '') + payload.delta
+          setAiText(lastAiText)
+        }
+      } else if (type === 'audio-chunk') {
+        // streaming 경로 — 도착 즉시 큐에 enqueue. 재생은 audioQueueChain 이 순차 처리.
+        enqueueAudioChunk(payload.audioBase64)
       } else if (type === 'text') {
+        // 비-스트리밍: 단일 전체 텍스트.
+        // 스트리밍: 마지막에 cleanCallTextForUI 가 마커 정리한 최종 텍스트로 overwrite.
         lastAiText = payload.text || ''
         setAiText(lastAiText)
         setPhase('speaking') // 곧 오디오 도착 예정 → 미리 phase 전환해 UI 자연스럽게
@@ -253,7 +311,9 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         }
       }
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name === 'AbortError') {
+        aborted = true
+      } else {
         const payload = { code: 'STREAM_ERROR', message: err.message }
         setError(payload)
         onError?.(payload)
@@ -261,13 +321,24 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     }
     abortRef.current = null
 
-    // 오디오 재생 — 끝까지 기다린 다음 listening으로 복귀
-    if (lastAudioUrl) {
+    // 오디오 재생 완료까지 대기 후 listening 복귀.
+    // - streaming 경로: audio-chunk 들이 audioQueueChain 에 순차 enqueue 되어 이미 재생 중.
+    //   여기서는 마지막 chunk 까지 끝나길 await.
+    // - 비-스트리밍 폴백(흥분 모드 등): chunk 없이 단일 audio URL 만 옴 → 기존 playAudio 로 재생.
+    if (!aborted) {
       try {
-        await playAudio(lastAudioUrl)
+        if (firstAudioStarted) {
+          await audioQueueChain
+        } else if (lastAudioUrl) {
+          await playAudio(lastAudioUrl)
+        }
       } catch (err) {
         console.warn('[Call] audio playback failed:', err)
       }
+    }
+    // streaming 에서 생성한 blob URL 들 해제.
+    for (const u of blobUrlsToRevoke) {
+      try { URL.revokeObjectURL(u) } catch {}
     }
 
     // 통화 세션 in-memory 히스토리 누적 (simple 모드용). 양쪽 모두 있을 때만.
