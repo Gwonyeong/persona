@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useCall from '../hooks/useCall'
 import useStore from '../store/useStore'
@@ -101,8 +101,36 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   // unmount 시 무조건 disconnect
   useEffect(() => () => { disconnect() }, [disconnect])
 
+  // 캐릭터 표정 sprite — aiEmotion 에 매칭되는 첫 이미지. 없으면 NEUTRAL fallback → profile.
+  // CharacterImage 의 URL 필드는 filePath (Supabase 절대 URL).
+  // (hooks 사용 위해 early return 위에서 계산.)
+  const emotionSpriteUrl = (() => {
+    const images = currentStyle?.images || []
+    const matched = images.find((img) => img.emotion === aiEmotion)
+    if (matched?.filePath) return matched.filePath
+    const neutral = images.find((img) => img.emotion === 'NEUTRAL')
+    return neutral?.filePath || profileUrl || null
+  })()
+
+  // === 표정 sprite 크로스페이드 ===
+  // 두 슬롯(A, B) 에 이전/현재 URL 을 번갈아 둔다. URL 변경 시 inactive 슬롯에 새 URL 을 쓰고 active 토글
+  // → 옛 슬롯은 opacity 1→0, 새 슬롯은 opacity 0→1 으로 동시 진행 (CSS transition).
+  const CROSSFADE_MS = 700
+  const [spriteLayers, setSpriteLayers] = useState({ A: null, B: null })
+  const [activeSpriteSlot, setActiveSpriteSlot] = useState('A')
+  const lastSpriteUrlRef = useRef(null)
+  useEffect(() => {
+    if (!emotionSpriteUrl) return
+    if (lastSpriteUrlRef.current === emotionSpriteUrl) return
+    lastSpriteUrlRef.current = emotionSpriteUrl
+    setActiveSpriteSlot((prev) => {
+      const next = prev === 'A' ? 'B' : 'A'
+      setSpriteLayers((prevLayers) => ({ ...prevLayers, [next]: emotionSpriteUrl }))
+      return next
+    })
+  }, [emotionSpriteUrl])
+
   // 디버그 — sprite 매칭 결과를 콘솔로 확인. (확인 후 제거 예정)
-  // 반드시 early return 위에서 호출해야 hooks 순서가 일정해진다.
   useEffect(() => {
     if (!open) return
     const images = currentStyle?.images || []
@@ -117,39 +145,46 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const canSpeak = phase === 'listening' || phase === 'recording'
   const isFatal = errorMsg && (phase === 'idle' || !canSpeak)
 
-  // 캐릭터 표정 sprite — aiEmotion 에 매칭되는 첫 이미지. 없으면 NEUTRAL fallback → profile.
-  // CharacterImage 의 URL 필드는 filePath (Supabase 절대 URL).
-  const emotionSpriteUrl = (() => {
-    const images = currentStyle?.images || []
-    const matched = images.find((img) => img.emotion === aiEmotion)
-    if (matched?.filePath) return matched.filePath
-    const neutral = images.find((img) => img.emotion === 'NEUTRAL')
-    return neutral?.filePath || profileUrl || null
-  })()
-
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* 캐릭터 표정 배경 — emotion 별 sprite. <img> 로 깔아서 src 변경이 즉시 반영되도록 한다.
-          (background-image 는 CSS transition 안 되고 일부 브라우저에서 갱신이 늦은 케이스 있음) */}
+      {/* 캐릭터 표정 배경 — emotion 별 sprite. 두 슬롯 모두 DOM 상주, opacity 토글로 크로스페이드. */}
+      <img
+        src={spriteLayers.A || ''}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+        style={{
+          filter: 'saturate(0.9)',
+          opacity: spriteLayers.A && activeSpriteSlot === 'A' ? 1 : 0,
+          transition: `opacity ${CROSSFADE_MS}ms ease-in-out`,
+          // src 가 비어있는 슬롯은 broken icon 안 보이도록 visibility 도 함께 끔.
+          visibility: spriteLayers.A ? 'visible' : 'hidden',
+        }}
+        aria-hidden="true"
+        draggable={false}
+      />
+      <img
+        src={spriteLayers.B || ''}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+        style={{
+          filter: 'saturate(0.9)',
+          opacity: spriteLayers.B && activeSpriteSlot === 'B' ? 1 : 0,
+          transition: `opacity ${CROSSFADE_MS}ms ease-in-out`,
+          visibility: spriteLayers.B ? 'visible' : 'hidden',
+        }}
+        aria-hidden="true"
+        draggable={false}
+      />
+      {/* 가독성 위해 위에 어두운 그라데이션 오버레이. */}
       {emotionSpriteUrl && (
-        <>
-          <img
-            src={emotionSpriteUrl}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
-            style={{ filter: 'saturate(0.9)' }}
-            aria-hidden="true"
-            draggable={false}
-          />
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: 'linear-gradient(to bottom, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.25) 35%, rgba(2,6,23,0.55) 70%, rgba(2,6,23,0.85) 100%)',
-            }}
-            aria-hidden="true"
-          />
-        </>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.25) 35%, rgba(2,6,23,0.55) 70%, rgba(2,6,23,0.85) 100%)',
+          }}
+          aria-hidden="true"
+        />
       )}
 
       <div className="relative flex items-center justify-between px-4 py-3">
