@@ -101,6 +101,16 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   // unmount 시 무조건 disconnect
   useEffect(() => () => { disconnect() }, [disconnect])
 
+  // 디버그 — sprite 매칭 결과를 콘솔로 확인. (확인 후 제거 예정)
+  // 반드시 early return 위에서 호출해야 hooks 순서가 일정해진다.
+  useEffect(() => {
+    if (!open) return
+    const images = currentStyle?.images || []
+    const available = images.map((i) => i.emotion).join(',')
+    const matched = images.find((img) => img.emotion === aiEmotion)
+    console.log(`[CallSheet] aiEmotion=${aiEmotion}, matched=${matched ? 'YES' : 'NO (fallback)'}, available=[${available}], styleId=${currentStyle?.id || 'none'}`)
+  }, [open, aiEmotion, currentStyle])
+
   if (!open) return null
 
   const isConnecting = phase === 'connecting'
@@ -115,13 +125,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     const neutral = images.find((img) => img.emotion === 'NEUTRAL')
     return neutral?.url || profileUrl || null
   })()
-  // 디버그 — sprite 매칭 결과를 콘솔로 확인. (확인 후 제거 예정)
-  useEffect(() => {
-    const images = currentStyle?.images || []
-    const available = images.map((i) => i.emotion).join(',')
-    const matched = images.find((img) => img.emotion === aiEmotion)
-    console.log(`[CallSheet] aiEmotion=${aiEmotion}, matched=${matched ? 'YES' : 'NO (fallback)'}, available=[${available}], styleId=${currentStyle?.id || 'none'}`)
-  }, [aiEmotion, currentStyle])
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
