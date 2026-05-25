@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import useCall from '../hooks/useCall'
 import useStore from '../store/useStore'
 
-const COST_PER_TURN = 5
+const COST_PER_TURN = 3
 
 const BUTTON_RESET = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
