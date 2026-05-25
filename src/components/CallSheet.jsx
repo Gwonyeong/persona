@@ -130,15 +130,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     })
   }, [emotionSpriteUrl])
 
-  // 디버그 — sprite 매칭 결과를 콘솔로 확인. (확인 후 제거 예정)
-  useEffect(() => {
-    if (!open) return
-    const images = currentStyle?.images || []
-    const available = images.map((i) => i.emotion).join(',')
-    const matched = images.find((img) => img.emotion === aiEmotion)
-    console.log(`[CallSheet] aiEmotion=${aiEmotion}, matched=${matched ? 'YES' : 'NO (fallback)'}, matchedUrl=${matched?.filePath || '(none)'}, available=[${available}], styleId=${currentStyle?.id || 'none'}`)
-  }, [open, aiEmotion, currentStyle])
-
   if (!open) return null
 
   const isConnecting = phase === 'connecting'
@@ -202,10 +193,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
             {safetyMode ? 'Safety ON' : 'Safety OFF'}
-          </span>
-          {/* DEBUG — 현재 캐릭터 emotion 표시. 확인 후 제거. */}
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-100">
-            🐛 {aiEmotion}
           </span>
         </div>
         <button

@@ -297,7 +297,6 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         // 서버가 [EMOTION:XXX] prefix 에서 추출한 캐릭터 감정 (NEUTRAL/HAPPY/.../AROUSED_*).
         // 화면 배경 sprite 결정에 사용. safety OFF 일 때만 AROUSED_* 가능.
         if (typeof payload.emotion === 'string' && payload.emotion) {
-          console.log('[Call] emotion event:', payload.emotion)
           setAiEmotion(payload.emotion)
         }
       } else if (type === 'audio') {
