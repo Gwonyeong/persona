@@ -99,6 +99,7 @@ export default function Characters() {
   const [editing, setEditing] = useState(null) // null | 'new' | character object
   const [form, setForm] = useState(EMPTY_FORM)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [dragOverColumn, setDragOverColumn] = useState(null)
   const [tab, setTab] = useState('public') // 'public' | 'private'
   const [v2Lang, setV2Lang] = useState('ko')
   const [v2Busy, setV2Busy] = useState({ image: false, voice: false, translate: false, generate: false })
@@ -324,6 +325,37 @@ export default function Characters() {
       load()
     } catch (e) {
       alert('홈 이미지 삭제 실패')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  // 신규 컬럼(profileImageNsfw / homeImageSquare / homeImageSquareNsfw) 공용 업로더
+  const uploadColumnImage = async (column, endpointPath, file) => {
+    if (!editing || editing === 'new') return
+    setUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const { character } = await api.put(`/admin/characters/${editing.id}/${endpointPath}`, formData)
+      setEditing({ ...editing, [column]: character[column] })
+      load()
+    } catch (e) {
+      alert('이미지 업로드 실패')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const removeColumnImage = async (column, endpointPath) => {
+    if (!editing || editing === 'new') return
+    setUploadingImage(true)
+    try {
+      await api.delete(`/admin/characters/${editing.id}/${endpointPath}`)
+      setEditing({ ...editing, [column]: null })
+      load()
+    } catch (e) {
+      alert('이미지 삭제 실패')
     } finally {
       setUploadingImage(false)
     }
@@ -827,6 +859,114 @@ export default function Characters() {
                 </div>
               )
             })()}
+
+            {/* 1:1 홈 슬라이더 / NSFW 이미지셋 — Safety OFF + adultVerified 유저에게만 NSFW 노출 */}
+            {editing !== 'new' && (
+              <div className="mb-4 pb-4 border-b border-gray-700 space-y-3">
+                <p className="text-xs font-semibold text-gray-300">홈 1:1 슬라이더 / NSFW 이미지셋</p>
+                <p className="text-[10px] text-gray-500 -mt-2">홈 1:1 미디어는 영상(MP4/WebM, 20MB 이하)도 허용 · 클릭 또는 드래그앤드랍</p>
+                {[
+                  {
+                    label: '홈 1:1 미디어 (SFW)',
+                    column: 'homeImageSquare',
+                    endpoint: 'home-image-square',
+                    accept: 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm',
+                    rounded: 'rounded-xl',
+                  },
+                  {
+                    label: '홈 1:1 미디어 (NSFW)',
+                    column: 'homeImageSquareNsfw',
+                    endpoint: 'home-image-square-nsfw',
+                    accept: 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm',
+                    rounded: 'rounded-xl',
+                  },
+                  {
+                    label: '프로필 이미지 (NSFW)',
+                    column: 'profileImageNsfw',
+                    endpoint: 'profile-image-nsfw',
+                    accept: 'image/*',
+                    rounded: 'rounded-full',
+                  },
+                ].map(({ label, column, endpoint, accept, rounded }) => {
+                  const url = editing[column]
+                  const isVideo = url && /\.(mp4|webm)(\?|$)/i.test(url)
+                  const isDragOver = dragOverColumn === column
+                  return (
+                    <div
+                      key={column}
+                      className={`flex items-center gap-4 p-2 -m-2 rounded-lg border-2 border-dashed transition-colors ${
+                        isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-transparent'
+                      }`}
+                      onDragEnter={(e) => {
+                        if (!e.dataTransfer?.types?.includes('Files')) return
+                        e.preventDefault()
+                        setDragOverColumn(column)
+                      }}
+                      onDragOver={(e) => {
+                        if (!e.dataTransfer?.types?.includes('Files')) return
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'copy'
+                      }}
+                      onDragLeave={(e) => {
+                        if (e.currentTarget.contains(e.relatedTarget)) return
+                        setDragOverColumn((c) => (c === column ? null : c))
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverColumn(null)
+                        const file = e.dataTransfer.files?.[0]
+                        if (file) uploadColumnImage(column, endpoint, file)
+                      }}
+                    >
+                      <div className={`w-16 h-16 ${rounded} bg-gray-800 overflow-hidden flex-shrink-0 pointer-events-none`}>
+                        {url ? (
+                          isVideo ? (
+                            <video src={url} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">?</div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <p className="text-xs text-gray-400">{label}{url ? '' : ' (미설정)'}</p>
+                        <div className="flex gap-2">
+                          <label
+                            className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer ${
+                              uploadingImage ? 'bg-gray-700 text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                            }`}
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            {uploadingImage ? '업로드 중...' : (url ? '변경' : '업로드')}
+                            <input
+                              type="file"
+                              accept={accept}
+                              className="hidden"
+                              disabled={uploadingImage}
+                              onChange={(e) => {
+                                if (e.target.files[0]) uploadColumnImage(column, endpoint, e.target.files[0])
+                                e.target.value = ''
+                              }}
+                            />
+                          </label>
+                          {url && (
+                            <button
+                              onClick={() => removeColumnImage(column, endpoint)}
+                              disabled={uploadingImage}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-red-400 hover:text-red-300 border border-gray-700"
+                              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                            >
+                              삭제
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
