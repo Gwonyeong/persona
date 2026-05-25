@@ -56,6 +56,9 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
   const [aiText, setAiText] = useState(null)
   // 서버가 LLM 응답 prefix 에서 추출한 캐릭터 감정. 표정 sprite 배경에 사용. 초기 NEUTRAL.
   const [aiEmotion, setAiEmotion] = useState('NEUTRAL')
+  // 통화 화면에서 대화 기록 노출용. sessionHistoryRef 의 reactive 미러.
+  // 형식: [{role: 'user' | 'assistant', content: string}]
+  const [sessionHistory, setSessionHistory] = useState([])
   const [error, setError] = useState(null)
 
   const streamRef = useRef(null)
@@ -377,9 +380,21 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     }
 
     // 통화 세션 in-memory 히스토리 누적 (simple 모드용). 양쪽 모두 있을 때만.
+    // ref 는 sendTurn 의 동기 클로저용, state 는 UI 렌더용 — 둘 다 동기화 유지.
+    // 누적 후 transcript/aiText 는 비워서 통화 화면 미리보기 박스가 (live + history) 중복 노출되지 않도록 한다.
+    // assistant 항목에 audioUrl 도 포함 — 박스 안에서 재생 버튼으로 재생할 수 있도록.
     if (lastUserText && lastAiText) {
-      sessionHistoryRef.current.push({ role: 'user', content: lastUserText })
-      sessionHistoryRef.current.push({ role: 'assistant', content: lastAiText })
+      const assistantEntry = { role: 'assistant', content: lastAiText }
+      if (lastAudioUrl) assistantEntry.audioUrl = lastAudioUrl
+      const nextHistory = [
+        ...sessionHistoryRef.current,
+        { role: 'user', content: lastUserText },
+        assistantEntry,
+      ]
+      sessionHistoryRef.current = nextHistory
+      setSessionHistory(nextHistory)
+      setTranscript(null)
+      setAiText(null)
     }
 
     onTurnComplete?.({
@@ -499,11 +514,12 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     setPhase('connecting')
     // 세션 시작 시 in-memory 히스토리 초기화. simple 모드는 곧 서버에서 누적분을 받아 덮어쓴다.
     sessionHistoryRef.current = []
+    setSessionHistory([])
     // 질문 확률도 매 통화 세션마다 30%로 리셋.
     questionChanceRef.current = 30
 
     // simple 모드: 이전 통화 세션 히스토리를 서버에서 받아 LLM 컨텍스트로 사용.
-    // 실패해도 빈 세션으로 진행 (block X).
+    // 실패해도 빈 세션으로 진행 (block X). 이전 표정(lastEmotion) 도 함께 받아 sprite 복구.
     if (callMode === 'simple' && conversationId) {
       try {
         const token = useStore.getState().token
@@ -514,6 +530,11 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
           const data = await res.json()
           if (Array.isArray(data?.sessionHistory)) {
             sessionHistoryRef.current = data.sessionHistory
+            setSessionHistory(data.sessionHistory)
+          }
+          // 이전 통화 마지막 CHARACTER 표정 → 통화 화면 sprite 즉시 복구.
+          if (typeof data?.lastEmotion === 'string' && data.lastEmotion) {
+            setAiEmotion(data.lastEmotion)
           }
         }
       } catch (err) {
@@ -608,6 +629,7 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     transcript,
     aiText,
     aiEmotion,
+    sessionHistory,
     error,
     connect,
     disconnect,

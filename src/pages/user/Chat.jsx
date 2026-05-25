@@ -395,8 +395,10 @@ export default function Chat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [showCallChooser, setShowCallChooser] = useState(false)
-  // null 이면 통화 닫힘, 'simple'|'continue' 이면 CallSheet 오픈.
+  // null 이면 통화 닫힘, 'simple' 이면 CallSheet 오픈 (continue 모드는 deprecated).
   const [activeCallMode, setActiveCallMode] = useState(null)
+  // CallSession 메타데이터 — '통화 기록 이어서' 버튼 노출/비노출 + 턴 수 표시용. null=미로드.
+  const [callSessionMeta, setCallSessionMeta] = useState(null)
   const [showLightOnlyModal, setShowLightOnlyModal] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
   // Safety Mode: true=SFW 유지(기본), false=NSFW 허용. 인증된 유저만 OFF 가능.
@@ -579,8 +581,25 @@ export default function Chat() {
     errorTimerRef.current = setTimeout(() => setErrorToast(null), 3000)
   }
 
+  // CallSession 메타 fetch — '통화 기록 이어서' 버튼 노출/턴 수 표시용.
+  // 마운트 + 통화 종료 시 갱신. 메시지 본문은 통화 화면이 useCall 훅에서 직접 노출.
+  const refetchCallSessionMeta = useCallback(async () => {
+    if (!id) return
+    try {
+      const data = await api.get(`/conversations/${id}/call/session`)
+      setCallSessionMeta({
+        turnCount: data?.turnCount || 0,
+        lastCallAt: data?.lastCallAt || null,
+      })
+    } catch (err) {
+      // 404 등은 무시 — 비어있는 세션으로 간주.
+      setCallSessionMeta({ turnCount: 0, lastCallAt: null })
+    }
+  }, [id])
+
   useEffect(() => {
     initialLoadRef.current = true
+    refetchCallSessionMeta()
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
       setConversation(conv)
       setBackgroundImage(conv.backgroundImage || null)
@@ -1914,13 +1933,15 @@ export default function Chat() {
         open={!!activeCallMode}
         onClose={() => {
           setActiveCallMode(null)
-          // 통화 종료 후 freeCallUses 최신화 (서버 진실)
+          // 통화 종료 후 freeCallUses 최신화 (서버 진실) + 통화 기록 메타 갱신
           if (token) api.get('/auth/me').then(({ user: u }) => setUser(u)).catch(() => {})
+          refetchCallSessionMeta()
         }}
         onFreeUsesExhausted={() => {
           setActiveCallMode(null)
           setShowLightOnlyModal(true)
           if (token) api.get('/auth/me').then(({ user: u }) => setUser(u)).catch(() => {})
+          refetchCallSessionMeta()
         }}
         conversationId={conversation?.id}
         character={character}
@@ -1929,7 +1950,7 @@ export default function Chat() {
         characterStatus={characterStatus}
         affinity={conversation?.affinity ?? 0}
         safetyMode={safetyMode}
-        callMode={activeCallMode || 'continue'}
+        callMode={activeCallMode || 'simple'}
       />
 
       {/* Safety Mode OFF 확인 다이얼로그 */}
@@ -2015,7 +2036,7 @@ export default function Chat() {
         </div>
       )}
 
-      {/* 통화 모드 선택 바텀시트 */}
+      {/* 통화 진입 바텀시트 — 통화 기록이 있으면 '이어서' 버튼을 위에 보여줌 */}
       {showCallChooser && (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowCallChooser(false)}>
           <div
@@ -2023,25 +2044,44 @@ export default function Chat() {
             style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-white text-base font-semibold mb-1">{t('chat.call.chooseTitle')}</h3>
-            <p className="text-gray-400 text-xs mb-4">{t('chat.call.chooseDesc')}</p>
+            <h3 className="text-white text-base font-semibold mb-4">통화 시작</h3>
 
             <div className="flex flex-col gap-2.5">
+              {/* 이전 통화 기록이 있으면 '이어서' 버튼 — simple 모드로 열되 connect 가 GET 으로 history 시드 */}
+              {callSessionMeta && callSessionMeta.turnCount > 0 && (
+                <button
+                  onClick={() => { setActiveCallMode('simple'); setShowCallChooser(false) }}
+                  className="text-left bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 rounded-xl px-4 py-3 transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div className="text-indigo-100 font-medium text-sm flex items-center gap-2">
+                    📞 통화 기록 이어서
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-100">
+                      {callSessionMeta.turnCount}턴
+                    </span>
+                  </div>
+                  <div className="text-gray-400 text-xs mt-1">이전 통화 맥락을 그대로 이어 받습니다.</div>
+                </button>
+              )}
+              {/* 새로 통화 — 기존 CallSession 을 wipe 한 뒤 빈 컨텍스트로 시작 */}
               <button
-                onClick={() => { setActiveCallMode('continue'); setShowCallChooser(false) }}
-                className="text-left bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-xl px-4 py-3 transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div className="text-indigo-200 font-medium text-sm">{t('chat.call.modeContinue')}</div>
-                <div className="text-gray-400 text-xs mt-1">{t('chat.call.modeContinueDesc')}</div>
-              </button>
-              <button
-                onClick={() => { setActiveCallMode('simple'); setShowCallChooser(false) }}
+                onClick={async () => {
+                  setShowCallChooser(false)
+                  if (callSessionMeta && callSessionMeta.turnCount > 0) {
+                    try { await api.delete(`/conversations/${id}/call/session`) } catch {}
+                    setCallSessionMeta({ turnCount: 0, lastCallAt: null })
+                  }
+                  setActiveCallMode('simple')
+                }}
                 className="text-left bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                <div className="text-gray-100 font-medium text-sm">{t('chat.call.modeSimple')}</div>
-                <div className="text-gray-400 text-xs mt-1">{t('chat.call.modeSimpleDesc')}</div>
+                <div className="text-gray-100 font-medium text-sm">✨ 새로 통화하기</div>
+                <div className="text-gray-400 text-xs mt-1">
+                  {callSessionMeta && callSessionMeta.turnCount > 0
+                    ? '이전 통화 기록을 지우고 새로 시작합니다.'
+                    : '캐릭터와 가벼운 음성 통화를 시작합니다.'}
+                </div>
               </button>
             </div>
           </div>
