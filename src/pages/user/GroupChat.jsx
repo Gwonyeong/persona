@@ -7,8 +7,8 @@ import useStore from '../../store/useStore'
 import { formatChatTime } from '../../lib/timeFormat'
 import MaskIcon from '../../components/MaskIcon'
 
-// 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js의 GROUP_CHAT_*_COST와 동기
-const GROUP_MESSAGE_MASK_COST = 5
+// 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js의 GROUP_CHAT_COST와 동기
+const GROUP_MESSAGE_MASK_COST = 3
 
 const MIN_MEMBERS = 2
 const MAX_MEMBERS = 4
