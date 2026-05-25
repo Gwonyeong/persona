@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useCall from '../hooks/useCall'
 import useStore from '../store/useStore'
@@ -40,8 +40,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const { t } = useTranslation()
   const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
   const [errorMsg, setErrorMsg] = useState(null)
-  const [inputLevel, setInputLevel] = useState(0)
-  const levelRafRef = useRef(null)
   const isSimple = callMode === 'simple'
 
   const user = useStore((s) => s.user)
@@ -86,26 +84,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     },
   })
 
-  // 입력 레벨 시각화 — open && 마이크 활성일 때만 RAF 루프
-  useEffect(() => {
-    if (!open) return
-    let raf = null
-    let mounted = true
-    const tick = () => {
-      if (!mounted) return
-      // useCall이 노출하는 분석기가 있다면 직접 측정 (간소화: hook에서 getInputLevel을 노출함)
-      // 여기서는 phase 기반 fallback. 정확한 RMS를 원하면 useCall.getInputLevel() 사용.
-      setInputLevel((prev) => {
-        // 자연스러운 페이드: phase에 따라 목표값 결정
-        const target = phase === 'recording' ? 1 : phase === 'listening' ? 0.25 : 0.1
-        return prev + (target - prev) * 0.12
-      })
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => { mounted = false; if (raf) cancelAnimationFrame(raf) }
-  }, [open, phase])
-
   // 열릴 때 자동 연결, 닫힐 때 자동 종료
   useEffect(() => {
     if (open) {
@@ -128,8 +106,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const isConnecting = phase === 'connecting'
   const canSpeak = phase === 'listening' || phase === 'recording'
   const isFatal = errorMsg && (phase === 'idle' || !canSpeak)
-
-  const ringScale = 1 + inputLevel * 0.4
 
   // 캐릭터 표정 sprite — aiEmotion 에 매칭되는 첫 이미지. 없으면 NEUTRAL fallback → profile.
   const emotionSpriteUrl = (() => {
@@ -193,24 +169,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
       </div>
 
       <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-6">
-        <div className="relative flex items-center justify-center">
-          <div
-            className="absolute rounded-full bg-indigo-500/20 transition-transform duration-150"
-            style={{ width: 220, height: 220, transform: `scale(${ringScale})` }}
-          />
-          <div
-            className="absolute rounded-full bg-indigo-500/30 transition-transform duration-150"
-            style={{ width: 180, height: 180, transform: `scale(${1 + inputLevel * 0.25})` }}
-          />
-          <div className="relative w-36 h-36 rounded-full overflow-hidden border-2 border-white/30 bg-gray-800 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-            {profileUrl ? (
-              <img src={profileUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500">?</div>
-            )}
-          </div>
-        </div>
-
         <div className="text-center">
           <p className="text-xl font-semibold text-white">{character?.name}</p>
           {!isSimple && characterStatus?.isExcited && (
