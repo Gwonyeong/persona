@@ -202,10 +202,14 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     // === streaming audio queue (audio-chunk 이벤트용) ===
     // 서버가 문장 단위 mp3 chunk 를 base64 로 보내면 도착 즉시 큐에 넣고 순차 재생.
     // 첫 chunk 도착 시 phase='speaking' 으로 전환 → 텍스트 도착 전이라도 UI 갱신.
-    // SSE 스트림 종료 후 audioQueueChain 을 await 해서 끝까지 재생되도록 보장.
-    let audioQueueChain = Promise.resolve()
+    // chunk 사이에 CHUNK_GAP_MS 만큼 짧은 호흡 — 사람이 말하는 자연스러운 띄어쓰기.
+    // 단, 마지막 chunk(stream 종료 + queue 빔) 뒤에는 지연 없이 즉시 listening 복귀.
+    const CHUNK_GAP_MS = 1000
+    const chunkQueue = []        // 대기 중인 Blob URL 들 (FIFO)
     let firstAudioStarted = false
     let aborted = false
+    let streamEnded = false      // SSE 스트림이 닫혔는지 — "마지막 chunk" 판정에 사용
+    let processingPromise = null // 현재 동작 중인 큐 처리 루프 (null 이면 idle)
     const blobUrlsToRevoke = []
 
     const base64ToBlobUrl = (base64) => {
@@ -233,17 +237,37 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       audio.play().catch(() => resolve())
     })
 
-    const enqueueAudioChunk = (base64) => {
-      if (aborted || !base64) return
-      const url = base64ToBlobUrl(base64)
-      audioQueueChain = audioQueueChain.then(() => {
+    const processQueueLoop = async () => {
+      while (true) {
         if (aborted) return
+        if (chunkQueue.length === 0) {
+          // 큐가 비었는데 스트림이 끝났으면 완전 종료. 아니면 다음 chunk 를 짧게 기다림.
+          if (streamEnded) return
+          await new Promise((r) => setTimeout(r, 50))
+          continue
+        }
+        const url = chunkQueue.shift()
         if (!firstAudioStarted) {
           firstAudioStarted = true
           setPhase('speaking')
         }
-        return playOne(url)
-      })
+        await playOne(url)
+        if (aborted) return
+        // 마지막 chunk(stream 종료 + queue 빔)면 지연 없이 종료 → listening 복귀가 빨라짐.
+        if (chunkQueue.length === 0 && streamEnded) return
+        await new Promise((r) => setTimeout(r, CHUNK_GAP_MS))
+      }
+    }
+
+    const startProcessing = () => {
+      if (processingPromise) return
+      processingPromise = processQueueLoop().finally(() => { processingPromise = null })
+    }
+
+    const enqueueAudioChunk = (base64) => {
+      if (aborted || !base64) return
+      chunkQueue.push(base64ToBlobUrl(base64))
+      startProcessing()
     }
 
     const handleEvent = (type, payload) => {
@@ -322,13 +346,14 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     abortRef.current = null
 
     // 오디오 재생 완료까지 대기 후 listening 복귀.
-    // - streaming 경로: audio-chunk 들이 audioQueueChain 에 순차 enqueue 되어 이미 재생 중.
-    //   여기서는 마지막 chunk 까지 끝나길 await.
+    // - streaming 경로: 큐 루프가 마지막 chunk 까지 재생 후 종료. streamEnded 신호를 켜고 await.
     // - 비-스트리밍 폴백(흥분 모드 등): chunk 없이 단일 audio URL 만 옴 → 기존 playAudio 로 재생.
+    streamEnded = true
+    startProcessing() // 루프가 idle 이면 streamEnded 를 보고 즉시 정리되도록 1회 더 트리거
     if (!aborted) {
       try {
-        if (firstAudioStarted) {
-          await audioQueueChain
+        if (firstAudioStarted || chunkQueue.length > 0) {
+          if (processingPromise) await processingPromise
         } else if (lastAudioUrl) {
           await playAudio(lastAudioUrl)
         }
