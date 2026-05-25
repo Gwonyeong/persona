@@ -55,6 +55,8 @@ export default function GroupChat() {
   // 스트리밍 중인 버블들 — 응답이 done되면 비워짐
   // 키: `${turnIdx}_${bubbleIdx}` → { turnIdx, characterId, bubbleIdx, role, content, complete }
   const [streamingBubbles, setStreamingBubbles] = useState([])
+  const [presenceModeToast, setPresenceModeToast] = useState(null) // 'PHONE_AUTO' | 'PHONE' | 'IN_PERSON' | null
+  const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -116,6 +118,22 @@ export default function GroupChat() {
     return (groupChat?.members || []).filter((m) => m.isActive).length
   }, [groupChat?.members])
 
+  const withUserCount = useMemo(() => {
+    return (groupChat?.members || []).filter((m) => m.isWithUser).length
+  }, [groupChat?.members])
+
+  const presenceMode = groupChat?.presenceMode || 'PHONE'
+  const isInPerson = presenceMode === 'IN_PERSON'
+  const safetyMode = groupChat?.safetyMode !== false // 기본 SFW
+  const toggleDisabled = withUserCount === 0 && !isInPerson // IN_PERSON으로 전환할 멤버가 없음
+
+  // 채팅에 참여중인 캐릭터인지 판정 — 색상 규칙의 핵심
+  function isParticipating(m) {
+    if (!m.isActive) return false
+    if (isInPerson) return m.isWithUser
+    return true
+  }
+
   const headerTitle = useMemo(() => {
     if (!groupChat) return ''
     if (groupChat.title) return groupChat.title
@@ -144,6 +162,7 @@ export default function GroupChat() {
       let receivedMessages = null
       let memberUpdates = null
       let receivedUserLocation = null
+      let receivedPresenceModeChanged = null
 
       // 스트리밍 버블 누적 — Map 형태로 turn/bubble 인덱스별 최신 상태 유지
       const bubbleMap = new Map() // key=`${turnIdx}_${bubbleIdx}` → bubble obj
@@ -166,6 +185,7 @@ export default function GroupChat() {
           receivedMessages = data.responseMessages
           memberUpdates = data.memberUpdates
           receivedUserLocation = data.userLocation || null
+          receivedPresenceModeChanged = data.presenceModeChanged || null
         } else if (eventType === 'error') {
           throw new Error(data.error || 'Stream error')
         }
@@ -191,9 +211,11 @@ export default function GroupChat() {
             messages: [...(prev.messages || []), ...receivedMessages],
             members: updatedMembers,
             ...(receivedUserLocation ? { userLocation: receivedUserLocation } : {}),
+            ...(receivedPresenceModeChanged ? { presenceMode: receivedPresenceModeChanged } : {}),
           }
         })
         setStreamingBubbles([])
+        if (receivedPresenceModeChanged === 'PHONE') setPresenceModeToast('PHONE_AUTO')
       }
 
       // 마스크 잔액 새로고침
@@ -219,6 +241,42 @@ export default function GroupChat() {
       setSending(false)
     }
   }
+
+  async function setSafetyMode(enabled) {
+    if (!groupChat) return
+    const prev = groupChat.safetyMode !== false
+    setGroupChat((p) => p ? { ...p, safetyMode: enabled } : p)
+    try {
+      await api.patch(`/group-chats/${id}/safety-mode`, { enabled })
+    } catch (err) {
+      setGroupChat((p) => p ? { ...p, safetyMode: prev } : p)
+      if (err?.data?.error === 'ADULT_VERIFICATION_REQUIRED') navigate('/adult-verify')
+    }
+  }
+
+  async function togglePresenceMode() {
+    if (!groupChat || toggleDisabled) return
+    const nextMode = isInPerson ? 'PHONE' : 'IN_PERSON'
+    const prevMode = presenceMode
+    // 낙관적 업데이트
+    setGroupChat((prev) => prev ? { ...prev, presenceMode: nextMode } : prev)
+    setPresenceModeToast(nextMode)
+    try {
+      const { groupChat: updated } = await api.patch(`/group-chats/${id}/presence-mode`, { mode: nextMode })
+      setGroupChat(updated)
+    } catch (err) {
+      console.error(err)
+      setGroupChat((prev) => prev ? { ...prev, presenceMode: prevMode } : prev)
+      setPresenceModeToast(null)
+    }
+  }
+
+  // 토스트 자동 닫힘 (3초)
+  useEffect(() => {
+    if (!presenceModeToast) return
+    const t = setTimeout(() => setPresenceModeToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [presenceModeToast])
 
   async function toggleMember(characterId, nextActive) {
     if (!groupChat) return
@@ -326,88 +384,147 @@ export default function GroupChat() {
           {t('groupChat.yourLocation')}: <span className="text-gray-100 font-medium">{groupChat.userLocation || '집'}</span>
         </div>
 
-        {/* 함께 있음 */}
-        <div>
-          <div className="text-[10px] text-emerald-400 mb-1 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            {t('groupChat.withYou')}
-          </div>
-          <div className="flex gap-2 overflow-x-auto">
-            {(groupChat.members || []).filter((m) => m.isWithUser).length === 0 ? (
-              <span className="text-[10px] text-gray-600">-</span>
-            ) : (
-              (groupChat.members || []).filter((m) => m.isWithUser).map((m) => {
-                const avatar = getNeutralImage(m.character)
-                const mood = m.characterStatus?.mood
-                const emoji = m.characterStatus?.emoji
-                const excited = !!m.characterStatus?.isExcited
-                return (
-                  <div
-                    key={m.characterId}
-                    className={`relative flex-shrink-0 flex items-center gap-2 px-2 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 ${m.isActive ? '' : 'opacity-40'} ${excited ? 'ring-2 ring-pink-500/70 animate-pulse' : ''}`}
-                    title={excited ? t('groupChat.excitedHint', { defaultValue: '흥분 상태' }) : ''}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                      {avatar && <img src={avatar} alt="" className={`w-full h-full object-cover ${m.isActive ? '' : 'grayscale'}`} />}
-                    </div>
-                    <div className="min-w-0 max-w-[110px]">
-                      <div className="text-[11px] text-emerald-100 leading-tight truncate flex items-center gap-0.5">
-                        {m.character?.name}
-                        {excited && <span className="text-pink-400">♥</span>}
+        {[
+          { key: 'withYou', members: (groupChat.members || []).filter((m) => m.isWithUser), label: t('groupChat.withYou'), dotClass: 'bg-emerald-400', headerClass: 'text-emerald-400' },
+          { key: 'elsewhere', members: (groupChat.members || []).filter((m) => !m.isWithUser), label: t('groupChat.elsewhere'), dotClass: 'bg-gray-500', headerClass: 'text-gray-500' },
+        ].map((section) => (
+          <div key={section.key}>
+            <div className={`text-[10px] mb-1 flex items-center gap-1 ${section.headerClass}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${section.dotClass}`} />
+              {section.label}
+            </div>
+            <div className="flex gap-2 overflow-x-auto">
+              {section.members.length === 0 ? (
+                <span className="text-[10px] text-gray-600">-</span>
+              ) : (
+                section.members.map((m) => {
+                  const avatar = getNeutralImage(m.character)
+                  const mood = m.characterStatus?.mood
+                  const emoji = m.characterStatus?.emoji
+                  const excited = !!m.characterStatus?.isExcited
+                  const participating = isParticipating(m)
+                  // 색상: 참여중(초록) > 비참여(검정/제외) > 비활성(회색)
+                  const chipClass = !m.isActive
+                    ? 'bg-gray-900/70 border-gray-800 opacity-40'
+                    : participating
+                      ? 'bg-emerald-500/10 border-emerald-500/30'
+                      : 'bg-black/80 border-gray-800'
+                  const nameClass = !m.isActive
+                    ? 'text-gray-400'
+                    : participating
+                      ? 'text-emerald-100'
+                      : 'text-gray-500'
+                  const moodClass = !m.isActive
+                    ? 'text-gray-500'
+                    : participating
+                      ? 'text-emerald-200/70'
+                      : 'text-gray-600'
+                  return (
+                    <div
+                      key={m.characterId}
+                      className={`relative flex-shrink-0 flex items-center gap-2 px-2 py-1.5 rounded-full border ${chipClass} ${excited ? 'ring-2 ring-pink-500/70 animate-pulse' : ''}`}
+                      title={excited ? t('groupChat.excitedHint', { defaultValue: '흥분 상태' }) : ''}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
+                        {avatar && <img src={avatar} alt="" className={`w-full h-full object-cover ${participating && m.isActive ? '' : 'grayscale'}`} />}
                       </div>
-                      <div className="text-[10px] text-emerald-200/70 leading-tight truncate">
-                        {emoji ? <span className="mr-0.5">{emoji}</span> : null}
-                        {mood || '-'}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
-        {/* 다른 장소 */}
-        <div>
-          <div className="text-[10px] text-gray-500 mb-1 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-500" />
-            {t('groupChat.elsewhere')}
-          </div>
-          <div className="flex gap-2 overflow-x-auto">
-            {(groupChat.members || []).filter((m) => !m.isWithUser).length === 0 ? (
-              <span className="text-[10px] text-gray-600">-</span>
-            ) : (
-              (groupChat.members || []).filter((m) => !m.isWithUser).map((m) => {
-                const avatar = getNeutralImage(m.character)
-                const mood = m.characterStatus?.mood
-                const emoji = m.characterStatus?.emoji
-                const excited = !!m.characterStatus?.isExcited
-                return (
-                  <div
-                    key={m.characterId}
-                    className={`relative flex-shrink-0 flex items-center gap-2 px-2 py-1.5 rounded-full bg-gray-900/70 border border-gray-800 ${m.isActive ? '' : 'opacity-40'} ${excited ? 'ring-2 ring-pink-500/70 animate-pulse' : ''}`}
-                    title={excited ? t('groupChat.excitedHint', { defaultValue: '흥분 상태' }) : ''}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                      {avatar && <img src={avatar} alt="" className={`w-full h-full object-cover ${m.isActive ? '' : 'grayscale'}`} />}
-                    </div>
-                    <div className="min-w-0 max-w-[110px]">
-                      <div className="text-[11px] text-gray-300 leading-tight truncate flex items-center gap-0.5">
-                        {m.character?.name}
-                        {excited && <span className="text-pink-400">♥</span>}
-                      </div>
-                      <div className="text-[10px] text-gray-400 leading-tight truncate">
-                        {emoji ? <span className="mr-0.5">{emoji}</span> : null}
-                        {mood || '-'}
+                      <div className="min-w-0 max-w-[110px]">
+                        <div className={`text-[11px] leading-tight truncate flex items-center gap-0.5 ${nameClass}`}>
+                          {m.character?.name}
+                          {excited && <span className="text-pink-400">♥</span>}
+                        </div>
+                        <div className={`text-[10px] leading-tight truncate ${moodClass}`}>
+                          {emoji ? <span className="mr-0.5">{emoji}</span> : null}
+                          {mood || '-'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })
-            )}
+                  )
+                })
+              )}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
+
+      {/* 모드 토글 행 — presence 영역 구분선 바깥. 좌측: Safety, 우측: presence 토글 */}
+      <div className="flex justify-between items-center px-3 py-2 flex-shrink-0 gap-2">
+        <button
+          onClick={() => {
+            if (!user?.adultVerified) {
+              navigate('/adult-verify')
+              return
+            }
+            if (safetyMode) {
+              setSafetyConfirmVisible(true)
+            } else {
+              setSafetyMode(true)
+            }
+          }}
+          className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+            !user?.adultVerified
+              ? 'text-gray-500 hover:text-gray-300 bg-gray-800/60'
+              : safetyMode
+                ? 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/20'
+                : 'text-pink-300 bg-pink-500/15 hover:bg-pink-500/20'
+          }`}
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          title={!user?.adultVerified ? t('safetyMode.verifyRequired') : safetyMode ? t('safetyMode.tooltipOn') : t('safetyMode.tooltipOff')}
+        >
+          {!user?.adultVerified ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          ) : (
+            <span className="w-2 h-2 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
+          )}
+          <span>{safetyMode ? 'Safety ON' : 'Safety OFF'}</span>
+        </button>
+
+        <button
+          onClick={togglePresenceMode}
+          disabled={toggleDisabled}
+          title={
+            toggleDisabled
+              ? t('groupChat.presenceMode.disabledHint')
+              : isInPerson
+                ? t('groupChat.presenceMode.switchToPhoneHint')
+                : t('groupChat.presenceMode.switchToInPersonHint')
+          }
+          className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${
+            toggleDisabled
+              ? 'bg-gray-900/60 border border-gray-800 opacity-50 cursor-not-allowed text-gray-500'
+              : isInPerson
+                ? 'bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-200'
+                : 'bg-indigo-500/20 border border-indigo-500/40 hover:bg-indigo-500/30 text-indigo-200'
+          }`}
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          {isInPerson ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2.5" />
+              <line x1="12" y1="18" x2="12" y2="18" />
+            </svg>
+          )}
+        </button>
+      </div>
+
+      {/* 모드 전환 토스트 — 자동 폴백/수동 전환 공통 */}
+      {presenceModeToast && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-[120px] z-40 px-3 py-2 rounded-full bg-gray-900/95 border border-gray-700 text-xs text-white shadow-lg whitespace-nowrap pointer-events-none animate-fade-in">
+          {presenceModeToast === 'PHONE_AUTO'
+            ? t('groupChat.presenceMode.autoFallbackToast')
+            : presenceModeToast === 'IN_PERSON'
+              ? t('groupChat.presenceMode.switchedToInPerson')
+              : t('groupChat.presenceMode.switchedToPhone')}
+        </div>
+      )}
 
       {/* 메시지 영역 */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
@@ -560,6 +677,16 @@ export default function GroupChat() {
             </div>
           )
         })}
+
+        {/* 텍스트 스트림 완료 후 done 이벤트 대기 — 마지막 버블 아래 작은 스피너 (1:1 채팅과 동일 패턴) */}
+        {sending && streamingBubbles.length > 0 && streamingBubbles.every((b) => b.complete) && (
+          <div className="flex justify-start mt-1.5 ml-10 items-center gap-1.5 text-gray-500">
+            <svg width="14" height="14" viewBox="0 0 24 24" className="animate-spin">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" fill="none" strokeDasharray="42 100" strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px]">{t('groupChat.finalizing', { defaultValue: '응답 마무리 중...' })}</span>
+          </div>
+        )}
 
         <div ref={messagesEndRef} />
       </div>
@@ -721,6 +848,46 @@ export default function GroupChat() {
                     </button>
                   )
                 })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Safety OFF 확인 모달 */}
+      {safetyConfirmVisible && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 px-6" onClick={() => setSafetyConfirmVisible(false)}>
+          <div
+            className="bg-gray-900 border border-pink-700/40 rounded-2xl p-5 w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-pink-600/20 border border-pink-500/40 flex items-center justify-center mb-3">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-300 whitespace-pre-line mb-5">{t('safetyMode.confirmOff')}</p>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => setSafetyConfirmVisible(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium rounded-xl transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('common.cancel', { defaultValue: '취소' })}
+                </button>
+                <button
+                  onClick={() => {
+                    setSafetyConfirmVisible(false)
+                    setSafetyMode(false)
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-pink-600 hover:bg-pink-500 text-white text-sm font-semibold rounded-xl transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  Safety OFF
+                </button>
+              </div>
             </div>
           </div>
         </div>

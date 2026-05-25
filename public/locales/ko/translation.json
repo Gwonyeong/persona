@@ -797,6 +797,15 @@
     "withYou": "당신과 함께 있음",
     "elsewhere": "다른 장소에 있음",
     "actionButton": "행동 묘사 (괄호)",
-    "excitedHint": "흥분 상태"
+    "excitedHint": "흥분 상태",
+    "finalizing": "응답 마무리 중...",
+    "presenceMode": {
+      "disabledHint": "함께 있는 캐릭터가 없어요",
+      "switchToInPersonHint": "함께 있는 캐릭터끼리만 대화하기",
+      "switchToPhoneHint": "다른 장소 캐릭터와도 메신저로 대화하기",
+      "switchedToInPerson": "🧑 같이 있는 친구들과만 대화해요",
+      "switchedToPhone": "📱 메신저 모드로 전환했어요",
+      "autoFallbackToast": "📱 함께 있는 친구가 없어서 메신저 모드로 전환했어요"
+    }
   }
 }
