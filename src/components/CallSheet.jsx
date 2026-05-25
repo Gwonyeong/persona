@@ -36,7 +36,7 @@ function PhaseLabel({ phase, mode, t }) {
   }
 }
 
-export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversationId, character, profileUrl, characterStatus, affinity = 0, callMode = 'continue' }) {
+export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversationId, character, currentStyle, profileUrl, characterStatus, affinity = 0, safetyMode = true, callMode = 'continue' }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
   const [errorMsg, setErrorMsg] = useState(null)
@@ -55,6 +55,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     phase,
     transcript,
     aiText,
+    aiEmotion,
     error,
     connect,
     disconnect,
@@ -130,28 +131,68 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
 
   const ringScale = 1 + inputLevel * 0.4
 
+  // 캐릭터 표정 sprite — aiEmotion 에 매칭되는 첫 이미지. 없으면 NEUTRAL fallback → profile.
+  const emotionSpriteUrl = (() => {
+    const images = currentStyle?.images || []
+    const matched = images.find((img) => img.emotion === aiEmotion)
+    if (matched?.url) return matched.url
+    const neutral = images.find((img) => img.emotion === 'NEUTRAL')
+    return neutral?.url || profileUrl || null
+  })()
+
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-gray-950"
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">
+      {/* 캐릭터 표정 배경 — emotion 별 sprite. 가독성 위해 위에 어두운 그라데이션 오버레이. */}
+      {emotionSpriteUrl && (
+        <>
+          <div
+            className="absolute inset-0 pointer-events-none transition-[background-image] duration-300"
+            style={{
+              backgroundImage: `url(${emotionSpriteUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'saturate(0.9)',
+            }}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(2,6,23,0.55) 0%, rgba(2,6,23,0.25) 35%, rgba(2,6,23,0.55) 70%, rgba(2,6,23,0.85) 100%)',
+            }}
+            aria-hidden="true"
+          />
+        </>
+      )}
+
+      <div className="relative flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-gray-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
             {t('chat.call.title', { name: character?.name || '' })}
           </span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSimple ? 'bg-gray-700/60 text-gray-300' : 'bg-indigo-500/30 text-indigo-200'}`}>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full ${isSimple ? 'bg-gray-700/70 text-gray-200' : 'bg-indigo-500/40 text-indigo-100'}`}>
             {isSimple ? t('chat.call.modeSimple') : t('chat.call.modeContinue')}
+          </span>
+          {/* Safety mode 상태 표시 — 1:1 채팅의 토글과 동기화. 읽기 전용 (토글은 채팅 페이지에서). */}
+          <span
+            className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${safetyMode ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200' : 'bg-pink-500/15 border-pink-500/40 text-pink-200'}`}
+            title={safetyMode ? t('safetyMode.tooltipOn') : t('safetyMode.tooltipOff')}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
+            {safetyMode ? 'Safety ON' : 'Safety OFF'}
           </span>
         </div>
         <button
           onClick={() => { disconnect(); onClose?.() }}
-          className="text-gray-400 hover:text-white text-xs"
+          className="text-gray-100 hover:text-white text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
           style={BUTTON_RESET}
         >
           ✕
         </button>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
+      <div className="relative flex-1 flex flex-col items-center justify-center px-6 gap-6">
         <div className="relative flex items-center justify-center">
           <div
             className="absolute rounded-full bg-indigo-500/20 transition-transform duration-150"
@@ -161,7 +202,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
             className="absolute rounded-full bg-indigo-500/30 transition-transform duration-150"
             style={{ width: 180, height: 180, transform: `scale(${1 + inputLevel * 0.25})` }}
           />
-          <div className="relative w-36 h-36 rounded-full overflow-hidden border-2 border-white/20 bg-gray-800">
+          <div className="relative w-36 h-36 rounded-full overflow-hidden border-2 border-white/30 bg-gray-800 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
             {profileUrl ? (
               <img src={profileUrl} alt="" className="w-full h-full object-cover" />
             ) : (
@@ -228,7 +269,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
         </div>
       </div>
 
-      <div className="px-6 pb-6 flex flex-col items-center gap-4">
+      <div className="relative px-6 pb-6 flex flex-col items-center gap-4">
         {/* 모드 토글 */}
         <div className="flex bg-white/10 rounded-full p-1 text-xs">
           <button
