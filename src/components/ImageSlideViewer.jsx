@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 
 /**
  * 슬라이드형 미디어 뷰어 (전체화면 오버레이)
@@ -23,6 +23,26 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
   const [fillMode, setFillMode] = useState(false) // false=contain(여백), true=cover(꽉 채움)
   const containerRef = useRef(null)
   const videoRefs = useRef({})
+  // 컨테이너 너비를 첫 렌더부터 정확히 — #root max-width:480px에 맞춰 추정값으로 초기화.
+  // 첫 paint부터 올바른 trackOffset이 적용돼 "1번 → 클릭한 번호"로 슬라이드 되던 문제 차단.
+  const [containerWidth, setContainerWidth] = useState(() => {
+    if (typeof window === 'undefined') return 480
+    return Math.min(window.innerWidth, 480)
+  })
+
+  useLayoutEffect(() => {
+    // 추정값이 정확하면 setState bail-out으로 재렌더 없음. 다르면 즉시 정정(paint 전 동기 처리).
+    if (containerRef.current) {
+      const actual = containerRef.current.offsetWidth
+      if (actual && actual !== containerWidth) setContainerWidth(actual)
+    }
+    const handleResize = () => {
+      if (containerRef.current) setContainerWidth(containerRef.current.offsetWidth)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     setCurrent(initialIndex)
@@ -102,8 +122,7 @@ export default function ImageSlideViewer({ images, initialIndex = 0, title, desc
   const img = images[current]
   if (!img) return null
 
-  // 컨테이너 너비 기반 슬라이드 오프셋 계산
-  const containerWidth = containerRef.current?.offsetWidth || 0
+  // 컨테이너 너비 기반 슬라이드 오프셋 계산 (state 기반 — useLayoutEffect로 paint 전에 측정됨)
   const trackOffset = -current * containerWidth + offsetX
 
   return (

@@ -33,6 +33,9 @@ import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import useBackHandler from '../../hooks/useBackHandler'
 import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib/review'
 
+const NORMAL_EMOTIONS = ['NEUTRAL', 'HAPPY', 'ANGRY', 'SAD', 'SHY', 'WORRIED']
+const AROUSED_EMOTIONS = ['AROUSED_TEASE', 'AROUSED_TOPLESS', 'AROUSED_NUDE', 'AROUSED_FOREPLAY', 'AROUSED_INSERT', 'AROUSED_INSERT_ALT', 'AROUSED_CLIMAX', 'AROUSED_AFTERGLOW']
+
 export default function CharacterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -54,6 +57,9 @@ export default function CharacterDetail() {
   const [giftUnlocks, setGiftUnlocks] = useState([])
   const [giftViewer, setGiftViewer] = useState(null) // { gift, index }
   const [gallerySlideViewer, setGallerySlideViewer] = useState(null)
+  const [expressionViewer, setExpressionViewer] = useState(null) // { images, initialIndex }
+  const [playingVoice, setPlayingVoice] = useState(null) // null | 'normal' | 'aroused'
+  const voiceAudioRef = useRef(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -97,6 +103,7 @@ export default function CharacterDetail() {
   })
   useBackHandler(showResetModal, () => setShowResetModal(false))
   useBackHandler(!!gallerySlideViewer, () => setGallerySlideViewer(null))
+  useBackHandler(!!expressionViewer, () => setExpressionViewer(null))
   useBackHandler(!!giftViewer, () => setGiftViewer(null))
   useBackHandler(!!unlockTarget, () => setUnlockTarget(null))
   useBackHandler(showReport, () => setShowReport(false))
@@ -213,6 +220,55 @@ export default function CharacterDetail() {
     { page: 'characterTour', key: 'reset', target: '[data-onboarding-target="restart"]', caption: t('characterTour.reset') },
   ], [user?.name, t])
 
+  // 음성 샘플 재생/정지 토글. 다른 샘플로 전환 시 기존 audio 정리. 언마운트/캐릭터 전환 시도 정리.
+  const toggleVoiceSample = (kind, audioUrl) => {
+    if (!audioUrl) return
+    if (playingVoice === kind && voiceAudioRef.current) {
+      voiceAudioRef.current.pause()
+      voiceAudioRef.current = null
+      setPlayingVoice(null)
+      return
+    }
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.pause()
+      voiceAudioRef.current = null
+    }
+    const audio = new Audio(audioUrl)
+    voiceAudioRef.current = audio
+    audio.onended = () => {
+      if (voiceAudioRef.current === audio) voiceAudioRef.current = null
+      setPlayingVoice((prev) => (prev === kind ? null : prev))
+    }
+    audio.play().catch(() => {
+      if (voiceAudioRef.current === audio) voiceAudioRef.current = null
+      setPlayingVoice((prev) => (prev === kind ? null : prev))
+    })
+    setPlayingVoice(kind)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (voiceAudioRef.current) {
+        voiceAudioRef.current.pause()
+        voiceAudioRef.current = null
+      }
+    }
+  }, [id])
+
+  // 표정 슬라이드 — 감정마다 랜덤 1장씩, character.id 바뀔 때만 재셔플
+  const expressionRows = useMemo(() => {
+    const images = character?.styles?.[0]?.images
+    if (!images?.length) return { normal: [], aroused: [] }
+    const pick = (emotion) => {
+      const matching = images.filter((img) => img.emotion === emotion)
+      return matching.length ? matching[Math.floor(Math.random() * matching.length)] : null
+    }
+    return {
+      normal: NORMAL_EMOTIONS.map(pick).filter(Boolean),
+      aroused: AROUSED_EMOTIONS.map(pick).filter(Boolean),
+    }
+  }, [character?.id])
+
   if (!character) {
     return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">{t('common.loading')}</div>
   }
@@ -238,139 +294,244 @@ export default function CharacterDetail() {
         <meta name="description" content={character.description} />
       </Helmet>
 
-      {/* 헤더 */}
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 flex-shrink-0">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-gray-400 hover:text-white"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <div className="flex items-center gap-1.5 flex-1">
-          <span className="font-bold text-base">{character.name}</span>
-          {onlineStatus === 'free' && (
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-          )}
-        </div>
-        <button
-          onClick={() => setShowReport(true)}
-          className="text-gray-500 hover:text-red-400 transition-colors"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          title={t('report.title')}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-        </button>
-      </header>
-
       {/* 스크롤 영역 */}
       <div className="flex-1 overflow-auto">
-        {/* 프로필 섹션 */}
-        <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center gap-6">
-            {/* 프로필 이미지 (스토리가 있으면 그라데이션 링) */}
-            <button
-              onClick={() => { if (hasStories) { setStoryIndex(0); setShowStory(true) } }}
-              className="flex-shrink-0"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <div className={`w-[90px] h-[90px] rounded-full p-[3px] ${hasStories ? (storyViewed ? 'bg-gray-600' : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400') : ''}`}>
-                <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
-                  <div className="w-full h-full rounded-full bg-gray-800 overflow-hidden">
-                    {profileUrl ? (
-                      <img src={profileUrl} alt={character.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl text-gray-600">?</div>
-                    )}
-                  </div>
+        {/* 히어로 이미지 — 풀 너비 + 하단 그라데이션 딤 + 플로팅 버튼 */}
+        <div className="relative">
+          <button
+            onClick={() => { if (hasStories) { setStoryIndex(0); setShowStory(true) } }}
+            className="relative block w-full aspect-[4/5] overflow-hidden bg-gray-900"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {profileUrl ? (
+              <img src={profileUrl} alt={character.name} className="w-full h-full object-cover" draggable={false} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-6xl text-gray-700">?</div>
+            )}
+            {/* 하단 그라데이션 딤드 — 페이지 bg(gray-950)와 일치해서 경계 안 보이게 */}
+            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-gray-950 via-gray-950/70 to-transparent pointer-events-none" />
+            {/* 하단 오버레이 — 스토리 뱃지 + 이름 + 소개 */}
+            <div className="absolute inset-x-0 bottom-0 px-4 pb-5 pt-14 text-left pointer-events-none">
+              {hasStories && (
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2 ${storyViewed ? 'bg-gray-700/80' : 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400'}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                  <span className="text-[10px] text-white font-semibold">스토리</span>
                 </div>
+              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-bold text-xl text-white">{character.name}</p>
+                {onlineStatus === 'free' && (
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                )}
+                {(existingConv?.affinity ?? 0) >= 20 && (
+                  <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/30 text-indigo-200 rounded-full">
+                    {isFollowing ? t('character.mutualFollow') : t('character.followsYou')}
+                  </span>
+                )}
               </div>
-            </button>
-
-            {/* 통계 */}
-            <div className="flex flex-1 justify-around">
-              <div className="text-center">
-                <p className="text-lg font-bold">{feedPosts.length}</p>
-                <p className="text-xs text-gray-400">{t('character.posts')}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold">{(character.followerCount || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-400">{t('character.followers')}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold">{(character.followingCount || 0).toLocaleString()}</p>
-                <p className="text-xs text-gray-400">{t('character.following')}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 이름 + 소개 */}
-          <div className="mt-3">
-            <div className="flex items-center gap-2">
-              <p className="font-bold text-sm">{character.name}</p>
-              {(existingConv?.affinity ?? 0) >= 20 && (
-                <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/20 text-indigo-400 rounded-full">
-                  {isFollowing ? t('character.mutualFollow') : t('character.followsYou')}
-                </span>
+              {character.concept && (
+                <p className="text-sm text-gray-300 mt-1">{character.concept}</p>
+              )}
+              {character.description && (
+                <p className="text-sm text-gray-200 mt-1.5 leading-relaxed line-clamp-3">{character.description}</p>
               )}
             </div>
-            {character.concept && (
-              <p className="text-sm text-gray-400 mt-0.5">{character.concept}</p>
-            )}
-            {character.description && (
-              <p className="text-sm text-gray-300 mt-1 leading-relaxed">{character.description}</p>
-            )}
-            {character.tags?.length > 0 && (
-              <div className="flex gap-1.5 mt-2 flex-wrap">
-                {character.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0])).map((tag) => {
-                  const info = getTagInfo(tag, tagCategories)
-                  return (
-                    <span key={tag} className="inline-flex items-center gap-1 text-xs text-indigo-400">
-                      {info.flag && (
-                        <img
-                          src={`https://flagcdn.com/w40/${info.flag}.png`}
-                          alt={info.label}
-                          className="w-4 h-4 rounded-full object-cover"
-                        />
-                      )}
-                      #{info.label}
-                    </span>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+          </button>
 
-          {/* 액션 버튼 */}
-          <div className="mt-4 flex flex-col gap-2">
-            <div className="flex gap-2">
-              <button
-                onClick={toggleFollow}
-                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  isFollowing
-                    ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
-                    : 'bg-gray-800 text-white border border-gray-700 hover:bg-gray-700'
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                data-onboarding-target="follow"
-              >
-                {isFollowing ? t('character.unfollow') : t('character.follow')}
-              </button>
-              <button
-                onClick={existingConv ? resumeChat : startChat}
-                disabled={starting}
-                className="flex-1 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                data-onboarding-target="message"
-              >
-                {starting ? t('character.starting') : t('character.sendMessage')}
-              </button>
+          {/* 뒤로가기 (좌상단) */}
+          <button
+            onClick={() => navigate(-1)}
+            className="absolute left-3 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+            style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label="뒤로가기"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          {/* 신고 (우상단) */}
+          <button
+            onClick={() => setShowReport(true)}
+            className="absolute right-3 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+            style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label={t('report.title')}
+            title={t('report.title')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </button>
+        </div>
+
+        {/* 프로필 섹션 */}
+        <div className="px-4 pt-2 pb-2">
+          {/* 태그 */}
+          {character.tags?.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {character.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0])).map((tag) => {
+                const info = getTagInfo(tag, tagCategories)
+                return (
+                  <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-500/15 text-xs text-indigo-300">
+                    {info.flag && (
+                      <img
+                        src={`https://flagcdn.com/w40/${info.flag}.png`}
+                        alt={info.label}
+                        className="w-4 h-4 rounded-full object-cover"
+                      />
+                    )}
+                    #{info.label}
+                  </span>
+                )
+              })}
             </div>
+          )}
+
+          {/* 표정 슬라이드 — 1행: 일반 / 2행: 흥분 (safetyMode면 블러) */}
+          {(expressionRows.normal.length > 0 || expressionRows.aroused.length > 0) && (
+            <div className="mt-4 space-y-2">
+              {expressionRows.normal.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+                  {expressionRows.normal.map((img, idx) => (
+                    <button
+                      key={img.id}
+                      onClick={() => setExpressionViewer({
+                        images: expressionRows.normal.map((i) => ({ filePath: i.filePath })),
+                        initialIndex: idx,
+                      })}
+                      className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-900"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <img src={img.filePath} alt={img.emotion} className="w-full h-full object-cover" draggable={false} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {expressionRows.aroused.length > 0 && (
+                <div className="relative">
+                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+                    {expressionRows.aroused.map((img, idx) => {
+                      const isSafetyOn = user?.safetyMode
+                      const isTease = img.emotion === 'AROUSED_TEASE'
+                      let imgStyle
+                      if (isSafetyOn) {
+                        imgStyle = { filter: 'blur(20px)', transform: 'scale(1.2)' }
+                      } else if (!isTease) {
+                        imgStyle = { filter: 'blur(8px)', transform: 'scale(1.1)' }
+                      }
+                      const handleClick = isSafetyOn ? undefined : () => setExpressionViewer({
+                        images: expressionRows.aroused.map((i) => ({ filePath: i.filePath })),
+                        initialIndex: idx,
+                      })
+                      return (
+                        <button
+                          key={img.id}
+                          onClick={handleClick}
+                          disabled={isSafetyOn}
+                          className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-900 disabled:cursor-default"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <img
+                            src={img.filePath}
+                            alt={img.emotion}
+                            className="w-full h-full object-cover"
+                            style={imgStyle}
+                            draggable={false}
+                          />
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {user?.safetyMode && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
+                        <p className="text-xs text-white/90">Safety Mode 해제 시 확인할 수 있어요</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 음성 샘플 버블 — 일반 / 흥분. aroused는 safetyMode=false일 때만 재생 가능 */}
+          {(character.voiceSamples?.normal?.text || character.voiceSamples?.aroused?.text) && (
+            <div className="mt-4 flex flex-col gap-2">
+              {['normal', 'aroused'].map((kind) => {
+                const sample = character.voiceSamples?.[kind]
+                if (!sample?.text) return null
+                const isAroused = kind === 'aroused'
+                const locked = isAroused && user?.safetyMode
+                const isPlaying = playingVoice === kind
+                const canPlay = !!sample.audioUrl && !locked
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => canPlay && toggleVoiceSample(kind, sample.audioUrl)}
+                    disabled={!canPlay}
+                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl text-left transition-colors ${
+                      isAroused
+                        ? 'bg-pink-500/10 border border-pink-500/30 hover:bg-pink-500/15'
+                        : 'bg-gray-800 border border-gray-700 hover:bg-gray-750'
+                    } disabled:opacity-70 disabled:cursor-default`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {/* 재생/잠금 아이콘 */}
+                    <span className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+                      locked
+                        ? 'bg-gray-700/60 text-gray-400'
+                        : isAroused
+                          ? 'bg-pink-500/80 text-white'
+                          : 'bg-indigo-600 text-white'
+                    }`}>
+                      {locked ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                      ) : isPlaying ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="6" y="5" width="4" height="14" rx="1" />
+                          <rect x="14" y="5" width="4" height="14" rx="1" />
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <polygon points="6 4 20 12 6 20" />
+                        </svg>
+                      )}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[10px] mb-0.5 ${isAroused ? 'text-pink-300' : 'text-gray-400'}`}>
+                        {isAroused ? '흥분' : '일반'}
+                      </p>
+                      <p className={`text-sm leading-snug line-clamp-2 ${locked ? 'text-gray-500' : 'text-gray-100'}`}>
+                        {locked ? 'Safety Mode 해제 시 재생할 수 있어요' : sample.text}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* 액션 버튼 (메시지 보내기는 하단 고정 CTA로 이동) */}
+          <div className="mt-4 flex flex-col gap-2">
+            <button
+              onClick={toggleFollow}
+              className={`w-full py-2 text-sm font-semibold rounded-lg transition-colors ${
+                isFollowing
+                  ? 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                  : 'bg-gray-800 text-white border border-gray-700 hover:bg-gray-700'
+              }`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="follow"
+            >
+              {isFollowing ? t('character.unfollow') : t('character.follow')}
+            </button>
             {(existingConv || tourActive) && (
               <div className="flex justify-end">
                 <button
@@ -731,6 +892,22 @@ export default function CharacterDetail() {
         )}
       </div>
 
+      {/* 하단 고정 CTA — 메시지 보내기 */}
+      <div
+        className="flex-shrink-0 px-4 pt-3 bg-gray-950 border-t border-gray-800/60"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+      >
+        <button
+          onClick={existingConv ? resumeChat : startChat}
+          disabled={starting}
+          className="w-full py-3.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          data-onboarding-target="message"
+        >
+          {starting ? t('character.starting') : t('character.sendMessage')}
+        </button>
+      </div>
+
       {/* 스토리 뷰어 */}
       {showStory && hasStories && (
         <StoryViewer
@@ -760,6 +937,15 @@ export default function CharacterDetail() {
           title={gallerySlideViewer.title}
           description={gallerySlideViewer.description}
           onClose={() => setGallerySlideViewer(null)}
+        />
+      )}
+
+      {/* 표정 슬라이드 뷰어 */}
+      {expressionViewer && (
+        <ImageSlideViewer
+          images={expressionViewer.images}
+          initialIndex={expressionViewer.initialIndex}
+          onClose={() => setExpressionViewer(null)}
         />
       )}
 

@@ -104,6 +104,10 @@ export default function Characters() {
   const [v2Lang, setV2Lang] = useState('ko')
   const [v2Busy, setV2Busy] = useState({ image: false, voice: false, translate: false, generate: false })
   const [v2DragOverIdx, setV2DragOverIdx] = useState(null)
+  // 음성 샘플 (캐릭터 상세 페이지 버블) — character.voiceSamples Json 컬럼에 저장됨. PUT /characters와 별개 엔드포인트.
+  const [voiceSamples, setVoiceSamples] = useState({ normal: { text: '', audioUrl: '' }, aroused: { text: '', audioUrl: '' } })
+  // busy[kind] = null | 'text' | 'save' | 'tts'
+  const [voiceSampleBusy, setVoiceSampleBusy] = useState({ normal: null, aroused: null })
   const [nationality, setNationality] = useState('all') // 'all' | 'kr' | 'jp' | 'us'
   const [sortBy, setSortBy] = useState('conversations') // 'name' | 'conversations' | 'nationality'
   const navigate = useNavigate()
@@ -161,6 +165,8 @@ export default function Characters() {
     setForm({ ...EMPTY_FORM, firstMessageV2Text: { ko: '', en: '', ja: '' } })
     setV2Lang('ko')
     setV2Busy({ image: false, voice: false, translate: false, generate: false })
+    setVoiceSamples({ normal: { text: '', audioUrl: '' }, aroused: { text: '', audioUrl: '' } })
+    setVoiceSampleBusy({ normal: null, aroused: null })
     setEditing('new')
   }
 
@@ -199,6 +205,12 @@ export default function Characters() {
     })
     setV2Lang('ko')
     setV2Busy({ image: false, voice: false, translate: false, generate: false })
+    const vs = (c.voiceSamples && typeof c.voiceSamples === 'object') ? c.voiceSamples : {}
+    setVoiceSamples({
+      normal: { text: vs.normal?.text || '', audioUrl: vs.normal?.audioUrl || '' },
+      aroused: { text: vs.aroused?.text || '', audioUrl: vs.aroused?.audioUrl || '' },
+    })
+    setVoiceSampleBusy({ normal: null, aroused: null })
     setEditing(c)
   }
 
@@ -268,6 +280,42 @@ export default function Characters() {
     if (!confirm('정말 삭제하시겠습니까?')) return
     await api.delete(`/admin/characters/${id}`)
     load()
+  }
+
+  // 음성 샘플 — DeepSeek로 대사 생성 (저장 안 함)
+  const generateVoiceSampleText = async (kind) => {
+    if (!editing || editing === 'new') return
+    setVoiceSampleBusy((prev) => ({ ...prev, [kind]: 'text' }))
+    try {
+      const { text } = await api.post(`/admin/characters/${editing.id}/voice-sample/generate-text`, { kind })
+      setVoiceSamples((prev) => ({ ...prev, [kind]: { ...prev[kind], text } }))
+    } catch (e) {
+      alert(`대사 생성 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setVoiceSampleBusy((prev) => ({ ...prev, [kind]: null }))
+    }
+  }
+
+  // 음성 샘플 저장 (generateTts=true면 TTS도 함께 생성·업로드)
+  const saveVoiceSample = async (kind, { generateTts }) => {
+    if (!editing || editing === 'new') return
+    const text = (voiceSamples[kind]?.text || '').trim()
+    if (!text) { alert('대사를 먼저 입력하세요'); return }
+    setVoiceSampleBusy((prev) => ({ ...prev, [kind]: generateTts ? 'tts' : 'save' }))
+    try {
+      const { voiceSamples: updated } = await api.post(
+        `/admin/characters/${editing.id}/voice-sample/save`,
+        { kind, text, generateTts }
+      )
+      setVoiceSamples({
+        normal: { text: updated?.normal?.text || '', audioUrl: updated?.normal?.audioUrl || '' },
+        aroused: { text: updated?.aroused?.text || '', audioUrl: updated?.aroused?.audioUrl || '' },
+      })
+    } catch (e) {
+      alert(`저장 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setVoiceSampleBusy((prev) => ({ ...prev, [kind]: null }))
+    }
   }
 
   const uploadProfileImage = async (file) => {
@@ -1418,6 +1466,70 @@ export default function Characters() {
                 />
                 <p className="text-[10px] text-gray-500 mt-1">설정하면 채팅에서 TTS 버튼이 활성화됩니다</p>
               </div>
+
+              {/* 음성 샘플 — 캐릭터 상세 페이지 버블 (normal / aroused). 메인 저장과 별개로 즉시 저장됨 */}
+              {editing !== 'new' && (
+                <div className="border-t border-gray-700 pt-4 mt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-200">음성 샘플 (상세 페이지 버블)</label>
+                    <span className="text-[10px] text-gray-500">각 카드는 독립 저장</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mb-3">'딥시크로 생성' → 텍스트 검토 → 'TTS 생성 + 저장'. aroused는 클라이언트에서 Safety Mode OFF일 때만 재생됨.</p>
+                  {['normal', 'aroused'].map((kind) => {
+                    const busy = voiceSampleBusy[kind]
+                    const sample = voiceSamples[kind] || { text: '', audioUrl: '' }
+                    const label = kind === 'normal' ? '일반' : '흥분 (TEASE)'
+                    return (
+                      <div key={kind} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 mb-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-gray-300">{label}</span>
+                          <button
+                            type="button"
+                            onClick={() => generateVoiceSampleText(kind)}
+                            disabled={!!busy}
+                            className="text-[11px] px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            {busy === 'text' ? '생성 중…' : '딥시크로 대사 생성'}
+                          </button>
+                        </div>
+                        <textarea
+                          value={sample.text}
+                          onChange={(e) => setVoiceSamples((prev) => ({ ...prev, [kind]: { ...prev[kind], text: e.target.value } }))}
+                          placeholder={kind === 'aroused' ? '살짝 유혹하는 톤의 한 줄 대사 (60자 이하)' : '일상 톤의 한 줄 대사 (60자 이하)'}
+                          rows={2}
+                          maxLength={300}
+                          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 resize-none"
+                        />
+                        {sample.audioUrl && (
+                          <audio src={sample.audioUrl} controls preload="none" className="w-full mt-2 h-9" />
+                        )}
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => saveVoiceSample(kind, { generateTts: false })}
+                            disabled={!!busy || !sample.text.trim()}
+                            className="text-[11px] px-2 py-1 rounded bg-gray-700 text-gray-200 hover:bg-gray-600 disabled:opacity-50"
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            {busy === 'save' ? '저장 중…' : '텍스트만 저장'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveVoiceSample(kind, { generateTts: true })}
+                            disabled={!!busy || !sample.text.trim() || !form.voiceId.trim()}
+                            className="text-[11px] px-2 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                            title={!form.voiceId.trim() ? 'voiceId를 먼저 설정·저장하세요' : ''}
+                          >
+                            {busy === 'tts' ? 'TTS 생성 중…' : 'TTS 생성 + 저장'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 mt-6 flex-wrap">

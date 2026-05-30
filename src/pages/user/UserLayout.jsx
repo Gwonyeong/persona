@@ -92,8 +92,8 @@ export default function UserLayout() {
         )}
       </main>
 
-      {/* 하단 탭바 (채팅 페이지에서는 키보드 애니메이션과 충돌하므로 숨김) */}
-      {!isChatPage && (
+      {/* 하단 탭바 (채팅 / 캐릭터 풀스크린 페이지에서는 숨김) */}
+      {!isFullscreenPage && (
       <nav className="relative flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {TABS.map((tab, i) => (
           <React.Fragment key={tab.to}>
