@@ -376,6 +376,8 @@ export default function Chat() {
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
+  // 본인인증 유도 모달: Safety ON 상태에서 유저가 성적 시도를 감지했을 때 (세션당 1회).
+  const [showAdultVerifyPrompt, setShowAdultVerifyPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [showGiftSheet, setShowGiftSheet] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
@@ -426,6 +428,7 @@ export default function Chat() {
   const [errorToast, setErrorToast] = useState(null)
   const errorTimerRef = useRef(null)
   const pushPromptShownRef = useRef(false)
+  const adultVerifyPromptShownRef = useRef(false)
   const messagesEndRef = useRef(null)
   const initialLoadRef = useRef(true)
   const token = useStore((s) => s.token)
@@ -569,6 +572,7 @@ export default function Chat() {
   // 모달/오버레이 뒤로가기 처리
   useBackHandler(!!lightboxUrl, () => setLightboxUrl(null))
   useBackHandler(showPushPrompt, () => setShowPushPrompt(false))
+  useBackHandler(showAdultVerifyPrompt, () => setShowAdultVerifyPrompt(false))
   useBackHandler(showGallery, () => setShowGallery(false))
   useBackHandler(showImageGenModal, () => setShowImageGenModal(false))
   useBackHandler(showSelfieModal, () => setShowSelfieModal(false))
@@ -855,6 +859,19 @@ export default function Chat() {
                   pushPromptShownRef.current = true
                   setShowPushPrompt(true)
                 }
+              })
+            }
+            // Safety ON 상태에서 유저가 성적 시도 → 세이프티 모드를 끌 수 있음을 안내 (세션당 1회).
+            // 인증 여부와 무관하게 노출. 인증 상태에 따라 CTA만 분기 (모달 UI에서 처리).
+            if (
+              data.userNsfwAttempt === true
+              && !adultVerifyPromptShownRef.current
+            ) {
+              adultVerifyPromptShownRef.current = true
+              setShowAdultVerifyPrompt(true)
+              window.gtag?.('event', 'nsfw_attempt_detected', {
+                conversation_id: id,
+                adult_verified: user?.adultVerified ? 1 : 0,
               })
             }
             if (data.affinity !== undefined) {
@@ -1818,6 +1835,44 @@ export default function Chat() {
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
                 {t('chat.pushEnable')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAdultVerifyPrompt && (
+        <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowAdultVerifyPrompt(false)}>
+          <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 bg-gray-700 rounded-full" />
+            </div>
+            <p className="text-white font-semibold text-center mb-1">{t('chat.safetyHintTitle')}</p>
+            <p className="text-gray-400 text-sm text-center mb-5 whitespace-pre-line">
+              {user?.adultVerified ? t('chat.safetyHintDescVerified') : t('chat.safetyHintDescUnverified')}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAdultVerifyPrompt(false)}
+                className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 rounded-xl"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('chat.safetyHintLater')}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAdultVerifyPrompt(false)
+                  if (user?.adultVerified) {
+                    window.gtag?.('event', 'nsfw_attempt_turnoff_cta', { conversation_id: id })
+                    setSafetyConfirmVisible(true)
+                  } else {
+                    window.gtag?.('event', 'nsfw_attempt_verify_cta', { conversation_id: id })
+                    navigate('/adult-verify')
+                  }
+                }}
+                className="flex-1 py-2.5 text-sm text-white bg-pink-600 rounded-xl font-semibold"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {user?.adultVerified ? t('chat.safetyHintCtaTurnOff') : t('chat.safetyHintCtaVerify')}
               </button>
             </div>
           </div>
