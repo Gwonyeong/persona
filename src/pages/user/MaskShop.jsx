@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation, Trans } from 'react-i18next'
 import i18n from '../../i18n'
@@ -24,6 +24,8 @@ export default function MaskShop() {
   const { t } = useTranslation()
   const { token, masks, setMasks, subscription } = useStore()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialTab = ['subscription', 'shop', 'free'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'shop'
 
   const PACKAGES = [
     { amount: 30, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
@@ -33,7 +35,7 @@ export default function MaskShop() {
 
   const currentTier = subscription?.tier || 'FREE'
 
-  const [activeTab, setActiveTab] = useState('shop')
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [selectedPkg, setSelectedPkg] = useState(1)
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState('')
