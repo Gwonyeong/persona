@@ -8,7 +8,7 @@ export default function ImpersonationBanner() {
   const [hasBackup, setHasBackup] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const { setToken, setUser, user } = useStore()
+  const { setToken, setUser } = useStore()
 
   useEffect(() => {
     const check = () => setHasBackup(!!sessionStorage.getItem(ADMIN_BACKUP_KEY))
@@ -42,17 +42,14 @@ export default function ImpersonationBanner() {
 
   return (
     <div
-      className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] w-full max-w-[480px]"
+      className="fixed top-0 left-1/2 -translate-x-1/2 z-[60] w-full max-w-[480px] pointer-events-none"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="mx-2 mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-500/95 text-black text-xs px-3 py-2 shadow-lg">
-        <span className="truncate">
-          테스트 계정({user?.name || user?.email || '...'})으로 둘러보는 중
-        </span>
+      <div className="flex justify-end pr-2 pt-2">
         <button
           type="button"
           onClick={restore}
-          className="shrink-0 px-2 py-1 rounded bg-black/80 text-white text-[11px] font-medium hover:bg-black"
+          className="pointer-events-auto px-2 py-1 rounded bg-black/70 text-white text-[11px] font-medium hover:bg-black shadow-lg"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
           어드민으로 복귀
