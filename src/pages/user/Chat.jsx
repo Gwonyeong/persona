@@ -1519,22 +1519,6 @@ export default function Chat() {
       <div className="absolute bottom-0 left-0 right-0 z-30">
         {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치 */}
         <div className="flex items-center gap-2 px-3 mb-1.5">
-          {(() => {
-            const voiceActive = voiceMode && character?.voiceId
-            // 무료 보이스 잔여 있을 때는 +4 면제
-            const voiceSurcharge = voiceActive && !canUseFreeVoice ? 4 : 0
-            const cost = (chatModel === 'ADVANCED' ? 3 : 1) + voiceSurcharge
-            if (cost <= 1 && !(voiceActive && canUseFreeVoice)) return null
-            const color = chatModel === 'ADVANCED' ? 'text-amber-400' : 'text-emerald-400'
-            return (
-              <span className={`text-[10px] font-medium whitespace-nowrap ${color} flex items-center gap-0.5`}>
-                -{cost} <MaskIcon className="text-base" />
-                {voiceActive && canUseFreeVoice && (
-                  <span className="ml-1 text-sky-300">무료 {remainingFreeVoiceUses}</span>
-                )}
-              </span>
-            )
-          })()}
           <div className="ml-auto relative h-8 flex items-center justify-end">
             <button
               onClick={() => setShowInputButtons(true)}
@@ -1715,8 +1699,20 @@ export default function Chat() {
             >
               <span className="text-[15px] font-mono leading-none">( )</span>
             </button>
-            <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+            <button onClick={send} disabled={!input.trim() || sending} className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+              {(() => {
+                const voiceActive = voiceMode && character?.voiceId
+                const voiceSurcharge = voiceActive && !canUseFreeVoice ? 4 : 0
+                const cost = (chatModel === 'ADVANCED' ? 3 : 1) + voiceSurcharge
+                return (
+                  <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[10px] font-bold leading-none flex items-center gap-px bg-black/60 px-1 py-0.5 rounded">
+                      -{cost}<MaskIcon className="text-[11px]" />
+                    </span>
+                  </span>
+                )
+              })()}
             </button>
           </div>
         </div>
