@@ -10,6 +10,7 @@ import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
 import CallSheet from '../../components/CallSheet'
+import InsufficientMasksModal from '../../components/InsufficientMasksModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -445,6 +446,8 @@ export default function Chat() {
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   // 본인인증 유도 모달: Safety ON 상태에서 유저가 성적 시도를 감지했을 때 (세션당 1회).
   const [showAdultVerifyPrompt, setShowAdultVerifyPrompt] = useState(false)
+  // 마스크 부족 모달 — actionType: 'message' | 'image' | 'tts'
+  const [insufficientMasksFor, setInsufficientMasksFor] = useState(null)
   const [showGallery, setShowGallery] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
   // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
@@ -977,13 +980,14 @@ export default function Chat() {
       })
     } catch (error) {
       console.error(error)
-      // Insufficient masks는 재시도해도 의미 없음 — 즉시 mask shop으로.
+      // Insufficient masks — 작성 메시지 보존 + in-context 결제 모달 노출
       if (error.message?.includes('Insufficient masks')) {
         setMessages((prev) => prev.filter((m) => m._round !== roundId && m.id !== tempUserMsg.id))
         setShowTyping(false)
         setSending(false)
+        setInput(text)
         window.gtag?.('event', 'mask_depleted', { conversation_id: id })
-        navigate('/mask-shop')
+        setInsufficientMasksFor('message')
         return
       }
       handleRoundFailure({ refunded: true })
@@ -1046,7 +1050,7 @@ export default function Chat() {
     } catch (error) {
       console.error('Image generation error:', error)
       if (error.message?.includes('Insufficient masks')) {
-        navigate('/mask-shop')
+        setInsufficientMasksFor('image')
       } else {
         showError(t('chat.errorImageGen'))
       }
@@ -1100,7 +1104,7 @@ export default function Chat() {
     } catch (error) {
       console.error('TTS error:', error)
       if (error.message?.includes('Insufficient masks')) {
-        navigate('/mask-shop')
+        setInsufficientMasksFor('tts')
       } else {
         showError(t('chat.errorTTS'))
       }
@@ -2109,6 +2113,14 @@ export default function Chat() {
         affinity={conversation?.affinity ?? 0}
         safetyMode={safetyMode}
         callMode={activeCallMode || 'simple'}
+      />
+
+      <InsufficientMasksModal
+        open={!!insufficientMasksFor}
+        onClose={() => setInsufficientMasksFor(null)}
+        currentStyle={currentStyle}
+        spriteBackgroundImage={spriteBackgroundImage}
+        profileUrl={profileUrl}
       />
 
       {/* Safety Mode OFF 확인 다이얼로그 */}
