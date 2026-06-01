@@ -20,6 +20,12 @@ const useStore = create((set) => ({
   setSubscription: (subscription) => set({ subscription }),
   setSafetyMode: (safetyMode) =>
     set((s) => ({ user: s.user ? { ...s.user, safetyMode } : s.user })),
+  setAdultVerified: (verified, verifiedAt = null) =>
+    set((s) => ({
+      user: s.user
+        ? { ...s.user, adultVerified: verified, adultVerifiedAt: verifiedAt ?? s.user.adultVerifiedAt }
+        : s.user,
+    })),
   clearAuth: () => {
     localStorage.removeItem('token')
     set({ user: null, token: null, masks: 0, subscription: null })
