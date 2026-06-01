@@ -49,7 +49,7 @@ const ERROR_TO_I18N = {
 export default function AdultVerify() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { token } = useStore()
+  const { token, setAdultVerified } = useStore()
 
   const [status, setStatus] = useState(null) // { verified, verifiedAt, birthDate, gender }
   const [loading, setLoading] = useState(true)
@@ -87,6 +87,7 @@ export default function AdultVerify() {
           birthDate: result.birthDate,
           gender: result.gender,
         })
+        setAdultVerified(true, result.verifiedAt)
       })
       .catch((err) => {
         const code = err?.data?.error
@@ -164,6 +165,7 @@ export default function AdultVerify() {
         birthDate: result.birthDate,
         gender: result.gender,
       })
+      setAdultVerified(true, result.verifiedAt)
     } catch (err) {
       const code = err?.data?.error
       if (code && ERROR_TO_I18N[code]) {
