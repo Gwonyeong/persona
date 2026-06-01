@@ -393,6 +393,7 @@ export default function Chat() {
   const [previewFeedImages, setPreviewFeedImages] = useState([])
   const [characterStatus, setCharacterStatus] = useState(null)
   const [showStatusPanel, setShowStatusPanel] = useState(true)
+  const [showInputButtons, setShowInputButtons] = useState(true)
   const [showReport, setShowReport] = useState(false)
   const [showCallChooser, setShowCallChooser] = useState(false)
   // null 이면 통화 닫힘, 'simple' 이면 CallSheet 오픈 (continue 모드는 deprecated).
@@ -1307,105 +1308,6 @@ export default function Chat() {
           {/* 액션 버튼 — status panel과 함께 토글 */}
           {showStatusPanel && (
           <div className="flex flex-wrap gap-2 justify-end px-3 pt-2 pointer-events-auto">
-            {(character.voiceId || tourActive) && (
-              <div className="relative">
-                {excitedTooltipVisible && characterStatus?.isExcited && (
-                  <div
-                    ref={excitedTooltipRef}
-                    className="absolute top-full right-0 mt-2 px-3 py-2 bg-red-600 text-white text-xs rounded-lg shadow-lg whitespace-nowrap animate-slide-down z-30"
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    {t('chat.excitedTooltip')}
-                    <div className="absolute bottom-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-red-600" />
-                  </div>
-                )}
-                <button
-                  ref={voiceButtonRef}
-                  onClick={() => {
-                    if (tourActive && !character.voiceId) return
-                    setVoiceMode((v) => {
-                      const next = !v
-                      api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
-                      return next
-                    })
-                  }}
-                  disabled={!token || (tourActive && !character.voiceId)}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${
-                    characterStatus?.isExcited
-                      ? 'bg-red-600 hover:bg-red-500 ring-2 ring-red-400'
-                      : voiceMode
-                        ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400'
-                        : 'bg-gray-700 hover:bg-gray-600'
-                  } disabled:opacity-40`}
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  data-onboarding-target="voice-btn"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    {voiceMode ? (
-                      <>
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                      </>
-                    ) : (
-                      <>
-                        <line x1="18" y1="9" x2="22" y2="13" />
-                        <line x1="22" y1="9" x2="18" y2="13" />
-                      </>
-                    )}
-                  </svg>
-                </button>
-              </div>
-            )}
-            {character.voiceId && (
-              <button
-                onClick={handleCallClick}
-                className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${
-                  showFreeCallBadge
-                    ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400'
-                    : 'bg-indigo-600 hover:bg-indigo-500'
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                aria-label={t('chat.call.start')}
-                title={t('chat.call.start')}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                </svg>
-                {showFreeCallBadge && (
-                  <span className="absolute -bottom-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[10px] font-bold flex items-center justify-center shadow">
-                    {remainingFreeCalls}
-                  </span>
-                )}
-                <span className="absolute -top-1 -right-1 px-1 py-px text-[8px] font-bold leading-none rounded-sm bg-indigo-500 text-white tracking-tight shadow">
-                  Beta
-                </span>
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setShowImageGenModal(true)
-                api.get(`/characters/${conversation.characterId}`).then(({ character: c }) => {
-                  const allImages = (c.feedPosts || []).flatMap((p) => (p.images || []).map((img) => img.filePath)).filter(Boolean)
-                  const shuffled = allImages.sort(() => Math.random() - 0.5)
-                  setPreviewFeedImages(shuffled.slice(0, 3))
-                }).catch(() => {})
-              }}
-              disabled={generatingImage || !token}
-              className="w-11 h-11 rounded-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 flex items-center justify-center shadow-lg transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              data-onboarding-target="image-gen-btn"
-            >
-              {generatingImage ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
-                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
-                </svg>
-              )}
-            </button>
             <div className="relative">
               {showGalleryTooltip && (
                 <div className="absolute top-full right-0 mt-2 whitespace-nowrap pointer-events-none animate-fade-in z-30">
@@ -1417,7 +1319,7 @@ export default function Chat() {
               )}
               <button
                 onClick={() => { setShowGallery(true); setShowGalleryTooltip(false); setShowGalleryBadge(false) }}
-                className="relative w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center shadow-lg transition-colors"
+                className="relative w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 data-onboarding-target="gallery-btn"
               >
@@ -1432,7 +1334,7 @@ export default function Chat() {
             {/* 채팅 설정 페이지 진입 */}
             <button
               onClick={() => navigate(`/chats/${id}/settings`)}
-              className="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center shadow-lg transition-colors"
+              className="w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               aria-label={t('chatSettings.title')}
             >
@@ -1440,23 +1342,6 @@ export default function Chat() {
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-            </button>
-            <button
-              onClick={() => setShowModelSheet(true)}
-              disabled={!token}
-              className={`h-11 px-3 rounded-full text-white text-xs font-semibold flex items-center gap-1 shadow-lg transition-colors ${
-                chatModel === 'ADVANCED'
-                  ? 'bg-amber-600 hover:bg-amber-500 ring-2 ring-amber-400'
-                  : 'bg-gray-700 hover:bg-gray-600'
-              } disabled:opacity-40`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={t('chat.modelSelectorTitle')}
-              data-onboarding-target="model-btn"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-              {chatModel === 'ADVANCED' ? t('chat.modelAdvanced') : t('chat.modelBasic')}
             </button>
           </div>
           )}
@@ -1467,7 +1352,7 @@ export default function Chat() {
         className="h-full overflow-auto px-4 space-y-2"
         style={{
           paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
           ...(backgroundImage ? {
             backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
             backgroundSize: 'cover',
@@ -1631,58 +1516,206 @@ export default function Chat() {
       </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 z-30 px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
-        {attachedFeed && (
-          <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
-            <img
-              src={attachedFeed.images?.[0]?.filePath}
-              alt=""
-              className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-indigo-400 font-medium">{t('chat.feedAttached')}</p>
-              <p className="text-xs text-gray-400 truncate">{attachedFeed.caption || t('chat.feedPost')}</p>
-            </div>
+      <div className="absolute bottom-0 left-0 right-0 z-30">
+        {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치 */}
+        <div className="flex items-center gap-2 px-3 mb-1.5">
+          {(() => {
+            const voiceActive = voiceMode && character?.voiceId
+            // 무료 보이스 잔여 있을 때는 +4 면제
+            const voiceSurcharge = voiceActive && !canUseFreeVoice ? 4 : 0
+            const cost = (chatModel === 'ADVANCED' ? 3 : 1) + voiceSurcharge
+            if (cost <= 1 && !(voiceActive && canUseFreeVoice)) return null
+            const color = chatModel === 'ADVANCED' ? 'text-amber-400' : 'text-emerald-400'
+            return (
+              <span className={`text-[10px] font-medium whitespace-nowrap ${color} flex items-center gap-0.5`}>
+                -{cost} <MaskIcon className="text-base" />
+                {voiceActive && canUseFreeVoice && (
+                  <span className="ml-1 text-sky-300">무료 {remainingFreeVoiceUses}</span>
+                )}
+              </span>
+            )
+          })()}
+          <div className="ml-auto relative h-8 flex items-center justify-end">
             <button
-              onClick={() => setAttachedFeed(null)}
-              className="text-gray-500 hover:text-white flex-shrink-0"
+              onClick={() => setShowInputButtons(true)}
+              className={`w-8 h-8 rounded-full bg-gray-900/75 border border-gray-800/50 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-800/80 transition-opacity duration-200 ${
+                showInputButtons ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="기능 버튼 열기"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </svg>
+            </button>
+            <div className={`absolute right-0 top-0 bg-gray-900/75 border border-gray-800/50 rounded-full pl-1.5 pr-0.5 py-0.5 flex items-center gap-1.5 origin-right transition-all duration-300 ease-out ${
+              showInputButtons ? 'opacity-100 scale-x-100 pointer-events-auto' : 'opacity-0 scale-x-0 pointer-events-none'
+            }`}>
+            {(character.voiceId || tourActive) && (
+              <div className="relative">
+                {excitedTooltipVisible && characterStatus?.isExcited && (
+                  <div
+                    ref={excitedTooltipRef}
+                    className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-red-600 text-white text-xs rounded-lg shadow-lg whitespace-nowrap animate-slide-up z-30"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {t('chat.excitedTooltip')}
+                    <div className="absolute top-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-600" />
+                  </div>
+                )}
+                <button
+                  ref={voiceButtonRef}
+                  onClick={() => {
+                    if (tourActive && !character.voiceId) return
+                    setVoiceMode((v) => {
+                      const next = !v
+                      api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
+                      return next
+                    })
+                  }}
+                  disabled={!token || (tourActive && !character.voiceId)}
+                  className={`w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
+                    characterStatus?.isExcited
+                      ? 'ring-2 ring-red-400'
+                      : voiceMode
+                        ? 'ring-2 ring-emerald-400'
+                        : ''
+                  } disabled:opacity-40`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  data-onboarding-target="voice-btn"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    {voiceMode ? (
+                      <>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                      </>
+                    ) : (
+                      <>
+                        <line x1="18" y1="9" x2="22" y2="13" />
+                        <line x1="22" y1="9" x2="18" y2="13" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </div>
+            )}
+            {character.voiceId && (
+              <button
+                onClick={handleCallClick}
+                className={`relative w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
+                  showFreeCallBadge ? 'ring-2 ring-emerald-400' : ''
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                aria-label={t('chat.call.start')}
+                title={t('chat.call.start')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={showFreeCallBadge ? '#6ee7b7' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+                {showFreeCallBadge && (
+                  <span className="absolute -bottom-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[9px] font-bold flex items-center justify-center shadow">
+                    {remainingFreeCalls}
+                  </span>
+                )}
+                <span className="absolute -top-1 -right-1 px-0.5 py-px text-[7px] font-bold leading-none rounded-sm bg-gray-600 text-white tracking-tight shadow">
+                  β
+                </span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setShowImageGenModal(true)
+                api.get(`/characters/${conversation.characterId}`).then(({ character: c }) => {
+                  const allImages = (c.feedPosts || []).flatMap((p) => (p.images || []).map((img) => img.filePath)).filter(Boolean)
+                  const shuffled = allImages.sort(() => Math.random() - 0.5)
+                  setPreviewFeedImages(shuffled.slice(0, 3))
+                }).catch(() => {})
+              }}
+              disabled={generatingImage || !token}
+              className="w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 disabled:opacity-40 flex items-center justify-center shadow transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              data-onboarding-target="image-gen-btn"
+            >
+              {generatingImage ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
+                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={() => setShowModelSheet(true)}
+              disabled={!token}
+              className={`h-7 px-2 rounded-full text-[10px] font-semibold flex items-center gap-0.5 shadow transition-colors whitespace-nowrap flex-shrink-0 bg-gray-800/80 hover:bg-gray-700/80 ${
+                chatModel === 'ADVANCED'
+                  ? 'ring-1 ring-amber-400 text-amber-300'
+                  : 'text-white'
+              } disabled:opacity-40`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label={t('chat.modelSelectorTitle')}
+              data-onboarding-target="model-btn"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              {chatModel === 'ADVANCED' ? t('chat.modelAdvanced') : t('chat.modelBasic')}
+            </button>
+            <button
+              onClick={() => setShowInputButtons(false)}
+              className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="기능 버튼 닫기"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
+            </div>
           </div>
-        )}
-        <div className="flex gap-2 items-end">
-          <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
-          <button
-            onClick={handleInsertParens}
-            type="button"
-            title={t('chat.insertActionParens', { defaultValue: '행동 묘사 ( ) 추가' })}
-            className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <span className="text-[15px] font-mono leading-none">( )</span>
-          </button>
-          <div className="relative flex-shrink-0">
-            {(() => {
-              const voiceActive = voiceMode && character?.voiceId
-              // 무료 보이스 잔여 있을 때는 +4 면제
-              const voiceSurcharge = voiceActive && !canUseFreeVoice ? 4 : 0
-              const cost = (chatModel === 'ADVANCED' ? 3 : 1) + voiceSurcharge
-              if (cost <= 1 && !(voiceActive && canUseFreeVoice)) return null
-              const color = chatModel === 'ADVANCED' ? 'text-amber-400' : 'text-emerald-400'
-              return (
-                <span className={`absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap ${color} flex items-center gap-0.5`}>
-                  -{cost} <MaskIcon className="text-base" />
-                  {voiceActive && canUseFreeVoice && (
-                    <span className="ml-1 text-sky-300">무료 {remainingFreeVoiceUses}</span>
-                  )}
-                </span>
-              )
-            })()}
-            <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
+        </div>
+        <div className="px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
+          {attachedFeed && (
+            <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
+              <img
+                src={attachedFeed.images?.[0]?.filePath}
+                alt=""
+                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-indigo-400 font-medium">{t('chat.feedAttached')}</p>
+                <p className="text-xs text-gray-400 truncate">{attachedFeed.caption || t('chat.feedPost')}</p>
+              </div>
+              <button
+                onClick={() => setAttachedFeed(null)}
+                className="text-gray-500 hover:text-white flex-shrink-0"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2 items-end">
+            <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+            <button
+              onClick={handleInsertParens}
+              type="button"
+              title={t('chat.insertActionParens', { defaultValue: '행동 묘사 ( ) 추가' })}
+              className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <span className="text-[15px] font-mono leading-none">( )</span>
+            </button>
+            <button onClick={send} disabled={!input.trim() || sending} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
             </button>
           </div>
