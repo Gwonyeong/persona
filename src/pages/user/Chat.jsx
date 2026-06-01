@@ -1350,24 +1350,24 @@ export default function Chat() {
                     <span className="text-2xl leading-none mt-0.5 flex-shrink-0">{status.emoji}</span>
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusMood')}</span>
+                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusMood')}</span>
                         <span className="text-xs text-gray-200">{status.mood}</span>
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusLocation')}</span>
+                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusLocation')}</span>
                         <span className="text-xs text-gray-200">{status.location}</span>
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusActivity')}</span>
+                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusActivity')}</span>
                         <span className="text-xs text-gray-200">{status.activity}</span>
                       </div>
                       <div className="flex items-baseline gap-2" data-onboarding-target="affinity">
-                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusAffinity')}</span>
+                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusAffinity')}</span>
                         <span className="text-xs text-pink-300">❤️ {affinity} <span className="text-gray-400">· {affinityLabel}</span></span>
                       </div>
                       {status.outfit && (
                         <div className="flex items-baseline gap-2">
-                          <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusOutfit')}</span>
+                          <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusOutfit')}</span>
                           <span className="text-xs text-gray-200">{status.outfit}</span>
                         </div>
                       )}
@@ -1445,7 +1445,7 @@ export default function Chat() {
 
       <div
         ref={scrollContainerRef}
-        className="h-full overflow-auto px-4 space-y-2"
+        className="relative z-10 h-full overflow-auto px-4 space-y-2"
         style={(() => {
           const base = {
             paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
