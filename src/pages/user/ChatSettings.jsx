@@ -6,7 +6,7 @@ import useStore from '../../store/useStore'
 
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
-const SPRITE_MODES = ['BUBBLE', 'FULL', 'OFF']
+const SPRITE_MODES = ['BUBBLE', 'FULL', 'BACKGROUND', 'OFF']
 const CHAT_MODES = ['ROLEPLAY', 'NORMAL']
 const NICKNAME_MODES = ['NAME', 'OPPA', 'CUSTOM']
 const OPPA_VALUE = '오빠'

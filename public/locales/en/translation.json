@@ -239,11 +239,15 @@
       "options": {
         "BUBBLE": {
           "title": "Default",
-          "desc": "Show as a small image inside the message bubble. Appears once per round to avoid clutter."
+          "desc": "Pin the latest emotion image as a small fixed thumbnail above the input bar."
         },
         "FULL": {
           "title": "Full",
           "desc": "Show as a full-width 9:16 image at the end of each round. Maximum visual impact."
+        },
+        "BACKGROUND": {
+          "title": "Background",
+          "desc": "Use the latest emotion image as the chat background, overriding any gallery-set background."
         },
         "OFF": {
           "title": "Off",

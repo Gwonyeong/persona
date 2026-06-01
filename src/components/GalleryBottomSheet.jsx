@@ -5,15 +5,18 @@ import { api } from '../lib/api'
 import useStore from '../store/useStore'
 import GalleryGrid from './GalleryGrid'
 import ImageSlideViewer from './ImageSlideViewer'
+import MaskIcon from './MaskIcon'
 
-export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange, affinityBadge, onAffinityBadgeClear }) {
+export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange, affinityBadge, onAffinityBadgeClear, onGiftSent, onOutfitApplied }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const token = useStore((s) => s.token)
+  const masks = useStore((s) => s.masks)
+  const setMasks = useStore((s) => s.setMasks)
   const [contents, setContents] = useState([])
   const [feedPosts, setFeedPosts] = useState([])
   const [generatedImages, setGeneratedImages] = useState([])
-  const [giftUnlocks, setGiftUnlocks] = useState([])
+  const [gifts, setGifts] = useState([])
   const [giftViewer, setGiftViewer] = useState(null) // { gift, index }
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -24,6 +27,12 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const [bgPickImages, setBgPickImages] = useState(null) // 다중 이미지 선택용 { images: [] }
   const [showAffinityBadge, setShowAffinityBadge] = useState(!!affinityBadge)
   const [bgSelected, setBgSelected] = useState(null) // 선택된 이미지 URL
+  const [purchaseTab, setPurchaseTab] = useState('UNBOUGHT') // GIFT 탭 내부 하위 탭
+  const [pendingGift, setPendingGift] = useState(null)
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState(null) // { gift, contents }
+  const [contentIndex, setContentIndex] = useState(0)
+  const [applyingId, setApplyingId] = useState(null)
   const overlayRef = useRef(null)
 
   // 마운트 애니메이션
@@ -65,19 +74,92 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     }
     if (token) {
       promises.push(
-        api.get(`/gifts/character/${characterId}/unlocks`).catch(() => ({ unlocks: [] }))
+        api.get(`/gifts/character/${characterId}`).catch(() => ({ gifts: [] }))
       )
     } else {
-      promises.push(Promise.resolve({ unlocks: [] }))
+      promises.push(Promise.resolve({ gifts: [] }))
     }
 
     Promise.all(promises).then(([galleryRes, charRes, genRes, giftRes]) => {
       setContents(galleryRes.galleryContents || [])
       setFeedPosts(charRes.character?.feedPosts || [])
       if (genRes) setGeneratedImages(genRes.images || [])
-      setGiftUnlocks(giftRes?.unlocks || [])
+      setGifts(giftRes?.gifts || [])
     }).finally(() => setLoading(false))
   }, [characterId, conversationId, token])
+
+  // 선물 관련 핸들러
+  const unboughtCount = gifts.filter((g) => !g.unlocked).length
+  const boughtCount = gifts.length - unboughtCount
+
+  const handleGiftSelect = (gift) => {
+    if (gift.unlocked) return
+    setPendingGift(gift)
+  }
+
+  const handleApplyOutfit = async (gift) => {
+    setApplyingId(gift.id)
+    try {
+      const res = await api.post(`/gifts/conversation/${conversationId}/apply/${gift.id}`)
+      onOutfitApplied?.({
+        gift,
+        messages: res.messages || [],
+        characterStatus: res.characterStatus,
+      })
+      onClose?.()
+    } catch (err) {
+      console.error('Apply outfit error:', err)
+      alert('의상 변경에 실패했어요.')
+    } finally {
+      setApplyingId(null)
+    }
+  }
+
+  const confirmSendGift = async () => {
+    if (!pendingGift) return
+    if (masks < pendingGift.maskCost) {
+      alert('마스크가 부족합니다.')
+      onClose?.()
+      navigate('/subscription')
+      return
+    }
+    setSending(true)
+    try {
+      const res = await api.post(`/gifts/conversation/${conversationId}/send/${pendingGift.id}`)
+      setMasks(res.masks)
+      setGifts((prev) => prev.map((g) => (g.id === pendingGift.id ? { ...g, unlocked: true, contents: res.contents || g.contents } : g)))
+      onGiftSent?.({
+        gift: pendingGift,
+        message: res.message,
+        thanksMessages: res.thanksMessages || [],
+        imageBubble: res.imageBubble || null,
+        affinity: res.affinity,
+        affinityChange: res.affinityChange,
+      })
+      setResult({ gift: pendingGift, contents: res.contents || [] })
+      setPendingGift(null)
+      setContentIndex(0)
+    } catch (err) {
+      console.error('Send gift error:', err)
+      if (err.status === 402) {
+        alert('마스크가 부족합니다.')
+        onClose?.()
+        navigate('/subscription')
+      } else if (err.status === 409) {
+        alert('이미 선물한 항목입니다.')
+        setGifts((prev) => prev.map((g) => (g.id === pendingGift.id ? { ...g, unlocked: true } : g)))
+        setPendingGift(null)
+      } else {
+        alert('선물 전송에 실패했습니다.')
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const closeGiftResult = () => {
+    setResult(null)
+  }
 
   const filtered = contents
     .filter((item) => item.unlockType === tab)
@@ -414,74 +496,214 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
               )}
               {tab === 'GIFT' && (
                 <>
-                  {giftUnlocks.length === 0 ? (
-                    <div className="text-center text-gray-500 py-16 px-6">
-                      <p className="text-sm">아직 선물한 항목이 없습니다.</p>
-                      <p className="text-xs text-gray-600 mt-1">🎁 버튼에서 선물할 수 있어요.</p>
+                  {/* 하위 탭: 미구매 / 구매 + 마스크 잔고 */}
+                  <div className="sticky top-0 z-10 bg-gray-900 border-b border-gray-800 px-3 pt-2 pb-2 flex items-center gap-2">
+                    <div className="flex flex-1 gap-1">
+                      <button
+                        onClick={() => setPurchaseTab('UNBOUGHT')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          purchaseTab === 'UNBOUGHT'
+                            ? 'bg-white/10 text-white'
+                            : 'bg-gray-800/50 text-gray-500'
+                        }`}
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        미구매 <span className="opacity-70">({unboughtCount})</span>
+                      </button>
+                      <button
+                        onClick={() => setPurchaseTab('BOUGHT')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          purchaseTab === 'BOUGHT'
+                            ? 'bg-white/10 text-white'
+                            : 'bg-gray-800/50 text-gray-500'
+                        }`}
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        구매 <span className="opacity-70">({boughtCount})</span>
+                      </button>
                     </div>
-                  ) : (
-                    <div className="flex flex-col gap-4 py-3">
-                      {giftUnlocks.map((u) => (
-                        <section key={u.gift.id} className="px-3">
-                          {/* 헤더: 썸네일 + 이름 + 콘텐츠 개수 */}
-                          <div className="flex items-center gap-2.5 mb-2">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0">
-                              <img src={u.gift.imageUrl} alt={u.gift.name} className="w-full h-full object-cover" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white font-medium truncate">{u.gift.name}</p>
-                              <p className="text-[11px] text-gray-500">
-                                해금 콘텐츠 {u.gift.contents?.length || 0}개
-                              </p>
-                            </div>
-                          </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded-md flex-shrink-0">
+                      <MaskIcon className="w-3 h-3" />
+                      <span>{masks}</span>
+                    </div>
+                  </div>
 
-                          {/* 콘텐츠 그리드 */}
-                          {u.gift.contents?.length > 0 ? (
-                            <div className="grid grid-cols-3 gap-[2px] bg-gray-900 rounded-lg overflow-hidden">
-                              {u.gift.contents.map((c, idx) => (
-                                <button
-                                  key={c.id}
-                                  onClick={() => setGiftViewer({ gift: u.gift, index: idx })}
-                                  className="aspect-square relative bg-gray-950 overflow-hidden"
-                                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                                >
-                                  {c.type === 'VIDEO' ? (
-                                    <>
-                                      <video
-                                        src={c.filePath}
-                                        muted
-                                        playsInline
-                                        preload="metadata"
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
-                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                                            <polygon points="8 5 19 12 8 19" />
-                                          </svg>
-                                        </div>
+                  {purchaseTab === 'UNBOUGHT' && (
+                    <>
+                      {gifts.filter((g) => !g.unlocked).length === 0 ? (
+                        <div className="text-center text-gray-500 py-16 px-6">
+                          <p className="text-sm">{gifts.length > 0 ? '모든 선물을 보냈어요!' : '등록된 선물이 없습니다.'}</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 px-3 py-3">
+                          {gifts.filter((g) => !g.unlocked).map((g) => (
+                            <button
+                              key={g.id}
+                              onClick={() => handleGiftSelect(g)}
+                              disabled={!token}
+                              className={`w-full rounded-xl border p-2.5 flex items-center gap-2.5 text-left transition-colors ${
+                                g.adminOnly
+                                  ? 'bg-amber-950/40 border-amber-700/60 hover:border-amber-500'
+                                  : 'bg-gray-800/70 border-gray-700 hover:border-gray-500'
+                              } disabled:opacity-50`}
+                              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                            >
+                              <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-900">
+                                <img src={g.imageUrl} alt={g.name} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    {g.adminOnly && (
+                                      <span className="flex-shrink-0 text-[9px] font-bold bg-amber-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                        테스트
+                                      </span>
+                                    )}
+                                    <p className="text-[13px] text-white font-medium truncate">{g.name}</p>
+                                  </div>
+                                  <div className="flex-shrink-0 flex items-center gap-1 bg-gray-900/80 px-2 py-0.5 rounded-full">
+                                    <MaskIcon className="w-3 h-3" />
+                                    <span className="text-[11px] text-white">{g.maskCost}</span>
+                                  </div>
+                                </div>
+                                {g.contents?.length > 0 ? (
+                                  <div className="flex gap-1 overflow-hidden">
+                                    {g.contents.slice(0, 4).map((c, idx) => (
+                                      <div
+                                        key={c.id}
+                                        className="relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-900"
+                                      >
+                                        {c.type === 'VIDEO' ? (
+                                          <video
+                                            src={c.filePath}
+                                            muted
+                                            playsInline
+                                            preload="metadata"
+                                            className="w-full h-full object-cover"
+                                            style={{ filter: 'blur(2px)' }}
+                                          />
+                                        ) : (
+                                          <img
+                                            src={c.filePath}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            style={{ filter: 'blur(2px)' }}
+                                          />
+                                        )}
+                                        {c.type === 'VIDEO' && (
+                                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <div className="w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+                                              <svg width="10" height="10" viewBox="0 0 24 24" fill="white">
+                                                <polygon points="8 5 19 12 8 19" />
+                                              </svg>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {g.contents.length > 4 && idx === 3 && (
+                                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <span className="text-[11px] text-white font-medium">+{g.contents.length - 4}</span>
+                                          </div>
+                                        )}
                                       </div>
-                                    </>
-                                  ) : (
-                                    <img
-                                      src={c.filePath}
-                                      alt=""
-                                      className="w-full h-full object-cover"
-                                      loading="lazy"
-                                    />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="h-12 flex items-center">
+                                    <span className="text-[10px] text-gray-500 italic">해금 콘텐츠 없음</span>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {purchaseTab === 'BOUGHT' && (
+                    <>
+                      {gifts.filter((g) => g.unlocked).length === 0 ? (
+                        <div className="text-center text-gray-500 py-16 px-6">
+                          <p className="text-sm">아직 선물한 항목이 없습니다.</p>
+                          <p className="text-xs text-gray-600 mt-1">미구매 탭에서 선물할 수 있어요.</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-4 py-3">
+                          {gifts.filter((g) => g.unlocked).map((g) => {
+                            const canApply = g.tag === 'OUTFIT'
+                            const isApplying = applyingId === g.id
+                            return (
+                              <section key={g.id} className="px-3">
+                                <div className="flex items-center gap-2.5 mb-2">
+                                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-900 flex-shrink-0">
+                                    <img src={g.imageUrl} alt={g.name} className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-white font-medium truncate">{g.name}</p>
+                                    <p className="text-[11px] text-gray-500">
+                                      해금 콘텐츠 {g.contents?.length || 0}개
+                                    </p>
+                                  </div>
+                                  {canApply && (
+                                    <button
+                                      onClick={() => handleApplyOutfit(g)}
+                                      disabled={isApplying}
+                                      className="flex-shrink-0 px-3 py-1.5 text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-md disabled:opacity-50"
+                                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                                    >
+                                      {isApplying ? '변경 중...' : '착용시키기'}
+                                    </button>
                                   )}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-[11px] text-gray-600 italic py-3 text-center bg-gray-900/50 rounded-lg">
-                              해금된 콘텐츠가 없습니다
-                            </div>
-                          )}
-                        </section>
-                      ))}
-                    </div>
+                                </div>
+
+                                {g.contents?.length > 0 ? (
+                                  <div className="grid grid-cols-3 gap-[2px] bg-gray-900 rounded-lg overflow-hidden">
+                                    {g.contents.map((c, idx) => (
+                                      <button
+                                        key={c.id}
+                                        onClick={() => setGiftViewer({ gift: g, index: idx })}
+                                        className="aspect-square relative bg-gray-950 overflow-hidden"
+                                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                                      >
+                                        {c.type === 'VIDEO' ? (
+                                          <>
+                                            <video
+                                              src={c.filePath}
+                                              muted
+                                              playsInline
+                                              preload="metadata"
+                                              className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                              <div className="w-8 h-8 rounded-full bg-black/60 flex items-center justify-center">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                                                  <polygon points="8 5 19 12 8 19" />
+                                                </svg>
+                                              </div>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <img
+                                            src={c.filePath}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                          />
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-gray-600 italic py-3 text-center bg-gray-900/50 rounded-lg">
+                                    해금된 콘텐츠가 없습니다
+                                  </div>
+                                )}
+                              </section>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
@@ -625,6 +847,118 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           title={`🎁 ${giftViewer.gift.name}`}
           onClose={() => setGiftViewer(null)}
         />
+      )}
+
+      {/* 선물 구매 확인 모달 */}
+      {pendingGift && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center px-6" onClick={() => !sending && setPendingGift(null)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-800 mb-3">
+                <img src={pendingGift.imageUrl} alt={pendingGift.name} className="w-full h-full object-cover" />
+              </div>
+              <p className="text-base text-white font-bold mb-1">{pendingGift.name}</p>
+              <p className="text-xs text-gray-400 mb-4">{characterName}에게 선물하시겠습니까?</p>
+              <div className="flex items-center gap-1 text-sm text-white bg-gray-800 px-3 py-1.5 rounded-full mb-4">
+                <MaskIcon className="w-3.5 h-3.5" />
+                <span>{pendingGift.maskCost} 차감</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPendingGift(null)}
+                disabled={sending}
+                className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmSendGift}
+                disabled={sending}
+                className="flex-1 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {sending ? '전송 중...' : '선물하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 선물 완료 결과 모달 */}
+      {result && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center px-4" onClick={closeGiftResult}>
+          <div className="absolute inset-0 bg-black/80" />
+          <div className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-3 text-center">
+              <p className="text-xs text-emerald-400 mb-1">🎁 선물 완료</p>
+              <p className="text-base font-bold text-white">{result.gift.name}</p>
+            </div>
+            {result.contents.length > 0 ? (
+              <div className="relative bg-black">
+                <div className="aspect-[3/4]">
+                  {result.contents[contentIndex]?.type === 'VIDEO' ? (
+                    <video
+                      src={result.contents[contentIndex].filePath}
+                      className="w-full h-full object-contain"
+                      autoPlay
+                      controls
+                      loop
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={result.contents[contentIndex]?.filePath}
+                      alt=""
+                      className="w-full h-full object-contain"
+                    />
+                  )}
+                </div>
+                {result.contents.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setContentIndex((i) => Math.max(0, i - 1))}
+                      disabled={contentIndex === 0}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center disabled:opacity-30"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setContentIndex((i) => Math.min(result.contents.length - 1, i + 1))}
+                      disabled={contentIndex === result.contents.length - 1}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center disabled:opacity-30"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full">
+                      {contentIndex + 1} / {result.contents.length}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="px-5 py-6 text-center text-xs text-gray-500">해금된 콘텐츠가 없습니다.</div>
+            )}
+            <div className="px-5 py-4 flex flex-col gap-2">
+              <p className="text-[11px] text-gray-500 text-center">해금한 콘텐츠는 선물 탭의 구매 목록에서 다시 볼 수 있어요.</p>
+              <button
+                onClick={closeGiftResult}
+                className="w-full py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
