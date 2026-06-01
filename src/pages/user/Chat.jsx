@@ -6,7 +6,6 @@ import { ensureMicPermission } from '../../lib/microphone'
 import { ensureAppUpToDate } from '../../lib/appUpdate'
 import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
-import GiftBottomSheet from '../../components/GiftBottomSheet'
 import ReportModal from '../../components/ReportModal'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
@@ -379,7 +378,6 @@ export default function Chat() {
   // 본인인증 유도 모달: Safety ON 상태에서 유저가 성적 시도를 감지했을 때 (세션당 1회).
   const [showAdultVerifyPrompt, setShowAdultVerifyPrompt] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
-  const [showGiftSheet, setShowGiftSheet] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
   // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
   const [backgroundImage, setBackgroundImage] = useState(null)
@@ -1151,14 +1149,14 @@ export default function Chat() {
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-gray-950 z-20">
-      <header className="relative z-30 flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900/95 backdrop-blur-sm flex-shrink-0" style={{ paddingTop: 'calc(max(12px, env(safe-area-inset-top)) + 8px)' }}>
+    <div className="absolute inset-0 bg-gray-950 z-20">
+      <header className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-4 py-1.5 border-b border-gray-800/30 bg-gray-900/30" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 6px)' }}>
         <button onClick={handleBack} className="text-gray-400 hover:text-white" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
         <button
           onClick={() => navigate(`/characters/${conversation.characterId}`)}
-          className="flex items-center gap-3 flex-1 min-w-0"
+          className="flex items-center gap-2 flex-1 min-w-0"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
           <div className="relative flex-shrink-0">
@@ -1167,9 +1165,9 @@ export default function Chat() {
             </div>
             {onlineStatus === 'free' && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900" />}
           </div>
-          <div>
-            <span className="font-semibold text-sm text-white block">{character.name}</span>
-            {onlineStatus === 'free' && <p className="text-[10px] text-green-400">{t('chat.online')}</p>}
+          <div className="min-w-0 flex-1 text-left">
+            <span className="font-semibold text-sm text-white block truncate">{character.name}</span>
+            {onlineStatus === 'free' && <p className="text-[10px] text-green-400 truncate">{t('chat.online')}</p>}
           </div>
         </button>
         <button
@@ -1187,7 +1185,7 @@ export default function Chat() {
           }}
           className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
             !user?.adultVerified
-              ? 'text-gray-500 hover:text-gray-300 bg-gray-800/60'
+              ? 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/20'
               : safetyMode
                 ? 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/20'
                 : 'text-pink-300 bg-pink-500/15 hover:bg-pink-500/20'
@@ -1196,40 +1194,17 @@ export default function Chat() {
           title={!user?.adultVerified ? t('safetyMode.verifyRequired') : safetyMode ? t('safetyMode.tooltipOn') : t('safetyMode.tooltipOff')}
         >
           {!user?.adultVerified ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           ) : (
-            <span className="w-2 h-2 rounded-full" style={{ background: safetyMode ? '#34d399' : '#f472b6' }} />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3z" />
+            </svg>
           )}
           <span>{safetyMode ? 'Safety ON' : 'Safety OFF'}</span>
         </button>
-        {character.voiceId && (
-          <button
-            onClick={handleCallClick}
-            className={`relative flex items-center gap-1 px-1.5 py-1 rounded-md transition-colors ${
-              showFreeCallBadge
-                ? 'text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/15'
-                : 'text-gray-400 hover:text-indigo-300'
-            }`}
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            title={t('chat.call.start')}
-            aria-label={t('chat.call.start')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            {showFreeCallBadge && (
-              <span className="text-[10px] font-semibold leading-none">
-                {t('chat.call.freeCount', { count: remainingFreeCalls })}
-              </span>
-            )}
-            <span className="absolute -top-0.5 -right-1 px-1 py-px text-[8px] font-bold leading-none rounded-sm bg-indigo-600 text-white tracking-tight">
-              Beta
-            </span>
-          </button>
-        )}
         <button
           onClick={() => setShowReport(true)}
           className="text-gray-500 hover:text-red-400 transition-colors ml-1"
@@ -1241,83 +1216,97 @@ export default function Chat() {
             <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         </button>
+        {character.voiceId && (
+          <div
+            className={`flex items-center justify-center w-6 h-6 rounded-md ${
+              voiceMode ? 'text-emerald-300 bg-emerald-500/15' : 'text-gray-600'
+            }`}
+            title={voiceMode ? '음성 ON' : '음성 OFF'}
+            aria-label={voiceMode ? '음성 ON' : '음성 OFF'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {voiceMode ? (
+                <>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </>
+              ) : (
+                <>
+                  <line x1="18" y1="9" x2="22" y2="13" />
+                  <line x1="22" y1="9" x2="18" y2="13" />
+                </>
+              )}
+            </svg>
+          </div>
+        )}
+        <div
+          className={`flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wide ${
+            chatModel === 'ADVANCED'
+              ? 'bg-amber-500/20 text-amber-300'
+              : 'bg-gray-700/60 text-gray-300'
+          }`}
+          aria-label={chatModel === 'ADVANCED' ? t('chat.modelAdvanced') : t('chat.modelBasic')}
+        >
+          {chatModel === 'ADVANCED' ? 'ADV' : 'BASIC'}
+        </div>
+        <button
+          onClick={() => setShowStatusPanel(v => !v)}
+          className="text-gray-400 hover:text-white transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          aria-label={showStatusPanel ? '패널 접기' : '패널 펼치기'}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {showStatusPanel ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
+          </svg>
+        </button>
       </header>
 
-      <div className="relative flex-1 min-h-0">
+      <div className="absolute inset-0">
         {/* 상단 overlay — 상태 panel(접기 가능) + 액션 버튼 행 (항상 표시) */}
-        <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
-          {showStatusPanel ? (
-            <div className="bg-gray-900/95 backdrop-blur-md border-b border-gray-700/50 rounded-b-2xl px-4 pt-3 pb-3 shadow-xl animate-slide-down pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top) + 44px)' }}>
+          {showStatusPanel && (
+            <div className="bg-gray-900/75 border border-gray-800/50 rounded-2xl mx-3 mt-2 px-4 pt-3 pb-3 animate-slide-down pointer-events-auto" onClick={(e) => e.stopPropagation()}>
               {(() => {
                 const status = characterStatus || getDefaultStatus(character.activeHours)
                 const affinity = conversation.affinity ?? 0
                 const affinityLabel = t(`chat.${getAffinityLabelKey(affinity)}`)
                 return (
                   <div className="flex items-start gap-3">
-                    <span className="text-3xl leading-none">{status.emoji}</span>
-                    <div className="flex-1 min-w-0 grid grid-cols-3 gap-x-2 gap-y-2">
-                      <div>
-                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusMood')}</p>
-                        <p className="text-xs text-gray-200 truncate">{status.mood}</p>
+                    <span className="text-2xl leading-none mt-0.5 flex-shrink-0">{status.emoji}</span>
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusMood')}</span>
+                        <span className="text-xs text-gray-200">{status.mood}</span>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusLocation')}</p>
-                        <p className="text-xs text-gray-200 truncate">{status.location}</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusLocation')}</span>
+                        <span className="text-xs text-gray-200">{status.location}</span>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusActivity')}</p>
-                        <p className="text-xs text-gray-200 truncate">{status.activity}</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusActivity')}</span>
+                        <span className="text-xs text-gray-200">{status.activity}</span>
                       </div>
-                      <div data-onboarding-target="affinity">
-                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusAffinity')}</p>
-                        <p className="text-xs text-pink-300 truncate">❤️ {affinity} <span className="text-gray-400">· {affinityLabel}</span></p>
+                      <div className="flex items-baseline gap-2" data-onboarding-target="affinity">
+                        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusAffinity')}</span>
+                        <span className="text-xs text-pink-300">❤️ {affinity} <span className="text-gray-400">· {affinityLabel}</span></span>
                       </div>
-                      <div className="col-span-2">
-                        <p className="text-[10px] text-gray-500 mb-0.5">{t('chat.statusOutfit')}</p>
-                        <p className="text-xs text-gray-200 truncate">{status.outfit || '-'}</p>
-                      </div>
+                      {status.outfit && (
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">{t('chat.statusOutfit')}</span>
+                          <span className="text-xs text-gray-200">{status.outfit}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
               })()}
-              <div className="flex justify-center mt-2">
-                <button onClick={() => setShowStatusPanel(false)} className="text-gray-600" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15" /></svg>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-end px-3 pt-3 pointer-events-auto">
-              <button
-                onClick={() => setShowStatusPanel(true)}
-                className="w-9 h-9 rounded-full bg-gray-900/80 backdrop-blur-sm border border-gray-700/50 flex items-center justify-center shadow-lg hover:bg-gray-800/90 transition-colors"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                aria-label={t('chat.statusMood')}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-              </button>
             </div>
           )}
 
-          {/* 액션 버튼 5개 — 상태 panel 바로 아래, 항상 표시 */}
+          {/* 액션 버튼 — status panel과 함께 토글 */}
+          {showStatusPanel && (
           <div className="flex flex-wrap gap-2 justify-end px-3 pt-2 pointer-events-auto">
-            <button
-              onClick={() => setShowGiftSheet(true)}
-              disabled={!token}
-              className="w-11 h-11 rounded-full bg-pink-600 hover:bg-pink-500 disabled:opacity-40 flex items-center justify-center shadow-lg transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="선물하기"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 12 20 22 4 22 4 12" />
-                <rect x="2" y="7" width="20" height="5" />
-                <line x1="12" y1="22" x2="12" y2="7" />
-                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-              </svg>
-            </button>
             {(character.voiceId || tourActive) && (
               <div className="relative">
                 {excitedTooltipVisible && characterStatus?.isExcited && (
@@ -1367,6 +1356,31 @@ export default function Chat() {
                   </svg>
                 </button>
               </div>
+            )}
+            {character.voiceId && (
+              <button
+                onClick={handleCallClick}
+                className={`relative w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                  showFreeCallBadge
+                    ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400'
+                    : 'bg-indigo-600 hover:bg-indigo-500'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                aria-label={t('chat.call.start')}
+                title={t('chat.call.start')}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+                {showFreeCallBadge && (
+                  <span className="absolute -bottom-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[10px] font-bold flex items-center justify-center shadow">
+                    {remainingFreeCalls}
+                  </span>
+                )}
+                <span className="absolute -top-1 -right-1 px-1 py-px text-[8px] font-bold leading-none rounded-sm bg-indigo-500 text-white tracking-tight shadow">
+                  Beta
+                </span>
+              </button>
             )}
             <button
               onClick={() => {
@@ -1445,16 +1459,21 @@ export default function Chat() {
               {chatModel === 'ADVANCED' ? t('chat.modelAdvanced') : t('chat.modelBasic')}
             </button>
           </div>
+          )}
         </div>
 
       <div
         ref={scrollContainerRef}
-        className="h-full overflow-auto px-4 py-3 space-y-2"
-        style={backgroundImage ? {
-          backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        } : undefined}
+        className="h-full overflow-auto px-4 space-y-2"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 64px)',
+          ...(backgroundImage ? {
+            backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          } : {}),
+        }}
       >
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
@@ -1612,7 +1631,7 @@ export default function Chat() {
       </div>
       </div>
 
-      <div className="flex-shrink-0 p-3 pt-3 border-t border-gray-800 bg-gray-900/95" style={{ paddingBottom: 'calc(max(12px, env(safe-area-inset-bottom)) + 8px)' }}>
+      <div className="absolute bottom-0 left-0 right-0 z-30 px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
         {attachedFeed && (
           <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
             <img
@@ -1896,14 +1915,6 @@ export default function Chat() {
           onBackgroundChange={(url) => setBackgroundImage(url)}
           affinityBadge={showGalleryBadge}
           onAffinityBadgeClear={() => setShowGalleryBadge(false)}
-        />
-      )}
-      {showGiftSheet && (
-        <GiftBottomSheet
-          characterId={conversation.characterId}
-          characterName={character.name}
-          conversationId={conversation.id}
-          onClose={() => setShowGiftSheet(false)}
           onGiftSent={({ message, thanksMessages = [], imageBubble, affinity }) => {
             // 선물 GIFT 버블 → 캐릭터 감사 인사 → (있다면) 이미지 버블 순으로 append
             setMessages((prev) => [
@@ -1922,7 +1933,6 @@ export default function Chat() {
             if (imageBubble) {
               setGalleryTooltipText('선물 이미지가 추가됐어요!')
               setShowGalleryTooltip(true)
-              // 5초 후 자동으로 숨김
               setTimeout(() => setShowGalleryTooltip(false), 5000)
             }
           }}
