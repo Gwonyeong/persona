@@ -47,6 +47,74 @@ function SpriteMedia({ src, className = '' }) {
   return <img src={src} alt="" className={className} loading="lazy" />
 }
 
+// CallSheet 패턴 — 두 슬롯(A, B)에 이전/현재 URL을 번갈아 두고 opacity 토글로 크로스페이드.
+// `src` 변경 시 inactive 슬롯에 새 URL을 넣고 active 토글 → 옛 슬롯은 1→0, 새 슬롯은 0→1.
+// variant: 'img' (정적 img) | 'sprite' (video URL 처리 포함)
+function CrossfadeMedia({ src, className = '', style, fadeMs = 500, variant = 'img' }) {
+  const [layers, setLayers] = useState({ A: null, B: null })
+  const [activeSlot, setActiveSlot] = useState('A')
+  const lastSrcRef = useRef(null)
+
+  useEffect(() => {
+    if (!src) return
+    if (lastSrcRef.current === src) return
+    lastSrcRef.current = src
+    setActiveSlot((prev) => {
+      const next = prev === 'A' ? 'B' : 'A'
+      setLayers((prevLayers) => ({ ...prevLayers, [next]: src }))
+      return next
+    })
+  }, [src])
+
+  const renderSlot = (slot) => {
+    const url = layers[slot]
+    const slotStyle = {
+      ...style,
+      opacity: url && activeSlot === slot ? 1 : 0,
+      transition: `opacity ${fadeMs}ms ease-in-out`,
+      visibility: url ? 'visible' : 'hidden',
+    }
+    if (!url) {
+      return <div key={slot} className={className} style={slotStyle} aria-hidden="true" />
+    }
+    if (variant === 'sprite' && isVideoUrl(url)) {
+      return (
+        <video
+          key={slot}
+          src={url}
+          className={className}
+          style={slotStyle}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+        />
+      )
+    }
+    return (
+      <img
+        key={slot}
+        src={url}
+        alt=""
+        className={className}
+        style={slotStyle}
+        loading="lazy"
+        draggable={false}
+        aria-hidden="true"
+      />
+    )
+  }
+
+  return (
+    <>
+      {renderSlot('A')}
+      {renderSlot('B')}
+    </>
+  )
+}
+
 // 한글 음절(가-힣)을 자모 단계로 분해. 예: '상' → ['ㅅ', '사', '상'], '가' → ['ㄱ', '가'] (받침 없음)
 const HANGUL_INITIALS = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 const HANGUL_SYL_BASE = 0xAC00
@@ -610,7 +678,7 @@ export default function Chat() {
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
       setVoiceMode(!!conv.voiceMode)
       setSafetyMode(conv.safetyMode !== false)
-      setSpriteMode(['FULL', 'BUBBLE', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
+      setSpriteMode(['FULL', 'BUBBLE', 'BACKGROUND', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
       setChatMode(conv.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
@@ -1123,6 +1191,27 @@ export default function Chat() {
     { page: 'chatTour', key: 'changeBg', target: '[data-onboarding-target="change-bg"]', caption: t('chatTour.changeBg') },
   ], [user?.name, t])
 
+  // 최신 캐릭터 메시지의 emotion sprite URL — BUBBLE 고정 표시 + BACKGROUND 모드에서 사용.
+  // early return 전에 호출해야 hook order 안정.
+  const latestCharacterSpriteUrl = useMemo(() => {
+    if (!conversation) return null
+    const ch = conversation.character
+    if (!ch) return null
+    const style = ch.styles?.find((s) => s.id === conversation.currentStyleId) || ch.styles?.[0]
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.role !== 'CHARACTER' || !msg.emotion) continue
+      const candidates = style?.images?.filter((img) => img.emotion === msg.emotion) || []
+      if (candidates.length === 0) continue
+      if (candidates.length === 1) return candidates[0].filePath
+      const seed = String(msg.createdAt || '') + '|' + i
+      let h = 0
+      for (let s = 0; s < seed.length; s++) h = ((h << 5) - h + seed.charCodeAt(s)) | 0
+      return candidates[Math.abs(h) % candidates.length].filePath
+    }
+    return null
+  }, [messages, conversation])
+
   if (!conversation) {
     return <div className="flex items-center justify-center h-screen text-gray-400">{t('common.loading')}</div>
   }
@@ -1264,6 +1353,24 @@ export default function Chat() {
       </header>
 
       <div className="absolute inset-0">
+        {/* BACKGROUND 모드: sprite + spriteBackgroundImage 합성 레이어 (블러 처리 가능, 크로스페이드) */}
+        {spriteMode === 'BACKGROUND' && latestCharacterSpriteUrl && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {spriteBackgroundImage && (
+              <CrossfadeMedia
+                src={spriteBackgroundImage}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(2px)' }}
+              />
+            )}
+            <CrossfadeMedia
+              src={latestCharacterSpriteUrl}
+              variant="sprite"
+              className="absolute inset-0 w-full h-full object-cover object-bottom"
+            />
+            <div className="absolute inset-0 bg-black/45" />
+          </div>
+        )}
         {/* 상단 overlay — 상태 panel(접기 가능) + 액션 버튼 행 (항상 표시) */}
         <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top) + 44px)' }}>
           {showStatusPanel && (
@@ -1308,6 +1415,29 @@ export default function Chat() {
           {/* 액션 버튼 — status panel과 함께 토글 */}
           {showStatusPanel && (
           <div className="flex flex-wrap gap-2 justify-end px-3 pt-2 pointer-events-auto">
+            {character.voiceId && (
+              <button
+                onClick={handleCallClick}
+                className={`relative w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors ${
+                  showFreeCallBadge ? 'ring-2 ring-emerald-400' : ''
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                aria-label={t('chat.call.start')}
+                title={t('chat.call.start')}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={showFreeCallBadge ? '#6ee7b7' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+                {showFreeCallBadge && (
+                  <span className="absolute -bottom-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[10px] font-bold flex items-center justify-center shadow">
+                    {remainingFreeCalls}
+                  </span>
+                )}
+                <span className="absolute -top-1 -right-1 px-1 py-px text-[8px] font-bold leading-none rounded-sm bg-gray-600 text-white tracking-tight shadow">
+                  β
+                </span>
+              </button>
+            )}
             <div className="relative">
               {showGalleryTooltip && (
                 <div className="absolute top-full right-0 mt-2 whitespace-nowrap pointer-events-none animate-fade-in z-30">
@@ -1350,15 +1480,22 @@ export default function Chat() {
       <div
         ref={scrollContainerRef}
         className="h-full overflow-auto px-4 space-y-2"
-        style={{
-          paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
-          ...(backgroundImage ? {
-            backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          } : {}),
-        }}
+        style={(() => {
+          const base = {
+            paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
+          }
+          // BACKGROUND 모드는 별도 레이어로 처리. 갤러리 배경(기본)만 여기서 그림.
+          if (spriteMode !== 'BACKGROUND' && backgroundImage) {
+            return {
+              ...base,
+              backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }
+          }
+          return base
+        })()}
       >
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
@@ -1394,27 +1531,6 @@ export default function Chat() {
             !nextMsg || nextMsg.role !== msg.role || nextMsg.role === 'NARRATION' || nextMsg.role === 'GENERATED_IMAGE' ||
             formatChatTime(msg.createdAt) !== formatChatTime(nextMsg.createdAt)
           )
-          // 캐릭터 메시지의 emotion → currentStyle.images에서 sprite URL 찾기.
-          // spriteMode별 렌더 분기 — 모두 라운드 마지막 메시지 다음에 별도 행으로 출력.
-          //  - 'OFF'     : 미출력
-          //  - 'BUBBLE'  : 캐릭터 좌측 버블 형태 (max-w-[75%], 9:16, max-h 320)
-          //  - 'FULL'    : 풀폭 9:16
-          const isEndOfCharRound = msg.role === 'CHARACTER' && msg.emotion
-            && (!messages[idx + 1] || messages[idx + 1].role !== 'CHARACTER')
-          // 같은 emotion에 여러 이미지가 있을 수 있음 → 메시지별 결정적 랜덤(시드 = createdAt+idx)으로 1장 선택.
-          // 같은 메시지가 다시 렌더돼도 같은 이미지가 나오도록 안정성 확보.
-          const spriteUrl = (() => {
-            if (!isEndOfCharRound) return null
-            const candidates = currentStyle?.images?.filter((img) => img.emotion === msg.emotion) || []
-            if (candidates.length === 0) return null
-            if (candidates.length === 1) return candidates[0].filePath
-            const seed = String(msg.createdAt || '') + '|' + idx
-            let h = 0
-            for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0
-            return candidates[Math.abs(h) % candidates.length].filePath
-          })()
-          const bubbleComposite = (spriteMode === 'BUBBLE' && spriteUrl) ? spriteUrl : null
-          const fullComposite = (spriteMode === 'FULL' && spriteUrl) ? spriteUrl : null
           return (
             <Fragment key={msg.id || idx}>
               <MessageBubble
@@ -1438,55 +1554,30 @@ export default function Chat() {
                 onAppear={handleBubbleAppear}
                 t={t}
               />
-              {bubbleComposite && (
-                <div className="flex justify-start mt-2">
-                  {/* 아바타 자리 (연속 캐릭터 메시지처럼 비워둠) */}
-                  <div className="w-7 flex-shrink-0 mr-2" />
-                  <div className="max-w-[75%] w-[60%]">
-                    <div
-                      className="relative rounded-2xl rounded-tl-none overflow-hidden bg-gray-800 cursor-pointer"
-                      style={{ aspectRatio: '9 / 16', maxHeight: 320 }}
-                      onClick={() => setLightboxUrl({ url: bubbleComposite, bgUrl: spriteBackgroundImage })}
-                    >
-                      {spriteBackgroundImage && (
-                        <img
-                          src={spriteBackgroundImage}
-                          alt=""
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      )}
-                      <SpriteMedia
-                        src={bubbleComposite}
-                        className="absolute inset-0 w-full h-full object-contain object-bottom"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {fullComposite && (
-                <div
-                  className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
-                  style={{ aspectRatio: '9 / 16' }}
-                  onClick={() => setLightboxUrl({ url: fullComposite, bgUrl: spriteBackgroundImage })}
-                >
-                  {spriteBackgroundImage && (
-                    <img
-                      src={spriteBackgroundImage}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  )}
-                  <SpriteMedia
-                    src={fullComposite}
-                    className="absolute inset-0 w-full h-full object-contain object-bottom"
-                  />
-                </div>
-              )}
             </Fragment>
           )
         })}
+        {/* FULL 모드: 메시지 목록 끝에 1회만 표시 — 최신 캐릭터 표정 sprite (크로스페이드) */}
+        {spriteMode === 'FULL' && latestCharacterSpriteUrl && (
+          <div
+            className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
+            style={{ aspectRatio: '9 / 16' }}
+            onClick={() => setLightboxUrl({ url: latestCharacterSpriteUrl, bgUrl: spriteBackgroundImage })}
+          >
+            {spriteBackgroundImage && (
+              <CrossfadeMedia
+                src={spriteBackgroundImage}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(2px)' }}
+              />
+            )}
+            <CrossfadeMedia
+              src={latestCharacterSpriteUrl}
+              variant="sprite"
+              className="absolute inset-0 w-full h-full object-cover object-bottom"
+            />
+          </div>
+        )}
         {showTyping && (
           <div className="flex justify-start mt-3">
             <div className="w-7 flex-shrink-0 mr-2">
@@ -1517,6 +1608,29 @@ export default function Chat() {
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 z-30">
+        {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드) */}
+        {spriteMode === 'BUBBLE' && latestCharacterSpriteUrl && (
+          <div className="flex justify-end px-3 mb-1.5">
+            <div
+              className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+              style={{ aspectRatio: '9 / 16' }}
+              onClick={() => setLightboxUrl({ url: latestCharacterSpriteUrl, bgUrl: spriteBackgroundImage })}
+            >
+              {spriteBackgroundImage && (
+                <CrossfadeMedia
+                  src={spriteBackgroundImage}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  style={{ filter: 'blur(2px)' }}
+                />
+              )}
+              <CrossfadeMedia
+                src={latestCharacterSpriteUrl}
+                variant="sprite"
+                className="absolute inset-0 w-full h-full object-cover object-bottom"
+              />
+            </div>
+          </div>
+        )}
         {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치 */}
         <div className="flex items-center gap-2 px-3 mb-1.5">
           <div className="ml-auto relative h-8 flex items-center justify-end">
@@ -1561,17 +1675,19 @@ export default function Chat() {
                     })
                   }}
                   disabled={!token || (tourActive && !character.voiceId)}
-                  className={`w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
+                  className={`relative w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
                     characterStatus?.isExcited
                       ? 'ring-2 ring-red-400'
                       : voiceMode
                         ? 'ring-2 ring-emerald-400'
-                        : ''
+                        : canUseFreeVoice
+                          ? 'ring-2 ring-emerald-400'
+                          : ''
                   } disabled:opacity-40`}
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   data-onboarding-target="voice-btn"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={canUseFreeVoice && !characterStatus?.isExcited ? '#6ee7b7' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                     {voiceMode ? (
                       <>
@@ -1585,31 +1701,13 @@ export default function Chat() {
                       </>
                     )}
                   </svg>
+                  {canUseFreeVoice && (
+                    <span className="absolute -bottom-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[9px] font-bold flex items-center justify-center shadow">
+                      {remainingFreeVoiceUses}
+                    </span>
+                  )}
                 </button>
               </div>
-            )}
-            {character.voiceId && (
-              <button
-                onClick={handleCallClick}
-                className={`relative w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
-                  showFreeCallBadge ? 'ring-2 ring-emerald-400' : ''
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                aria-label={t('chat.call.start')}
-                title={t('chat.call.start')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={showFreeCallBadge ? '#6ee7b7' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                </svg>
-                {showFreeCallBadge && (
-                  <span className="absolute -bottom-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[9px] font-bold flex items-center justify-center shadow">
-                    {remainingFreeCalls}
-                  </span>
-                )}
-                <span className="absolute -top-1 -right-1 px-0.5 py-px text-[7px] font-bold leading-none rounded-sm bg-gray-600 text-white tracking-tight shadow">
-                  β
-                </span>
-              </button>
             )}
             <button
               onClick={() => {
@@ -1984,11 +2082,11 @@ export default function Chat() {
               style={{ aspectRatio: '9 / 16', height: '90vh', maxWidth: '90vw' }}
             >
               {lightboxUrl.bgUrl && (
-                <img src={lightboxUrl.bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                <img src={lightboxUrl.bgUrl} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(2px)' }} />
               )}
               <SpriteMedia
                 src={lightboxUrl.url}
-                className="absolute inset-0 w-full h-full object-contain object-bottom"
+                className="absolute inset-0 w-full h-full object-cover object-bottom"
               />
             </div>
           ) : isVideoUrl(lightboxUrl) ? (
