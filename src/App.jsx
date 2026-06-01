@@ -62,6 +62,7 @@ import InquiryWrite from './pages/user/InquiryWrite'
 import UserNotifications from './pages/user/Notifications'
 import MessageNotification from './components/MessageNotification'
 import WelcomeMaskSheet from './components/WelcomeMaskSheet'
+import ImpersonationBanner from './components/ImpersonationBanner'
 
 function App() {
   const { token, setToken, setUser, clearAuth } = useStore()
@@ -167,6 +168,7 @@ function App() {
   return (
     <>
     <MessageNotification />
+    <ImpersonationBanner />
     <Routes>
       {/* 어드민 */}
       <Route path="/admin" element={<AdminLayout />}>
