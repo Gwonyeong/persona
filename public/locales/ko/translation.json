@@ -127,6 +127,7 @@
       "costPerTurn": "1턴당 마스크 {{count}}개",
       "errorSend": "전송에 실패했어요",
       "errorEmpty": "말소리가 감지되지 않았어요",
+      "errorInvalidAudio": "음성이 잘 들리지 않았어요. 다시 한 번 말해주세요",
       "errorInsufficientMasks": "마스크가 부족해요",
       "you": "나",
       "muteSelf": "내 마이크 음소거",
