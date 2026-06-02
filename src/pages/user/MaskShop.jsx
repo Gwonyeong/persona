@@ -125,7 +125,7 @@ export default function MaskShop() {
       if (meRes.user) useStore.getState().setUser(meRes.user)
     } catch (err) {
       const msg = err?.message || ''
-      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
+      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled') && !msg.includes('Purchase is not purchased')) {
         setSubError(msg || t('subscription.subscribeError'))
       }
     }
@@ -209,7 +209,7 @@ export default function MaskShop() {
       }
     } catch (err) {
       const msg = err?.message || ''
-      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
+      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled') && !msg.includes('Purchase is not purchased')) {
         setPurchaseError(msg || t('myPage.purchaseFailed'))
       }
     }

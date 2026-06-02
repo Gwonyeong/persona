@@ -116,7 +116,7 @@ export default function Subscription() {
       navigate('/my')
     } catch (err) {
       const msg = err?.message || ''
-      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
+      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled') && !msg.includes('Purchase is not purchased')) {
         setErrorMsg(msg || t('subscription.subscribeError'))
       }
     }
