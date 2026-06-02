@@ -127,6 +127,7 @@
       "costPerTurn": "1ターンあたりマスク {{count}}個",
       "errorSend": "送信に失敗しました",
       "errorEmpty": "音声が検出されませんでした",
+      "errorInvalidAudio": "音声がうまく聞き取れませんでした。もう一度お話しください",
       "errorInsufficientMasks": "マスクが足りません",
       "you": "あなた",
       "muteSelf": "マイクをミュート",

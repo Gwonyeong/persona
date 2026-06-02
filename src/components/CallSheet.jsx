@@ -72,6 +72,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
         SUBSCRIPTION_REQUIRED: t('chat.call.needLight'),
         INSUFFICIENT_MASKS: t('chat.call.errorInsufficientMasks'),
         EMPTY_TRANSCRIPT: t('chat.call.errorEmpty'),
+        INVALID_AUDIO: t('chat.call.errorInvalidAudio'),
       }
       setErrorMsg(map[err.code] || t('chat.call.errorSend'))
     },

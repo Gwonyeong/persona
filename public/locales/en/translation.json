@@ -127,6 +127,7 @@
       "costPerTurn": "{{count}} mask(s) per turn",
       "errorSend": "Failed to send",
       "errorEmpty": "No speech detected",
+      "errorInvalidAudio": "Couldn't hear you clearly. Please try again",
       "errorInsufficientMasks": "Not enough masks",
       "you": "You",
       "muteSelf": "Mute my microphone",
