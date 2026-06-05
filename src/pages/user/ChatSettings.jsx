@@ -29,6 +29,9 @@ export default function ChatSettings() {
   const [chatMode, setChatMode] = useState('ROLEPLAY')
   const [nicknameMode, setNicknameMode] = useState('NAME')
   const [customNickname, setCustomNickname] = useState('')
+  // V2 채팅 — 배경 이미지를 AI가 자동 갱신하므로 spriteMode 'BACKGROUND' 옵션 비활성화.
+  // 판별: conversation.dataV2 또는 conversation.character.promptDataV2 존재 여부.
+  const [isV2, setIsV2] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingChatMode, setSavingChatMode] = useState(false)
@@ -48,6 +51,8 @@ export default function ChatSettings() {
         const mode = resolveNicknameMode(stored)
         setNicknameMode(mode)
         setCustomNickname(mode === 'CUSTOM' ? stored : '')
+        // V2 판별 — dataV2 또는 character.promptDataV2 존재 시
+        setIsV2(!!(conversation?.dataV2 || conversation?.character?.promptDataV2))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -162,6 +167,8 @@ export default function ChatSettings() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+        {/* V2 채팅에서는 채팅모드 설정 미노출 — 스토리 모드는 항상 ROLEPLAY 형식 (narration/행동 표시) */}
+        {!isV2 && (
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.chatMode.heading')}</h2>
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.chatMode.description')}</p>
@@ -195,13 +202,14 @@ export default function ChatSettings() {
             })}
           </div>
         </section>
+        )}
 
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.spriteMode.heading')}</h2>
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.spriteMode.description')}</p>
 
           <div className="space-y-2">
-            {SPRITE_MODES.map((mode) => {
+            {SPRITE_MODES.filter((mode) => !(isV2 && mode === 'BACKGROUND')).map((mode) => {
               const selected = spriteMode === mode
               return (
                 <button
@@ -230,6 +238,8 @@ export default function ChatSettings() {
           </div>
         </section>
 
+        {/* V2 채팅에서는 호칭 설정 미노출 — preset/Planner가 상황별 호칭(사장님/오빠 등)을 자동 결정 */}
+        {!isV2 && (
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.nickname.heading')}</h2>
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.nickname.description')}</p>
@@ -288,6 +298,7 @@ export default function ChatSettings() {
             })}
           </div>
         </section>
+        )}
       </div>
     </div>
   )

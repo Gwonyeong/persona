@@ -250,11 +250,13 @@ export default function ChatList() {
                 const previewMsg = conv.lastCharMessage || conv.messages?.[0]
                 const isUnread = conv.updatedAt && (!conv.lastReadAt || new Date(conv.updatedAt) > new Date(conv.lastReadAt))
                 const onlineStatus = getCharacterOnlineStatus(conv.character.activeHours)
+                // V2(스토리) 채팅 — 서버가 isV2 boolean으로 표시 (dataV2 자체는 응답 size 절감 위해 제외).
+                const isV2 = !!conv.isV2
 
                 return (
                   <div key={`c-${conv.id}`} className="flex items-center">
                     <button
-                      onClick={() => navigate(`/chats/${conv.id}`)}
+                      onClick={() => navigate(isV2 ? `/chats-v2/${conv.id}` : `/chats/${conv.id}`)}
                       className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 hover:bg-gray-900/60 transition-colors text-left group"
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     >
@@ -276,6 +278,11 @@ export default function ChatList() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className={`font-semibold text-sm truncate ${isUnread ? 'text-white' : 'text-gray-300'}`}>{conv.character.name}</p>
+                          {isV2 && (
+                            <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-px rounded-md bg-violet-500/20 text-violet-300 border border-violet-400/30">
+                              스토리
+                            </span>
+                          )}
                           <span className="text-xs text-gray-500 flex-shrink-0">{timeAgo(conv.updatedAt)}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">

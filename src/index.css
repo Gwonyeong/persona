@@ -48,6 +48,15 @@ body:has(.admin-layout) #root {
   50% { opacity: 0.2; }
 }
 
+/* V2 이벤트 카드 — 진행 중 에피소드 보더 초록색 깜빡임 (무한 반복) */
+@keyframes episodeActiveBorder {
+  0%, 100% { border-color: rgba(74, 222, 128, 0.95); box-shadow: 0 0 12px rgba(74, 222, 128, 0.55); }
+  50%      { border-color: rgba(74, 222, 128, 0.3);  box-shadow: 0 0 0 rgba(74, 222, 128, 0); }
+}
+.episode-active-border {
+  animation: episodeActiveBorder 1.4s ease-in-out infinite;
+}
+
 /* 토스트 — 우측에서 등장(슬라이드 인) → 잠시 머무름 → 우측으로 사라짐(슬라이드 아웃) */
 @keyframes toastSlideInOut {
   0% { transform: translateX(120%); opacity: 0; }

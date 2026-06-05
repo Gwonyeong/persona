@@ -62,6 +62,12 @@ export default function CharacterDetail() {
   const voiceAudioRef = useRef(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [v2Presets, setV2Presets] = useState(null)        // { v2Enabled, startingPresets } | null
+  const [existingV2Conv, setExistingV2Conv] = useState(null) // V2(스토리) conversation 별도 체크
+  // 통합 채팅 모달 — 메시지 보내기 버튼 클릭 시 진입점.
+  //   step 'mode': 기본 채팅 vs 컨셉 채팅 선택
+  //   step 'preset': 컨셉 채팅의 preset 3개 선택
+  const [chatModal, setChatModal] = useState({ open: false, step: 'mode' })
   const [showReport, setShowReport] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
   const [storylines, setStorylines] = useState([])
@@ -130,12 +136,17 @@ export default function CharacterDetail() {
 
   useEffect(() => {
     if (!token) return
+    // V1과 V2 conversation 별도 체크 — 모달에 각 모드별 "이어서" 상태 표시.
     api.get(`/conversations/check/${id}`)
-      .then((data) => {
-        if (data.exists) setExistingConv(data)
-        else setExistingConv(null)
-      })
+      .then((data) => setExistingConv(data?.exists ? data : null))
       .catch(() => setExistingConv(null))
+    api.get(`/v2/conversations/check/${id}`)
+      .then((data) => setExistingV2Conv(data?.exists ? data : null))
+      .catch(() => setExistingV2Conv(null))
+    // V2 preset 정보 미리 fetch — 모달 1단계 카드 "컨셉 채팅" 비활성 여부 결정용
+    api.get(`/v2/characters/${id}/presets`)
+      .then((data) => setV2Presets(data))
+      .catch(() => setV2Presets(null))
     api.get(`/follows/${id}`)
       .then(({ following }) => setIsFollowing(following))
       .catch(() => {})
@@ -155,15 +166,27 @@ export default function CharacterDetail() {
     }
   }
 
-  const startChat = async () => {
+  // 메시지 보내기 버튼 클릭 진입점 — 항상 통합 모달 오픈.
+  const openChatModal = () => {
     if (!token) { goToLogin(navigate); return }
+    setChatModal({ open: true, step: 'mode' })
+  }
+  const closeChatModal = () => setChatModal({ open: false, step: 'mode' })
+
+  // === 기본 채팅 (V1) ===
+  // V1 conversation 이어서: 그대로 navigate. 없으면 새로 생성.
+  const handleBasicResume = () => {
+    if (!existingConv) return handleBasicStart()
+    navigate(`/chats/${existingConv.conversationId}`)
+  }
+  const handleBasicStart = async () => {
+    closeChatModal()
     setStarting(true)
     try {
       const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id) })
       window.gtag?.('event', 'chat_start', { character_id: id, conversation_id: conversation.id })
       if (shouldShowReview(conversationCount)) {
         setShowReviewModal(true)
-        // 리뷰 모달 후 채팅으로 이동
         window.__pendingChatId = conversation.id
       } else {
         navigate(`/chats/${conversation.id}`)
@@ -176,11 +199,55 @@ export default function CharacterDetail() {
       setStarting(false)
     }
   }
-
-  const resumeChat = () => {
-    if (!token) { goToLogin(navigate); return }
-    if (existingConv) navigate(`/chats/${existingConv.conversationId}`)
+  // 기본 채팅 새로 시작 (existing reset)
+  const handleBasicReset = async () => {
+    if (!existingConv) return handleBasicStart()
+    closeChatModal()
+    setStarting(true)
+    try {
+      const { conversation } = await api.post(`/conversations/${existingConv.conversationId}/reset`)
+      navigate(`/chats/${conversation.id}`)
+    } catch (error) {
+      console.error(error)
+      setStarting(false)
+    }
   }
+
+  // === 컨셉 채팅 (V2/스토리) ===
+  // V2 conversation 이어서: 그대로 navigate.
+  const handleConceptResume = () => {
+    if (!existingV2Conv) return setChatModal({ open: true, step: 'preset' })
+    navigate(`/chats-v2/${existingV2Conv.conversationId}`)
+  }
+  // preset 선택 → V2 conversation 생성/reset + init → /chats-v2 진입
+  const handleConceptPresetPick = async (presetId) => {
+    closeChatModal()
+    setStarting(true)
+    try {
+      // 기존 V2 있으면 reset + 새 preset init, 없으면 신규 V2 conversation 생성
+      let conversationId
+      if (existingV2Conv) {
+        await api.post(`/v2/conversations/${existingV2Conv.conversationId}/reset`)
+        conversationId = existingV2Conv.conversationId
+        await api.post(`/v2/conversations/${conversationId}/init`, { presetId })
+      } else {
+        const { conversation } = await api.post('/v2/conversations', { characterId: parseInt(id), presetId })
+        conversationId = conversation.id
+      }
+      window.gtag?.('event', 'chat_start_v2', { character_id: id, conversation_id: conversationId, preset_id: presetId })
+      navigate(`/chats-v2/${conversationId}`)
+    } catch (error) {
+      console.error('handleConceptPresetPick error:', error)
+      if (error?.data?.error === 'CHARACTER_LIMIT_REACHED') {
+        setToast(t('character.freeLimitReached', { limit: error.data.limit }))
+      }
+      setStarting(false)
+    }
+  }
+
+  // 더 이상 사용 안 함 — 모달 핸들러로 대체. 외부 참조 회피 위해 안전 stub만 유지.
+  const startChat = openChatModal
+  const resumeChat = openChatModal
 
   const resetChat = async () => {
     setShowResetModal(false)
@@ -532,19 +599,7 @@ export default function CharacterDetail() {
             >
               {isFollowing ? t('character.unfollow') : t('character.follow')}
             </button>
-            {(existingConv || tourActive) && (
-              <div className="flex justify-end">
-                <button
-                  onClick={() => existingConv && !tourActive && setShowResetModal(true)}
-                  disabled={starting}
-                  className="py-1.5 px-4 text-xs text-red-400 font-semibold rounded-lg border border-red-400/30 hover:bg-red-400/10 disabled:opacity-50 transition-colors"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  data-onboarding-target="restart"
-                >
-                  {t('character.restart')}
-                </button>
-              </div>
-            )}
+            {/* 새로하기 버튼은 통합 모달 안으로 이동 — 메인 화면에서 제거. */}
           </div>
 
           {/* 스토리 목록 — 시나리오 카드 + 단독 스토리 카드 혼합 노출 */}
@@ -898,7 +953,7 @@ export default function CharacterDetail() {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
       >
         <button
-          onClick={existingConv ? resumeChat : startChat}
+          onClick={openChatModal}
           disabled={starting}
           className="w-full py-3.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 disabled:opacity-50 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -1022,33 +1077,7 @@ export default function CharacterDetail() {
         </div>
       )}
 
-      {/* 리셋 경고 모달 */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
-          <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-white mb-2">{t('character.restartTitle')}</h3>
-            <p className="text-sm text-gray-400 leading-relaxed mb-6">
-              {t('character.restartDesc')}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowResetModal(false)}
-                className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={resetChat}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-colors text-sm font-medium"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {t('character.restartConfirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 기존 리셋 모달은 통합 모달 안의 '새로 시작' 옵션으로 흡수됨 — 제거. */}
 
       {showReport && (
         <ReportModal
@@ -1081,6 +1110,204 @@ export default function CharacterDetail() {
         steps={tourSteps}
         onComplete={completeTour}
       />
+
+      {/* 통합 채팅 모드 모달 — 메시지 보내기 진입점. 2단계: 모드 선택 → (컨셉 채팅 시) preset 선택. */}
+      {chatModal.open && (
+        <div
+          onClick={() => !starting && closeChatModal()}
+          className="absolute inset-0 z-50 flex items-end justify-center bg-black/55"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 max-h-[82vh] overflow-y-auto"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+          >
+            {/* 헤더 */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                {chatModal.step === 'mode' && (
+                  <>
+                    <h3 className="text-base font-bold text-white">대화 시작</h3>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{character?.name}와(과) 어떻게 만날까요?</p>
+                  </>
+                )}
+                {chatModal.step === 'preset' && (
+                  <>
+                    <h3 className="text-base font-bold text-white">시작 상태 선택</h3>
+                    <p className="text-[11px] text-gray-400 mt-0.5">관계의 출발점에 따라 호감도/친밀도가 달라집니다.</p>
+                  </>
+                )}
+                {(chatModal.step === 'confirm-basic' || chatModal.step === 'confirm-concept') && (
+                  <>
+                    <h3 className="text-base font-bold text-white">대화를 새로 시작할까요?</h3>
+                    <p className="text-[11px] text-red-300 mt-0.5">기존 대화 내용이 삭제되며 되돌릴 수 없습니다.</p>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => !starting && closeChatModal()}
+                disabled={starting}
+                className="text-gray-400 hover:text-white text-2xl leading-none"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                ×
+              </button>
+            </div>
+
+            {chatModal.step === 'mode' && (
+              <div className="flex flex-col gap-2.5">
+                {/* 기본 채팅 카드 */}
+                <div className="rounded-2xl border border-gray-700/60 bg-gray-800/40 p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-2xl leading-none mt-0.5">💬</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white">기본 채팅</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">자유롭게 대화하는 일반 모드</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={existingConv ? handleBasicResume : handleBasicStart}
+                      disabled={starting}
+                      className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {existingConv ? '이어서 대화' : '대화 시작'}
+                    </button>
+                    {existingConv && (
+                      <button
+                        onClick={() => setChatModal({ open: true, step: 'confirm-basic' })}
+                        disabled={starting}
+                        className="px-3 py-2.5 text-[11px] text-red-300 border border-red-400/40 hover:bg-red-400/10 disabled:opacity-50 rounded-xl transition-colors"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        새로 시작
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 컨셉 채팅 카드 — V2 활성 캐릭터에만 노출 */}
+                {v2Presets?.v2Enabled && v2Presets?.startingPresets?.length > 0 && (
+                  <div className="rounded-2xl border border-violet-500/40 bg-violet-500/8 p-4">
+                    <div className="flex items-start gap-3 mb-3">
+                      <span className="text-2xl leading-none mt-0.5">🎬</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-violet-100">컨셉 채팅</p>
+                          <span className="text-[9px] font-bold px-1.5 py-px rounded-md bg-violet-500/30 text-violet-200 border border-violet-400/40 tracking-wide">
+                            스토리
+                          </span>
+                          <span className="text-[9px] font-bold px-1.5 py-px rounded-md bg-amber-400/25 text-amber-200 border border-amber-300/50 tracking-wide">
+                            추천
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-violet-200/70 mt-0.5">에피소드·시간·관계가 진화하는 미연시 모드</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {existingV2Conv ? (
+                        <>
+                          <button
+                            onClick={handleConceptResume}
+                            disabled={starting}
+                            className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            이어서 진행
+                          </button>
+                          <button
+                            onClick={() => setChatModal({ open: true, step: 'confirm-concept' })}
+                            disabled={starting}
+                            className="px-3 py-2.5 text-[11px] text-violet-200 border border-violet-400/40 hover:bg-violet-400/10 disabled:opacity-50 rounded-xl transition-colors"
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          >
+                            새로 시작
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setChatModal({ open: true, step: 'preset' })}
+                          disabled={starting}
+                          className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          스토리 시작
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {chatModal.step === 'preset' && v2Presets?.startingPresets?.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setChatModal({ open: true, step: 'mode' })}
+                  disabled={starting}
+                  className="self-start text-[11px] text-gray-400 hover:text-white mb-1 flex items-center gap-1"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  ← 모드 다시 선택
+                </button>
+                {v2Presets.startingPresets.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleConceptPresetPick(p.id)}
+                    disabled={starting}
+                    className="text-left p-3.5 rounded-2xl border border-violet-500/40 bg-violet-500/8 hover:bg-violet-500/15 disabled:opacity-50 transition-colors"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="text-sm font-semibold text-violet-100">{p.label}</div>
+                    <div className="text-[11px] text-violet-200/80 mt-1">{p.description}</div>
+                    <div className="text-[10px] text-violet-300/60 mt-1.5 flex gap-2 flex-wrap">
+                      <span>친밀도 {p.familiarity} · 호감도 {p.affinity}</span>
+                      {p.userNickname && <span>· 호칭 <strong className="text-violet-200">{p.userNickname}</strong></span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {(chatModal.step === 'confirm-basic' || chatModal.step === 'confirm-concept') && (
+              <div className="flex flex-col gap-3">
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/8 p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl leading-none mt-0.5">⚠️</span>
+                    <div className="flex-1 min-w-0 text-[12px] text-red-100/90 leading-relaxed">
+                      {chatModal.step === 'confirm-basic'
+                        ? '지금까지 나눈 기본 채팅 대화 기록이 모두 삭제되고 새 대화로 시작합니다.'
+                        : '지금까지 진행된 컨셉 채팅(스토리)의 호감도·친밀도·에피소드 진행 상황이 모두 초기화됩니다.'}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setChatModal({ open: true, step: 'mode' })}
+                    disabled={starting}
+                    className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-200 text-sm font-semibold rounded-xl transition-colors"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (chatModal.step === 'confirm-basic') handleBasicReset()
+                      else setChatModal({ open: true, step: 'preset' })
+                    }}
+                    disabled={starting}
+                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    삭제하고 새로 시작
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
