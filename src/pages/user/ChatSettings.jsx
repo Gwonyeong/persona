@@ -167,6 +167,8 @@ export default function ChatSettings() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+        {/* V2 채팅에서는 채팅모드 설정 미노출 — 스토리 모드는 항상 ROLEPLAY 형식 (narration/행동 표시) */}
+        {!isV2 && (
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.chatMode.heading')}</h2>
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.chatMode.description')}</p>
@@ -200,6 +202,7 @@ export default function ChatSettings() {
             })}
           </div>
         </section>
+        )}
 
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.spriteMode.heading')}</h2>
@@ -235,6 +238,8 @@ export default function ChatSettings() {
           </div>
         </section>
 
+        {/* V2 채팅에서는 호칭 설정 미노출 — preset/Planner가 상황별 호칭(사장님/오빠 등)을 자동 결정 */}
+        {!isV2 && (
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.nickname.heading')}</h2>
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.nickname.description')}</p>
@@ -293,6 +298,7 @@ export default function ChatSettings() {
             })}
           </div>
         </section>
+        )}
       </div>
     </div>
   )

@@ -238,6 +238,177 @@ function useJamoTypewriter(fullText, shouldAnimate) {
   return fullText || ''
 }
 
+// V2 스트리밍 메시지의 인위적 char 노출 속도 (ms/글자).
+// 위쪽 TYPING_SPEED_MS(자모 typewriter 훅용)와는 별개 — V2는 char 단위 단순 typewriter.
+// 0이면 비활성 (즉시 전체 표시). 환경변수로 오버라이드 가능.
+const V2_CHAR_TYPING_MS = Number(import.meta.env.VITE_V2_TYPING_SPEED_MS) || 25
+
+// 캐릭터 상태(시간/장소/기분 등) 변화를 메시지 위에 작은 카드로 표시.
+// 표시할 필드 + 라벨 + 아이콘 매핑.
+const STATUS_DIFF_FIELDS = [
+  { key: 'timeLabel', icon: '🕐' },
+  { key: 'location', icon: '📍' },
+  { key: 'activity', icon: '💼' },
+  { key: 'mood', icon: '😌' },
+  { key: 'outfit', icon: '👕' },
+]
+
+function computeStatusDiff(prev, curr) {
+  if (!prev || !curr) return null
+  const changes = []
+  for (const f of STATUS_DIFF_FIELDS) {
+    const a = (prev[f.key] || '').trim()
+    const b = (curr[f.key] || '').trim()
+    if (a && b && a !== b) changes.push({ icon: f.icon, from: a, to: b })
+  }
+  return changes.length > 0 ? changes : null
+}
+
+// MEETING ↔ DM 모드 전환 시점에 그어지는 강조 디바이더.
+// 같이 있던 → 떨어진 (DM) 또는 떨어져 있던 → 같이 있게 됨 (MEETING) 전환을 시각적으로 명확히.
+function ModeChangeDivider({ to }) {
+  const isMeeting = to === 'MEETING'
+  return (
+    <div className="flex items-center gap-2 my-5 px-4">
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent to-gray-600/50" />
+      <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border shadow-sm ${
+        isMeeting
+          ? 'bg-amber-500/10 border-amber-400/40'
+          : 'bg-indigo-500/10 border-indigo-400/40'
+      }`}>
+        <span className="text-sm leading-none">{isMeeting ? '🤝' : '📱'}</span>
+        <span className={`text-[11px] font-semibold tracking-wide ${
+          isMeeting ? 'text-amber-200' : 'text-indigo-200'
+        }`}>
+          {isMeeting ? '함께 있음' : '메신저 대화'}
+        </span>
+      </div>
+      <div className="flex-1 h-px bg-gradient-to-l from-transparent to-gray-600/50" />
+    </div>
+  )
+}
+
+// 상태 패널 — 시간/에피소드/기분/장소/활동/호감도/복장 표시.
+// 각 행마다 useChangeHighlight 훅 사용하므로 별도 컴포넌트로 분리 (IIFE 안에서는 훅 호출 불가).
+// 변경된 항목은 라벨 색이 emerald-300으로 강조 + 4초 후 원복.
+function StatusPanel({ status, currentTimeLabel, activeEpisode, affinity, affinityLabel, t }) {
+  const moodH = useChangeHighlight(status.mood)
+  const locationH = useChangeHighlight(status.location)
+  const activityH = useChangeHighlight(status.activity)
+  const outfitH = useChangeHighlight(status.outfit)
+  const timeH = useChangeHighlight(currentTimeLabel)
+  const episodeH = useChangeHighlight(activeEpisode?.id)
+
+  const labelBase = 'text-[10px] font-medium w-12 flex-shrink-0 transition-colors duration-500'
+  const labelOn = 'text-emerald-300'
+  const labelOff = 'text-gray-300'
+
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-2xl leading-none mt-0.5 flex-shrink-0">{status.emoji}</span>
+      <div className="flex-1 min-w-0 space-y-1.5">
+        {currentTimeLabel && (
+          <div className="flex items-baseline gap-2">
+            <span className={`${labelBase} ${timeH ? labelOn : labelOff}`}>시간</span>
+            <span className="text-xs text-amber-200">⏰ <TypingText value={currentTimeLabel} /></span>
+          </div>
+        )}
+        {activeEpisode && activeEpisode.snapshot && (
+          <div className="flex items-baseline gap-2">
+            <span className={`${labelBase} ${episodeH ? labelOn : labelOff}`}>에피소드</span>
+            <span className="text-xs text-violet-200">
+              🎬 <TypingText value={activeEpisode.snapshot.title} />
+              <span className="text-gray-400 ml-1">({(activeEpisode.turnsElapsed ?? 0) + 1}/{activeEpisode.snapshot.duration})</span>
+            </span>
+          </div>
+        )}
+        <div className="flex items-baseline gap-2">
+          <span className={`${labelBase} ${moodH ? labelOn : labelOff}`}>{t('chat.statusMood')}</span>
+          <TypingText value={status.mood} className="text-xs text-gray-200" />
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className={`${labelBase} ${locationH ? labelOn : labelOff}`}>{t('chat.statusLocation')}</span>
+          <TypingText value={status.location} className="text-xs text-gray-200" />
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className={`${labelBase} ${activityH ? labelOn : labelOff}`}>{t('chat.statusActivity')}</span>
+          <TypingText value={status.activity} className="text-xs text-gray-200" />
+        </div>
+        <div className="flex items-baseline gap-2" data-onboarding-target="affinity">
+          <span className={`${labelBase} ${labelOff}`}>{t('chat.statusAffinity')}</span>
+          <span className="text-xs text-pink-300">❤️ {affinity} <span className="text-gray-400">· {affinityLabel}</span></span>
+        </div>
+        {status.outfit && (
+          <div className="flex items-baseline gap-2">
+            <span className={`${labelBase} ${outfitH ? labelOn : labelOff}`}>{t('chat.statusOutfit')}</span>
+            <TypingText value={status.outfit} className="text-xs text-gray-200" />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// 값이 바뀐 직후 일정 시간 동안 highlighted=true. 첫 마운트나 빈 → 값 전환은 highlight 안 함.
+function useChangeHighlight(value, durationMs = 4000) {
+  const [highlighted, setHighlighted] = useState(false)
+  const prevRef = useRef(value)
+  useEffect(() => {
+    const prev = prevRef.current
+    prevRef.current = value
+    if (prev !== undefined && prev !== '' && prev !== value) {
+      setHighlighted(true)
+      const tid = setTimeout(() => setHighlighted(false), durationMs)
+      return () => clearTimeout(tid)
+    }
+  }, [value, durationMs])
+  return highlighted
+}
+
+// 상태 패널 텍스트 — 값이 바뀔 때만 한 글자씩 타이핑되어 등장. 동일하면 즉시 표시.
+// 첫 마운트도 즉시 (페이지 진입 시 모든 행이 타이핑되면 어색).
+function TypingText({ value, speedMs = 35, className = '' }) {
+  const target = String(value ?? '')
+  const [display, setDisplay] = useState(target)
+  const prevTargetRef = useRef(target)
+  useEffect(() => {
+    if (target === prevTargetRef.current) return
+    prevTargetRef.current = target
+    // 값 변경 — 빈 문자열에서 타이핑 시작
+    setDisplay('')
+  }, [target])
+  useEffect(() => {
+    if (display === target) return
+    if (display.length < target.length) {
+      const tid = setTimeout(() => {
+        setDisplay(target.slice(0, display.length + 1))
+      }, speedMs)
+      return () => clearTimeout(tid)
+    }
+    // target이 더 짧아진 경우 즉시 동기화
+    setDisplay(target)
+  }, [display, target, speedMs])
+  return <span className={className}>{display}</span>
+}
+
+function StatusChangeCard({ changes }) {
+  if (!changes || changes.length === 0) return null
+  return (
+    <div className="flex justify-center my-3">
+      <div className="inline-flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 bg-gray-800/40 border border-gray-700/40 rounded-xl px-3 py-1.5 max-w-[92%]">
+        {changes.map((c, i) => (
+          <span key={i} className="text-[11px] flex items-center gap-1 leading-tight">
+            <span>{c.icon}</span>
+            <span className="text-gray-500 line-through max-w-[90px] truncate">{c.from}</span>
+            <span className="text-gray-500">→</span>
+            <span className="text-emerald-300 font-medium max-w-[110px] truncate">{c.to}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // 메시지 한 개를 렌더링하는 메모이즈된 컴포넌트.
 // 부모(Chat) 리렌더에 의한 입력 lag를 차단하기 위해 React.memo로 감싸 불필요한 재렌더를 막는다.
 const MessageBubble = memo(function MessageBubble({
@@ -252,6 +423,8 @@ const MessageBubble = memo(function MessageBubble({
   isPlayingAll,
   isThisPlayingAudio,
   chatMode,
+  isMyTypingTurn = true,
+  onTypingComplete,
   onLightbox,
   onPlayAudio,
   onStopAudio,
@@ -261,23 +434,74 @@ const MessageBubble = memo(function MessageBubble({
   onAppear,
   t,
 }) {
-  // 라이브 스트리밍: 서버가 delta 이벤트로 content를 점진적으로 갱신하므로 별도 자모 애니메이션 불필요.
-  // 새 버블이 등장할 때 부모에게 알려 스크롤 따라가기.
+  // 라이브 스트리밍: 서버가 delta 이벤트로 content를 점진적으로 갱신.
   const isStreamingBubble = msg._streaming === true
+  // 새 버블이 등장하거나, 숨김 상태에서 자기 차례가 되어 등장할 때 스크롤 따라가기.
   useEffect(() => {
-    if (isStreamingBubble && onAppear) onAppear()
+    if ((isStreamingBubble || isMyTypingTurn) && msg._round && onAppear) onAppear()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStreamingBubble])
+  }, [isStreamingBubble, isMyTypingTurn])
+
+  // Typewriter 효과 — msg.content가 갱신될 때마다 displayContent를 한 글자씩 따라잡으며 노출.
+  // V2_CHAR_TYPING_MS=0이면 비활성 (즉시 전체 표시).
+  // 첫 마운트 분기:
+  //   · _round 있음(이번 라이브 라운드의 새 메시지, CHARACTER/NARRATION/NPC 모두 포함) → 빈 문자열로 시작 → typewriter
+  //   · _round 없음(히스토리/USER) → 즉시 전체
+  const [displayContent, setDisplayContent] = useState(() =>
+    (msg._round && V2_CHAR_TYPING_MS > 0) ? '' : (msg.content || '')
+  )
+  useEffect(() => {
+    const target = msg.content || ''
+    if (V2_CHAR_TYPING_MS <= 0) {
+      if (displayContent !== target) setDisplayContent(target)
+      return
+    }
+    // 라이브 라운드 메시지인데 아직 내 차례가 아니면 대기 (displayContent 빈 채로 유지)
+    if (msg._round && !isMyTypingTurn) {
+      return
+    }
+    if (displayContent.length >= target.length) {
+      if (displayContent !== target) setDisplayContent(target)
+      return
+    }
+    const tid = setTimeout(() => {
+      setDisplayContent(target.slice(0, displayContent.length + 1))
+    }, V2_CHAR_TYPING_MS)
+    return () => clearTimeout(tid)
+  }, [msg.content, displayContent, isMyTypingTurn, msg._round])
+
+  // typewriter 완료 알림 — 같은 라운드 다음 메시지 차례로 넘김.
+  // 한 메시지에 대해 한 번만 발사 (ref로 가드).
+  const typingCompletedRef = useRef(false)
+  useEffect(() => {
+    typingCompletedRef.current = false
+  }, [msg._round, msg._streamIdx])
+  useEffect(() => {
+    if (typingCompletedRef.current) return
+    if (!msg._round) return
+    const target = msg.content || ''
+    // 완료 조건: target이 일정 길이 이상이고 displayContent가 따라잡았으며 이번 차례인 경우
+    if (!isMyTypingTurn) return
+    if (displayContent.length < target.length) return
+    if (target.length === 0) return
+    typingCompletedRef.current = true
+    onTypingComplete?.(msg._round, msg._streamIdx ?? 0)
+  }, [displayContent, msg.content, isMyTypingTurn, msg._round, msg._streamIdx, onTypingComplete])
 
   const isNormalMode = chatMode === 'NORMAL'
 
   const segments = useMemo(() => {
-    if (msg.role !== 'CHARACTER' && msg.role !== 'USER') return null
-    const parsed = parseMessageSegments(msg.content || '', msg.role)
-    // NORMAL 모드: action(《...》, (...)) 세그먼트는 숨기고 대사 텍스트만 남김.
+    if (msg.role !== 'CHARACTER' && msg.role !== 'USER' && msg.role !== 'NPC') return null
+    // displayContent 기반 — typewriter가 점진적으로 노출하는 그 시점의 텍스트.
+    const parsed = parseMessageSegments(displayContent || '', msg.role)
     if (isNormalMode) return parsed.filter((s) => s.type !== 'action')
     return parsed
-  }, [msg.content, msg.role, isNormalMode])
+  }, [displayContent, msg.role, isNormalMode])
+
+  // 라이브 라운드 메시지인데 아직 typing 차례가 안 왔으면 버블 자체 숨김 — 빈 버블이 미리 생성되는 어색함 제거.
+  if (msg._round && !isMyTypingTurn && (displayContent || '').length === 0) {
+    return null
+  }
 
   if (msg.role === 'NARRATION') {
     // NORMAL 모드: 별도 NARRATION 메시지는 숨김.
@@ -285,7 +509,7 @@ const MessageBubble = memo(function MessageBubble({
     return (
       <div className="flex justify-center my-4">
         <div className="bg-gray-900/70 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-2 max-w-[85%]">
-          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{msg.content || ''}</p>
+          <p className="text-xs text-gray-400 text-center italic leading-relaxed">{displayContent || ''}</p>
         </div>
       </div>
     )
@@ -352,25 +576,38 @@ const MessageBubble = memo(function MessageBubble({
 
   // NORMAL 모드에서 캐릭터/유저 메시지의 모든 세그먼트가 action(행동 묘사)이어서 필터링 후 본문이 비면 버블을 숨김.
   // (단, 미디어/오디오 등 표시할 다른 요소가 있으면 유지)
-  if (isNormalMode && (msg.role === 'CHARACTER' || msg.role === 'USER')) {
+  if (isNormalMode && (msg.role === 'CHARACTER' || msg.role === 'USER' || msg.role === 'NPC')) {
     const hasText = segments && segments.some((s) => (s.value || '').trim().length > 0)
     const hasExtras = !!(msg.feedImage || (msg.role === 'CHARACTER' && msg.audioUrl))
     if (!hasText && !hasExtras) return null
   }
 
+  // NPC는 캐릭터 버블과 동일한 UI를 사용하되 아바타는 기본 프로필 아이콘으로.
+  const isCharLike = msg.role === 'CHARACTER' || msg.role === 'NPC'
+  const displayName = msg.role === 'NPC' ? (msg.npcName || '제 3자') : characterName
   return (
     <div className={`flex ${msg.role === 'USER' ? 'justify-end' : 'justify-start'} ${isConsecutive ? '' : 'mt-3'}`}>
-      {msg.role === 'CHARACTER' && (
+      {isCharLike && (
         <div className="w-7 flex-shrink-0 mr-2">
           {!isConsecutive ? (
-            <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => profileUrl && onLightbox(profileUrl)}>
-              {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
-            </div>
+            msg.role === 'NPC' ? (
+              // 기본 프로필 아이콘 — 회색 원 안에 사람 SVG
+              <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden cursor-pointer" onClick={() => profileUrl && onLightbox(profileUrl)}>
+                {profileUrl ? <img src={profileUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px]">?</div>}
+              </div>
+            )
           ) : null}
         </div>
       )}
       <div className="max-w-[75%]">
-        {msg.role === 'CHARACTER' && !isConsecutive && <p className="text-xs text-gray-400 mb-1 font-medium">{characterName}</p>}
+        {isCharLike && !isConsecutive && <p className="text-xs text-gray-400 mb-1 font-medium">{displayName}</p>}
         {msg.feedImage && (
           <div className="mb-1.5 rounded-2xl rounded-tr-none overflow-hidden">
             <img src={msg.feedImage} alt="" className="w-full aspect-square object-cover" loading="lazy" />
@@ -447,6 +684,17 @@ export default function ChatV2() {
   const [sending, setSending] = useState(false)
   const [showTyping, setShowTyping] = useState(false)
   const [currentEmotion, setCurrentEmotion] = useState('NEUTRAL')
+  // V2 typewriter — 같은 라운드의 메시지들이 순차적으로 typing되도록 큐 관리.
+  // { round: <roundId>, idx: <다음 차례 _streamIdx> }. 새 라운드 시작 시 자동 reset.
+  const [typingHead, setTypingHead] = useState({ round: null, idx: 0 })
+  const handleTypingComplete = useCallback((round, streamIdx) => {
+    setTypingHead((prev) => {
+      // 같은 라운드인데 이미 더 앞으로 진행한 경우만 무시.
+      // 다른 라운드(prev.round=null 또는 이전 round)이거나 같은 라운드의 동등/큰 idx면 갱신.
+      if (prev.round === round && prev.idx > streamIdx) return prev
+      return { round, idx: streamIdx + 1 }
+    })
+  }, [])
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const [showPushPrompt, setShowPushPrompt] = useState(false)
   // 본인인증 유도 모달: Safety ON 상태에서 유저가 성적 시도를 감지했을 때 (세션당 1회).
@@ -648,7 +896,7 @@ export default function ChatV2() {
       setSpriteMode(['FULL', 'BUBBLE', 'BACKGROUND', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
       setChatMode(conv.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
-      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
+      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'NPC' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       // 호감도 해금 임계치 로드
@@ -789,15 +1037,14 @@ export default function ChatV2() {
       await api.stream(`/v2/conversations/${id}/messages`, body, (event, data) => {
         switch (event) {
           case 'delta': {
-            // 라이브 모드: Grok 토큰 단위 스트리밍. 같은 idx에 대한 delta는 기존 버블의 content를 갱신.
-            const { idx, role, content, complete } = data
+            // 라이브 모드: 토큰 단위 스트리밍. 같은 idx에 대한 delta는 기존 버블의 content를 갱신.
+            // NPC 버블은 npcName도 같이 받음 (V2 한정).
+            const { idx, role, content, complete, npcName } = data
             setShowTyping(false)
             setMessages((prev) => {
-              // 1) tempUserMsg → confirmedUserMsg 보장
               const base = prev.some((m) => m.id === tempUserMsg.id)
                 ? [...prev.filter((m) => m.id !== tempUserMsg.id), confirmedUserMsg]
                 : prev
-              // 2) 같은 round + idx 의 기존 버블 찾아 갱신, 없으면 추가
               const existingI = base.findIndex(
                 (m) => m._round === roundId && m._streamIdx === idx,
               )
@@ -807,6 +1054,7 @@ export default function ChatV2() {
                   ...updated[existingI],
                   role,
                   content,
+                  ...(npcName !== undefined ? { npcName } : {}),
                   _streaming: !complete,
                 }
                 return updated
@@ -816,6 +1064,7 @@ export default function ChatV2() {
                 {
                   role,
                   content,
+                  ...(npcName !== undefined ? { npcName } : {}),
                   _round: roundId,
                   _streamIdx: idx,
                   _streaming: !complete,
@@ -832,7 +1081,7 @@ export default function ChatV2() {
           }
           case 'done': {
             const { responseMessages } = data
-            const rawCharMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')
+            const rawCharMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION' || m.role === 'NPC')
             // 호감도가 오른 경우 마지막 캐릭터 메시지에 affinityUp 부착할 인덱스
             let lastCharIdxInCharMsgs = -1
             for (let i = rawCharMsgs.length - 1; i >= 0; i--) {
@@ -855,6 +1104,8 @@ export default function ChatV2() {
                     emotion: final.emotion,
                     createdAt: final.createdAt,
                     audioUrl: final.audioUrl,
+                    ...(final.statusSnapshot ? { statusSnapshot: final.statusSnapshot } : {}),
+                    ...(final.npcName ? { npcName: final.npcName } : {}),
                     _streaming: false,
                     ...(isLast && data.affinityChange > 0 ? { affinityUp: true } : {}),
                   }
@@ -1344,48 +1595,14 @@ export default function ChatV2() {
                 const affinity = conversation.affinity ?? 0
                 const affinityLabel = t(`chat.${getAffinityLabelKey(affinity)}`)
                 return (
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl leading-none mt-0.5 flex-shrink-0">{status.emoji}</span>
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      {currentTimeLabel && (
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">시간</span>
-                          <span className="text-xs text-amber-200">⏰ {currentTimeLabel}</span>
-                        </div>
-                      )}
-                      {activeEpisode && activeEpisode.snapshot && (
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">에피소드</span>
-                          <span className="text-xs text-violet-200">
-                            🎬 {activeEpisode.snapshot.title}
-                            <span className="text-gray-400 ml-1">({(activeEpisode.turnsElapsed ?? 0) + 1}/{activeEpisode.snapshot.duration})</span>
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusMood')}</span>
-                        <span className="text-xs text-gray-200">{status.mood}</span>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusLocation')}</span>
-                        <span className="text-xs text-gray-200">{status.location}</span>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusActivity')}</span>
-                        <span className="text-xs text-gray-200">{status.activity}</span>
-                      </div>
-                      <div className="flex items-baseline gap-2" data-onboarding-target="affinity">
-                        <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusAffinity')}</span>
-                        <span className="text-xs text-pink-300">❤️ {affinity} <span className="text-gray-400">· {affinityLabel}</span></span>
-                      </div>
-                      {status.outfit && (
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusOutfit')}</span>
-                          <span className="text-xs text-gray-200">{status.outfit}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <StatusPanel
+                    status={status}
+                    currentTimeLabel={currentTimeLabel}
+                    activeEpisode={activeEpisode}
+                    affinity={affinity}
+                    affinityLabel={affinityLabel}
+                    t={t}
+                  />
                 )
               })()}
             </div>
@@ -1447,25 +1664,24 @@ export default function ChatV2() {
           )}
         </div>
 
+      {/* 채팅방 배경 이미지 — 크로스페이드 레이어. backgroundImage 변경 시 스르륵 페이드 인/아웃. */}
+      {spriteMode !== 'BACKGROUND' && backgroundImage && (
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <CrossfadeMedia
+            src={backgroundImage}
+            className="absolute inset-0 w-full h-full object-cover"
+            fadeMs={700}
+          />
+          <div className="absolute inset-0 bg-black/45" />
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
         className="relative z-10 h-full overflow-auto px-4 space-y-2"
-        style={(() => {
-          const base = {
-            paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
-            paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
-          }
-          // BACKGROUND 모드는 별도 레이어로 처리. 갤러리 배경(기본)만 여기서 그림.
-          if (spriteMode !== 'BACKGROUND' && backgroundImage) {
-            return {
-              ...base,
-              backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImage})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }
-          }
-          return base
-        })()}
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
+        }}
       >
         {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
         {visibleStart === 0 ? (
@@ -1496,11 +1712,23 @@ export default function ChatV2() {
           const idx = visibleStart + i
           const prevMsg = messages[idx - 1]
           const nextMsg = messages[idx + 1]
-          const isConsecutive = prevMsg?.role === msg.role
+          // NPC는 같은 이름끼리만 consecutive로 묶임 (손님 → 사장 같이 화자 바뀌면 분리).
+          const isConsecutive = prevMsg?.role === msg.role &&
+            (msg.role !== 'NPC' || prevMsg?.npcName === msg.npcName)
           const showTime = msg.createdAt && (
-            !nextMsg || nextMsg.role !== msg.role || nextMsg.role === 'NARRATION' || nextMsg.role === 'GENERATED_IMAGE' ||
+            !nextMsg ||
+            nextMsg.role !== msg.role ||
+            (msg.role === 'NPC' && nextMsg.npcName !== msg.npcName) ||
+            nextMsg.role === 'NARRATION' || nextMsg.role === 'GENERATED_IMAGE' ||
             formatChatTime(msg.createdAt) !== formatChatTime(nextMsg.createdAt)
           )
+          // typewriter 차례 판정 — 라이브 라운드 메시지만 큐 순서 따름. 히스토리/USER는 항상 즉시.
+          const isMyTypingTurn = !msg._round
+            ? true
+            : (typingHead.round !== msg._round
+                ? msg._streamIdx === 0   // 새 라운드 첫 메시지는 즉시 시작
+                : typingHead.idx >= (msg._streamIdx ?? 0))
+          // 상태 변화는 헤더 status panel에서 라벨 색 강조로 표시 (메시지 영역에 카드/디바이더 미표시).
           return (
             <Fragment key={msg.id || idx}>
               <MessageBubble
@@ -1515,6 +1743,8 @@ export default function ChatV2() {
                 isPlayingAll={isPlayingAll}
                 isThisPlayingAudio={playingAudioIdx === idx}
                 chatMode={chatMode}
+                isMyTypingTurn={isMyTypingTurn}
+                onTypingComplete={handleTypingComplete}
                 onLightbox={setLightboxUrl}
                 onPlayAudio={playAudio}
                 onStopAudio={stopAudio}
@@ -1577,12 +1807,14 @@ export default function ChatV2() {
       </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 z-30">
-        {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드) */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
+        {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드)
+            wrapper는 pointer-events-none — 좌측 빈 공간에서 스크롤 통과되도록.
+            sprite 박스 자체만 pointer-events-auto로 클릭 받음. */}
         {spriteMode === 'BUBBLE' && latestCharacterSpriteUrl && (
-          <div className="flex justify-end px-3 mb-1.5">
+          <div className="flex justify-end px-3 mb-1.5 pointer-events-none">
             <div
-              className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+              className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto"
               style={{ aspectRatio: '9 / 16' }}
               onClick={() => setLightboxUrl({ url: latestCharacterSpriteUrl, bgUrl: spriteBackgroundImage })}
             >
@@ -1601,9 +1833,10 @@ export default function ChatV2() {
             </div>
           </div>
         )}
-        {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치 */}
-        <div className="flex items-center gap-2 px-3 mb-1.5">
-          <div className="ml-auto relative h-8 flex items-center justify-end">
+        {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치.
+            wrapper는 pointer-events-none, 우측 버튼 그룹만 pointer-events-auto. */}
+        <div className="flex items-center gap-2 px-3 mb-1.5 pointer-events-none">
+          <div className="ml-auto relative h-8 flex items-center justify-end pointer-events-auto">
             <button
               onClick={() => setShowInputButtons(true)}
               className={`w-8 h-8 rounded-full bg-gray-900/75 border border-gray-800/50 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-800/80 transition-opacity duration-200 ${
@@ -1679,30 +1912,7 @@ export default function ChatV2() {
                 </button>
               </div>
             )}
-            <button
-              onClick={() => {
-                setShowImageGenModal(true)
-                api.get(`/characters/${conversation.characterId}`).then(({ character: c }) => {
-                  const allImages = (c.feedPosts || []).flatMap((p) => (p.images || []).map((img) => img.filePath)).filter(Boolean)
-                  const shuffled = allImages.sort(() => Math.random() - 0.5)
-                  setPreviewFeedImages(shuffled.slice(0, 3))
-                }).catch(() => {})
-              }}
-              disabled={generatingImage || !token}
-              className="w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 disabled:opacity-40 flex items-center justify-center shadow transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              data-onboarding-target="image-gen-btn"
-            >
-              {generatingImage ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
-                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
-                </svg>
-              )}
-            </button>
+            {/* V2 채팅에서는 이미지 생성 버튼 미지원 — 제거됨 */}
             <button
               onClick={() => setShowModelSheet(true)}
               disabled={!token}
@@ -1733,7 +1943,7 @@ export default function ChatV2() {
             </div>
           </div>
         </div>
-        <div className="px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
+        <div className="px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30 pointer-events-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
           {attachedFeed && (
             <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
               <img
