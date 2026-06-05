@@ -254,7 +254,11 @@ export default function ChatList() {
                 return (
                   <div key={`c-${conv.id}`} className="flex items-center">
                     <button
-                      onClick={() => navigate(`/chats/${conv.id}`)}
+                      onClick={() => {
+                        // V2 캐릭터(promptDataV2 보유)는 V2 라우트로. dataV2가 채워져 있으면 채팅 진입 가능.
+                        const isV2 = !!(conv.character?.promptDataV2 && conv.dataV2)
+                        navigate(isV2 ? `/chats-v2/${conv.id}` : `/chats/${conv.id}`)
+                      }}
                       className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 hover:bg-gray-900/60 transition-colors text-left group"
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     >

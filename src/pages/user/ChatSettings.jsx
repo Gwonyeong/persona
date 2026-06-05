@@ -29,6 +29,9 @@ export default function ChatSettings() {
   const [chatMode, setChatMode] = useState('ROLEPLAY')
   const [nicknameMode, setNicknameMode] = useState('NAME')
   const [customNickname, setCustomNickname] = useState('')
+  // V2 채팅 — 배경 이미지를 AI가 자동 갱신하므로 spriteMode 'BACKGROUND' 옵션 비활성화.
+  // 판별: conversation.dataV2 또는 conversation.character.promptDataV2 존재 여부.
+  const [isV2, setIsV2] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingChatMode, setSavingChatMode] = useState(false)
@@ -48,6 +51,8 @@ export default function ChatSettings() {
         const mode = resolveNicknameMode(stored)
         setNicknameMode(mode)
         setCustomNickname(mode === 'CUSTOM' ? stored : '')
+        // V2 판별 — dataV2 또는 character.promptDataV2 존재 시
+        setIsV2(!!(conversation?.dataV2 || conversation?.character?.promptDataV2))
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -201,7 +206,7 @@ export default function ChatSettings() {
           <p className="text-xs text-gray-500 mb-4">{t('chatSettings.spriteMode.description')}</p>
 
           <div className="space-y-2">
-            {SPRITE_MODES.map((mode) => {
+            {SPRITE_MODES.filter((mode) => !(isV2 && mode === 'BACKGROUND')).map((mode) => {
               const selected = spriteMode === mode
               return (
                 <button

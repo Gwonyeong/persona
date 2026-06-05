@@ -7,7 +7,9 @@ import GalleryGrid from './GalleryGrid'
 import ImageSlideViewer from './ImageSlideViewer'
 import MaskIcon from './MaskIcon'
 
-export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange, affinityBadge, onAffinityBadgeClear, onGiftSent, onOutfitApplied }) {
+export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange, affinityBadge, onAffinityBadgeClear, onGiftSent, onOutfitApplied, allowBackgroundChange = true }) {
+  // allowBackgroundChange — false면 "배경으로 설정" 액션을 모두 숨김 (V2 채팅용).
+  // V2에서는 AI가 backgroundImage를 mode 기반으로 자동 갱신하므로 유저 수동 변경이 충돌.
   const navigate = useNavigate()
   const { t } = useTranslation()
   const token = useStore((s) => s.token)
@@ -362,7 +364,8 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
               ))}
             </div>
 
-            {/* 배경 이미지 변경 버튼 */}
+            {/* 배경 이미지 변경 버튼 — V2 채팅(allowBackgroundChange=false)에서는 숨김 */}
+            {allowBackgroundChange && (
             <div className="flex justify-end mt-2">
               {!bgPickMode ? (
                 <button
@@ -397,6 +400,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 
@@ -812,7 +816,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           initialIndex={slideViewer.initialIndex}
           title={slideViewer.title}
           description={slideViewer.description}
-          actions={conversationId ? [
+          actions={conversationId && allowBackgroundChange ? [
             {
               key: 'set-bg',
               label: '배경으로 설정',

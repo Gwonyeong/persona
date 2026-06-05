@@ -62,6 +62,9 @@ export default function CharacterDetail() {
   const voiceAudioRef = useRef(null)
   const [unlockTarget, setUnlockTarget] = useState(null)
   const [showReviewModal, setShowReviewModal] = useState(false)
+  const [v2Presets, setV2Presets] = useState(null)        // { v2Enabled, startingPresets } | null
+  const [showV2PresetModal, setShowV2PresetModal] = useState(false)
+  const [pendingV2Mode, setPendingV2Mode] = useState(null) // 'start' | 'reset'
   const [showReport, setShowReport] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
   const [storylines, setStorylines] = useState([])
@@ -155,15 +158,32 @@ export default function CharacterDetail() {
     }
   }
 
+  // V2 활성 + presets이 있으면 모달 띄움. 아니면 기존 V1 흐름.
+  const tryShowV2PresetModal = async (mode) => {
+    try {
+      const data = v2Presets ?? await api.get(`/v2/characters/${id}/presets`)
+      if (!v2Presets) setV2Presets(data)
+      if (data?.v2Enabled && Array.isArray(data.startingPresets) && data.startingPresets.length > 0) {
+        setPendingV2Mode(mode)
+        setShowV2PresetModal(true)
+        return true
+      }
+    } catch (e) {
+      console.warn('V2 presets fetch failed:', e)
+    }
+    return false
+  }
+
   const startChat = async () => {
     if (!token) { goToLogin(navigate); return }
+    // V2 활성이면 preset 모달 먼저
+    if (await tryShowV2PresetModal('start')) return
     setStarting(true)
     try {
       const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id) })
       window.gtag?.('event', 'chat_start', { character_id: id, conversation_id: conversation.id })
       if (shouldShowReview(conversationCount)) {
         setShowReviewModal(true)
-        // 리뷰 모달 후 채팅으로 이동
         window.__pendingChatId = conversation.id
       } else {
         navigate(`/chats/${conversation.id}`)
@@ -182,8 +202,32 @@ export default function CharacterDetail() {
     if (existingConv) navigate(`/chats/${existingConv.conversationId}`)
   }
 
+  // V2 preset 선택 후 호출 — 채팅방 생성/reset + V2 init + V1 Chat 컴포넌트(/chats-v2)로 이동.
+  // V1 Chat.jsx 컴포넌트를 chatApiPrefix='/v2/conversations' 으로 재사용.
+  const startV2ChatWithPreset = async (presetId) => {
+    setShowV2PresetModal(false)
+    setStarting(true)
+    try {
+      let conversationId
+      if (pendingV2Mode === 'reset' && existingConv) {
+        const { conversation } = await api.post(`/conversations/${existingConv.conversationId}/reset`)
+        conversationId = conversation.id
+      } else {
+        const { conversation } = await api.post('/conversations', { characterId: parseInt(id) })
+        conversationId = conversation.id
+      }
+      await api.post(`/v2/conversations/${conversationId}/init`, { presetId })
+      navigate(`/chats-v2/${conversationId}`)
+    } catch (error) {
+      console.error('startV2ChatWithPreset error:', error)
+      setStarting(false)
+    }
+  }
+
   const resetChat = async () => {
     setShowResetModal(false)
+    // V2 활성이면 preset 모달 먼저
+    if (await tryShowV2PresetModal('reset')) return
     setStarting(true)
     try {
       const { conversation } = await api.post(`/conversations/${existingConv.conversationId}/reset`)
@@ -1081,6 +1125,55 @@ export default function CharacterDetail() {
         steps={tourSteps}
         onComplete={completeTour}
       />
+
+      {/* V2 preset 선택 모달 (임시 테스트용) */}
+      {showV2PresetModal && v2Presets?.startingPresets?.length > 0 && (
+        <div
+          onClick={() => !starting && setShowV2PresetModal(false)}
+          className="absolute inset-0 z-50 flex items-end justify-center bg-black/50"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full bg-white rounded-t-2xl p-5 max-h-[80vh] overflow-y-auto"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-base font-bold">시작 난이도 선택</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {pendingV2Mode === 'reset' ? '기존 채팅을 초기화하고' : '새 채팅방을'} 이 상태로 시작합니다.
+                </p>
+              </div>
+              <button
+                onClick={() => !starting && setShowV2PresetModal(false)}
+                disabled={starting}
+                className="text-gray-500 text-xl"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                ×
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {v2Presets.startingPresets.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => startV2ChatWithPreset(p.id)}
+                  disabled={starting}
+                  className="text-left p-3 rounded-xl border border-gray-200 hover:border-indigo-400 disabled:opacity-50"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div className="font-semibold text-sm">{p.label}</div>
+                  <div className="text-xs text-gray-600 mt-1">{p.description}</div>
+                  <div className="text-xs text-gray-400 mt-1 flex gap-2">
+                    <span>친밀도 {p.familiarity} · 호감도 {p.affinity}</span>
+                    {p.userNickname && <span>· 호칭 <strong className="text-gray-600">{p.userNickname}</strong></span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

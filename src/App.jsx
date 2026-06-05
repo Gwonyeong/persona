@@ -38,6 +38,8 @@ import Scenario from './pages/user/Scenario'
 import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
+import ChatV2 from './pages/user/ChatV2'
+import V2ChatTest from './pages/V2ChatTest'
 import ChatSettings from './pages/user/ChatSettings'
 import GroupChatNew from './pages/user/GroupChatNew'
 import GroupChat from './pages/user/GroupChat'
@@ -204,6 +206,9 @@ function App() {
       {/* 스토리 플레이어 (풀스크린, 탭바 없음) */}
       <Route path="/storylines/:id" element={<Storyline />} />
 
+      {/* V2 채팅 테스트 (풀스크린, 탭바 없음, 임시) */}
+      <Route path="/v2-test/:id" element={<V2ChatTest />} />
+
       {/* 유저 - 탭바 레이아웃 */}
       <Route element={<UserLayout />}>
         <Route path="/" element={<Home />} />
@@ -215,6 +220,7 @@ function App() {
         <Route path="/characters/:id/feed" element={<CharacterFeed />} />
         <Route path="/scenarios/:id" element={<Scenario />} />
         <Route path="/chats/:id" element={<Chat />} />
+        <Route path="/chats-v2/:id" element={<ChatV2 />} />
         <Route path="/chats/:id/settings" element={<ChatSettings />} />
         <Route path="/group-chats/new" element={<GroupChatNew />} />
         <Route path="/group-chats/:id" element={<GroupChat />} />
