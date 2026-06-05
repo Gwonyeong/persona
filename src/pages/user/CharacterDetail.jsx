@@ -414,7 +414,7 @@ export default function CharacterDetail() {
                 <div className="relative">
                   <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
                     {expressionRows.aroused.map((img, idx) => {
-                      const isSafetyOn = user?.safetyMode
+                      const isSafetyOn = !user || user?.safetyMode
                       const isTease = img.emotion === 'AROUSED_TEASE'
                       let imgStyle
                       if (isSafetyOn) {
@@ -445,7 +445,7 @@ export default function CharacterDetail() {
                       )
                     })}
                   </div>
-                  {user?.safetyMode && (
+                  {(!user || user?.safetyMode) && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
                         <p className="text-xs text-white/90">Safety Mode 해제 시 확인할 수 있어요</p>
@@ -464,7 +464,7 @@ export default function CharacterDetail() {
                 const sample = character.voiceSamples?.[kind]
                 if (!sample?.text) return null
                 const isAroused = kind === 'aroused'
-                const locked = isAroused && user?.safetyMode
+                const locked = isAroused && (!user || user?.safetyMode)
                 const isPlaying = playingVoice === kind
                 const canPlay = !!sample.audioUrl && !locked
                 return (
