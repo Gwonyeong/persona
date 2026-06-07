@@ -391,17 +391,26 @@ export default function Notifications() {
 
               <div>
                 <label className="block text-sm text-gray-400 mb-1">클릭 시 이동</label>
-                <select
+                <input
+                  type="text"
                   value={form.linkPath}
                   onChange={(e) => setForm({ ...form, linkPath: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-                >
-                  {LINK_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
+                  placeholder="/survey/1  또는  /chats  (비우면 이동 없음)"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:outline-none"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {LINK_OPTIONS.filter((o) => o.value).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, linkPath: opt.value })}
+                      className={`px-2 py-0.5 rounded text-xs transition-colors ${form.linkPath === opt.value ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
                       {opt.label}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
 
