@@ -38,6 +38,8 @@ export default function Notifications() {
   const [userResults, setUserResults] = useState([])
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState(null)
+  const [idInput, setIdInput] = useState('')
+  const [idInputError, setIdInputError] = useState('')
 
   const load = () => {
     api.get(`/notifications/admin/all?page=${page}`).then((data) => {
@@ -55,6 +57,8 @@ export default function Notifications() {
     setTargetUsers([])
     setUserQuery('')
     setUserResults([])
+    setIdInput('')
+    setIdInputError('')
     setShowForm(true)
   }
 
@@ -75,6 +79,28 @@ export default function Notifications() {
 
   const removeUser = (userId) => {
     setTargetUsers(targetUsers.filter((u) => u.id !== userId))
+  }
+
+  const addUsersByIds = () => {
+    const raw = idInput.trim()
+    if (!raw) return
+    // JSON 배열 또는 콤마 구분 모두 허용
+    const nums = raw
+      .replace(/^\[|\]$/g, '')
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n) && n > 0)
+    if (nums.length === 0) {
+      setIdInputError('유효한 숫자가 없습니다.')
+      return
+    }
+    const existing = new Set(targetUsers.map((u) => u.id))
+    const newUsers = nums
+      .filter((id) => !existing.has(id))
+      .map((id) => ({ id, name: `#${id}`, email: '' }))
+    setTargetUsers((prev) => [...prev, ...newUsers])
+    setIdInput('')
+    setIdInputError('')
   }
 
   const save = async () => {
@@ -286,8 +312,30 @@ export default function Notifications() {
                       ))}
                     </div>
                   )}
+                  <div className="mt-3 pt-3 border-t border-gray-800">
+                    <label className="block text-sm text-gray-400 mb-1">userId 직접 입력</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={idInput}
+                        onChange={(e) => { setIdInput(e.target.value); setIdInputError('') }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addUsersByIds() } }}
+                        placeholder="1, 2, 45  또는  [1, 2, 45]"
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none font-mono"
+                      />
+                      <button
+                        onClick={addUsersByIds}
+                        className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        추가
+                      </button>
+                    </div>
+                    {idInputError && <p className="text-xs text-red-400 mt-1">{idInputError}</p>}
+                  </div>
+
                   {targetUsers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1.5 mt-3">
                       {targetUsers.map((u) => (
                         <span
                           key={u.id}
