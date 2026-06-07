@@ -11,6 +11,7 @@ import useTagFilter from '../../hooks/useTagFilter'
 import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import { getTagLabel } from '../../lib/tagLabel'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
+import SurveyBanner from '../../components/SurveyBanner'
 import RecentStoriesRow from '../../components/RecentStoriesRow'
 import FeaturedCharacterSlider from '../../components/FeaturedCharacterSlider'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
@@ -261,6 +262,9 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* 설문 배너 */}
+        <SurveyBanner />
 
         {/* 광고 배너 (어드민 관리) */}
         <HomeBannerSlider />
