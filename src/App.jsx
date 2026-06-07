@@ -62,6 +62,8 @@ import InquiryList from './pages/user/InquiryList'
 import InquiryDetail from './pages/user/InquiryDetail'
 import InquiryWrite from './pages/user/InquiryWrite'
 import UserNotifications from './pages/user/Notifications'
+import Survey from './pages/user/Survey'
+import AdminSurveys from './pages/admin/AdminSurveys'
 import MessageNotification from './components/MessageNotification'
 import WelcomeMaskSheet from './components/WelcomeMaskSheet'
 import ImpersonationBanner from './components/ImpersonationBanner'
@@ -195,6 +197,7 @@ function App() {
         <Route path="finance/mask-stats" element={<FinanceMaskStats />} />
         <Route path="inquiries" element={<AdminInquiries />} />
         <Route path="notifications" element={<AdminNotifications />} />
+        <Route path="surveys" element={<AdminSurveys />} />
       </Route>
 
       {/* 공개 페이지 (인증 불필요) */}
@@ -238,6 +241,7 @@ function App() {
         <Route path="/inquiry/:id" element={<InquiryDetail />} />
         <Route path="/inquiry/write" element={<InquiryWrite />} />
         <Route path="/notifications" element={<UserNotifications />} />
+        <Route path="/survey/:id" element={<Survey />} />
       </Route>
     </Routes>
     <WelcomeMaskSheet />

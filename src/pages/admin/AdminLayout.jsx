@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { to: '/admin/broadcasts', label: '푸시 알림' },
   { to: '/admin/notifications', label: '인앱 알림' },
   { to: '/admin/users', label: '유저 관리' },
+  { to: '/admin/surveys', label: '설문조사' },
   { to: '/admin/inquiries', label: '문의 관리' },
   {
     key: 'finance',
