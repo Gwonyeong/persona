@@ -272,26 +272,10 @@ function SurveyForm({ initial, onSave, onCancel }) {
   )
 }
 
-function ResultsView({ surveyId, onClose }) {
-  const [data, setData] = useState(null)
-
-  useEffect(() => {
-    api.get(`/admin/surveys/${surveyId}/results`).then(setData).catch(() => {})
-  }, [surveyId])
-
-  if (!data) return <div className="text-center text-gray-500 py-8 text-sm">불러오는 중...</div>
-
+function AggregateResults({ results }) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-bold text-white">{data.survey.title}</h3>
-          <p className="text-xs text-gray-400 mt-0.5">응답 {data.responseCount}명</p>
-        </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-white text-sm" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>닫기</button>
-      </div>
-
-      {data.results.map((r) => (
+    <div className="space-y-4">
+      {results.map((r) => (
         <div key={r.questionId} className="bg-gray-800 rounded-xl p-4">
           <p className="text-sm font-medium text-white mb-3">{r.text}</p>
 
@@ -353,6 +337,128 @@ function ResultsView({ surveyId, onClose }) {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function UserAnswerCard({ user, questions }) {
+  const [expanded, setExpanded] = useState(false)
+  const completedAt = user.completedAt ? new Date(user.completedAt).toLocaleString('ko-KR') : ''
+
+  const renderAnswer = (q) => {
+    const ans = user.answers[q.id]
+    if (ans === undefined || ans === null) return <span className="text-gray-600">—</span>
+
+    if (q.type === 'RATING') {
+      return <span className="text-yellow-400">{'★'.repeat(Number(ans))}{'☆'.repeat(5 - Number(ans))}</span>
+    }
+
+    if (q.type === 'SINGLE_CHOICE') {
+      const val = ans?.value || (typeof ans === 'string' ? ans : '')
+      const comment = ans?.comment
+      return (
+        <div>
+          <span className="text-indigo-300">{val || '—'}</span>
+          {comment && <p className="text-gray-400 text-xs mt-0.5">"{comment}"</p>}
+        </div>
+      )
+    }
+
+    if (q.type === 'MULTIPLE_CHOICE') {
+      const vals = ans?.values || (Array.isArray(ans) ? ans : [])
+      const comment = ans?.comment
+      return (
+        <div>
+          <div className="flex flex-wrap gap-1">
+            {vals.length === 0 ? <span className="text-gray-600">—</span> : vals.map((v) => (
+              <span key={v} className="text-xs bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded-full">{v}</span>
+            ))}
+          </div>
+          {comment && <p className="text-gray-400 text-xs mt-0.5">"{comment}"</p>}
+        </div>
+      )
+    }
+
+    if (q.type === 'TEXT') {
+      return <span className="text-gray-300">{typeof ans === 'string' && ans.trim() ? `"${ans}"` : '—'}</span>
+    }
+
+    return <span className="text-gray-500">{JSON.stringify(ans)}</span>
+  }
+
+  return (
+    <div className="bg-gray-800 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+      >
+        <div>
+          <p className="text-sm font-medium text-white">{user.name}</p>
+          <p className="text-xs text-gray-500">{user.email || `id: ${user.userId}`} · {completedAt}</p>
+        </div>
+        <span className="text-gray-500 text-xs ml-2">{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-700 px-4 py-3 space-y-3">
+          {questions.map((q) => (
+            <div key={q.id}>
+              <p className="text-xs text-gray-400 mb-1">{q.text}</p>
+              <div className="text-sm">{renderAnswer(q)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ResultsView({ surveyId, onClose }) {
+  const [data, setData] = useState(null)
+  const [tab, setTab] = useState('aggregate')
+
+  useEffect(() => {
+    api.get(`/admin/surveys/${surveyId}/results`).then(setData).catch(() => {})
+  }, [surveyId])
+
+  if (!data) return <div className="text-center text-gray-500 py-8 text-sm">불러오는 중...</div>
+
+  const questions = data.survey.questions || []
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-white">{data.survey.title}</h3>
+          <p className="text-xs text-gray-400 mt-0.5">응답 {data.responseCount}명</p>
+        </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-white text-sm" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>닫기</button>
+      </div>
+
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {[['aggregate', '통합'], ['per-user', '유저별']].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >{label}</button>
+        ))}
+      </div>
+
+      {tab === 'aggregate' && <AggregateResults results={data.results} />}
+
+      {tab === 'per-user' && (
+        <div className="space-y-3">
+          {(data.perUser || []).length === 0 && (
+            <p className="text-center text-gray-500 text-sm py-8">응답 없음</p>
+          )}
+          {(data.perUser || []).map((u) => (
+            <UserAnswerCard key={u.userId} user={u} questions={questions} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
