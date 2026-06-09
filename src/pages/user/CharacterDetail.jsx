@@ -14,6 +14,12 @@ function getImageUrl(filePath) {
   return null
 }
 
+function isVideoUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const clean = url.split('?')[0].toLowerCase()
+  return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v')
+}
+
 function getCharacterOnlineStatus(activeHours) {
   if (!activeHours?.schedule) return 'free'
   const hour = new Date().getHours()
@@ -322,19 +328,71 @@ export default function CharacterDetail() {
     }
   }, [id])
 
-  // 표정 슬라이드 — 감정마다 랜덤 1장씩, character.id 바뀔 때만 재셔플
+  // 표정 슬라이드 — normal은 감정당 랜덤 1장, aroused는 모든 이미지 노출(갤러리 UI)
+  // 이미지 row만 후보 (standalone 영상 row 제외)
   const expressionRows = useMemo(() => {
     const images = character?.styles?.[0]?.images
     if (!images?.length) return { normal: [], aroused: [] }
-    const pick = (emotion) => {
-      const matching = images.filter((img) => img.emotion === emotion)
+    const pickOne = (emotion) => {
+      const matching = images.filter((img) => img.emotion === emotion && !isVideoUrl(img.filePath))
       return matching.length ? matching[Math.floor(Math.random() * matching.length)] : null
     }
+    // aroused: 모든 이미지 노출 (seen 먼저 정렬 → unseen)
+    const arousedAll = images
+      .filter((img) => AROUSED_EMOTIONS.includes(img.emotion) && !isVideoUrl(img.filePath))
+      .sort((a, b) => {
+        if (a.seen && !b.seen) return -1
+        if (!a.seen && b.seen) return 1
+        return a.id - b.id
+      })
     return {
-      normal: NORMAL_EMOTIONS.map(pick).filter(Boolean),
-      aroused: AROUSED_EMOTIONS.map(pick).filter(Boolean),
+      normal: NORMAL_EMOTIONS.map(pickOne).filter(Boolean),
+      aroused: arousedAll,
     }
-  }, [character?.id])
+  }, [character])
+
+  // 표정 영상 해금 — 10마스크
+  const EXPRESSION_VIDEO_COST = 10
+  const EXPRESSION_INITIAL_LIMIT = 9
+  const [unlockingExpImageId, setUnlockingExpImageId] = useState(null)
+  const [expVideoLightboxUrl, setExpVideoLightboxUrl] = useState(null)
+  const [arousedExpanded, setArousedExpanded] = useState(false)
+
+  const handleUnlockExpressionVideo = async (img) => {
+    if (!user) return goToLogin()
+    if ((user.masks ?? 0) < EXPRESSION_VIDEO_COST) {
+      alert('마스크가 부족합니다.')
+      navigate('/subscription')
+      return
+    }
+    setUnlockingExpImageId(img.id)
+    try {
+      const res = await api.post(`/characters/${id}/images/${img.id}/unlock-video`, {})
+      // 로컬 character state 업데이트
+      setCharacter((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          styles: prev.styles.map((s) => ({
+            ...s,
+            images: s.images.map((i) =>
+              i.id === img.id ? { ...i, seen: true, videoUnlocked: true } : i,
+            ),
+          })),
+        }
+      })
+      if (res.masks !== undefined) setUser({ ...user, masks: res.masks })
+    } catch (err) {
+      if (err?.error === 'INSUFFICIENT_MASKS') {
+        alert('마스크가 부족합니다.')
+        navigate('/subscription')
+      } else {
+        alert('해금에 실패했어요.')
+      }
+    } finally {
+      setUnlockingExpImageId(null)
+    }
+  }
 
   if (!character) {
     return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">{t('common.loading')}</div>
@@ -479,45 +537,109 @@ export default function CharacterDetail() {
 
               {expressionRows.aroused.length > 0 && (
                 <div className="relative">
-                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
-                    {expressionRows.aroused.map((img, idx) => {
-                      const isSafetyOn = !user || user?.safetyMode
-                      const isTease = img.emotion === 'AROUSED_TEASE'
-                      let imgStyle
-                      if (isSafetyOn) {
-                        imgStyle = { filter: 'blur(20px)', transform: 'scale(1.2)' }
-                      } else if (!isTease) {
-                        imgStyle = { filter: 'blur(8px)', transform: 'scale(1.1)' }
-                      }
-                      const handleClick = isSafetyOn ? undefined : () => setExpressionViewer({
-                        images: expressionRows.aroused.map((i) => ({ filePath: i.filePath })),
-                        initialIndex: idx,
-                      })
+                  <div className="grid grid-cols-3 gap-2">
+                    {(arousedExpanded ? expressionRows.aroused : expressionRows.aroused.slice(0, EXPRESSION_INITIAL_LIMIT)).map((img) => {
+                      const hasVideo = !!img.videoFilePath
+                      const seen = !!img.seen
+                      const videoUnlocked = !!img.videoUnlocked
+                      const isUnlocking = unlockingExpImageId === img.id
                       return (
-                        <button
+                        <div
                           key={img.id}
-                          onClick={handleClick}
-                          disabled={isSafetyOn}
-                          className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-900 disabled:cursor-default"
-                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                          className="relative rounded-xl overflow-hidden bg-gray-800 border border-gray-700"
+                          style={{ aspectRatio: '9 / 16' }}
                         >
+                          {/* 베이스 이미지 */}
                           <img
                             src={img.filePath}
                             alt={img.emotion}
-                            className="w-full h-full object-cover"
-                            style={imgStyle}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            style={!seen ? { filter: 'blur(16px)' } : undefined}
                             draggable={false}
                           />
-                        </button>
+
+                          {/* 안 본 이미지 → 블러 + 자물쇠 */}
+                          {!seen && (
+                            <>
+                              <div className="absolute inset-0 bg-black/40" />
+                              <div className="absolute inset-0 flex items-center justify-center text-white pointer-events-none">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                              </div>
+                            </>
+                          )}
+
+                          {/* 본 + 영상 해금됨 → 선명 영상 */}
+                          {seen && hasVideo && videoUnlocked && (
+                            <video
+                              src={img.videoFilePath}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              autoPlay loop muted playsInline
+                            />
+                          )}
+
+                          {/* 본 + 영상 미해금 → 블러 영상 */}
+                          {seen && hasVideo && !videoUnlocked && (
+                            <>
+                              <video
+                                src={img.videoFilePath}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                style={{ filter: 'blur(14px)' }}
+                                autoPlay loop muted playsInline
+                              />
+                              <div className="absolute inset-0 bg-black/30" />
+                            </>
+                          )}
+
+                          {/* 영상 있는 본 이미지 → 중앙 재생 버튼 */}
+                          {seen && hasVideo && (
+                            <button
+                              onClick={() => {
+                                if (videoUnlocked) setExpVideoLightboxUrl(img.videoFilePath)
+                                else handleUnlockExpressionVideo(img)
+                              }}
+                              disabled={isUnlocking}
+                              className="absolute inset-0 flex items-center justify-center disabled:opacity-60"
+                              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                              aria-label={videoUnlocked ? '영상 재생' : '영상 해금'}
+                            >
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-lg">
+                                  {isUnlocking ? (
+                                    <svg className="animate-spin w-5 h-5 text-white" viewBox="0 0 24 24" fill="none">
+                                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="42 100" strokeLinecap="round" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                      <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                  )}
+                                </div>
+                                {!videoUnlocked && !isUnlocking && (
+                                  <div className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm border border-white/20 flex items-center gap-1 text-[10px] text-white">
+                                    <MaskIcon size={10} />
+                                    <span>{EXPRESSION_VIDEO_COST}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
-                  {(!user || user?.safetyMode) && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
-                        <p className="text-xs text-white/90">Safety Mode 해제 시 확인할 수 있어요</p>
-                      </div>
-                    </div>
+                  {expressionRows.aroused.length > EXPRESSION_INITIAL_LIMIT && (
+                    <button
+                      onClick={() => setArousedExpanded((v) => !v)}
+                      className="mt-2 w-full py-2 text-xs text-gray-300 bg-gray-800/60 hover:bg-gray-800 rounded-lg"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {arousedExpanded
+                        ? '접기'
+                        : `더 보기 (+${expressionRows.aroused.length - EXPRESSION_INITIAL_LIMIT})`}
+                    </button>
                   )}
                 </div>
               )}
@@ -1002,6 +1124,32 @@ export default function CharacterDetail() {
           initialIndex={expressionViewer.initialIndex}
           onClose={() => setExpressionViewer(null)}
         />
+      )}
+
+      {/* 표정 영상 fullscreen 라이트박스 */}
+      {expVideoLightboxUrl && (
+        <div
+          className="absolute inset-0 z-[60] bg-black/95 flex items-center justify-center"
+          onClick={() => setExpVideoLightboxUrl(null)}
+        >
+          <video
+            src={expVideoLightboxUrl}
+            className="w-full h-full object-contain"
+            autoPlay loop playsInline controls
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setExpVideoLightboxUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label="닫기"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* 선물 콘텐츠 뷰어 — 이미지/비디오 혼합. ImageSlideViewer 재사용 */}
