@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import JSZip from 'jszip'
 import { api } from '../../lib/api'
 import { removeChromaBackground } from '../../lib/removeChromaBackground'
+import useVideoJobs from '../../store/useVideoJobs'
 
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 const PAGE_SIZE = 10
@@ -333,6 +334,8 @@ export default function Expressions() {
           </div>
         </>
       )}
+
+      <VideoJobsPanel characters={characters} onAddImage={addImage} />
     </div>
   )
 }
@@ -536,6 +539,8 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, allS
 
   const hasImages = images.length > 0
   const firstImage = hasImages ? images[0] : null
+  // 이미지 row(영상 파일 아님) 중 videoFilePath 비어있는 게 하나라도 있으면 강조
+  const needsVideo = images.some((i) => !isVideoUrl(i.filePath) && !i.videoFilePath)
 
   const uploadFile = async (file) => {
     if (!file) return
@@ -607,7 +612,7 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, allS
         className={`relative w-16 h-16 mx-auto rounded-md overflow-hidden border-2 flex items-center justify-center transition-colors group ${
           dragOver
             ? 'border-indigo-400 bg-indigo-500/15 ring-2 ring-indigo-500/40'
-            : `border-dashed ${hasImages ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-700 hover:border-indigo-500 bg-gray-800/40'}`
+            : `border-dashed ${hasImages ? 'border-gray-700 hover:border-indigo-500' : 'border-gray-700 hover:border-indigo-500 bg-gray-800/40'} ${needsVideo ? 'ring-2 ring-red-500/70' : ''}`
         } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         style={NO_OUTLINE}
         title={hasImages ? `${images.length}장 — 클릭하여 관리 / 드래그하여 추가` : '클릭 또는 드래그하여 업로드'}
@@ -670,6 +675,8 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
   const [linkPickerForImage, setLinkPickerForImage] = useState(null) // CharacterImage object or null
   const [linkingVideoId, setLinkingVideoId] = useState(null)
   const [unlinkingId, setUnlinkingId] = useState(null)
+  // 영상 프레임 추출 — videoUrl이 있는 영상에서 1초 단위 캡처
+  const [frameExtractFor, setFrameExtractFor] = useState(null) // { ...img, videoSource } or null
 
   // 사용 가능한 standalone 영상 풀 — 1:1 정책상 이미 linked된 URL은 제외
   // 기본은 같은 감정만 (linkPickerForImage 기준), 토글로 전체 감정 보기 가능
@@ -813,8 +820,17 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
 
           const renderCell = (img) => {
             const isVid = isVideoUrl(img.filePath)
+            // 프레임 추출용 영상 소스 — standalone 영상 row면 filePath, 이미지 row에 연결된 영상이면 videoFilePath.
+            const videoSource = isVid ? img.filePath : img.videoFilePath
+            // 이미지 row 중 연결된 영상이 없으면 빨간 border로 강조 (운영 작업 추적용)
+            const needsVideo = !isVid && !img.videoFilePath
             return (
-              <div key={img.id} className="relative group rounded-md overflow-hidden bg-gray-800">
+              <div
+                key={img.id}
+                className={`relative group rounded-md overflow-hidden bg-gray-800 ${
+                  needsVideo ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-gray-900' : ''
+                }`}
+              >
                 <div className="aspect-[3/4]">
                   <ExpressionThumb src={img.filePath} className="w-full h-full object-cover" />
                 </div>
@@ -822,6 +838,16 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                   <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-emerald-500/90 text-white px-1.5 py-0.5 rounded-full pointer-events-none">
                     🔗
                   </span>
+                )}
+                {videoSource && (
+                  <button
+                    onClick={() => setFrameExtractFor({ ...img, videoSource })}
+                    className="absolute top-1.5 right-7 w-6 h-6 rounded-full bg-black/70 hover:bg-indigo-600 text-white text-[11px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    style={NO_OUTLINE}
+                    title="영상에서 1초 단위 프레임 추출"
+                  >
+                    🎞
+                  </button>
                 )}
                 {!isVid && (
                   <>
@@ -988,7 +1014,6 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
           styleId={styleId}
           emotion={emotion}
           emotionLabel={emotionLabel}
-          onAdd={onAdd}
           onClose={() => setSeedanceImage(null)}
         />
       )}
@@ -1097,6 +1122,16 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
             )}
           </div>
         </div>
+      )}
+
+      {frameExtractFor && (
+        <FrameExtractorModal
+          videoUrl={frameExtractFor.videoSource}
+          styleId={styleId}
+          defaultEmotion={frameExtractFor.emotion || emotion}
+          onAdd={(uploaded) => onAdd?.(uploaded)}
+          onClose={() => setFrameExtractFor(null)}
+        />
       )}
     </div>
   )
@@ -1217,77 +1252,15 @@ function WanImageModal({ image, styleId, emotion, emotionLabel, onAdd, onClose }
 }
 
 // ============================================
-// Seedance 2.0 Fast Spicy — 표정 이미지 → 비디오 생성 + 업로드 + 프레임 추출
+// Seedance 2.0 Fast Spicy — 표정 이미지 → 비디오 생성
+// 백그라운드 잡으로 실행. 잡 시작 후 모달 자동 닫힘.
+// 결과는 우하단 VideoJobsPanel에서 확인.
 // ============================================
-function SeedanceVideoModal({ image, characterId, styleId, emotion, emotionLabel, onAdd, onClose }) {
+function SeedanceVideoModal({ image, characterId, styleId, emotion, emotionLabel, onClose }) {
   const [prompt, setPrompt] = useState('')
-  const [generating, setGenerating] = useState(false)
   const [generatingPrompt, setGeneratingPrompt] = useState(false)
-  const [videoUrl, setVideoUrl] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadedImage, setUploadedImage] = useState(null)
-  const [frames, setFrames] = useState([]) // { timestampMs, objectUrl, saved, error }
-  const [extracting, setExtracting] = useState(false)
-  const [extractError, setExtractError] = useState(null)
   const [error, setError] = useState(null)
-
-  const extractFrames = async (url) => {
-    setExtracting(true)
-    setExtractError(null)
-    setFrames([])
-    try {
-      const INTERVAL = 1.0
-      await new Promise((resolve, reject) => {
-        const video = document.createElement('video')
-        video.crossOrigin = 'anonymous'
-        video.preload = 'auto'
-        video.src = url
-        video.onloadedmetadata = async () => {
-          try {
-            const duration = video.duration
-            const canvas = document.createElement('canvas')
-            canvas.width = video.videoWidth || 720
-            canvas.height = video.videoHeight || 1280
-            const ctx = canvas.getContext('2d')
-            const timestamps = []
-            for (let t = 0; t <= duration + 0.01; t += INTERVAL)
-              timestamps.push(Math.min(parseFloat(t.toFixed(1)), duration))
-
-            for (const t of timestamps) {
-              video.currentTime = t
-              await new Promise((r) => { video.onseeked = r })
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-              const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.88))
-              const objectUrl = URL.createObjectURL(blob)
-              const timestampMs = Math.round(t * 1000)
-
-              setFrames(prev => [...prev, { timestampMs, objectUrl, saved: false, error: false }])
-
-              try {
-                const fd = new FormData()
-                fd.append('frame', blob, `frame_${timestampMs}.jpg`)
-                fd.append('characterId', String(characterId))
-                fd.append('emotion', emotion)
-                fd.append('sourceVideoUrl', url)
-                fd.append('timestampMs', String(timestampMs))
-                await api.post('/admin/video-frames', fd)
-                setFrames(prev => prev.map(f => f.timestampMs === timestampMs ? { ...f, saved: true } : f))
-              } catch {
-                setFrames(prev => prev.map(f => f.timestampMs === timestampMs ? { ...f, error: true } : f))
-              }
-            }
-            resolve()
-          } catch (e) { reject(e) }
-        }
-        video.onerror = () => reject(new Error('비디오 로드 실패 (CORS 문제일 수 있음)'))
-        video.load()
-      })
-    } catch (err) {
-      setExtractError('프레임 추출 실패: ' + (err.message || ''))
-    } finally {
-      setExtracting(false)
-    }
-  }
+  const startSeedanceJob = useVideoJobs((s) => s.startSeedanceJob)
 
   const handleGeneratePrompt = async () => {
     setGeneratingPrompt(true)
@@ -1302,47 +1275,23 @@ function SeedanceVideoModal({ image, characterId, styleId, emotion, emotionLabel
     }
   }
 
-  const handleGenerate = async () => {
-    if (generating) return
-    setGenerating(true)
-    setVideoUrl(null)
-    setUploadedImage(null)
-    setFrames([])
-    setExtractError(null)
-    setError(null)
-    try {
-      const { videoUrl: url } = await api.post(`/admin/images/${image.id}/generate-video-seedance`, { prompt })
-      setVideoUrl(url)
-      extractFrames(url)
-    } catch (err) {
-      setError(err.message || '생성 실패')
-    } finally {
-      setGenerating(false)
-    }
+  const handleQueue = () => {
+    startSeedanceJob({
+      image,
+      characterId,
+      styleId,
+      emotion,
+      emotionLabel,
+      prompt,
+    })
+    onClose() // 잡은 백그라운드 진행 — 모달 즉시 닫고 다른 작업 가능
   }
-
-  const handleUploadVideo = async () => {
-    if (uploading || !videoUrl) return
-    setUploading(true)
-    setError(null)
-    try {
-      const { image: newImage } = await api.post(`/admin/images/${image.id}/upload-seedance-video`, { videoUrl })
-      setUploadedImage(newImage)
-      onAdd({ ...newImage, emotion })
-    } catch (err) {
-      setError('업로드 실패: ' + (err.message || ''))
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const savedCount = frames.filter(f => f.saved).length
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 overflow-y-auto py-6" onClick={onClose}>
       <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-sm font-semibold text-white mb-1">🎬 Seedance 2.0 Spicy — {emotionLabel}</h3>
-        <p className="text-[11px] text-gray-500 mb-4">seedance-2.0-fast/image-to-video-spicy · 5s · 720p</p>
+        <p className="text-[11px] text-gray-500 mb-4">seedance-2.0-fast/image-to-video-spicy · 5s · 720p · 백그라운드 진행</p>
 
         {/* 레퍼런스 이미지 + 프롬프트 */}
         <div className="flex gap-3 mb-2">
@@ -1368,87 +1317,18 @@ function SeedanceVideoModal({ image, characterId, styleId, emotion, emotionLabel
 
         {error && <p className="text-red-400 text-xs mb-3 px-1">{error}</p>}
 
-        {/* 비디오 생성 중 */}
-        {generating && (
-          <div className="flex items-center gap-2 my-3 py-2.5 px-3 bg-gray-800 rounded-xl">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" className="animate-spin flex-shrink-0">
-              <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-            </svg>
-            <span className="text-blue-400 text-xs">비디오 생성 중... (최대 5분)</span>
-          </div>
-        )}
-
-        {/* 비디오 플레이어 */}
-        {videoUrl && (
-          <div className="my-3 rounded-xl overflow-hidden border border-gray-700 bg-black">
-            <video src={videoUrl} controls autoPlay loop playsInline className="w-full max-h-56" />
-            <div className="flex border-t border-gray-700">
-              <a href={videoUrl} target="_blank" rel="noreferrer" className="flex-1 text-center text-xs text-blue-400 py-2 bg-gray-800 hover:bg-gray-700">원본 링크</a>
-              <button
-                onClick={handleUploadVideo}
-                disabled={uploading || !!uploadedImage}
-                className="flex-1 text-xs py-2 bg-gray-800 hover:bg-gray-700 border-l border-gray-700 disabled:opacity-50"
-                style={{ ...NO_OUTLINE, color: uploadedImage ? '#4ade80' : '#a78bfa' }}
-              >
-                {uploading ? '업로드 중...' : uploadedImage ? '✓ 감정 슬롯에 저장됨' : '↑ 감정에 업로드'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 프레임 그리드 */}
-        {(frames.length > 0 || extracting) && (
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-400">
-                프레임 추출
-                {extracting && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-indigo-400">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
-                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                    </svg>
-                    추출 중...
-                  </span>
-                )}
-                {!extracting && frames.length > 0 && (
-                  <span className="ml-2 text-green-400">{savedCount}/{frames.length} 저장됨</span>
-                )}
-              </span>
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {frames.map((frame) => (
-                <div key={frame.timestampMs} className="relative flex-shrink-0">
-                  <img
-                    src={frame.objectUrl}
-                    alt={`${frame.timestampMs}ms`}
-                    className="h-24 rounded-lg object-cover border border-gray-700"
-                    style={{ aspectRatio: '9/16' }}
-                  />
-                  <span className="absolute bottom-0 left-0 right-0 text-center text-[9px] text-white bg-black/60 rounded-b-lg py-0.5">
-                    {(frame.timestampMs / 1000).toFixed(1)}s
-                  </span>
-                  {frame.saved && (
-                    <span className="absolute top-1 right-1 text-[9px] text-green-400 bg-black/70 rounded px-0.5">✓</span>
-                  )}
-                  {frame.error && (
-                    <span className="absolute top-1 right-1 text-[9px] text-red-400 bg-black/70 rounded px-0.5">✗</span>
-                  )}
-                </div>
-              ))}
-            </div>
-            {extractError && <p className="text-red-400 text-[11px] mt-1">{extractError}</p>}
-          </div>
-        )}
+        <p className="text-[11px] text-gray-500 mb-3 px-1">
+          ⓘ "비디오 생성"을 누르면 백그라운드로 실행됩니다. 결과는 우하단 패널에서 확인하세요.
+        </p>
 
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-xl" style={NO_OUTLINE}>닫기</button>
           <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="flex-1 py-2 text-sm text-white bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold disabled:opacity-50"
+            onClick={handleQueue}
+            className="flex-1 py-2 text-sm text-white bg-blue-600 hover:bg-blue-500 rounded-xl font-semibold"
             style={NO_OUTLINE}
           >
-            {generating ? '생성 중...' : '비디오 생성'}
+            비디오 생성 (백그라운드)
           </button>
         </div>
       </div>
@@ -1755,6 +1635,250 @@ const PIPELINE_SEQUENCE = [
 ]
 
 const STEP_LABEL = { prompt: '프롬프트', video: '비디오 생성', upload: '업로드', wan: 'WAN 이미지 생성', frames: '프레임 추출', analyze: '이미지 분석', select: '래퍼런스 선정' }
+
+// ============================================
+// 영상 프레임 추출 — videoUrl에서 1초 단위 캡처 → 표정 이미지로 등록
+// - 브라우저 canvas로 추출 (서버 ffmpeg 불필요)
+// - 영상의 0초, 1초, ..., floor(duration)초 시점 캡처
+// - 등록 시 기존 POST /admin/styles/:styleId/images 재사용 (이미지 파일 = JPEG blob)
+// - CORS: Supabase storage는 anonymous 허용. video crossOrigin="anonymous" 필요.
+// ============================================
+function FrameExtractorModal({ videoUrl, styleId, defaultEmotion, onAdd, onClose }) {
+  const videoRef = useRef(null)
+  const [duration, setDuration] = useState(0)
+  const [extracting, setExtracting] = useState(false)
+  const [frames, setFrames] = useState([]) // [{ t, blob, blobUrl }]
+  const [error, setError] = useState(null)
+  const [emotion, setEmotion] = useState(defaultEmotion || 'NEUTRAL')
+  const [busyIdx, setBusyIdx] = useState(null)
+  const [addedTs, setAddedTs] = useState(() => new Set()) // 이미 추가된 timestamp 집합
+  const framesRef = useRef([])
+  useEffect(() => {
+    framesRef.current = frames
+  }, [frames])
+
+  // unmount 시 마지막 frames의 Blob URL 해제 (ref 경유로 stale closure 우회)
+  useEffect(
+    () => () => {
+      framesRef.current.forEach((f) => URL.revokeObjectURL(f.blobUrl))
+    },
+    [],
+  )
+
+  const handleLoadedMetadata = () => {
+    const v = videoRef.current
+    if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration)
+  }
+
+  const seekTo = (v, t) =>
+    new Promise((resolve, reject) => {
+      const onSeeked = () => {
+        v.removeEventListener('seeked', onSeeked)
+        v.removeEventListener('error', onErr)
+        resolve()
+      }
+      const onErr = () => {
+        v.removeEventListener('seeked', onSeeked)
+        v.removeEventListener('error', onErr)
+        reject(new Error('video seek error'))
+      }
+      v.addEventListener('seeked', onSeeked)
+      v.addEventListener('error', onErr)
+      // duration보다 살짝 짧게 — 일부 브라우저가 정확히 duration일 때 frame 못 얻음
+      v.currentTime = Math.min(t, Math.max(0, v.duration - 0.05))
+    })
+
+  const extractFrames = async () => {
+    const v = videoRef.current
+    if (!v) return
+    setError(null)
+    // 이전 추출 결과 정리
+    frames.forEach((f) => URL.revokeObjectURL(f.blobUrl))
+    setFrames([])
+    setAddedTs(new Set())
+    setExtracting(true)
+    try {
+      if (!Number.isFinite(v.duration) || v.duration <= 0) {
+        await new Promise((res) => v.addEventListener('loadedmetadata', res, { once: true }))
+      }
+      const w = v.videoWidth || 720
+      const h = v.videoHeight || 1280
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      const totalSec = Math.floor(v.duration)
+      const stamps = []
+      for (let t = 0; t <= totalSec; t++) stamps.push(t)
+
+      const out = []
+      for (const t of stamps) {
+        await seekTo(v, t)
+        ctx.drawImage(v, 0, 0, w, h)
+        const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.92))
+        if (!blob) throw new Error('canvas.toBlob 실패 (CORS 가능성)')
+        out.push({ t, blob, blobUrl: URL.createObjectURL(blob) })
+      }
+      setFrames(out)
+    } catch (err) {
+      console.error('Frame extraction error:', err)
+      setError(err?.message || '프레임 추출 실패 (영상 CORS / 디코딩 문제일 수 있음)')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  const handleAdd = async (idx) => {
+    setBusyIdx(idx)
+    setError(null)
+    try {
+      const f = frames[idx]
+      const fd = new FormData()
+      fd.append('image', f.blob, `frame_${f.t}s.jpg`)
+      fd.append('emotion', emotion)
+      fd.append('description', `Extracted from video frame @ ${f.t}s`)
+      const { image } = await api.post(`/admin/styles/${styleId}/images`, fd)
+      onAdd?.({ ...image, emotion })
+      setAddedTs((prev) => {
+        const n = new Set(prev)
+        n.add(f.t)
+        return n
+      })
+    } catch (err) {
+      setError(err?.error || err?.message || '업로드 실패')
+    } finally {
+      setBusyIdx(null)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-3xl max-h-[88vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-white">🎞 영상 프레임 추출</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              영상에서 1초 단위로 프레임을 캡처해 표정 이미지로 등록합니다.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white" style={NO_OUTLINE}>
+            ✕
+          </button>
+        </div>
+
+        {/* 영상 미리보기 + 추출 컨트롤 */}
+        <div className="bg-gray-800/50 rounded-lg p-3 mb-3 flex gap-3">
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            crossOrigin="anonymous"
+            muted
+            playsInline
+            preload="auto"
+            controls
+            onLoadedMetadata={handleLoadedMetadata}
+            className="w-40 rounded-md bg-black"
+            style={{ aspectRatio: '3/4' }}
+          />
+          <div className="flex-1 flex flex-col justify-between min-w-0">
+            <div className="text-xs text-gray-400 space-y-1">
+              <p>길이: {duration ? `${duration.toFixed(2)}초` : '로딩 중...'}</p>
+              <p>
+                추출 예정 프레임:{' '}
+                {duration ? `${Math.floor(duration) + 1}장 (0초 ~ ${Math.floor(duration)}초)` : '?'}
+              </p>
+            </div>
+            <button
+              onClick={extractFrames}
+              disabled={extracting || !duration}
+              className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 self-start"
+              style={NO_OUTLINE}
+            >
+              {extracting ? '추출 중...' : frames.length > 0 ? '다시 추출' : '프레임 추출'}
+            </button>
+          </div>
+        </div>
+
+        {/* 등록할 감정 선택 */}
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="text-gray-400">등록할 감정:</span>
+          <select
+            value={emotion}
+            onChange={(e) => setEmotion(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white"
+            style={NO_OUTLINE}
+          >
+            {Object.entries(EMOTION_LABEL_MAP).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v} ({k})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {error && <p className="text-xs text-red-400 mb-3">{error}</p>}
+
+        {/* 프레임 그리드 */}
+        {frames.length === 0 ? (
+          <p className="text-center text-sm text-gray-500 py-10">
+            아직 추출된 프레임이 없습니다. 위에서 "프레임 추출"을 눌러주세요.
+          </p>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+            {frames.map((f, idx) => {
+              const added = addedTs.has(f.t)
+              return (
+                <div
+                  key={f.t}
+                  className="relative bg-gray-800 rounded-lg overflow-hidden border border-gray-700"
+                >
+                  <div className="aspect-[3/4]">
+                    <img
+                      src={f.blobUrl}
+                      alt={`frame at ${f.t}s`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="absolute top-1 left-1 text-[9px] bg-black/70 text-gray-200 px-1.5 py-0.5 rounded-full">
+                    {f.t}s
+                  </span>
+                  <button
+                    onClick={() => handleAdd(idx)}
+                    disabled={busyIdx === idx || added}
+                    className={`absolute bottom-1 left-1 right-1 px-2 py-1 rounded-md text-[10px] font-semibold disabled:opacity-50 ${
+                      added
+                        ? 'bg-emerald-700 text-white'
+                        : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                    }`}
+                    style={NO_OUTLINE}
+                  >
+                    {added ? '✓ 추가됨' : busyIdx === idx ? '추가 중...' : '+ 표정으로 추가'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="mt-4 pt-3 border-t border-gray-800 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            style={NO_OUTLINE}
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ArousedPipelineModal({ characterId, styleId, characterName, teaseImages, onClose }) {
   const [selectedImage, setSelectedImage] = useState(teaseImages[0] || null)
@@ -3613,6 +3737,268 @@ function LibraryPickerModal({ library, alreadyAssigned, onClose, onConfirm }) {
             style={NO_OUTLINE}
           >추가 ({selected.size})</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// 백그라운드 영상 잡 패널 — 우하단 floating
+// - 진행/완료/실패 잡을 카드로 표시
+// - 완료 잡 클릭 → JobResultModal에서 미리보기 + 감정 슬롯 업로드 결정
+// ============================================
+function VideoJobsPanel({ characters, onAddImage }) {
+  const jobs = useVideoJobs((s) => s.jobs)
+  const dismissJob = useVideoJobs((s) => s.dismissJob)
+  const clearFinished = useVideoJobs((s) => s.clearFinished)
+  const [openJobId, setOpenJobId] = useState(null)
+  const [collapsed, setCollapsed] = useState(false)
+
+  const characterNameMap = useMemo(() => {
+    const m = new Map()
+    for (const c of characters || []) m.set(c.id, c.name)
+    return m
+  }, [characters])
+
+  // 자동 업로드된 잡을 한 번만 캐릭터 그리드에 반영. consumedRef로 중복 방지.
+  const consumedRef = useRef(new Set())
+  useEffect(() => {
+    for (const job of jobs) {
+      if (job.status === 'uploaded' && job.uploadedImage && !consumedRef.current.has(job.id)) {
+        consumedRef.current.add(job.id)
+        onAddImage?.(job.characterId, { ...job.uploadedImage, emotion: job.emotion })
+      }
+    }
+  }, [jobs, onAddImage])
+
+  const openJob = useMemo(
+    () => (openJobId ? jobs.find((j) => j.id === openJobId) : null),
+    [openJobId, jobs],
+  )
+
+  if (jobs.length === 0) return null
+
+  const runningCount = jobs.filter((j) => j.status === 'generating' || j.status === 'uploading').length
+  const doneCount = jobs.filter((j) => j.status === 'uploaded').length
+  const failedCount = jobs.filter((j) => j.status === 'failed' || j.status === 'upload_failed').length
+
+  return (
+    <>
+      <div className="fixed bottom-4 right-4 z-40 w-80 max-w-[90vw] bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl text-white">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
+          <div className="text-xs font-semibold">
+            🎬 영상 작업
+            <span className="ml-2 text-gray-400 font-normal">
+              {runningCount > 0 && <span className="text-blue-400">{runningCount} 진행</span>}
+              {runningCount > 0 && doneCount > 0 && ' · '}
+              {doneCount > 0 && <span className="text-emerald-400">{doneCount} 저장됨</span>}
+              {failedCount > 0 && (
+                <>
+                  {(runningCount > 0 || doneCount > 0) && ' · '}
+                  <span className="text-red-400">{failedCount} 실패</span>
+                </>
+              )}
+            </span>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={clearFinished}
+              className="text-[10px] text-gray-500 hover:text-gray-300 px-1.5"
+              style={NO_OUTLINE}
+              title="완료/실패 잡 정리"
+            >
+              비우기
+            </button>
+            <button
+              onClick={() => setCollapsed((v) => !v)}
+              className="text-gray-400 hover:text-white text-xs w-6 h-6 flex items-center justify-center"
+              style={NO_OUTLINE}
+              title={collapsed ? '펼치기' : '접기'}
+            >
+              {collapsed ? '▲' : '▼'}
+            </button>
+          </div>
+        </div>
+
+        {!collapsed && (
+          <div className="max-h-96 overflow-y-auto p-2 space-y-2">
+            {jobs.map((job) => {
+              const name = characterNameMap.get(job.characterId) || `Character #${job.characterId}`
+              return (
+                <div
+                  key={job.id}
+                  className="bg-gray-800/70 rounded-lg p-2 flex gap-2 items-center"
+                >
+                  <img
+                    src={job.image.filePath}
+                    alt=""
+                    className="w-10 h-12 rounded object-cover bg-gray-700 flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate">
+                      {name}{' '}
+                      <span className="text-gray-400 font-normal">· {job.emotionLabel}</span>
+                    </p>
+                    <p className="text-[10px] mt-0.5">
+                      {job.status === 'generating' && (
+                        <span className="text-blue-400 inline-flex items-center gap-1">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="animate-spin">
+                            <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                          </svg>
+                          생성 중... (최대 5분)
+                        </span>
+                      )}
+                      {job.status === 'uploading' && (
+                        <span className="text-amber-400 inline-flex items-center gap-1">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="animate-spin">
+                            <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                          </svg>
+                          감정 슬롯에 업로드 중...
+                        </span>
+                      )}
+                      {job.status === 'uploaded' && (
+                        <span className="text-emerald-400">✓ 감정 슬롯에 저장됨</span>
+                      )}
+                      {job.status === 'failed' && (
+                        <span className="text-red-400" title={job.error || ''}>✗ 생성 실패</span>
+                      )}
+                      {job.status === 'upload_failed' && (
+                        <span className="text-red-400" title={job.error || ''}>⚠ 업로드 실패 — 영상은 생성됨</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    {(job.status === 'uploaded' || job.status === 'upload_failed') && (
+                      <button
+                        onClick={() => setOpenJobId(job.id)}
+                        className="text-[10px] px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded"
+                        style={NO_OUTLINE}
+                      >
+                        결과 확인
+                      </button>
+                    )}
+                    {job.status !== 'generating' && job.status !== 'uploading' && (
+                      <button
+                        onClick={() => dismissJob(job.id)}
+                        className="text-[10px] px-2 py-0.5 text-gray-400 hover:text-white"
+                        style={NO_OUTLINE}
+                        title="목록에서 제거"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {openJob && (
+        <JobResultModal
+          job={openJob}
+          onClose={() => setOpenJobId(null)}
+          onAddImage={onAddImage}
+        />
+      )}
+    </>
+  )
+}
+
+// 잡 결과 영상 미리보기. 자동 업로드 결과 확인 + upload_failed인 경우 재시도.
+function JobResultModal({ job, onClose, onAddImage }) {
+  const retryUpload = useVideoJobs((s) => s.retryUpload)
+
+  const handleRetry = () => {
+    retryUpload(job.id, (newImage) => {
+      onAddImage?.(job.characterId, newImage)
+    })
+  }
+
+  const alreadyUploaded = job.status === 'uploaded'
+  const uploading = job.status === 'uploading'
+  const canRetry = job.status === 'upload_failed'
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 py-6 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-semibold text-white mb-1">
+          🎬 결과 — {job.emotionLabel}
+        </h3>
+        <p className="text-[11px] text-gray-500 mb-4">
+          Seedance 2.0 Spicy
+          {alreadyUploaded && <span className="text-emerald-400 ml-2">· 자동 저장 완료</span>}
+        </p>
+
+        {/* 원본 이미지 + 생성 영상 비교 */}
+        <div className="flex gap-3 mb-3">
+          <div className="w-24 flex-shrink-0">
+            <img
+              src={job.image.filePath}
+              alt="원본"
+              className="w-full rounded-lg object-cover aspect-[3/4] border border-gray-700"
+            />
+            <p className="text-[10px] text-gray-500 mt-1 text-center">원본</p>
+          </div>
+          <div className="flex-1 min-w-0">
+            <video
+              src={job.videoUrl}
+              controls
+              autoPlay
+              loop
+              playsInline
+              className="w-full rounded-lg bg-black border border-gray-700"
+              style={{ aspectRatio: '3/4' }}
+            />
+            <p className="text-[10px] text-gray-500 mt-1 text-center">생성된 영상</p>
+          </div>
+        </div>
+
+        {job.error && (
+          <p className="text-red-400 text-xs mb-3 px-1">⚠ {job.error}</p>
+        )}
+
+        <div className="flex gap-2 mb-2">
+          <a
+            href={job.videoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 py-2 text-xs text-center text-blue-400 bg-gray-800 hover:bg-gray-700 rounded-lg"
+            style={NO_OUTLINE}
+          >
+            원본 링크
+          </a>
+          {canRetry && (
+            <button
+              onClick={handleRetry}
+              disabled={uploading}
+              className="flex-1 py-2 text-xs text-white bg-amber-600 hover:bg-amber-500 rounded-lg font-semibold disabled:opacity-50"
+              style={NO_OUTLINE}
+            >
+              {uploading ? '업로드 중...' : '↻ 업로드 재시도'}
+            </button>
+          )}
+          {alreadyUploaded && (
+            <div className="flex-1 py-2 text-xs text-center text-emerald-400 bg-emerald-900/30 border border-emerald-700/40 rounded-lg font-semibold">
+              ✓ 감정 슬롯에 저장됨
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-xl"
+          style={NO_OUTLINE}
+        >
+          닫기
+        </button>
       </div>
     </div>
   )
