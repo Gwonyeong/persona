@@ -309,7 +309,7 @@
     "light": "Light",
     "perMonth": "/mo",
     "trial": "Free for 3 days",
-    "instantMasks": "Get 30 masks instantly!",
+    "instantMasks": "Get 10 masks instantly!",
     "startFree": "Start Free Trial",
     "manageSubscription": "Manage Subscription",
     "googlePlayError": "Google Play billing is not available.",
@@ -328,7 +328,7 @@
     "lightBenefit5": "Unlimited group chats",
     "lightTrialNote": "First 3 days are free! Cancel during trial and you won't be charged.",
     "freeBoxTagline": "Start chatting with 10 characters for free",
-    "signupBonusBubble": "Get 30 extra masks the moment you sign up!",
+    "signupBonusBubble": "Get 10 extra masks the moment you sign up!",
     "feature": {
       "chat": "Chat",
       "dailyMasks": "Daily Masks",
@@ -581,7 +581,7 @@
     ],
     "s6Title": "Article 6 (Masks and Virtual Currency)",
     "s6Items": [
-      "Users receive 30 masks upon registration.",
+      "Users receive 10 masks upon registration.",
       "Masks are used for conversations with AI characters.",
       "Additional masks can be earned by completing missions.",
       "Masks are non-refundable for cash."
