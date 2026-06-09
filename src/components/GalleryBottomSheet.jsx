@@ -18,12 +18,16 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const [contents, setContents] = useState([])
   const [feedPosts, setFeedPosts] = useState([])
   const [generatedImages, setGeneratedImages] = useState([])
+  const [expressions, setExpressions] = useState([])
+  const [unlockingImageId, setUnlockingImageId] = useState(null)
+  const [videoLightboxUrl, setVideoLightboxUrl] = useState(null)
+  const [expressionsExpanded, setExpressionsExpanded] = useState(false)
   const [gifts, setGifts] = useState([])
   const [giftViewer, setGiftViewer] = useState(null) // { gift, index }
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [slideViewer, setSlideViewer] = useState(null)
-  const [tab, setTab] = useState('FEED')
+  const [tab, setTab] = useState('EXPRESSION')
   const [selectedFeed, setSelectedFeed] = useState(null)
   const [bgPickMode, setBgPickMode] = useState(false)
   const [bgPickImages, setBgPickImages] = useState(null) // 다중 이미지 선택용 { images: [] }
@@ -84,11 +88,46 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
 
     Promise.all(promises).then(([galleryRes, charRes, genRes, giftRes]) => {
       setContents(galleryRes.galleryContents || [])
+      setExpressions(galleryRes.expressions || [])
       setFeedPosts(charRes.character?.feedPosts || [])
       if (genRes) setGeneratedImages(genRes.images || [])
       setGifts(giftRes?.gifts || [])
     }).finally(() => setLoading(false))
   }, [characterId, conversationId, token])
+
+  // 표정 영상 해금 핸들러 — 10마스크 (character-level endpoint, conversation 무관)
+  const EXPRESSION_VIDEO_COST = 10
+  const handleUnlockExpressionVideo = async (exp) => {
+    if (masks < EXPRESSION_VIDEO_COST) {
+      alert('마스크가 부족합니다.')
+      onClose?.()
+      navigate('/subscription')
+      return
+    }
+    setUnlockingImageId(exp.characterImageId)
+    try {
+      const res = await api.post(`/characters/${characterId}/images/${exp.characterImageId}/unlock-video`, {})
+      // 로컬 state 업데이트 — 해금 + seen 처리 (해금하면 본 거니까)
+      setExpressions((prev) =>
+        prev.map((e) =>
+          e.characterImageId === exp.characterImageId
+            ? { ...e, videoUnlocked: true, seen: true, lastSeenAt: new Date().toISOString() }
+            : e,
+        ),
+      )
+      if (res.masks !== undefined) setMasks(res.masks)
+    } catch (err) {
+      if (err?.error === 'INSUFFICIENT_MASKS') {
+        alert('마스크가 부족합니다.')
+        onClose?.()
+        navigate('/subscription')
+      } else {
+        alert('해금에 실패했어요.')
+      }
+    } finally {
+      setUnlockingImageId(null)
+    }
+  }
 
   // 선물 관련 핸들러
   const unboughtCount = gifts.filter((g) => !g.unlocked).length
@@ -246,6 +285,18 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   }
 
   const tabs = [
+    {
+      key: 'EXPRESSION',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+          <line x1="9" y1="9" x2="9.01" y2="9" />
+          <line x1="15" y1="9" x2="15.01" y2="9" />
+        </svg>
+      ),
+      label: '표정',
+    },
     {
       key: 'FEED',
       icon: (
@@ -711,6 +762,124 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                   )}
                 </>
               )}
+              {tab === 'EXPRESSION' && (
+                <div className="px-3 py-3">
+                  {expressions.length === 0 ? (
+                    <p className="text-center text-sm text-gray-500 py-12">
+                      등록된 표정이 없습니다.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-gray-500 mb-2 px-1">
+                        본 표정: {expressions.filter((e) => e.seen).length} / {expressions.length}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(expressionsExpanded ? expressions : expressions.slice(0, 9)).map((exp) => {
+                          const hasVideo = !!exp.videoFilePath
+                          const seen = exp.seen
+                          const videoUnlocked = exp.videoUnlocked
+                          const isUnlocking = unlockingImageId === exp.characterImageId
+
+                          return (
+                            <div
+                              key={exp.characterImageId}
+                              className="relative rounded-xl overflow-hidden bg-gray-800 border border-gray-700"
+                              style={{ aspectRatio: '9 / 16' }}
+                            >
+                              {/* 베이스 — 이미지 */}
+                              <img
+                                src={exp.imageFilePath}
+                                alt={exp.emotion}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                style={!seen ? { filter: 'blur(16px)' } : undefined}
+                              />
+
+                              {/* 안 본 이미지 → 블러 + 자물쇠 */}
+                              {!seen && (
+                                <>
+                                  <div className="absolute inset-0 bg-black/40" />
+                                  <div className="absolute inset-0 flex items-center justify-center text-white pointer-events-none">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <rect x="3" y="11" width="18" height="11" rx="2" />
+                                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                  </div>
+                                </>
+                              )}
+
+                              {/* 본 이미지 + 영상 있음 + 해금됨 → 영상 오버레이 (선명) */}
+                              {seen && hasVideo && videoUnlocked && (
+                                <video
+                                  src={exp.videoFilePath}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  autoPlay loop muted playsInline
+                                />
+                              )}
+
+                              {/* 본 이미지 + 영상 있음 + 미해금 → 블러 영상 */}
+                              {seen && hasVideo && !videoUnlocked && (
+                                <>
+                                  <video
+                                    src={exp.videoFilePath}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    style={{ filter: 'blur(14px)' }}
+                                    autoPlay loop muted playsInline
+                                  />
+                                  <div className="absolute inset-0 bg-black/30" />
+                                </>
+                              )}
+
+                              {/* 영상 있는 본 이미지 → 중앙 재생 버튼 */}
+                              {seen && hasVideo && (
+                                <button
+                                  onClick={() => {
+                                    if (videoUnlocked) setVideoLightboxUrl(exp.videoFilePath)
+                                    else handleUnlockExpressionVideo(exp)
+                                  }}
+                                  disabled={isUnlocking}
+                                  className="absolute inset-0 flex items-center justify-center disabled:opacity-60"
+                                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                                  aria-label={videoUnlocked ? '영상 재생' : '영상 해금'}
+                                >
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-lg">
+                                      {isUnlocking ? (
+                                        <svg className="animate-spin w-5 h-5 text-white" viewBox="0 0 24 24" fill="none">
+                                          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="42 100" strokeLinecap="round" />
+                                        </svg>
+                                      ) : (
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                          <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                    {!videoUnlocked && !isUnlocking && (
+                                      <div className="px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm border border-white/20 flex items-center gap-1 text-[10px] text-white">
+                                        <MaskIcon size={10} />
+                                        <span>{EXPRESSION_VIDEO_COST}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </button>
+                              )}
+
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {expressions.length > 9 && (
+                        <button
+                          onClick={() => setExpressionsExpanded((v) => !v)}
+                          className="mt-3 w-full py-2 text-xs text-gray-300 bg-gray-800/60 hover:bg-gray-800 rounded-lg"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          {expressionsExpanded ? '접기' : `더 보기 (+${expressions.length - 9})`}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
               {tab === 'GENERATED' && (
                 <>
                   <div className="grid grid-cols-3 gap-[1px]">
@@ -753,6 +922,32 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           )}
         </div>
       </div>
+
+      {/* 표정 영상 fullscreen 라이트박스 */}
+      {videoLightboxUrl && (
+        <div
+          className="absolute inset-0 z-[60] bg-black/95 flex items-center justify-center"
+          onClick={() => setVideoLightboxUrl(null)}
+        >
+          <video
+            src={videoLightboxUrl}
+            className="w-full h-full object-contain"
+            autoPlay loop playsInline controls
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setVideoLightboxUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label="닫기"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* 피드 선택 액션 버튼 (일반 모드) */}
       {!bgPickMode && selectedFeed && (

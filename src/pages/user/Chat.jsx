@@ -450,6 +450,11 @@ export default function Chat() {
   const [insufficientMasksFor, setInsufficientMasksFor] = useState(null)
   const [showGallery, setShowGallery] = useState(false)
   const [attachedFeed, setAttachedFeed] = useState(null)
+  // 영상 언락 — Set of characterImageId (per-image, 1:1)
+  const [videoUnlockedImageIds, setVideoUnlockedImageIds] = useState(new Set())
+  const [unlockingVideo, setUnlockingVideo] = useState(false)
+  // 본 이미지 marked 추적 — 중복 호출 방지 (per session)
+  const markedSeenRef = useRef(new Set())
   // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
   const [backgroundImage, setBackgroundImage] = useState(null)
   // 캐릭터 표정 sprite 뒤 backdrop — AI가 scene에 따라 자동 선택. 채팅방 배경과 독립.
@@ -674,8 +679,16 @@ export default function Chat() {
   useEffect(() => {
     initialLoadRef.current = true
     refetchCallSessionMeta()
-    api.get(`/conversations/${id}/messages`).then(({ conversation: conv }) => {
+    api.get(`/conversations/${id}/messages`).then(({ conversation: conv, seenRecords }) => {
       setConversation(conv)
+      if (seenRecords) {
+        const unlockedIds = new Set(
+          seenRecords.filter((r) => r.videoUnlockedAt).map((r) => r.characterImageId)
+        )
+        setVideoUnlockedImageIds(unlockedIds)
+        // 이미 본 이미지는 markedSeen에 미리 채워서 중복 호출 방지
+        seenRecords.forEach((r) => markedSeenRef.current.add(r.characterImageId))
+      }
       setBackgroundImage(conv.backgroundImage || null)
       setSpriteBackgroundImage(conv.spriteBackgroundImage || null)
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
@@ -1195,26 +1208,70 @@ export default function Chat() {
     { page: 'chatTour', key: 'changeBg', target: '[data-onboarding-target="change-bg"]', caption: t('chatTour.changeBg') },
   ], [user?.name, t])
 
-  // 최신 캐릭터 메시지의 emotion sprite URL — BUBBLE 고정 표시 + BACKGROUND 모드에서 사용.
+  // 최신 캐릭터 메시지에 대응하는 CharacterImage 객체 — 이미지 row만 (standalone 영상 row 제외).
+  // 영상은 같은 row의 videoFilePath 필드로 따라옴 (이미지↔영상 1:1).
+  // 랜덤 선택 로직과 동일한 seed를 써서 이미지와 영상이 항상 같은 row를 가리킴.
   // early return 전에 호출해야 hook order 안정.
-  const latestCharacterSpriteUrl = useMemo(() => {
+  const latestCharacterSprite = useMemo(() => {
     if (!conversation) return null
     const ch = conversation.character
     if (!ch) return null
     const style = ch.styles?.find((s) => s.id === conversation.currentStyleId) || ch.styles?.[0]
+    if (!style) return null
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
       if (msg.role !== 'CHARACTER' || !msg.emotion) continue
-      const candidates = style?.images?.filter((img) => img.emotion === msg.emotion) || []
+      // 이미지 row만 후보로 — filePath가 영상인 standalone row는 제외
+      const candidates = style.images?.filter((img) => img.emotion === msg.emotion && !isVideoUrl(img.filePath)) || []
       if (candidates.length === 0) continue
-      if (candidates.length === 1) return candidates[0].filePath
+      if (candidates.length === 1) return { ...candidates[0], styleId: style.id }
       const seed = String(msg.createdAt || '') + '|' + i
       let h = 0
       for (let s = 0; s < seed.length; s++) h = ((h << 5) - h + seed.charCodeAt(s)) | 0
-      return candidates[Math.abs(h) % candidates.length].filePath
+      return { ...candidates[Math.abs(h) % candidates.length], styleId: style.id }
     }
     return null
   }, [messages, conversation])
+
+  const latestCharacterSpriteUrl = latestCharacterSprite?.filePath ?? null
+
+  // sprite가 새로 노출될 때 mark-seen 호출 (세션 내 중복 방지)
+  useEffect(() => {
+    const imgId = latestCharacterSprite?.id
+    if (!imgId || markedSeenRef.current.has(imgId)) return
+    markedSeenRef.current.add(imgId)
+    api.post(`/conversations/${id}/mark-image-seen`, { characterImageId: imgId }).catch(() => {
+      // 실패 시 다음 번 재시도 가능하게 markedSeen에서 제거
+      markedSeenRef.current.delete(imgId)
+    })
+  }, [latestCharacterSprite?.id, id])
+
+  // 선택된 이미지에 영상이 있고 해금됐는지 — per-image (1:1)
+  const isCurrentVideoUnlocked = latestCharacterSprite?.videoFilePath
+    ? videoUnlockedImageIds.has(latestCharacterSprite.id)
+    : false
+
+  const activeSpriteUrl = (isCurrentVideoUnlocked && latestCharacterSprite?.videoFilePath)
+    ? latestCharacterSprite.videoFilePath
+    : latestCharacterSpriteUrl
+
+  const handleUnlockEmotionVideo = async () => {
+    if (!latestCharacterSprite?.videoFilePath || unlockingVideo) return
+    setUnlockingVideo(true)
+    try {
+      const res = await api.post(`/conversations/${id}/unlock-image-video`, {
+        characterImageId: latestCharacterSprite.id,
+      })
+      setVideoUnlockedImageIds((prev) => new Set([...prev, latestCharacterSprite.id]))
+      if (res.masks !== undefined) setUser({ ...user, masks: res.masks })
+    } catch (err) {
+      if (err?.error === 'INSUFFICIENT_MASKS') {
+        setInsufficientMasksFor('emotionVideo')
+      }
+    } finally {
+      setUnlockingVideo(false)
+    }
+  }
 
   if (!conversation) {
     return <div className="flex items-center justify-center h-screen text-gray-400">{t('common.loading')}</div>
@@ -1222,7 +1279,8 @@ export default function Chat() {
 
   const { character } = conversation
   const currentStyle = character.styles.find((s) => s.id === conversation.currentStyleId) || character.styles[0]
-  const profileImg = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
+  // 프로필 썸네일도 이미지 row만 (standalone 영상 row 제외)
+  const profileImg = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL' && !isVideoUrl(i.filePath))
   const profileUrl = getImageUrl(character.profileImage) || getImageUrl(profileImg?.filePath)
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
@@ -1324,7 +1382,7 @@ export default function Chat() {
 
       <div className="absolute inset-0">
         {/* BACKGROUND 모드: sprite + spriteBackgroundImage 합성 레이어 (블러 처리 가능, 크로스페이드) */}
-        {spriteMode === 'BACKGROUND' && latestCharacterSpriteUrl && (
+        {spriteMode === 'BACKGROUND' && activeSpriteUrl && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {spriteBackgroundImage && (
               <CrossfadeMedia
@@ -1334,7 +1392,7 @@ export default function Chat() {
               />
             )}
             <CrossfadeMedia
-              src={latestCharacterSpriteUrl}
+              src={activeSpriteUrl}
               variant="sprite"
               className="absolute inset-0 w-full h-full object-cover object-bottom"
             />
@@ -1528,11 +1586,11 @@ export default function Chat() {
           )
         })}
         {/* FULL 모드: 메시지 목록 끝에 1회만 표시 — 최신 캐릭터 표정 sprite (크로스페이드) */}
-        {spriteMode === 'FULL' && latestCharacterSpriteUrl && (
+        {spriteMode === 'FULL' && activeSpriteUrl && (
           <div
             className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
             style={{ aspectRatio: '9 / 16' }}
-            onClick={() => setLightboxUrl({ url: latestCharacterSpriteUrl, bgUrl: spriteBackgroundImage })}
+            onClick={() => setLightboxUrl({ url: activeSpriteUrl, bgUrl: spriteBackgroundImage })}
           >
             {spriteBackgroundImage && (
               <CrossfadeMedia
@@ -1542,10 +1600,20 @@ export default function Chat() {
               />
             )}
             <CrossfadeMedia
-              src={latestCharacterSpriteUrl}
+              src={activeSpriteUrl}
               variant="sprite"
               className="absolute inset-0 w-full h-full object-cover object-bottom"
             />
+            {latestCharacterSprite?.videoFilePath && !isCurrentVideoUnlocked && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleUnlockEmotionVideo() }}
+                disabled={unlockingVideo}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 flex items-center gap-1.5 disabled:opacity-60"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                🎬 <span>{unlockingVideo ? '처리중...' : '영상으로 보기 10마스크'}</span>
+              </button>
+            )}
           </div>
         )}
         {showTyping && (
@@ -1579,25 +1647,37 @@ export default function Chat() {
 
       <div className="absolute bottom-0 left-0 right-0 z-30">
         {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드) */}
-        {spriteMode === 'BUBBLE' && latestCharacterSpriteUrl && (
+        {spriteMode === 'BUBBLE' && activeSpriteUrl && (
           <div className="flex justify-end px-3 mb-1.5">
-            <div
-              className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
-              style={{ aspectRatio: '9 / 16' }}
-              onClick={() => setLightboxUrl({ url: latestCharacterSpriteUrl, bgUrl: spriteBackgroundImage })}
-            >
-              {spriteBackgroundImage && (
-                <CrossfadeMedia
-                  src={spriteBackgroundImage}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{ filter: 'blur(2px)' }}
-                />
+            <div className="flex flex-col items-end gap-1">
+              {latestCharacterSprite?.videoFilePath && !isCurrentVideoUnlocked && (
+                <button
+                  onClick={handleUnlockEmotionVideo}
+                  disabled={unlockingVideo}
+                  className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border border-white/20 flex items-center gap-1 disabled:opacity-60"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  🎬 {unlockingVideo ? '...' : '영상 10'}
+                </button>
               )}
-              <CrossfadeMedia
-                src={latestCharacterSpriteUrl}
-                variant="sprite"
-                className="absolute inset-0 w-full h-full object-cover object-bottom"
-              />
+              <div
+                className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+                style={{ aspectRatio: '9 / 16' }}
+                onClick={() => setLightboxUrl({ url: activeSpriteUrl, bgUrl: spriteBackgroundImage })}
+              >
+                {spriteBackgroundImage && (
+                  <CrossfadeMedia
+                    src={spriteBackgroundImage}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ filter: 'blur(2px)' }}
+                  />
+                )}
+                <CrossfadeMedia
+                  src={activeSpriteUrl}
+                  variant="sprite"
+                  className="absolute inset-0 w-full h-full object-cover object-bottom"
+                />
+              </div>
             </div>
           </div>
         )}

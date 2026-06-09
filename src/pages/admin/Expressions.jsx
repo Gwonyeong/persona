@@ -132,14 +132,14 @@ export default function Expressions() {
     api.get('/admin/expressions-overview').then(({ characters }) => setCharacters(characters || []))
   }, [])
 
-  // 같은 (styleId, emotion)에 여러 이미지 허용 — 추가/삭제 별도 핸들러.
+  // 같은 (styleId, emotion)에 여러 이미지 허용 — 추가/삭제/업데이트 별도 핸들러.
   const addImage = (characterId, image) => {
     setCharacters((prev) =>
       prev.map((c) => {
         if (c.id !== characterId || !c.defaultStyle) return c
         const next = [
           ...c.defaultStyle.images,
-          { id: image.id, emotion: image.emotion, filePath: image.filePath },
+          { id: image.id, emotion: image.emotion, filePath: image.filePath, videoFilePath: image.videoFilePath ?? null },
         ]
         return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
       }),
@@ -150,6 +150,15 @@ export default function Expressions() {
       prev.map((c) => {
         if (c.id !== characterId || !c.defaultStyle) return c
         const next = c.defaultStyle.images.filter((i) => i.id !== imageId)
+        return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
+      }),
+    )
+  }
+  const updateImage = (characterId, imageId, patch) => {
+    setCharacters((prev) =>
+      prev.map((c) => {
+        if (c.id !== characterId || !c.defaultStyle) return c
+        const next = c.defaultStyle.images.map((i) => (i.id === imageId ? { ...i, ...patch } : i))
         return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
       }),
     )
@@ -288,6 +297,7 @@ export default function Expressions() {
                     emotions={currentEmotions}
                     onAddImage={(img) => addImage(c.id, img)}
                     onRemoveImage={(imageId) => removeImage(c.id, imageId)}
+                    onUpdateImage={(imageId, patch) => updateImage(c.id, imageId, patch)}
                   />
                 ))}
               </tbody>
@@ -409,7 +419,7 @@ function ExpressionPromptReference({ emotions }) {
   )
 }
 
-function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
+function CharacterRow({ character, emotions, onAddImage, onRemoveImage, onUpdateImage }) {
   const style = character.defaultStyle
   const [frameGalleryOpen, setFrameGalleryOpen] = useState(false)
   const [aiGenOpen, setAiGenOpen] = useState(false)
@@ -485,8 +495,10 @@ function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
                 emotion={e.key}
                 emotionLabel={e.label}
                 images={imagesByEmotion[e.key] || []}
+                allStyleImages={style.images || []}
                 onAdd={onAddImage}
                 onRemove={onRemoveImage}
+                onUpdate={onUpdateImage}
               />
             ) : (
               <div className="w-16 h-16 mx-auto rounded-md bg-gray-800/40 border border-dashed border-gray-700/50" />
@@ -517,7 +529,7 @@ function CharacterRow({ character, emotions, onAddImage, onRemoveImage }) {
   )
 }
 
-function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, onAdd, onRemove }) {
+function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, allStyleImages, onAdd, onRemove, onUpdate }) {
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
@@ -623,11 +635,13 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, onAd
           emotion={emotion}
           emotionLabel={emotionLabel}
           images={images}
+          allStyleImages={allStyleImages}
           onClose={() => setManagerOpen(false)}
           onUpload={uploadFile}
           uploading={uploading}
           onRemove={onRemove}
           onAdd={onAdd}
+          onUpdate={onUpdate}
         />
       )}
     </>
@@ -645,13 +659,67 @@ const PREV_EMOTION_MAP = {
   AROUSED_AFTERGLOW: 'AROUSED_CLIMAX',
 }
 
-function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, images, onClose, onUpload, uploading, onRemove, onAdd }) {
+function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, images, allStyleImages, onClose, onUpload, uploading, onRemove, onAdd, onUpdate }) {
   const [removingId, setRemovingId] = useState(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [bgImage, setBgImage] = useState(null)
   const [seedanceImage, setSeedanceImage] = useState(null)
   const [fromFrameOpen, setFromFrameOpen] = useState(false)
   const [wanImage, setWanImage] = useState(null)
+  // 영상 연결 picker — 어떤 이미지 row에 어떤 영상을 붙일지 선택.
+  const [linkPickerForImage, setLinkPickerForImage] = useState(null) // CharacterImage object or null
+  const [linkingVideoId, setLinkingVideoId] = useState(null)
+  const [unlinkingId, setUnlinkingId] = useState(null)
+
+  // 사용 가능한 standalone 영상 풀 — 1:1 정책상 이미 linked된 URL은 제외
+  // 기본은 같은 감정만 (linkPickerForImage 기준), 토글로 전체 감정 보기 가능
+  const [pickerScope, setPickerScope] = useState('emotion') // 'emotion' | 'all'
+
+  const availableVideos = useMemo(() => {
+    if (!linkPickerForImage) return []
+    const linkedUrls = new Set((allStyleImages || []).map((i) => i.videoFilePath).filter(Boolean))
+    const seen = new Set()
+    const list = []
+    for (const i of allStyleImages || []) {
+      if (!isVideoUrl(i.filePath)) continue
+      if (linkedUrls.has(i.filePath)) continue // 이미 다른 이미지에 1:1로 연결됨
+      if (seen.has(i.filePath)) continue
+      if (pickerScope === 'emotion' && i.emotion !== linkPickerForImage.emotion) continue
+      seen.add(i.filePath)
+      list.push({ videoUrl: i.filePath, thumbnailUrl: i.filePath, emotion: i.emotion })
+    }
+    return list
+  }, [allStyleImages, linkPickerForImage, pickerScope])
+
+  const handleLinkVideo = async (imageId, videoUrl) => {
+    setLinkingVideoId(videoUrl)
+    try {
+      const res = await api.post(`/admin/images/${imageId}/link-video`, { videoUrl })
+      onUpdate?.(imageId, { videoFilePath: res.image.videoFilePath })
+      // 소모된 standalone row는 로컬 state에서 제거
+      if (res.consumedStandalone) onRemove?.(res.consumedStandalone)
+      // 1:1 정책으로 이전 연결 해제된 이미지 반영
+      if (res.transferredFrom) onUpdate?.(res.transferredFrom, { videoFilePath: null })
+      setLinkPickerForImage(null)
+    } catch (err) {
+      alert('연결 실패: ' + (err?.error || err?.message))
+    } finally {
+      setLinkingVideoId(null)
+    }
+  }
+
+  const handleUnlinkVideo = async (imageId) => {
+    if (!confirm('이 이미지의 영상 연결을 해제하시겠습니까?')) return
+    setUnlinkingId(imageId)
+    try {
+      await api.delete(`/admin/images/${imageId}/video`)
+      onUpdate?.(imageId, { videoFilePath: null })
+    } catch (err) {
+      alert('해제 실패: ' + (err?.error || err?.message))
+    } finally {
+      setUnlinkingId(null)
+    }
+  }
 
   const triggerUpload = () => {
     const input = document.createElement('input')
@@ -690,7 +758,16 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
         <div className="flex items-center justify-between mb-4 gap-2">
           <div>
             <h3 className="text-sm font-semibold text-white">{emotionLabel} <span className="text-gray-500 text-[11px]">({emotion})</span></h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">총 {images.length}장 · 채팅에서 랜덤으로 1장 선택됨</p>
+            {(() => {
+              const linkedUrls = new Set((allStyleImages || []).map((i) => i.videoFilePath).filter(Boolean))
+              const imageCount = images.filter((i) => !isVideoUrl(i.filePath)).length
+              const standaloneCount = images.filter((i) => isVideoUrl(i.filePath) && !linkedUrls.has(i.filePath)).length
+              return (
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  🖼 {imageCount}장 · 🎥 {standaloneCount}개 (미연결) · 채팅에서 랜덤으로 1장 선택됨
+                </p>
+              )
+            })()}
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
             {PREV_EMOTION_MAP[emotion] && (
@@ -723,44 +800,77 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
           </div>
         </div>
 
-        {images.length === 0 ? (
-          <p className="text-center text-sm text-gray-500 py-10">아직 이미지가 없습니다.</p>
-        ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-            {images.map((img) => (
+        {(() => {
+          // 1:1 정책 — 스타일 전체 기준으로 videoFilePath 사용 중인 URL 체크 (cross-emotion 포함)
+          const linkedUrls = new Set((allStyleImages || []).map((i) => i.videoFilePath).filter(Boolean))
+          const imageRows = images.filter((i) => !isVideoUrl(i.filePath))
+          const videoRows = images.filter((i) => isVideoUrl(i.filePath) && !linkedUrls.has(i.filePath))
+          const ghostRows = images.filter((i) => isVideoUrl(i.filePath) && linkedUrls.has(i.filePath))
+
+          if (images.length === 0) {
+            return <p className="text-center text-sm text-gray-500 py-10">아직 이미지가 없습니다.</p>
+          }
+
+          const renderCell = (img) => {
+            const isVid = isVideoUrl(img.filePath)
+            return (
               <div key={img.id} className="relative group rounded-md overflow-hidden bg-gray-800">
                 <div className="aspect-[3/4]">
                   <ExpressionThumb src={img.filePath} className="w-full h-full object-cover" />
                 </div>
-                {!isVideoUrl(img.filePath) && (
-                  <button
-                    onClick={() => setBgImage(img)}
-                    className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-fuchsia-600 text-white text-[12px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={NO_OUTLINE}
-                    title="배경 제거 (시안 chroma key)"
-                  >
-                    🪄
-                  </button>
+                {img.videoFilePath && !isVid && (
+                  <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-emerald-500/90 text-white px-1.5 py-0.5 rounded-full pointer-events-none">
+                    🔗
+                  </span>
                 )}
-                {!isVideoUrl(img.filePath) && (
-                  <button
-                    onClick={() => setSeedanceImage(img)}
-                    className="absolute bottom-1.5 left-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-blue-600 text-white text-[11px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={NO_OUTLINE}
-                    title="Seedance 2.0 Spicy — 비디오 생성"
-                  >
-                    🎬
-                  </button>
-                )}
-                {!isVideoUrl(img.filePath) && (
-                  <button
-                    onClick={() => setWanImage(img)}
-                    className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-emerald-600 text-white text-[11px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    style={NO_OUTLINE}
-                    title="WAN 2.7 image-edit — 이미지 생성"
-                  >
-                    🖼
-                  </button>
+                {!isVid && (
+                  <>
+                    <button
+                      onClick={() => setBgImage(img)}
+                      className="absolute top-1.5 left-7 w-6 h-6 rounded-full bg-black/70 hover:bg-fuchsia-600 text-white text-[12px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      style={NO_OUTLINE}
+                      title="배경 제거 (시안 chroma key)"
+                    >
+                      🪄
+                    </button>
+                    <button
+                      onClick={() => setSeedanceImage(img)}
+                      className="absolute bottom-1.5 left-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-blue-600 text-white text-[11px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      style={NO_OUTLINE}
+                      title="Seedance 2.0 Spicy — 비디오 생성"
+                    >
+                      🎬
+                    </button>
+                    <button
+                      onClick={() => setWanImage(img)}
+                      className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/70 hover:bg-emerald-600 text-white text-[11px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      style={NO_OUTLINE}
+                      title="WAN 2.7 image-edit — 이미지 생성"
+                    >
+                      🖼
+                    </button>
+                    {/* 영상 연결 or 해제 버튼 — 중앙 하단 */}
+                    {img.videoFilePath ? (
+                      <button
+                        onClick={() => handleUnlinkVideo(img.id)}
+                        disabled={unlinkingId === img.id}
+                        className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 h-6 rounded-full bg-emerald-700/90 hover:bg-red-600 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 disabled:opacity-50"
+                        style={NO_OUTLINE}
+                        title="영상 연결 해제"
+                      >
+                        🔗 해제
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setLinkPickerForImage(img)}
+                        className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 h-6 rounded-full bg-black/70 hover:bg-emerald-600 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
+                        style={NO_OUTLINE}
+                        title="기존 영상에 연결"
+                      >
+                        🔗 연결
+                      </button>
+                    )}
+                  </>
                 )}
                 <button
                   onClick={() => handleRemove(img.id)}
@@ -775,9 +885,65 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                   </svg>
                 </button>
               </div>
-            ))}
-          </div>
-        )}
+            )
+          }
+
+          return (
+            <div className="space-y-5">
+              {/* 🖼 이미지 섹션 */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[11px] font-semibold text-blue-300">🖼 이미지</span>
+                  <span className="text-[10px] text-gray-500">({imageRows.length}장)</span>
+                  <span className="text-[10px] text-emerald-400/80">
+                    · 🔗 = 영상 연결됨 ({imageRows.filter((i) => i.videoFilePath).length}장)
+                  </span>
+                </div>
+                {imageRows.length === 0 ? (
+                  <p className="text-center text-xs text-gray-600 py-6 border border-dashed border-gray-800 rounded-md">
+                    등록된 이미지가 없습니다.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                    {imageRows.map(renderCell)}
+                  </div>
+                )}
+              </section>
+
+              {/* 🎥 영상 섹션 — 미연결 standalone만 (이미 linked된 URL은 ghost로 분리) */}
+              <section>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[11px] font-semibold text-amber-300">🎥 영상 (미연결)</span>
+                  <span className="text-[10px] text-gray-500">({videoRows.length}개)</span>
+                  <span className="text-[10px] text-gray-500">· 이미지에 연결 가능</span>
+                </div>
+                {videoRows.length === 0 ? (
+                  <p className="text-center text-xs text-gray-600 py-6 border border-dashed border-gray-800 rounded-md">
+                    연결 가능한 영상이 없습니다.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                    {videoRows.map(renderCell)}
+                  </div>
+                )}
+              </section>
+
+              {/* 👻 Ghost 섹션 — 정합성 깨진 잔여 row (이미 linked된 URL과 동일한 standalone) */}
+              {ghostRows.length > 0 && (
+                <section>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[11px] font-semibold text-red-300">👻 Ghost (정합성 오류)</span>
+                    <span className="text-[10px] text-gray-500">({ghostRows.length}개)</span>
+                    <span className="text-[10px] text-red-300/70">· 이미 이미지에 연결됐는데 standalone row도 남아있음 — 삭제 권장</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                    {ghostRows.map(renderCell)}
+                  </div>
+                </section>
+              )}
+            </div>
+          )
+        })()}
 
         <div className="mt-4 pt-3 border-t border-gray-800 flex justify-end">
           <button
@@ -848,6 +1014,89 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
           onAdd={onAdd}
           onClose={() => setFromFrameOpen(false)}
         />
+      )}
+
+      {/* 영상 picker 모달 — 1:1 관계, 같은 감정 기본 */}
+      {linkPickerForImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setLinkPickerForImage(null)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-white">🔗 영상 연결</h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">1:1 관계 · 선택한 영상은 이 이미지로 이전됩니다 (원본 standalone 삭제)</p>
+              </div>
+              <button
+                onClick={() => setLinkPickerForImage(null)}
+                className="text-gray-400 hover:text-white"
+                style={NO_OUTLINE}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 선택 대상 이미지 미리보기 */}
+            <div className="flex items-center gap-3 mb-4 bg-gray-800/50 rounded-lg p-3">
+              <img src={linkPickerForImage.filePath} alt="" className="w-16 rounded-lg object-cover" style={{ aspectRatio: '3/4' }} />
+              <div className="text-xs">
+                <p className="text-gray-300 font-semibold">{EMOTION_LABEL_MAP[linkPickerForImage.emotion] || linkPickerForImage.emotion}</p>
+                <p className="text-gray-500">이미지 ID: {linkPickerForImage.id}</p>
+              </div>
+            </div>
+
+            {/* 스코프 토글 */}
+            <div className="flex gap-2 mb-3 text-xs">
+              <button
+                onClick={() => setPickerScope('emotion')}
+                className={`px-2 py-1 rounded ${pickerScope === 'emotion' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                style={NO_OUTLINE}
+              >
+                같은 감정만 (기본)
+              </button>
+              <button
+                onClick={() => setPickerScope('all')}
+                className={`px-2 py-1 rounded ${pickerScope === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                style={NO_OUTLINE}
+              >
+                전체 감정
+              </button>
+            </div>
+
+            {availableVideos.length === 0 ? (
+              <p className="text-center text-sm text-gray-500 py-10">
+                연결 가능한 영상이 없습니다.<br/>
+                <span className="text-[11px]">
+                  {pickerScope === 'emotion'
+                    ? '같은 감정의 standalone 영상이 없습니다. 전체 감정 보기로 전환하거나 Seedance로 생성하세요.'
+                    : '먼저 영상을 업로드하거나 Seedance로 생성하세요.'}
+                </span>
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {availableVideos.map((v, idx) => (
+                  <button
+                    key={`${v.videoUrl}-${idx}`}
+                    onClick={() => handleLinkVideo(linkPickerForImage.id, v.videoUrl)}
+                    disabled={linkingVideoId === v.videoUrl}
+                    className="relative bg-gray-800 hover:bg-gray-700 rounded-lg overflow-hidden border border-gray-700 hover:border-emerald-500 transition-all disabled:opacity-50"
+                    style={NO_OUTLINE}
+                  >
+                    <div className="aspect-[3/4]">
+                      <video src={v.videoUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
+                    </div>
+                    <span className="absolute top-1 left-1 text-[9px] bg-black/70 text-gray-200 px-1.5 py-0.5 rounded-full">
+                      {EMOTION_LABEL_MAP[v.emotion] || v.emotion}
+                    </span>
+                    {linkingVideoId === v.videoUrl && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-emerald-400 text-xs">
+                        이전 중...
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )

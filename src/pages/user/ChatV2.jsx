@@ -1450,7 +1450,8 @@ export default function ChatV2() {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
       if (msg.role !== 'CHARACTER' || !msg.emotion) continue
-      const candidates = style?.images?.filter((img) => img.emotion === msg.emotion) || []
+      // 이미지 row만 후보로 — filePath가 영상인 standalone row는 제외
+      const candidates = style?.images?.filter((img) => img.emotion === msg.emotion && !isVideoUrl(img.filePath)) || []
       if (candidates.length === 0) continue
       if (candidates.length === 1) return candidates[0].filePath
       const seed = String(msg.createdAt || '') + '|' + i
@@ -1467,7 +1468,8 @@ export default function ChatV2() {
 
   const { character } = conversation
   const currentStyle = character.styles.find((s) => s.id === conversation.currentStyleId) || character.styles[0]
-  const profileImg = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
+  // 프로필 썸네일도 이미지 row만 (standalone 영상 row 제외)
+  const profileImg = character.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL' && !isVideoUrl(i.filePath))
   const profileUrl = getImageUrl(character.profileImage) || getImageUrl(profileImg?.filePath)
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
