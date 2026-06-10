@@ -1661,11 +1661,13 @@ export default function Chat() {
       </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 z-30">
+      {/* 부모 wrapper 자체를 pointer-events-none — sprite/미니버튼 행의 빈 좌측 영역이 채팅 스크롤 터치를 가로채지 않도록.
+          실제 인터랙티브 자식(sprite 박스, 미니버튼 행, 입력바)에만 pointer-events-auto 적용. */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
         {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드) */}
         {spriteMode === 'BUBBLE' && activeSpriteUrl && (
           <div className="flex justify-end px-3 mb-1.5">
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-1 pointer-events-auto">
               {latestCharacterSprite?.videoFilePath && !isCurrentVideoUnlocked && (
                 <button
                   onClick={handleUnlockEmotionVideo}
@@ -1699,7 +1701,7 @@ export default function Chat() {
         )}
         {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치 */}
         <div className="flex items-center gap-2 px-3 mb-1.5">
-          <div className="ml-auto relative h-8 flex items-center justify-end">
+          <div className="ml-auto relative h-8 flex items-center justify-end pointer-events-auto">
             <button
               onClick={() => setShowInputButtons(true)}
               className={`w-8 h-8 rounded-full bg-gray-900/75 border border-gray-800/50 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-800/80 transition-opacity duration-200 ${
@@ -1829,7 +1831,7 @@ export default function Chat() {
             </div>
           </div>
         </div>
-        <div className="px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
+        <div className="px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30 pointer-events-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
           {attachedFeed && (
             <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
               <img
