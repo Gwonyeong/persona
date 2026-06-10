@@ -356,8 +356,14 @@ export default function Home() {
         <div className="grid grid-cols-2 gap-3">
           {filterByTags(gridCharacters).map((c) => {
             const thumb = c.styles?.[0]?.images?.[0]
+            // 큰 박스(FeaturedCharacterSlider)와 동일한 우선순위 — homeImageSquare(NSFW 게이팅 대상) → homeImage → profileImage → 첫 스프라이트
+            const homeSquare = reducedData ? null : c.homeImageSquare
             const homeMedia = reducedData ? null : c.homeImage
-            const thumbUrl = getImageUrl(homeMedia) || getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
+            const thumbUrl =
+              getImageUrl(homeSquare) ||
+              getImageUrl(homeMedia) ||
+              getImageUrl(c.profileImage) ||
+              getImageUrl(thumb?.filePath)
             const isVideo = isVideoUrl(thumbUrl)
             const posterUrl = isVideo ? (getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)) : null
 
