@@ -1411,6 +1411,22 @@ export default function Chat() {
                   <div className="flex items-start gap-3">
                     <span className="text-2xl leading-none mt-0.5 flex-shrink-0">{status.emoji}</span>
                     <div className="flex-1 min-w-0 space-y-1.5">
+                      {status.virtualTime && (() => {
+                        const vt = status.virtualTime
+                        const parts = [
+                          vt.season,
+                          vt.monthDay,
+                          vt.weekday ? `${vt.weekday}요일` : null,
+                          vt.dayPart,
+                          Number.isInteger(vt.hour) ? `${vt.hour}시` : null,
+                        ].filter(Boolean)
+                        return parts.length > 0 ? (
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">시간</span>
+                            <span className="text-xs text-amber-200/90">{parts.join(' · ')}</span>
+                          </div>
+                        ) : null
+                      })()}
                       <div className="flex items-baseline gap-2">
                         <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat.statusMood')}</span>
                         <span className="text-xs text-gray-200">{status.mood}</span>
