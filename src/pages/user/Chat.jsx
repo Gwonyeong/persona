@@ -1247,13 +1247,17 @@ export default function Chat() {
   }, [latestCharacterSprite?.id, id])
 
   // 선택된 이미지에 영상이 있고 해금됐는지 — per-image (1:1)
-  const isCurrentVideoUnlocked = latestCharacterSprite?.videoFilePath
+  const hasEmotionVideo = !!latestCharacterSprite?.videoFilePath
+  const isCurrentVideoUnlocked = hasEmotionVideo
     ? videoUnlockedImageIds.has(latestCharacterSprite.id)
     : false
 
-  const activeSpriteUrl = (isCurrentVideoUnlocked && latestCharacterSprite?.videoFilePath)
+  const activeSpriteUrl = (isCurrentVideoUnlocked && hasEmotionVideo)
     ? latestCharacterSprite.videoFilePath
     : latestCharacterSpriteUrl
+
+  // 미해금 영상 오버레이 필요 여부 — sprite 이미지는 그대로 두고 그 위에 별도 블러 영상 레이어 + CTA.
+  const bubbleNeedsUnlock = hasEmotionVideo && !isCurrentVideoUnlocked
 
   const handleUnlockEmotionVideo = async () => {
     if (!latestCharacterSprite?.videoFilePath || unlockingVideo) return
@@ -1601,7 +1605,8 @@ export default function Chat() {
             </Fragment>
           )
         })}
-        {/* FULL 모드: 메시지 목록 끝에 1회만 표시 — 최신 캐릭터 표정 sprite (크로스페이드) */}
+        {/* FULL 모드: 메시지 목록 끝에 1회만 표시 — 최신 캐릭터 표정 sprite (크로스페이드).
+            미해금 영상이 있으면 sprite 우측 하단에 별도 영상 카드를 띄움 (BUBBLE 모드와 동일 카드 디자인). */}
         {spriteMode === 'FULL' && activeSpriteUrl && (
           <div
             className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
@@ -1620,15 +1625,29 @@ export default function Chat() {
               variant="sprite"
               className="absolute inset-0 w-full h-full object-cover object-bottom"
             />
-            {latestCharacterSprite?.videoFilePath && !isCurrentVideoUnlocked && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleUnlockEmotionVideo() }}
-                disabled={unlockingVideo}
-                className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 flex items-center gap-1.5 disabled:opacity-60"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            {bubbleNeedsUnlock && (
+              <div
+                className="absolute bottom-3 right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+                style={{ aspectRatio: '9 / 16' }}
+                onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
               >
-                🎬 <span>{unlockingVideo ? '처리중...' : '영상으로 보기 10마스크'}</span>
-              </button>
+                <CrossfadeMedia
+                  src={latestCharacterSprite.videoFilePath}
+                  variant="sprite"
+                  className="absolute inset-0 w-full h-full object-cover object-bottom blur-sm"
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
+                    <div className="flex items-center gap-0.5 text-white text-[11px] font-bold leading-none">
+                      <MaskIcon style={{ width: '0.9em', height: '0.9em' }} />
+                      <span>10</span>
+                    </div>
+                    <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
+                      {unlockingVideo ? '처리중' : '해금하기'}
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -1664,20 +1683,38 @@ export default function Chat() {
       {/* 부모 wrapper 자체를 pointer-events-none — sprite/미니버튼 행의 빈 좌측 영역이 채팅 스크롤 터치를 가로채지 않도록.
           실제 인터랙티브 자식(sprite 박스, 미니버튼 행, 입력바)에만 pointer-events-auto 적용. */}
       <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
-        {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드) */}
+        {/* 표정 sprite 고정 표시 (BUBBLE 모드) — 미니 버튼 행 위 우측 (크로스페이드).
+            미해금 영상이 있으면 sprite 카드 위에 별도 영상 카드를 쌓아 표시. */}
         {spriteMode === 'BUBBLE' && activeSpriteUrl && (
           <div className="flex justify-end px-3 mb-1.5">
-            <div className="flex flex-col items-end gap-1 pointer-events-auto">
-              {latestCharacterSprite?.videoFilePath && !isCurrentVideoUnlocked && (
-                <button
-                  onClick={handleUnlockEmotionVideo}
-                  disabled={unlockingVideo}
-                  className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border border-white/20 flex items-center gap-1 disabled:opacity-60"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            <div className="flex flex-col items-end gap-1.5 pointer-events-auto">
+              {/* 미해금 영상 카드 — sprite 카드 위에 별도 표시 */}
+              {bubbleNeedsUnlock && (
+                <div
+                  className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+                  style={{ aspectRatio: '9 / 16' }}
+                  onClick={() => { if (!unlockingVideo) handleUnlockEmotionVideo() }}
                 >
-                  🎬 {unlockingVideo ? '...' : '영상 10'}
-                </button>
+                  <CrossfadeMedia
+                    src={latestCharacterSprite.videoFilePath}
+                    variant="sprite"
+                    className="absolute inset-0 w-full h-full object-cover object-bottom blur-sm"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
+                      <div className="flex items-center gap-0.5 text-white text-[11px] font-bold leading-none">
+                        <MaskIcon style={{ width: '0.9em', height: '0.9em' }} />
+                        <span>10</span>
+                      </div>
+                      <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
+                        {unlockingVideo ? '처리중' : '해금하기'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               )}
+
+              {/* 표정 sprite 카드 — 깔끔하게 (영상 카드와 분리) */}
               <div
                 className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
                 style={{ aspectRatio: '9 / 16' }}
