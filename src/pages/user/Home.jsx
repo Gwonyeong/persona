@@ -9,11 +9,11 @@ import useStore from '../../store/useStore'
 import TagFilterBar from '../../components/TagFilterBar'
 import useTagFilter from '../../hooks/useTagFilter'
 import usePrefersReducedData from '../../hooks/usePrefersReducedData'
-import { getTagLabel } from '../../lib/tagLabel'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import RecentStoriesRow from '../../components/RecentStoriesRow'
 import FeaturedCharacterSlider from '../../components/FeaturedCharacterSlider'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
+import CharacterCard from '../../components/CharacterCard'
 import MaskIcon from '../../components/MaskIcon'
 // import AdBanner from '../../components/AdBanner'
 
@@ -22,17 +22,6 @@ const LANGUAGES = [
   { code: 'en', flag: 'us', label: 'English' },
   { code: 'ja', flag: 'jp', label: '日本語' },
 ]
-
-function getImageUrl(filePath) {
-  if (!filePath) return null
-  // Supabase public URL은 그대로 사용
-  if (filePath.startsWith('http')) return filePath
-  return null
-}
-
-function isVideoUrl(url) {
-  return !!url && /\.(mp4|webm)(\?|$)/i.test(url)
-}
 
 export default function Home() {
   const { t, i18n: i18nInstance } = useTranslation()
@@ -122,21 +111,13 @@ export default function Home() {
       .catch(() => setFeaturedCharacters([]))
   }, [i18nInstance.language, safetyMode])
 
-  const charactersWithRandomTags = useMemo(() => {
-    return characters.map((c) => {
-      const displayTags = c.tags.filter((t) => !['nationality', 'age', 'imageType', 'personality'].includes(t.split(':')[0]))
-      const shuffled = [...displayTags].sort(() => Math.random() - 0.5)
-      return { ...c, randomTags: shuffled.slice(0, 2) }
-    })
-  }, [characters])
-
-  // 최근 합류 3명 — 가로 슬라이드에서만 노출, 하단 그리드에서는 제외
+  // 최근 합류 4명 — 가로 슬라이드에서만 노출, 하단 그리드에서는 제외
   const recentJoined = useMemo(() => {
-    return [...charactersWithRandomTags]
+    return [...characters]
       .filter((c) => c.createdAt)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 3)
-  }, [charactersWithRandomTags])
+      .slice(0, 4)
+  }, [characters])
 
   const recentJoinedIds = useMemo(
     () => new Set(recentJoined.map((c) => c.id)),
@@ -144,8 +125,8 @@ export default function Home() {
   )
 
   const gridCharacters = useMemo(
-    () => charactersWithRandomTags.filter((c) => !recentJoinedIds.has(c.id)),
-    [charactersWithRandomTags, recentJoinedIds]
+    () => characters.filter((c) => !recentJoinedIds.has(c.id)),
+    [characters, recentJoinedIds]
   )
 
   return (
@@ -341,101 +322,32 @@ export default function Home() {
         reducedData={reducedData}
       />
 
-      {/* 최근에 합류한 페소나들 — 최근 생성된 3명 가로 슬라이드 */}
+      {/* 최근에 합류한 페소나들 — 최근 생성된 4명 가로 슬라이드 */}
       <RecentJoinedRow
         characters={recentJoined}
         reducedData={reducedData}
       />
 
-      {/* 캐릭터 그리드 — 최근 합류 3명 제외 */}
+      {/* 캐릭터 그리드 — 최근 합류 4명 제외 */}
       {filterByTags(gridCharacters).length === 0 ? (
         <div className="text-center text-gray-500 py-20">
           <p>{t('home.emptyCharacters')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {filterByTags(gridCharacters).map((c) => {
-            const thumb = c.styles?.[0]?.images?.[0]
-            // 큰 박스(FeaturedCharacterSlider)와 동일한 우선순위 — homeImageSquare(NSFW 게이팅 대상) → homeImage → profileImage → 첫 스프라이트
-            const homeSquare = reducedData ? null : c.homeImageSquare
-            const homeMedia = reducedData ? null : c.homeImage
-            const thumbUrl =
-              getImageUrl(homeSquare) ||
-              getImageUrl(homeMedia) ||
-              getImageUrl(c.profileImage) ||
-              getImageUrl(thumb?.filePath)
-            const isVideo = isVideoUrl(thumbUrl)
-            const posterUrl = isVideo ? (getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)) : null
-
-            const flagTag = c.tags.find((t) => t.startsWith('nationality:'))
-            const flagCode = flagTag?.split(':')[1]
-
-            return (
-              <button
+        <>
+          <h2 className="text-sm font-medium text-gray-400 mb-2">
+            다른 매력적인 페소나들
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {filterByTags(gridCharacters).map((c) => (
+              <CharacterCard
                 key={c.id}
-                onClick={() => navigate(`/characters/${c.id}`)}
-                className="relative rounded-xl overflow-hidden text-left hover:ring-1 hover:ring-gray-700 transition-all"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {/* 국기 배지 */}
-                {flagCode && (
-                  <div className="absolute top-2 right-2 z-[1] w-6 h-6 rounded-full overflow-hidden shadow-lg ring-1 ring-black/20">
-                    <img
-                      src={`https://flagcdn.com/w80/${flagCode}.png`}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                {/* TTS 마이크 배지 */}
-                {c.voiceId && (
-                  <div
-                    className="absolute top-2 left-2 z-[1] w-6 h-6 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center ring-1 ring-emerald-400/60"
-                    style={{ boxShadow: '0 0 8px 2px rgba(16, 185, 129, 0.7), 0 0 16px 4px rgba(16, 185, 129, 0.35)' }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-300" style={{ filter: 'drop-shadow(0 0 2px rgba(16, 185, 129, 0.9))' }}>
-                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="22" />
-                    </svg>
-                  </div>
-                )}
-                {/* 미디어 (이미지/영상) */}
-                <div className="aspect-[2/3] bg-gray-800 flex items-center justify-center">
-                  {thumbUrl ? (
-                    isVideo ? (
-                      <video
-                        src={thumbUrl}
-                        poster={posterUrl || undefined}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <img src={thumbUrl} alt={c.name} className="w-full h-full object-cover" />
-                    )
-                  ) : (
-                    <span className="text-4xl text-gray-600">?</span>
-                  )}
-                </div>
-                {/* 그라데이션 오버레이 + 정보 */}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-14">
-                  <p className="font-semibold text-sm truncate text-white">{c.name}</p>
-                  <div className="flex gap-1 mt-1.5 flex-wrap">
-                    {c.randomTags.map((tag) => (
-                      <span key={tag} className="px-1.5 py-0.5 bg-white/15 rounded text-[10px] text-gray-200">
-                        {getTagLabel(tag, tagCategories)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+                character={c}
+                reducedData={reducedData}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {/* 사업자 정보 푸터 */}
