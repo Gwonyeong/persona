@@ -237,6 +237,146 @@ function useJamoTypewriter(fullText, shouldAnimate) {
   return fullText || ''
 }
 
+// FULL 모드 전용 — 버블 없이 텍스트 라인만 노출 (비주얼 노벨 풍).
+// 캐릭터 본문: 흰색, 캐릭터 이름: amber 강조, 행동 묘사(《》, ()): 회색 italic.
+// 유저 본문: 우측 정렬, 옅은 인디고. NARRATION: 가운데 회색 italic. GIFT/GENERATED_IMAGE는 기존 박스 유지.
+const MessageLine = memo(function MessageLine({
+  msg,
+  msgIdx,
+  isConsecutive,
+  profileUrl,
+  characterName,
+  isLastChar,
+  latestResponseAudios,
+  isPlayingAll,
+  isThisPlayingAudio,
+  chatMode,
+  onLightbox,
+  onPlayAudio,
+  onStopAudio,
+  onSetBackground,
+  onPlayAll,
+  onStopAll,
+  onAppear,
+  t,
+}) {
+  const isStreamingBubble = msg._streaming === true
+  useEffect(() => {
+    if (isStreamingBubble && onAppear) onAppear()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreamingBubble])
+
+  const isNormalMode = chatMode === 'NORMAL'
+
+  // NARRATION: 가운데 회색 italic.
+  if (msg.role === 'NARRATION') {
+    if (isNormalMode) return null
+    return (
+      <p className="my-2 text-[13px] text-gray-400/90 italic text-center leading-relaxed">
+        {msg.content || ''}
+      </p>
+    )
+  }
+
+  // GIFT / GENERATED_IMAGE는 기존 박스 컴포넌트로 위임 (시각 요소가 박스로 묶이는 게 자연스러움).
+  if (msg.role === 'GIFT' || msg.role === 'GENERATED_IMAGE') {
+    return (
+      <MessageBubble
+        msg={msg}
+        msgIdx={msgIdx}
+        isConsecutive={isConsecutive}
+        showTime={false}
+        profileUrl={profileUrl}
+        characterName={characterName}
+        isLastChar={isLastChar}
+        latestResponseAudios={latestResponseAudios}
+        isPlayingAll={isPlayingAll}
+        isThisPlayingAudio={isThisPlayingAudio}
+        chatMode={chatMode}
+        onLightbox={onLightbox}
+        onPlayAudio={onPlayAudio}
+        onStopAudio={onStopAudio}
+        onSetBackground={onSetBackground}
+        onPlayAll={onPlayAll}
+        onStopAll={onStopAll}
+        onAppear={onAppear}
+        t={t}
+      />
+    )
+  }
+
+  if (msg.role !== 'CHARACTER' && msg.role !== 'USER') return null
+
+  const segments = parseMessageSegments(msg.content || '', msg.role)
+  const filteredSegs = isNormalMode ? segments.filter((s) => s.type !== 'action') : segments
+  const hasText = filteredSegs.some((s) => (s.value || '').trim().length > 0)
+  const hasExtras = !!(msg.feedImage || (msg.role === 'CHARACTER' && msg.audioUrl))
+  if (!hasText && !hasExtras) return null
+
+  const isCharacter = msg.role === 'CHARACTER'
+  const actionWrap = (val) => (isCharacter ? `《${val}》` : `(${val})`)
+
+  return (
+    <div className={`${isConsecutive ? 'mt-1' : 'mt-2.5'} ${isCharacter ? 'text-left' : 'text-right'}`}>
+      {isCharacter && !isConsecutive && (
+        <p className="text-[11px] text-amber-200/90 font-semibold mb-0.5">{characterName}</p>
+      )}
+      {msg.feedImage && (
+        <div className={`mb-1.5 ${isCharacter ? '' : 'inline-block'} rounded-xl overflow-hidden max-w-[60%]`}>
+          <img src={msg.feedImage} alt="" className="w-full aspect-square object-cover" loading="lazy" />
+        </div>
+      )}
+      <div className={`flex items-end gap-1.5 ${isCharacter ? 'justify-start' : 'justify-end'}`}>
+        <p
+          className={`text-[14px] leading-relaxed whitespace-pre-wrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] ${
+            isCharacter ? 'text-gray-50' : 'text-indigo-200/95'
+          }`}
+        >
+          {filteredSegs.map((seg, i) => (
+            <Fragment key={i}>
+              {i > 0 && (seg.type === 'action' || filteredSegs[i - 1].type === 'action') ? '\n' : ''}
+              {seg.type === 'action' ? (
+                <span className="italic text-gray-400/80 text-[13px]">{actionWrap(seg.value)}</span>
+              ) : (
+                seg.value
+              )}
+            </Fragment>
+          ))}
+        </p>
+        {isCharacter && msg.audioUrl && (
+          <button
+            onClick={() => isThisPlayingAudio ? onStopAudio() : onPlayAudio(msg.audioUrl, msgIdx)}
+            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {isThisPlayingAudio ? (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+            )}
+          </button>
+        )}
+      </div>
+      {isLastChar && latestResponseAudios.length >= 2 && (
+        <button
+          onClick={() => isPlayingAll ? onStopAll() : onPlayAll(latestResponseAudios)}
+          className={`mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${isPlayingAll ? 'bg-red-600/20 hover:bg-red-600/30 border-red-600/40' : 'bg-emerald-600/20 hover:bg-emerald-600/30 border-emerald-600/40'}`}
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill={isPlayingAll ? '#fca5a5' : '#6ee7b7'}>
+            {isPlayingAll
+              ? <><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></>
+              : <polygon points="5 3 19 12 5 21 5 3" />}
+          </svg>
+          <span className={`text-[11px] font-medium ${isPlayingAll ? 'text-red-200' : 'text-emerald-200'}`}>
+            {isPlayingAll ? t('chat.stopAll') : t('chat.playAll')}
+          </span>
+        </button>
+      )}
+    </div>
+  )
+})
+
 // 메시지 한 개를 렌더링하는 메모이즈된 컴포넌트.
 // 부모(Chat) 리렌더에 의한 입력 lag를 차단하기 위해 React.memo로 감싸 불필요한 재렌더를 막는다.
 const MessageBubble = memo(function MessageBubble({
@@ -1403,6 +1543,49 @@ export default function Chat() {
             <div className="absolute inset-0 bg-black/45" />
           </div>
         )}
+        {/* FULL 모드: sprite를 화면 상단부 배경으로 깔고, 메시지는 하단 박스에서 스크롤.
+            sprite 영역 = 화면 위 60%, 메시지 박스 = 하단 40%. 영상 카드는 박스 바로 위 우측. */}
+        {spriteMode === 'FULL' && activeSpriteUrl && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {spriteBackgroundImage && (
+              <CrossfadeMedia
+                src={spriteBackgroundImage}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(2px)' }}
+              />
+            )}
+            <CrossfadeMedia
+              src={activeSpriteUrl}
+              variant="sprite"
+              className="absolute inset-0 w-full h-full object-cover object-top"
+            />
+            {/* 미해금 영상 카드 — 메시지 박스 바로 위 우측 */}
+            {bubbleNeedsUnlock && (
+              <div
+                className="absolute right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto"
+                style={{ aspectRatio: '9 / 16', bottom: 'calc(30% + 8px)' }}
+                onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
+              >
+                <CrossfadeMedia
+                  src={latestCharacterSprite.videoFilePath}
+                  variant="sprite"
+                  className="absolute inset-0 w-full h-full object-cover object-bottom blur-sm"
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
+                    <div className="flex items-center gap-0.5 text-white text-[11px] font-bold leading-none">
+                      <MaskIcon style={{ width: '0.9em', height: '0.9em' }} />
+                      <span>10</span>
+                    </div>
+                    <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
+                      {unlockingVideo ? '처리중' : '해금하기'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {/* 상단 overlay — 상태 panel(접기 가능) + 액션 버튼 행 (항상 표시) */}
         <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top) + 44px)' }}>
           {showStatusPanel && (
@@ -1527,8 +1710,19 @@ export default function Chat() {
 
       <div
         ref={scrollContainerRef}
-        className="relative z-10 h-full overflow-auto px-4 space-y-2"
+        className={
+          spriteMode === 'FULL'
+            ? 'absolute left-0 right-0 bottom-0 z-10 overflow-auto px-4 pt-10 space-y-1'
+            : 'relative z-10 h-full overflow-auto px-4 space-y-2'
+        }
         style={(() => {
+          if (spriteMode === 'FULL') {
+            return {
+              top: '70%',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
+              backgroundImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.95) 100%)',
+            }
+          }
           const base = {
             paddingTop: 'calc(env(safe-area-inset-top) + 48px)',
             paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
@@ -1579,9 +1773,10 @@ export default function Chat() {
             !nextMsg || nextMsg.role !== msg.role || nextMsg.role === 'NARRATION' || nextMsg.role === 'GENERATED_IMAGE' ||
             formatChatTime(msg.createdAt) !== formatChatTime(nextMsg.createdAt)
           )
+          const MessageComponent = spriteMode === 'FULL' ? MessageLine : MessageBubble
           return (
             <Fragment key={msg.id || idx}>
-              <MessageBubble
+              <MessageComponent
                 msg={msg}
                 msgIdx={idx}
                 isConsecutive={isConsecutive}
@@ -1605,52 +1800,7 @@ export default function Chat() {
             </Fragment>
           )
         })}
-        {/* FULL 모드: 메시지 목록 끝에 1회만 표시 — 최신 캐릭터 표정 sprite (크로스페이드).
-            미해금 영상이 있으면 sprite 우측 하단에 별도 영상 카드를 띄움 (BUBBLE 모드와 동일 카드 디자인). */}
-        {spriteMode === 'FULL' && activeSpriteUrl && (
-          <div
-            className="-mx-4 mt-2 relative cursor-pointer overflow-hidden bg-gray-900"
-            style={{ aspectRatio: '9 / 16' }}
-            onClick={() => setLightboxUrl({ url: activeSpriteUrl, bgUrl: spriteBackgroundImage })}
-          >
-            {spriteBackgroundImage && (
-              <CrossfadeMedia
-                src={spriteBackgroundImage}
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ filter: 'blur(2px)' }}
-              />
-            )}
-            <CrossfadeMedia
-              src={activeSpriteUrl}
-              variant="sprite"
-              className="absolute inset-0 w-full h-full object-cover object-bottom"
-            />
-            {bubbleNeedsUnlock && (
-              <div
-                className="absolute bottom-3 right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
-                style={{ aspectRatio: '9 / 16' }}
-                onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
-              >
-                <CrossfadeMedia
-                  src={latestCharacterSprite.videoFilePath}
-                  variant="sprite"
-                  className="absolute inset-0 w-full h-full object-cover object-bottom blur-sm"
-                />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
-                    <div className="flex items-center gap-0.5 text-white text-[11px] font-bold leading-none">
-                      <MaskIcon style={{ width: '0.9em', height: '0.9em' }} />
-                      <span>10</span>
-                    </div>
-                    <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
-                      {unlockingVideo ? '처리중' : '해금하기'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {/* FULL 모드 sprite/영상 카드는 메시지 컨테이너 밖 배경 레이어로 옮겨짐 (line 1406~). */}
         {showTyping && (
           <div className="flex justify-start mt-3">
             <div className="w-7 flex-shrink-0 mr-2">
