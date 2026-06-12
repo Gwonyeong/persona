@@ -677,6 +677,10 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
   const [unlinkingId, setUnlinkingId] = useState(null)
   // 영상 프레임 추출 — videoUrl이 있는 영상에서 1초 단위 캡처
   const [frameExtractFor, setFrameExtractFor] = useState(null) // { ...img, videoSource } or null
+  // Ghost(정합성 오류) 영상을 다른 이미지에 재연결하기 위한 picker
+  const [relinkPickerForVideo, setRelinkPickerForVideo] = useState(null) // standalone 영상 row or null
+  const [relinkScope, setRelinkScope] = useState('emotion') // 'emotion' | 'all'
+  const [relinkingImageId, setRelinkingImageId] = useState(null)
 
   // 사용 가능한 standalone 영상 풀 — 1:1 정책상 이미 linked된 URL은 제외
   // 기본은 같은 감정만 (linkPickerForImage 기준), 토글로 전체 감정 보기 가능
@@ -712,6 +716,39 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
       alert('연결 실패: ' + (err?.error || err?.message))
     } finally {
       setLinkingVideoId(null)
+    }
+  }
+
+  // Ghost 재연결 — 같은 styleId 내 이미지 row 중 videoFilePath 비어있는 후보를 추린다.
+  const relinkCandidates = useMemo(() => {
+    if (!relinkPickerForVideo) return []
+    const list = []
+    const seen = new Set()
+    for (const i of allStyleImages || []) {
+      if (isVideoUrl(i.filePath)) continue // 이미지 row만
+      if (i.videoFilePath) continue // 이미 영상 연결된 것 제외
+      if (relinkScope === 'emotion' && i.emotion !== relinkPickerForVideo.emotion) continue
+      if (seen.has(i.id)) continue
+      seen.add(i.id)
+      list.push(i)
+    }
+    return list
+  }, [allStyleImages, relinkPickerForVideo, relinkScope])
+
+  const handleRelinkGhost = async (targetImageId, ghost) => {
+    setRelinkingImageId(targetImageId)
+    try {
+      const res = await api.post(`/admin/images/${targetImageId}/link-video`, {
+        videoUrl: ghost.filePath,
+      })
+      onUpdate?.(targetImageId, { videoFilePath: res.image.videoFilePath })
+      if (res.consumedStandalone) onRemove?.(res.consumedStandalone)
+      if (res.transferredFrom) onUpdate?.(res.transferredFrom, { videoFilePath: null })
+      setRelinkPickerForVideo(null)
+    } catch (err) {
+      alert('재연결 실패: ' + (err?.error || err?.message))
+    } finally {
+      setRelinkingImageId(null)
     }
   }
 
@@ -824,6 +861,8 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
             const videoSource = isVid ? img.filePath : img.videoFilePath
             // 이미지 row 중 연결된 영상이 없으면 빨간 border로 강조 (운영 작업 추적용)
             const needsVideo = !isVid && !img.videoFilePath
+            // Ghost — 영상 row 인데 그 URL이 이미 다른 이미지에 연결됨 (linkedUrls 기준)
+            const isGhost = isVid && linkedUrls.has(img.filePath)
             return (
               <div
                 key={img.id}
@@ -834,6 +873,16 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                 <div className="aspect-[3/4]">
                   <ExpressionThumb src={img.filePath} className="w-full h-full object-cover" />
                 </div>
+                {isGhost && (
+                  <button
+                    onClick={() => setRelinkPickerForVideo(img)}
+                    className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 h-6 rounded-full bg-amber-700/90 hover:bg-amber-600 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
+                    style={NO_OUTLINE}
+                    title="이 영상을 다른 이미지에 재연결"
+                  >
+                    🔗 재연결
+                  </button>
+                )}
                 {img.videoFilePath && !isVid && (
                   <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-emerald-500/90 text-white px-1.5 py-0.5 rounded-full pointer-events-none">
                     🔗
@@ -960,7 +1009,7 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[11px] font-semibold text-red-300">👻 Ghost (정합성 오류)</span>
                     <span className="text-[10px] text-gray-500">({ghostRows.length}개)</span>
-                    <span className="text-[10px] text-red-300/70">· 이미 이미지에 연결됐는데 standalone row도 남아있음 — 삭제 권장</span>
+                    <span className="text-[10px] text-red-300/70">· 이미 다른 이미지에 연결됨 + standalone row도 남아있음 — 재연결로 새 이미지에 옮기거나 삭제</span>
                   </div>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
                     {ghostRows.map(renderCell)}
@@ -1132,6 +1181,99 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
           onAdd={(uploaded) => onAdd?.(uploaded)}
           onClose={() => setFrameExtractFor(null)}
         />
+      )}
+
+      {/* Ghost 재연결 picker — 영상 → 이미지 방향. 서버 link-video가 기존 연결 해제 + standalone 소모를 자동 처리 */}
+      {relinkPickerForVideo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setRelinkPickerForVideo(null)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-white">🔗 영상 재연결</h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">기존 연결을 끊고 선택한 이미지로 이전합니다. standalone row도 함께 정리됩니다.</p>
+              </div>
+              <button
+                onClick={() => setRelinkPickerForVideo(null)}
+                className="text-gray-400 hover:text-white"
+                style={NO_OUTLINE}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 재연결할 영상 미리보기 */}
+            <div className="flex items-center gap-3 mb-4 bg-gray-800/50 rounded-lg p-3">
+              <video
+                src={relinkPickerForVideo.filePath}
+                className="w-16 rounded-lg object-cover"
+                style={{ aspectRatio: '3/4' }}
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+              <div className="text-xs">
+                <p className="text-gray-300 font-semibold">
+                  {EMOTION_LABEL_MAP[relinkPickerForVideo.emotion] || relinkPickerForVideo.emotion} 영상
+                </p>
+                <p className="text-gray-500">standalone row ID: {relinkPickerForVideo.id}</p>
+              </div>
+            </div>
+
+            {/* 스코프 토글 */}
+            <div className="flex gap-2 mb-3 text-xs">
+              <button
+                onClick={() => setRelinkScope('emotion')}
+                className={`px-2 py-1 rounded ${relinkScope === 'emotion' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                style={NO_OUTLINE}
+              >
+                같은 감정만 (기본)
+              </button>
+              <button
+                onClick={() => setRelinkScope('all')}
+                className={`px-2 py-1 rounded ${relinkScope === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}`}
+                style={NO_OUTLINE}
+              >
+                전체 감정
+              </button>
+            </div>
+
+            {relinkCandidates.length === 0 ? (
+              <p className="text-center text-sm text-gray-500 py-10">
+                연결 가능한 이미지가 없습니다.<br />
+                <span className="text-[11px]">
+                  {relinkScope === 'emotion'
+                    ? '같은 감정에 영상이 비어있는 이미지가 없습니다. 전체 감정 보기로 전환해보세요.'
+                    : '모든 이미지에 이미 영상이 연결되어 있습니다.'}
+                </span>
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {relinkCandidates.map((cand) => (
+                  <button
+                    key={cand.id}
+                    onClick={() => handleRelinkGhost(cand.id, relinkPickerForVideo)}
+                    disabled={relinkingImageId === cand.id}
+                    className="relative bg-gray-800 hover:bg-gray-700 rounded-lg overflow-hidden border border-gray-700 hover:border-amber-500 transition-all disabled:opacity-50"
+                    style={NO_OUTLINE}
+                  >
+                    <div className="aspect-[3/4]">
+                      <img src={cand.filePath} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <span className="absolute top-1 left-1 text-[9px] bg-black/70 text-gray-200 px-1.5 py-0.5 rounded-full">
+                      {EMOTION_LABEL_MAP[cand.emotion] || cand.emotion}
+                    </span>
+                    {relinkingImageId === cand.id && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-amber-400 text-xs">
+                        재연결 중...
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
