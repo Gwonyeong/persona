@@ -1346,9 +1346,6 @@ export default function CharacterDetail() {
                           <span className="text-[9px] font-bold px-1.5 py-px rounded-md bg-violet-500/30 text-violet-200 border border-violet-400/40 tracking-wide">
                             스토리
                           </span>
-                          <span className="text-[9px] font-bold px-1.5 py-px rounded-md bg-amber-400/25 text-amber-200 border border-amber-300/50 tracking-wide">
-                            추천
-                          </span>
                         </div>
                         <p className="text-[11px] text-violet-200/70 mt-0.5">에피소드·시간·관계가 진화하는 미연시 모드</p>
                       </div>
