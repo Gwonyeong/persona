@@ -347,7 +347,8 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
 
         {/* 메인 액션 */}
         <div className="flex items-center gap-4">
-          {/* PTT 모드일 때만 마이크 버튼 표시. VAD는 자동이라 hands-free. */}
+          {/* 탭 모드일 때만 마이크 버튼 표시. VAD는 자동이라 hands-free. */}
+          {/* 탭하여 시작 → 탭하여 정지로 토글. 녹음 중에는 정지(사각형) 아이콘으로 전환. */}
           {mode === 'ptt' && (
             <div className="relative">
               {showFreeCallBadge && phase !== 'recording' && (
@@ -356,10 +357,11 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
                 </span>
               )}
               <button
-                onPointerDown={(e) => { e.preventDefault(); startTalking() }}
-                onPointerUp={(e) => { e.preventDefault(); stopTalking() }}
-                onPointerCancel={() => stopTalking()}
-                onPointerLeave={() => { if (phase === 'recording') stopTalking() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (phase === 'recording') stopTalking()
+                  else startTalking()
+                }}
                 disabled={!canSpeak || isConnecting}
                 className={`w-20 h-20 rounded-full flex items-center justify-center transition-all select-none disabled:opacity-40 ${
                   phase === 'recording'
@@ -368,13 +370,20 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
                       ? 'bg-emerald-300 shadow-[0_0_24px_rgba(110,231,183,0.5)]'
                       : 'bg-white'
                 }`}
-                style={{ ...BUTTON_RESET, touchAction: 'none' }}
+                style={BUTTON_RESET}
+                aria-label={phase === 'recording' ? t('chat.call.release') : t('chat.call.tapToTalk')}
               >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={phase === 'recording' ? 'white' : '#111'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="2" width="6" height="12" rx="3" />
-                  <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="22" />
-                </svg>
+                {phase === 'recording' ? (
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                  </svg>
+                )}
               </button>
             </div>
           )}
