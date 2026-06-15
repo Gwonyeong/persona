@@ -1135,7 +1135,7 @@ export default function CharacterDetail() {
           <video
             src={expVideoLightboxUrl}
             className="w-full h-full object-contain"
-            autoPlay loop playsInline controls
+            autoPlay loop muted playsInline
             onClick={(e) => e.stopPropagation()}
           />
           <button
