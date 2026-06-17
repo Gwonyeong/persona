@@ -94,9 +94,324 @@ const EMPTY_FORM = {
   proactiveMaxCount: 3,
 }
 
+function formatRelativeKst(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  const diffMs = Date.now() - d.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 0) {
+    const abs = Math.abs(diffMin)
+    if (abs < 60) return `${abs}분 후`
+    if (abs < 60 * 24) return `${Math.floor(abs / 60)}시간 후`
+    return `${Math.floor(abs / 60 / 24)}일 후`
+  }
+  if (diffMin < 1) return '방금'
+  if (diffMin < 60) return `${diffMin}분 전`
+  if (diffMin < 60 * 24) return `${Math.floor(diffMin / 60)}시간 전`
+  return `${Math.floor(diffMin / 60 / 24)}일 전`
+}
+
+function formatKstDateTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const fmt = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return fmt.format(d)
+}
+
+// UTC ISO → datetime-local 입력값 (KST 기준)
+function toDatetimeLocalKst(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const kstMs = d.getTime() + 9 * 60 * 60 * 1000
+  return new Date(kstMs).toISOString().slice(0, 16)
+}
+
+// datetime-local 값 (KST로 입력됨) → UTC ISO
+function fromDatetimeLocalKst(value) {
+  if (!value) return null
+  const parsed = new Date(value + ':00+09:00')
+  if (isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
+}
+
+function NotifyCharacterModal({ character, onClose, onSent }) {
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [linkPath, setLinkPath] = useState(`/characters/${character.id}`)
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState('')
+  const [dragOver, setDragOver] = useState(false)
+  const [peak, setPeak] = useState(null)
+  const [scheduledOverride, setScheduledOverride] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [history, setHistory] = useState({ broadcasts: [], notifications: [] })
+
+  useEffect(() => {
+    api.get(`/admin/characters/${character.id}/peak-chat-hour`)
+      .then(setPeak)
+      .catch(() => {})
+    api.get(`/admin/characters/${character.id}/notifications`)
+      .then(setHistory)
+      .catch(() => {})
+  }, [character.id])
+
+  const handleFile = (file) => {
+    if (!file || !file.type?.startsWith('image/')) return
+    setImageFile(file)
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  const clearImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    setImageFile(null)
+    setImagePreview('')
+  }
+
+  const effectiveScheduledIso = scheduledOverride
+    ? fromDatetimeLocalKst(scheduledOverride)
+    : peak?.scheduledAt || null
+
+  const submit = async () => {
+    if (!title.trim()) { alert('제목을 입력하세요'); return }
+    if (!body.trim()) { alert('본문을 입력하세요'); return }
+    setBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('title', title.trim())
+      fd.append('body', body.trim())
+      fd.append('linkPath', linkPath.trim())
+      if (effectiveScheduledIso) fd.append('scheduledAt', effectiveScheduledIso)
+      if (imageFile) fd.append('image', imageFile)
+      await api.post(`/admin/characters/${character.id}/notify`, fd)
+      alert('알림이 예약되었습니다 (인앱은 즉시 발행, 푸시는 예약 시각에 발송)')
+      onSent?.()
+    } catch (e) {
+      alert(`발송 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const maxCount = peak ? Math.max(1, ...peak.distribution) : 1
+  const hourMin = peak?.hourWindow?.min ?? 9
+  const hourMax = peak?.hourWindow?.max ?? 22
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-lg max-h-[90vh] overflow-auto p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold">
+            푸시·인앱 알림 추가
+            <span className="ml-2 text-sm text-gray-400 font-normal">{character.name}</span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-300 text-sm"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >닫기</button>
+        </div>
+
+        <div className="space-y-3 mb-4">
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">제목 ({title.length}/100)</label>
+            <input
+              type="text"
+              value={title}
+              maxLength={100}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={`예) ${character.name}가 새 소식을 들고 왔어요`}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">본문 ({body.length}/2000)</label>
+            <textarea
+              value={body}
+              maxLength={2000}
+              rows={4}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="알림 본문을 입력하세요"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">링크 경로</label>
+            <input
+              type="text"
+              value={linkPath}
+              onChange={(e) => setLinkPath(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            />
+          </div>
+        </div>
+
+        <div
+          className={`mb-4 p-3 rounded-lg border-2 border-dashed transition-colors ${
+            dragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-700'
+          }`}
+          onDragEnter={(e) => {
+            if (!e.dataTransfer?.types?.includes('Files')) return
+            e.preventDefault(); setDragOver(true)
+          }}
+          onDragOver={(e) => {
+            if (!e.dataTransfer?.types?.includes('Files')) return
+            e.preventDefault(); e.dataTransfer.dropEffect = 'copy'
+          }}
+          onDragLeave={(e) => {
+            if (e.currentTarget.contains(e.relatedTarget)) return
+            setDragOver(false)
+          }}
+          onDrop={(e) => {
+            e.preventDefault(); setDragOver(false)
+            const file = e.dataTransfer.files?.[0]
+            if (file) handleFile(file)
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-lg bg-gray-800 overflow-hidden flex-shrink-0">
+              {imagePreview ? (
+                <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">이미지</div>
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-gray-400 mb-1.5">이미지 (선택) — 드래그앤드랍 가능</p>
+              <div className="flex gap-2">
+                <label
+                  className="px-3 py-1.5 text-xs rounded-lg cursor-pointer bg-indigo-600 text-white hover:bg-indigo-500"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  파일 선택
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files[0]) handleFile(e.target.files[0])
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+                {imageFile && (
+                  <button
+                    onClick={clearImage}
+                    type="button"
+                    className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-red-400 hover:text-red-300 border border-gray-700"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >제거</button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4 p-3 rounded-lg bg-gray-950 border border-gray-800">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-400">
+              활발 시간대 (최근 {peak?.windowDays ?? '...'}일, KST {hourMin}~{hourMax}시 윈도우)
+            </p>
+            {peak && (
+              <p className="text-xs text-gray-500">
+                샘플 {peak.sampleSize.toLocaleString()}건 · 피크 {peak.peakHour}시
+              </p>
+            )}
+          </div>
+          {peak ? (
+            <div className="flex items-end gap-0.5 h-16 mb-2">
+              {peak.distribution.map((count, h) => {
+                const heightPct = (count / maxCount) * 100
+                const inWindow = h >= hourMin && h <= hourMax
+                const isPeak = h === peak.peakHour
+                return (
+                  <div key={h} className="flex-1 flex flex-col items-center justify-end" title={`${h}시: ${count}건`}>
+                    <div
+                      className={`w-full rounded-t ${isPeak ? 'bg-indigo-500' : inWindow ? 'bg-gray-600' : 'bg-gray-800'}`}
+                      style={{ height: `${heightPct}%`, minHeight: count > 0 ? 2 : 1 }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-600 py-4 text-center">분석 중...</p>
+          )}
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">예약 시각 (KST)</label>
+            <input
+              type="datetime-local"
+              value={scheduledOverride || (peak ? toDatetimeLocalKst(peak.scheduledAt) : '')}
+              onChange={(e) => setScheduledOverride(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            />
+            {effectiveScheduledIso && (
+              <p className="text-xs text-gray-500 mt-1">
+                → {formatKstDateTime(effectiveScheduledIso)} · {formatRelativeKst(effectiveScheduledIso)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {(history.broadcasts.length > 0 || history.notifications.length > 0) && (
+          <div className="mb-4 p-3 rounded-lg bg-gray-950 border border-gray-800">
+            <p className="text-xs text-gray-400 mb-2">
+              이 캐릭터의 알림 기록 (푸시 {history.broadcasts.length} · 인앱 {history.notifications.length})
+            </p>
+            <div className="space-y-1.5 max-h-40 overflow-auto">
+              {history.broadcasts.map((b) => (
+                <div key={`b-${b.id}`} className="text-xs flex items-center gap-2">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    b.status === 'SENT' ? 'bg-green-900 text-green-300'
+                      : b.status === 'PENDING' ? 'bg-yellow-900 text-yellow-300'
+                      : b.status === 'FAILED' ? 'bg-red-900 text-red-300'
+                      : 'bg-gray-800 text-gray-400'
+                  }`}>{b.status}</span>
+                  <span className="text-gray-300 truncate flex-1">{b.title}</span>
+                  <span className="text-gray-500 flex-shrink-0">{formatKstDateTime(b.scheduledAt)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-gray-800">
+          <button
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2 text-sm rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >취소</button>
+          <button
+            onClick={submit}
+            disabled={busy || !peak}
+            className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >{busy ? '발송 중...' : '예약 발송'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Characters() {
   const [characters, setCharacters] = useState([])
   const [editing, setEditing] = useState(null) // null | 'new' | character object
+  const [notifyTarget, setNotifyTarget] = useState(null) // null | character object
   const [form, setForm] = useState(EMPTY_FORM)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [dragOverColumn, setDragOverColumn] = useState(null)
@@ -490,14 +805,14 @@ export default function Characters() {
     }
   }
 
-  // V2 JSON 자동 생성 (Grok) — 캐릭터 정보 기반으로 ko JSON 생성, ko 탭 textarea 덮어씀
-  const generateV2WithGrok = async () => {
+  // V2 JSON 자동 생성 (Gemini) — 캐릭터 정보 기반으로 ko JSON 생성, ko 탭 textarea 덮어씀
+  const generateV2WithGemini = async () => {
     if (!editing || editing === 'new') {
       alert('저장 후 사용 가능합니다 (캐릭터 ID 필요)')
       return
     }
     if (form.firstMessageV2Text.ko.trim() &&
-        !confirm('현재 ko 탭의 V2 JSON을 Grok 생성 결과로 덮어쓰시겠습니까?')) {
+        !confirm('현재 ko 탭의 V2 JSON을 Gemini 생성 결과로 덮어쓰시겠습니까?')) {
       return
     }
     const hint = prompt('추가 지시 (선택, 비워두면 캐릭터 정보만으로 생성):\n예) 비 오는 날 카페에서 처음 만나는 장면', '') ?? null
@@ -514,7 +829,7 @@ export default function Characters() {
         firstMessageV2Text: { ...f.firstMessageV2Text, ko: JSON.stringify(firstMessageV2, null, 2) },
       }))
       setV2Lang('ko')
-      alert('Grok 생성 완료. ko 탭에 채워졌습니다.')
+      alert('Gemini 생성 완료. ko 탭에 채워졌습니다.')
     } catch (e) {
       alert(`생성 실패: ${e?.message || 'unknown'}`)
     } finally {
@@ -706,8 +1021,10 @@ export default function Characters() {
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">이름</th>
                 <th className="p-3">대화 수</th>
+                <th className="p-3">V2 첫인사</th>
                 <th className="p-3">선제</th>
                 <th className="p-3">TTS</th>
+                <th className="p-3">푸시</th>
                 <th className="p-3">관리</th>
               </tr>
             </thead>
@@ -731,6 +1048,22 @@ export default function Characters() {
                   </td>
                   <td className="p-3">{c._count.conversations}</td>
                   <td className="p-3">
+                    {(() => {
+                      const hasKo = !!c.firstMessageV2
+                      const isDraft = !!c.firstMessageV2Draft
+                      if (!hasKo) return <span className="text-gray-600 text-xs">—</span>
+                      const langs = ['ko']
+                      if (c.translations?.en?.firstMessageV2) langs.push('en')
+                      if (c.translations?.ja?.firstMessageV2) langs.push('ja')
+                      const tooltip = `언어: ${langs.join(' · ')}${isDraft ? ' (초안 — 채팅에선 V1 폴백)' : ''}`
+                      return isDraft ? (
+                        <span className="text-yellow-400 text-xs" title={tooltip}>📝 초안</span>
+                      ) : (
+                        <span className="text-green-400 text-xs" title={tooltip}>✅ {langs.join('·')}</span>
+                      )
+                    })()}
+                  </td>
+                  <td className="p-3">
                     <span className={c.proactiveEnabled ? 'text-green-400' : 'text-gray-500'}>
                       {c.proactiveEnabled ? 'ON' : 'OFF'}
                     </span>
@@ -744,7 +1077,19 @@ export default function Characters() {
                     )}
                   </td>
                   <td className="p-3">
-                    <div className="flex gap-2">
+                    {c._count?.broadcastNotifications > 0 ? (
+                      <span
+                        className="text-yellow-400 text-xs"
+                        title={c.lastBroadcastAt ? `최근 발송: ${formatKstDateTime(c.lastBroadcastAt)}` : ''}
+                      >
+                        🔔 {c._count.broadcastNotifications}
+                      </span>
+                    ) : (
+                      <span className="text-gray-600 text-xs">-</span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => openEdit(c)}
                         className="text-indigo-400 hover:text-indigo-300 text-xs"
@@ -767,6 +1112,13 @@ export default function Characters() {
                         선물
                       </button>
                       <button
+                        onClick={() => setNotifyTarget(c)}
+                        className="text-yellow-400 hover:text-yellow-300 text-xs"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        알림
+                      </button>
+                      <button
                         onClick={() => remove(c.id)}
                         className="text-red-400 hover:text-red-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -781,6 +1133,15 @@ export default function Characters() {
           </table>
         )}
       </div>
+
+      {/* 푸시·인앱 알림 모달 */}
+      {notifyTarget && (
+        <NotifyCharacterModal
+          character={notifyTarget}
+          onClose={() => setNotifyTarget(null)}
+          onSent={() => { setNotifyTarget(null); load() }}
+        />
+      )}
 
       {/* 생성/수정 모달 */}
       {editing && (
@@ -1280,12 +1641,12 @@ export default function Characters() {
                 <div className="flex flex-wrap gap-2 mt-2">
                   <button
                     type="button"
-                    onClick={generateV2WithGrok}
+                    onClick={generateV2WithGemini}
                     disabled={v2Busy.generate}
                     className="px-3 py-1.5 text-xs rounded-md border border-purple-600 bg-purple-900/40 text-purple-200 hover:border-purple-400 disabled:opacity-50"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    {v2Busy.generate ? 'Grok 생성 중…' : '✨ Grok로 V2 JSON 생성 (ko)'}
+                    {v2Busy.generate ? 'Gemini 생성 중…' : '✨ Gemini로 V2 JSON 생성 (ko)'}
                   </button>
 
                   <label
@@ -1329,7 +1690,7 @@ export default function Characters() {
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  Grok 생성: 캐릭터 정보 기반으로 ko V2 JSON 자동 작성 (image 블록 2~3개, concept 한국어 묘사 포함, url은 비어있음).<br />
+                  Gemini 생성: 캐릭터 정보 기반으로 ko V2 JSON 자동 작성 (image 블록 2~3개, concept 한국어 묘사 포함, url은 비어있음).<br />
                   이미지 블록 업로드: 위 "이미지 블록" 패널에 파일을 드래그하거나 업로드 버튼 사용 → 해당 블록 url 자동 채움.<br />
                   이미지 업로드 (URL 복사): JSON 외 자유 업로드. 파일 → URL을 클립보드에 복사.<br />
                   보이스 일괄 생성: 현재 탭의 모든 message 블록에 한 번에 TTS 생성. 개별 재생성은 위 "메시지 블록" 패널의 재생성 버튼 사용.<br />
