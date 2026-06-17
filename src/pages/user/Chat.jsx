@@ -1569,7 +1569,7 @@ export default function Chat() {
                 <CrossfadeMedia
                   src={latestCharacterSprite.videoFilePath}
                   variant="sprite"
-                  className="absolute inset-0 w-full h-full object-cover object-bottom blur-sm"
+                  className="absolute inset-0 w-full h-full object-cover object-bottom blur"
                 />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
@@ -1848,7 +1848,7 @@ export default function Chat() {
                   <CrossfadeMedia
                     src={latestCharacterSprite.videoFilePath}
                     variant="sprite"
-                    className="absolute inset-0 w-full h-full object-cover object-bottom blur-sm"
+                    className="absolute inset-0 w-full h-full object-cover object-bottom blur"
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
