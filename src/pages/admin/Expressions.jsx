@@ -127,6 +127,7 @@ export default function Expressions() {
   const [filter, setFilter] = useState('ALL') // ALL | INCOMPLETE | NO_STYLE
   const [page, setPage] = useState(1)
   const [tab, setTab] = useState('sfw') // sfw | nsfw | bg
+  const [visibility, setVisibility] = useState('public') // public | private
   const currentEmotions = tab === 'bg' ? [] : EMOTION_TABS[tab].emotions
 
   useEffect(() => {
@@ -165,12 +166,22 @@ export default function Expressions() {
     )
   }
 
-  const filtered = useMemo(() => {
+  // 공개/비공개로 먼저 분할 → 필터·페이징은 분할된 집합 안에서 동작.
+  // 비공개는 채팅 수 기준이 무의미하므로 최신 생성순으로 재정렬.
+  const visibilityScoped = useMemo(() => {
     if (!characters) return []
+    const scoped = characters.filter((c) => (visibility === 'public' ? c.isPublic : !c.isPublic))
+    if (visibility === 'private') {
+      return [...scoped].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    }
+    return scoped
+  }, [characters, visibility])
+
+  const filtered = useMemo(() => {
     if (filter === 'INCOMPLETE') {
       // 현재 탭의 emotion 중 1장도 없는 게 있으면 미완성 (다중 이미지 모드)
       const tabKeys = new Set(currentEmotions.map((e) => e.key))
-      return characters.filter((c) => {
+      return visibilityScoped.filter((c) => {
         if (!c.defaultStyle) return false
         const filledEmotions = new Set(
           c.defaultStyle.images.filter((i) => tabKeys.has(i.emotion)).map((i) => i.emotion),
@@ -178,9 +189,9 @@ export default function Expressions() {
         return filledEmotions.size < currentEmotions.length
       })
     }
-    if (filter === 'NO_STYLE') return characters.filter((c) => !c.defaultStyle)
-    return characters
-  }, [characters, filter, currentEmotions])
+    if (filter === 'NO_STYLE') return visibilityScoped.filter((c) => !c.defaultStyle)
+    return visibilityScoped
+  }, [visibilityScoped, filter, currentEmotions])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -190,7 +201,7 @@ export default function Expressions() {
 
   return (
     <div className="p-6">
-      <div className="flex items-end justify-between mb-6">
+      <div className="flex items-end justify-between mb-4">
         <div>
           <h2 className="text-xl font-bold">표정 이미지</h2>
           <p className="text-sm text-gray-400 mt-1">
@@ -247,6 +258,33 @@ export default function Expressions() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 공개/비공개 탭 */}
+      <div className="flex gap-1 mb-4 border-b border-gray-800">
+        {[
+          { key: 'public', label: '공개' },
+          { key: 'private', label: '비공개' },
+        ].map((v) => {
+          const count = characters.filter((c) => (v.key === 'public' ? c.isPublic : !c.isPublic)).length
+          return (
+            <button
+              key={v.key}
+              onClick={() => {
+                setVisibility(v.key)
+                setPage(1)
+              }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                visibility === v.key
+                  ? 'border-indigo-500 text-white'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
+              }`}
+              style={NO_OUTLINE}
+            >
+              {v.label} ({count})
+            </button>
+          )
+        })}
       </div>
 
       {tab === 'nsfw' && (
