@@ -610,7 +610,7 @@ export default function AdminMaskPass() {
                     <div className="mt-1 flex flex-wrap gap-1">
                       {t.requirePurchase && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/40">
-                          🛒 구매 필요
+                          🛒 마스크 1회 이상 구매 필요
                         </span>
                       )}
                       {t.requireAdultVerified && (

@@ -13,7 +13,10 @@ const REWARD_LABEL = {
 }
 
 function RewardPreview({ tier }) {
-  const { rewardType, rewardPayload } = tier
+  const { rewardType, rewardPayload, claimed } = tier
+  // GALLERY/PROFILE 미수령 시 콘텐츠 노출 방지용 강한 블러 (수령하면 해제)
+  const visualBlur = !claimed && (rewardType === 'GALLERY' || rewardType === 'PROFILE')
+  const blurClass = visualBlur ? 'blur-xl scale-110' : ''
   if (rewardType === 'MASK') {
     const amount = rewardPayload?.amount || 0
     return (
@@ -56,10 +59,15 @@ function RewardPreview({ tier }) {
         <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-gray-700 flex-shrink-0 bg-gray-800">
           {preview?.thumbnailUrl && (
             isVideo ? (
-              <video src={preview.thumbnailUrl} className="w-full h-full object-cover" muted />
+              <video src={preview.thumbnailUrl} className={`w-full h-full object-cover ${blurClass}`} muted />
             ) : (
-              <img src={preview.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+              <img src={preview.thumbnailUrl} alt="" className={`w-full h-full object-cover ${blurClass}`} />
             )
+          )}
+          {visualBlur && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+            </div>
           )}
           {count > 1 && (
             <span className="absolute bottom-0 right-0 px-1 text-[9px] font-bold bg-black/70 text-white rounded-tl">
@@ -80,11 +88,16 @@ function RewardPreview({ tier }) {
     const preview = rewardPayload?.preview
     return (
       <div className="flex items-center gap-2 min-w-0">
-        {preview?.imageUrl ? (
-          <img src={preview.imageUrl} alt="" className="w-12 h-12 rounded-full object-cover border border-gray-700" />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-gray-800 border border-gray-700" />
-        )}
+        <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-700 flex-shrink-0 bg-gray-800">
+          {preview?.imageUrl && (
+            <img src={preview.imageUrl} alt="" className={`w-full h-full object-cover ${blurClass}`} />
+          )}
+          {visualBlur && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+            </div>
+          )}
+        </div>
         <div className="min-w-0">
           <p className="text-xs text-gray-400">{preview?.character?.name || ''}</p>
           <p className="text-sm text-gray-100 truncate">{preview?.title || '프로필'}</p>
@@ -123,23 +136,16 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
         <div className="flex-1 min-w-0">
           <p className="text-[10px] uppercase text-gray-500 mb-1 tracking-wider">{REWARD_LABEL[tier.rewardType] || tier.rewardType}</p>
           <RewardPreview tier={tier} />
-          {(tier.requirePurchase || tier.requireAdultVerified) && (
+          {/* 조건 태그: 미충족인 경우에만 노출. 이미 만족한 조건은 표시 안 함 */}
+          {(unmetReasons.includes('PURCHASE_REQUIRED') || unmetReasons.includes('ADULT_VERIFICATION_REQUIRED')) && (
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {tier.requirePurchase && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                  unmetReasons.includes('PURCHASE_REQUIRED')
-                    ? 'bg-orange-900/30 text-orange-300 border-orange-700/40'
-                    : 'bg-emerald-900/20 text-emerald-300 border-emerald-700/40'
-                }`}>
-                  🛒 구매 필요
+              {unmetReasons.includes('PURCHASE_REQUIRED') && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-orange-900/30 text-orange-300 border-orange-700/40">
+                  🛒 마스크 1회 이상 구매 필요
                 </span>
               )}
-              {tier.requireAdultVerified && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                  unmetReasons.includes('ADULT_VERIFICATION_REQUIRED')
-                    ? 'bg-orange-900/30 text-orange-300 border-orange-700/40'
-                    : 'bg-emerald-900/20 text-emerald-300 border-emerald-700/40'
-                }`}>
+              {unmetReasons.includes('ADULT_VERIFICATION_REQUIRED') && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-orange-900/30 text-orange-300 border-orange-700/40">
                   🔞 성인인증 필요
                 </span>
               )}
