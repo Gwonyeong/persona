@@ -1112,6 +1112,13 @@ export default function Characters() {
                         선물
                       </button>
                       <button
+                        onClick={() => navigate(`/admin/characters/${c.id}/profile-variants`)}
+                        className="text-amber-400 hover:text-amber-300 text-xs"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        프로필
+                      </button>
+                      <button
                         onClick={() => setNotifyTarget(c)}
                         className="text-yellow-400 hover:text-yellow-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}

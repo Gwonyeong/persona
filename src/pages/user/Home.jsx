@@ -76,10 +76,12 @@ export default function Home() {
     }
   }
 
+  const [unclaimedPassCount, setUnclaimedPassCount] = useState(0)
   useEffect(() => {
     if (token) {
       api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
       api.get('/notifications/unread-count').then(({ count }) => setUnreadNotifCount(count)).catch(() => {})
+      api.get('/mask-pass').then(({ unclaimedEligibleCount }) => setUnclaimedPassCount(unclaimedEligibleCount || 0)).catch(() => {})
     }
   }, [token])
 
@@ -227,6 +229,23 @@ export default function Home() {
                 </svg>
                 {unreadNotifCount > 0 && (
                   <span className="absolute bottom-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500 ring-1 ring-gray-950" />
+                )}
+              </button>
+            )}
+            {token && (
+              <button
+                onClick={() => navigate('/mask-pass')}
+                aria-label="마스크 패스"
+                className="relative w-8 h-8 flex items-center justify-center rounded-full text-amber-300 hover:text-amber-200 hover:bg-amber-900/30 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2l2.39 4.84 5.34.78-3.86 3.77.91 5.31L12 14.27l-4.78 2.51.91-5.31L4.27 7.7l5.34-.78L12 2z" />
+                </svg>
+                {unclaimedPassCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-[10px] text-white font-bold flex items-center justify-center ring-1 ring-gray-950">
+                    {unclaimedPassCount}
+                  </span>
                 )}
               </button>
             )}
