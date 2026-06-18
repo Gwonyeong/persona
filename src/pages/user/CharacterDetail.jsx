@@ -35,6 +35,7 @@ import GalleryGrid from '../../components/GalleryGrid'
 import GalleryUnlockModal from '../../components/GalleryUnlockModal'
 import ImageSlideViewer from '../../components/ImageSlideViewer'
 import ReportModal from '../../components/ReportModal'
+import ProfileVariantPicker from '../../components/ProfileVariantPicker'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import useBackHandler from '../../hooks/useBackHandler'
 import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib/review'
@@ -75,6 +76,7 @@ export default function CharacterDetail() {
   //   step 'preset': 컨셉 채팅의 preset 3개 선택
   const [chatModal, setChatModal] = useState({ open: false, step: 'mode' })
   const [showReport, setShowReport] = useState(false)
+  const [showProfilePicker, setShowProfilePicker] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
   const [storylines, setStorylines] = useState([])
   const [scenarios, setScenarios] = useState([])
@@ -474,6 +476,22 @@ export default function CharacterDetail() {
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
+
+          {/* 프로필 이미지 변경 (우상단, 신고 왼쪽) */}
+          {token && (
+            <button
+              onClick={() => setShowProfilePicker(true)}
+              className="absolute right-16 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="프로필 이미지 변경"
+              title="프로필 이미지 변경"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </button>
+          )}
 
           {/* 신고 (우상단) */}
           <button
@@ -1234,6 +1252,17 @@ export default function CharacterDetail() {
           onClose={() => setShowReport(false)}
         />
       )}
+
+      <ProfileVariantPicker
+        open={showProfilePicker}
+        characterId={parseInt(id)}
+        onClose={() => setShowProfilePicker(false)}
+        onApplied={() => {
+          // 적용 후 캐릭터 다시 받아와서 새 profileImage 반영
+          api.get(`/characters/${id}`).then(({ character }) => setCharacter(character)).catch(() => {})
+        }}
+      />
+
 
       {toast && (
         <div
