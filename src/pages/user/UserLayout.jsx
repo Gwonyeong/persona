@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
-import { isAdMobAvailable, initAdMob, showBannerAd, removeBannerAd } from '../../lib/admob'
 
 const TABS = [
   {
@@ -65,35 +64,10 @@ export default function UserLayout() {
     location.pathname === '/group-chats/new'
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
 
-  const isHomePage = location.pathname === '/'
-  const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
-  const shouldShowBanner = isHomePage && isFreeTier
-
   useEffect(() => {
     const handler = (e) => setHasUnread(e.detail > 0)
     window.addEventListener('unread-count', handler)
     return () => window.removeEventListener('unread-count', handler)
-  }, [])
-
-  useEffect(() => {
-    if (!isAdMobAvailable()) return
-    if (!shouldShowBanner) {
-      removeBannerAd()
-      return
-    }
-    let cancelled = false
-    initAdMob().then((ok) => {
-      if (!cancelled && ok) showBannerAd()
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [shouldShowBanner])
-
-  useEffect(() => {
-    return () => {
-      if (isAdMobAvailable()) removeBannerAd()
-    }
   }, [])
 
   return (
