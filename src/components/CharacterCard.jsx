@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import LazyVideo from './LazyVideo'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -60,15 +61,10 @@ export default function CharacterCard({ character, reducedData }) {
       <div className="aspect-[2/3] bg-gray-800 flex items-center justify-center">
         {thumbUrl ? (
           isVideo ? (
-            <video
+            <LazyVideo
               src={thumbUrl}
-              poster={posterUrl || undefined}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              className="w-full h-full object-cover"
+              poster={posterUrl}
+              className="w-full h-full"
             />
           ) : (
             <img src={thumbUrl} alt={c.name} className="w-full h-full object-cover" />
