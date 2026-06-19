@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
+import AdBanner from '../../components/AdBanner'
 
 const TABS = [
   {
@@ -94,7 +95,7 @@ export default function UserLayout() {
 
       {/* 하단 탭바 (채팅 / 캐릭터 풀스크린 페이지에서는 숨김) */}
       {!isFullscreenPage && (
-      <nav className="relative flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <nav className="relative flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
         {TABS.map((tab, i) => (
           <React.Fragment key={tab.to}>
             {i === 2 && (
@@ -144,6 +145,23 @@ export default function UserLayout() {
           </React.Fragment>
         ))}
       </nav>
+      )}
+
+      {/* 하단 배너 광고 (LIGHT 구독자는 광고 제거, safe-area 패딩만 유지) */}
+      {!isFullscreenPage && (
+        subscription?.tier === 'LIGHT' ? (
+          <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
+        ) : (
+          <div
+            className="flex-shrink-0 flex justify-center items-center bg-gray-950"
+            style={{
+              paddingTop: 8,
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 4px)',
+            }}
+          >
+            <AdBanner slot="bottom-nav" width={320} height={50} />
+          </div>
+        )
       )}
     </div>
   )
