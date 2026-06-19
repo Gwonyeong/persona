@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
-import AdBanner from '../../components/AdBanner'
+import { isAdMobAvailable, initAdMob, showBannerAd, removeBannerAd } from '../../lib/admob'
 
 const TABS = [
   {
@@ -65,10 +65,36 @@ export default function UserLayout() {
     location.pathname === '/group-chats/new'
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
 
+  const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
+  const shouldShowBanner = !isFullscreenPage && isFreeTier
+  const adMobAvailable = isAdMobAvailable()
+  const reserveBannerSlot = shouldShowBanner && adMobAvailable
+
   useEffect(() => {
     const handler = (e) => setHasUnread(e.detail > 0)
     window.addEventListener('unread-count', handler)
     return () => window.removeEventListener('unread-count', handler)
+  }, [])
+
+  useEffect(() => {
+    if (!adMobAvailable) return
+    if (!shouldShowBanner) {
+      removeBannerAd()
+      return
+    }
+    let cancelled = false
+    initAdMob().then((ok) => {
+      if (!cancelled && ok) showBannerAd()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [adMobAvailable, shouldShowBanner])
+
+  useEffect(() => {
+    return () => {
+      if (isAdMobAvailable()) removeBannerAd()
+    }
   }, [])
 
   return (
@@ -147,21 +173,19 @@ export default function UserLayout() {
       </nav>
       )}
 
-      {/* 하단 배너 광고 (LIGHT 구독자는 광고 제거, safe-area 패딩만 유지) */}
+      {/* nav 하단 spacer
+          - reserveBannerSlot=true → AdMob 네이티브 배너가 화면 절대 하단에 오버레이됨.
+            spacer 높이를 (배너 ~60px + safe-area)로 확보해 nav 오탭/가림 방지.
+          - false → safe-area 패딩만 (LIGHT 구독자 / iOS / web). */}
       {!isFullscreenPage && (
-        subscription?.tier === 'LIGHT' ? (
-          <div className="flex-shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
-        ) : (
-          <div
-            className="flex-shrink-0 flex justify-center items-center bg-gray-950"
-            style={{
-              paddingTop: 8,
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 4px)',
-            }}
-          >
-            <AdBanner slot="bottom-nav" width={320} height={50} />
-          </div>
-        )
+        <div
+          className="flex-shrink-0 bg-gray-900/95"
+          style={
+            reserveBannerSlot
+              ? { height: 'calc(60px + env(safe-area-inset-bottom))' }
+              : { paddingBottom: 'env(safe-area-inset-bottom)' }
+          }
+        />
       )}
     </div>
   )
