@@ -369,7 +369,7 @@ const MessageLine = memo(function MessageLine({
               : <polygon points="5 3 19 12 5 21 5 3" />}
           </svg>
           <span className={`text-[11px] font-medium ${isPlayingAll ? 'text-red-200' : 'text-emerald-200'}`}>
-            {isPlayingAll ? t('chat.stopAll') : t('chat.playAll')}
+            {isPlayingAll ? t('chat.playAllStop', { defaultValue: '중지' }) : t('chat.playAll', { defaultValue: '전체 재생' })}
           </span>
         </button>
       )}
@@ -1717,10 +1717,13 @@ export default function Chat() {
         }
         style={(() => {
           if (spriteMode === 'FULL') {
+            const fadeMask = 'linear-gradient(to bottom, black 0%, black calc(100% - env(safe-area-inset-bottom) - 115px), transparent calc(100% - env(safe-area-inset-bottom) - 90px))'
             return {
-              top: '70%',
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 100px)',
+              top: '58%',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 110px)',
               backgroundImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.95) 100%)',
+              maskImage: fadeMask,
+              WebkitMaskImage: fadeMask,
             }
           }
           const base = {
