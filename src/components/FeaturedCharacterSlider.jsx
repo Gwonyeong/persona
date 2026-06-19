@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import LazyVideo from './LazyVideo'
 
 const AUTO_INTERVAL_MS = 5000
 const SWIPE_THRESHOLD_PX = 40
@@ -90,7 +91,7 @@ export default function FeaturedCharacterSlider({ characters, reducedData }) {
             transition: isDragging ? 'none' : 'transform 300ms ease',
           }}
         >
-          {featured.map((c) => {
+          {featured.map((c, i) => {
             const thumb = c.styles?.[0]?.images?.[0]
             // 1:1 슬라이더는 homeImageSquare(정사각형 전용) 우선,
             // 미설정 시 homeImage(기존 2/3) → profileImage → 첫 스프라이트로 폴백.
@@ -106,6 +107,8 @@ export default function FeaturedCharacterSlider({ characters, reducedData }) {
             const posterUrl = isVideo
               ? getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
               : null
+            // 현재 인덱스 슬라이드만 영상 재생. 나머지는 포스터만 노출.
+            const isActiveSlide = i === index
 
             return (
               <button
@@ -125,15 +128,12 @@ export default function FeaturedCharacterSlider({ characters, reducedData }) {
               >
                 {thumbUrl ? (
                   isVideo ? (
-                    <video
+                    <LazyVideo
                       src={thumbUrl}
-                      poster={posterUrl || undefined}
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      preload="metadata"
-                      className="w-full h-full object-cover object-top pointer-events-none"
+                      poster={posterUrl}
+                      className="w-full h-full"
+                      objectPosition="top"
+                      active={isActiveSlide}
                     />
                   ) : (
                     <img
