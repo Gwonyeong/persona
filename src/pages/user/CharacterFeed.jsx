@@ -90,8 +90,8 @@ export default function CharacterFeed() {
   }
 
   const mainStyle = character.styles?.[0]
-  const mainImage = mainStyle?.images?.find((i) => i.emotion === 'NEUTRAL') || mainStyle?.images?.[0]
-  const thumbUrl = getImageUrl(mainImage?.filePath)
+  const mainImage = mainStyle?.images?.find((i) => i.emotion === 'NEUTRAL')
+  const thumbUrl = getImageUrl(character.profileImage) || getImageUrl(mainImage?.filePath)
   const feedPosts = (character.feedPosts || []).sort((a, b) => new Date(b.publishAt) - new Date(a.publishAt))
 
   return (
