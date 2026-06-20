@@ -11,6 +11,10 @@ import { useEffect, useRef, useState } from 'react'
 //  - active: 명시적 제어. undefined면 IntersectionObserver, true/false면 그 값을 그대로 사용
 //            (예: 슬라이더에서 현재 인덱스 슬라이드만 재생시키고 싶을 때)
 //  - rootMargin: IntersectionObserver rootMargin (기본 "200px" — 스크롤 직전 미리 마운트)
+//
+// controlled(active 명시) 모드에선 비활성 슬라이드도 <video>를 항상 마운트해
+// 첫 프레임을 그대로 보여준다 (#t=0.001 미디어 프래그먼트로 강제 디코드).
+// 슬라이더처럼 항목 수가 적은 곳에서만 사용하기를 권장.
 export default function LazyVideo({
   src,
   poster,
@@ -20,6 +24,7 @@ export default function LazyVideo({
   rootMargin = '200px',
 }) {
   const wrapperRef = useRef(null)
+  const videoRef = useRef(null)
   const [inView, setInView] = useState(false)
   const controlled = active !== undefined
 
@@ -40,11 +45,29 @@ export default function LazyVideo({
   }, [controlled, rootMargin])
 
   const shouldPlay = controlled ? active : inView
+  // controlled: 모든 슬라이드의 <video>를 항상 마운트(첫 프레임 노출용).
+  // uncontrolled: 화면에 들어왔을 때만 마운트(디코더 슬롯 절약).
+  const mountVideo = !!src && (controlled || inView)
   const objectCls = objectPosition === 'top' ? 'object-cover object-top' : 'object-cover'
+
+  // 메타데이터만 로드해도 #t=0.001 프래그먼트가 첫 프레임을 강제 디코드/표시한다.
+  const videoSrc = src ? (src.includes('#') ? src : `${src}#t=0.001`) : null
+
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    if (shouldPlay) {
+      try { v.currentTime = 0 } catch {}
+      v.play().catch(() => {})
+    } else {
+      v.pause()
+    }
+  }, [shouldPlay, videoSrc])
 
   return (
     <div ref={wrapperRef} className={`relative overflow-hidden ${className}`}>
-      {poster && (
+      {/* controlled 모드에선 프로필 이미지 폴백을 깔지 않는다 — 첫 프레임만 보이게 하기 위함. */}
+      {poster && !controlled && (
         <img
           src={poster}
           alt=""
@@ -53,11 +76,10 @@ export default function LazyVideo({
           className={`absolute inset-0 w-full h-full pointer-events-none ${objectCls}`}
         />
       )}
-      {shouldPlay && src && (
+      {mountVideo && (
         <video
-          src={src}
-          poster={poster || undefined}
-          autoPlay
+          ref={videoRef}
+          src={videoSrc}
           muted
           loop
           playsInline

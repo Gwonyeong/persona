@@ -14,9 +14,9 @@ const REWARD_LABEL = {
 
 function RewardPreview({ tier }) {
   const { rewardType, rewardPayload, claimed } = tier
-  // GALLERY/PROFILE 미수령 시 콘텐츠 노출 방지용 강한 블러 (수령하면 해제)
+  // GALLERY/PROFILE 미수령 시 미리보기용 약한 블러 (수령하면 해제)
   const visualBlur = !claimed && (rewardType === 'GALLERY' || rewardType === 'PROFILE')
-  const blurClass = visualBlur ? 'blur-xl scale-110' : ''
+  const blurClass = visualBlur ? 'blur-sm scale-105' : ''
   if (rewardType === 'MASK') {
     const amount = rewardPayload?.amount || 0
     return (
