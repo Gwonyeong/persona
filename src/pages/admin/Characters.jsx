@@ -1159,57 +1159,85 @@ export default function Characters() {
             </h3>
 
             {/* 프로필 이미지 */}
-            {editing !== 'new' && (
-              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-700">
-                <div className="w-16 h-16 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                  {editing.profileImage ? (
-                    <img src={editing.profileImage} alt="" className="w-full h-full object-cover" />
-                  ) : (() => {
-                    const img = editing.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
-                    return img?.filePath ? (
-                      <img src={img.filePath} alt="" className="w-full h-full object-cover opacity-50" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">?</div>
-                    )
-                  })()}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-xs text-gray-400">
-                    {editing.profileImage ? '프로필 이미지' : '프로필 이미지 (스프라이트 사용 중)'}
-                  </p>
-                  <div className="flex gap-2">
-                    <label
-                      className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer ${
-                        uploadingImage ? 'bg-gray-700 text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                      }`}
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      {uploadingImage ? '업로드 중...' : '이미지 변경'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        disabled={uploadingImage}
-                        onChange={(e) => {
-                          if (e.target.files[0]) uploadProfileImage(e.target.files[0])
-                          e.target.value = ''
-                        }}
-                      />
-                    </label>
-                    {editing.profileImage && (
-                      <button
-                        onClick={removeProfileImage}
-                        disabled={uploadingImage}
-                        className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-red-400 hover:text-red-300 border border-gray-700"
+            {editing !== 'new' && (() => {
+              const isDragOver = dragOverColumn === 'profileImage'
+              return (
+                <div
+                  className={`flex items-center gap-4 mb-4 pb-4 border-b border-gray-700 p-2 -m-2 rounded-lg border-2 border-dashed transition-colors ${
+                    isDragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-transparent'
+                  }`}
+                  onDragEnter={(e) => {
+                    if (!e.dataTransfer?.types?.includes('Files')) return
+                    e.preventDefault()
+                    setDragOverColumn('profileImage')
+                  }}
+                  onDragOver={(e) => {
+                    if (!e.dataTransfer?.types?.includes('Files')) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'copy'
+                  }}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget)) return
+                    setDragOverColumn((c) => (c === 'profileImage' ? null : c))
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragOverColumn(null)
+                    const file = e.dataTransfer.files?.[0]
+                    if (file && file.type.startsWith('image/')) uploadProfileImage(file)
+                  }}
+                >
+                  <div className="w-16 h-16 rounded-full bg-gray-800 overflow-hidden flex-shrink-0 pointer-events-none">
+                    {editing.profileImage ? (
+                      <img src={editing.profileImage} alt="" className="w-full h-full object-cover" />
+                    ) : (() => {
+                      const img = editing.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')
+                      return img?.filePath ? (
+                        <img src={img.filePath} alt="" className="w-full h-full object-cover opacity-50" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">?</div>
+                      )
+                    })()}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-gray-400">
+                      {editing.profileImage ? '프로필 이미지' : '프로필 이미지 (스프라이트 사용 중)'}
+                    </p>
+                    <p className="text-[10px] text-gray-500">클릭 또는 드래그앤드랍</p>
+                    <div className="flex gap-2">
+                      <label
+                        className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer ${
+                          uploadingImage ? 'bg-gray-700 text-gray-500' : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                        }`}
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        삭제
-                      </button>
-                    )}
+                        {uploadingImage ? '업로드 중...' : '이미지 변경'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingImage}
+                          onChange={(e) => {
+                            if (e.target.files[0]) uploadProfileImage(e.target.files[0])
+                            e.target.value = ''
+                          }}
+                        />
+                      </label>
+                      {editing.profileImage && (
+                        <button
+                          onClick={removeProfileImage}
+                          disabled={uploadingImage}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-red-400 hover:text-red-300 border border-gray-700"
+                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* 홈 미디어 (이미지/영상 — 홈 화면에서만 노출) */}
             {editing !== 'new' && (() => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LazyVideo from './LazyVideo'
 
-const AUTO_INTERVAL_MS = 5000
+const AUTO_INTERVAL_MS = 6000
 const SWIPE_THRESHOLD_PX = 40
 
 function getImageUrl(filePath) {
