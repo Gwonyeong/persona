@@ -832,5 +832,57 @@
       "insufficientMasks": "Not enough masks",
       "unlockError": "Failed to unlock"
     }
+  },
+  "personality": {
+    "button": "Personality",
+    "modal": {
+      "title": "{{name}}'s personality",
+      "subtitle": "{{used}}/{{total}} slots",
+      "originalLabel": "Original",
+      "originalHint": "Character default relationship & address (read-only)",
+      "activeBadge": "Active",
+      "untitled": "Untitled",
+      "emptyPresetHint": "Tap to create a new personality",
+      "unlockButton": "+1 slot",
+      "unlockSuccess": "+1 slot added",
+      "insufficientMasks": "Not enough masks",
+      "unlockError": "Failed to unlock",
+      "saveError": "Failed to save"
+    },
+    "edit": {
+      "title": "Edit personality",
+      "namePlaceholder": "Name (e.g. Gentle version)",
+      "cancel": "Cancel",
+      "save": "Save",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this personality?",
+      "relationshipLabel": "Relationship",
+      "relationshipHint": "How this character treats you",
+      "relationshipPresets": {
+        "friend": "Friend",
+        "lover": "Lover",
+        "soulmate": "Soulmate",
+        "colleague": "Colleague",
+        "mentor": "Mentor",
+        "roommate": "Roommate",
+        "custom": "Custom"
+      },
+      "relationshipCustomPlaceholder": "e.g. A cousin I've known since childhood",
+      "honorificLabel": "Speech style",
+      "honorific": {
+        "strict": "Always polite",
+        "mixed": "Mixed",
+        "casual": "Casual"
+      },
+      "distanceLabel": "Closeness",
+      "distance": {
+        "professional": "Professional",
+        "close": "Close",
+        "intimate": "Intimate"
+      },
+      "userAddressLabel": "How character calls you",
+      "userAddressPlaceholder": "e.g. babe, hon, name",
+      "userAddressHint": "Leave blank to use character default"
+    }
   }
 }

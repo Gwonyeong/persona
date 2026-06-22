@@ -832,5 +832,57 @@
       "insufficientMasks": "마스크가 부족해요",
       "unlockError": "해금에 실패했어요"
     }
+  },
+  "personality": {
+    "button": "성격",
+    "modal": {
+      "title": "{{name}}의 성격",
+      "subtitle": "{{used}}/{{total}} 슬롯",
+      "originalLabel": "원본",
+      "originalHint": "캐릭터 기본 관계·호칭 (편집 불가)",
+      "activeBadge": "활성",
+      "untitled": "이름 없음",
+      "emptyPresetHint": "탭해서 새 성격 만들기",
+      "unlockButton": "+1 슬롯",
+      "unlockSuccess": "+1 슬롯 추가했어요",
+      "insufficientMasks": "마스크가 부족해요",
+      "unlockError": "해금에 실패했어요",
+      "saveError": "저장에 실패했어요"
+    },
+    "edit": {
+      "title": "성격 편집",
+      "namePlaceholder": "이름 (예: 다정한 버전)",
+      "cancel": "취소",
+      "save": "저장",
+      "delete": "삭제",
+      "deleteConfirm": "이 성격을 삭제할까요?",
+      "relationshipLabel": "관계",
+      "relationshipHint": "이 캐릭터가 나를 어떤 존재로 대할지",
+      "relationshipPresets": {
+        "friend": "친구",
+        "lover": "연인",
+        "soulmate": "소울메이트",
+        "colleague": "회사 동료",
+        "mentor": "멘토",
+        "roommate": "룸메이트",
+        "custom": "직접 입력"
+      },
+      "relationshipCustomPlaceholder": "예: 어릴 때부터 알던 사촌",
+      "honorificLabel": "말투 정책",
+      "honorific": {
+        "strict": "항상 존댓말",
+        "mixed": "혼용",
+        "casual": "반말"
+      },
+      "distanceLabel": "거리감",
+      "distance": {
+        "professional": "직업적",
+        "close": "가까움",
+        "intimate": "친밀"
+      },
+      "userAddressLabel": "캐릭터가 부르는 호칭",
+      "userAddressPlaceholder": "예: 오빠, 자기, 그대",
+      "userAddressHint": "비워두면 캐릭터 기본 호칭 사용"
+    }
   }
 }

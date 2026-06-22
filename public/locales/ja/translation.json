@@ -832,5 +832,57 @@
       "insufficientMasks": "マスクが足りません",
       "unlockError": "解放に失敗しました"
     }
+  },
+  "personality": {
+    "button": "性格",
+    "modal": {
+      "title": "{{name}}の性格",
+      "subtitle": "{{used}}/{{total}} スロット",
+      "originalLabel": "オリジナル",
+      "originalHint": "キャラクターのデフォルト関係・呼び方（編集不可）",
+      "activeBadge": "アクティブ",
+      "untitled": "名前なし",
+      "emptyPresetHint": "タップして新しい性格を作成",
+      "unlockButton": "+1 スロット",
+      "unlockSuccess": "+1 スロットを追加しました",
+      "insufficientMasks": "マスクが足りません",
+      "unlockError": "解放に失敗しました",
+      "saveError": "保存に失敗しました"
+    },
+    "edit": {
+      "title": "性格を編集",
+      "namePlaceholder": "名前（例：優しいバージョン）",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "delete": "削除",
+      "deleteConfirm": "この性格を削除しますか？",
+      "relationshipLabel": "関係",
+      "relationshipHint": "このキャラクターがあなたをどう扱うか",
+      "relationshipPresets": {
+        "friend": "友達",
+        "lover": "恋人",
+        "soulmate": "ソウルメイト",
+        "colleague": "会社の同僚",
+        "mentor": "メンター",
+        "roommate": "ルームメイト",
+        "custom": "自由入力"
+      },
+      "relationshipCustomPlaceholder": "例：小さい頃からの幼なじみ",
+      "honorificLabel": "話し方",
+      "honorific": {
+        "strict": "常に敬語",
+        "mixed": "混合",
+        "casual": "タメ口"
+      },
+      "distanceLabel": "距離感",
+      "distance": {
+        "professional": "プロフェッショナル",
+        "close": "近い",
+        "intimate": "親密"
+      },
+      "userAddressLabel": "キャラクターが呼ぶ呼称",
+      "userAddressPlaceholder": "例：あなた、君、名前",
+      "userAddressHint": "空欄ならキャラクターデフォルトを使用"
+    }
   }
 }
