@@ -121,14 +121,14 @@ export default function UserLayout() {
 
       {/* 하단 탭바 (채팅 / 캐릭터 풀스크린 페이지에서는 숨김) */}
       {!isFullscreenPage && (
-      <nav className="relative flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
+      <nav className="relative z-[60] flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
         {TABS.map((tab, i) => (
           <React.Fragment key={tab.to}>
             {i === 2 && (
               <div className="flex-1 flex items-center justify-center">
                 <button
                   onClick={() => navigate('/mask-shop')}
-                  className="absolute -top-5 w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
+                  className="absolute -top-5 z-[60] w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <MaskIcon style={{ width: 44, height: 44 }} />
