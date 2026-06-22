@@ -1585,8 +1585,8 @@ export default function Chat() {
             {/* 미해금 영상 카드 — 메시지 박스 바로 위 우측 */}
             {bubbleNeedsUnlock && (
               <div
-                className="absolute right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto"
-                style={{ aspectRatio: '9 / 16', bottom: 'calc(30% + 8px)' }}
+                className="absolute right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto z-30"
+                style={{ aspectRatio: '9 / 16', bottom: 'calc(42% + 8px)' }}
                 onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
               >
                 <CrossfadeMedia
