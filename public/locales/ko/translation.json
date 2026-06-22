@@ -882,7 +882,23 @@
       },
       "userAddressLabel": "캐릭터가 부르는 호칭",
       "userAddressPlaceholder": "예: 오빠, 자기, 그대",
-      "userAddressHint": "비워두면 캐릭터 기본 호칭 사용"
+      "userAddressHint": "비워두면 캐릭터 기본 호칭 사용",
+      "preferencesLabel": "추가 취향",
+      "preferencesHint": "캐릭터 기본 취향에 더해서 추가 (기존 항목은 그대로)",
+      "likesLabel": "좋아하는 것 · 음식",
+      "likesPlaceholder": "Enter로 추가 (예: 라떼)",
+      "hobbiesLabel": "취미·관심사",
+      "hobbiesPlaceholder": "Enter로 추가 (예: 웹툰)",
+      "speechLabel": "말투 강도",
+      "speechHint": "중간이면 캐릭터 기본 말투 그대로",
+      "friendlinessLow": "격식",
+      "friendlinessHigh": "친근",
+      "cheerfulnessLow": "차분",
+      "cheerfulnessHigh": "발랄",
+      "emojiLow": "이모지 적게",
+      "emojiHigh": "이모지 많이",
+      "laughLow": "ㅋㅋ·ㅎㅎ 적게",
+      "laughHigh": "ㅋㅋ·ㅎㅎ 많이"
     }
   }
 }

@@ -882,7 +882,23 @@
       },
       "userAddressLabel": "How character calls you",
       "userAddressPlaceholder": "e.g. babe, hon, name",
-      "userAddressHint": "Leave blank to use character default"
+      "userAddressHint": "Leave blank to use character default",
+      "preferencesLabel": "Additional preferences",
+      "preferencesHint": "Adds on top of character defaults (originals are kept)",
+      "likesLabel": "Likes · Food",
+      "likesPlaceholder": "Enter to add (e.g. latte)",
+      "hobbiesLabel": "Hobbies · Interests",
+      "hobbiesPlaceholder": "Enter to add (e.g. webtoons)",
+      "speechLabel": "Speech intensity",
+      "speechHint": "Middle = character default",
+      "friendlinessLow": "Formal",
+      "friendlinessHigh": "Friendly",
+      "cheerfulnessLow": "Calm",
+      "cheerfulnessHigh": "Cheerful",
+      "emojiLow": "Few emojis",
+      "emojiHigh": "Many emojis",
+      "laughLow": "Less laughter",
+      "laughHigh": "More laughter"
     }
   }
 }

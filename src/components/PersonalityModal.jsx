@@ -16,6 +16,15 @@ const RELATIONSHIP_PRESETS = ['friend', 'lover', 'soulmate', 'colleague', 'mento
 const HONORIFIC_LEVELS = ['strict', 'mixed', 'casual']
 const PHYSICAL_DISTANCES = ['professional', 'close', 'intimate']
 
+const MAX_PREF_LEN = 30
+const MAX_PREF_ITEMS = 10
+const SPEECH_AXES = [
+  { key: 'friendliness', low: 'friendlinessLow', high: 'friendlinessHigh' },
+  { key: 'cheerfulness', low: 'cheerfulnessLow', high: 'cheerfulnessHigh' },
+  { key: 'emojiFreq', low: 'emojiLow', high: 'emojiHigh' },
+  { key: 'laughFreq', low: 'laughLow', high: 'laughHigh' },
+]
+
 function emptyDraft() {
   return {
     id:
@@ -548,6 +557,48 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
           />
           <p className="text-[11px] text-gray-500">{t('personality.edit.userAddressHint')}</p>
         </section>
+
+        {/* ③ 취향 추가 */}
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm text-white font-semibold">{t('personality.edit.preferencesLabel')}</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">{t('personality.edit.preferencesHint')}</p>
+          </div>
+          <ChipInput
+            label={t('personality.edit.likesLabel')}
+            values={draft?.addedLikes || []}
+            onChange={(v) => setDraft({ ...draft, addedLikes: v })}
+            placeholder={t('personality.edit.likesPlaceholder')}
+          />
+          <ChipInput
+            label={t('personality.edit.hobbiesLabel')}
+            values={draft?.addedHobbies || []}
+            onChange={(v) => setDraft({ ...draft, addedHobbies: v })}
+            placeholder={t('personality.edit.hobbiesPlaceholder')}
+          />
+        </section>
+
+        {/* ④ 말투 강도 */}
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm text-white font-semibold">{t('personality.edit.speechLabel')}</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">{t('personality.edit.speechHint')}</p>
+          </div>
+          {SPEECH_AXES.map((axis) => (
+            <SpeechSlider
+              key={axis.key}
+              value={draft?.speech?.[axis.key]}
+              onChange={(v) =>
+                setDraft({
+                  ...draft,
+                  speech: { ...(draft?.speech || {}), [axis.key]: v },
+                })
+              }
+              lowLabel={t(`personality.edit.${axis.low}`)}
+              highLabel={t(`personality.edit.${axis.high}`)}
+            />
+          ))}
+        </section>
       </div>
 
       <div className="px-4 pt-3 flex gap-2 border-t border-gray-800/60">
@@ -581,6 +632,87 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
         >
           {t('personality.edit.save')}
         </button>
+      </div>
+    </div>
+  )
+}
+
+function ChipInput({ label, values, onChange, placeholder }) {
+  const [draft, setDraft] = useState('')
+  const handleAdd = () => {
+    const v = draft.trim().slice(0, MAX_PREF_LEN)
+    if (!v) return
+    if (values.some((x) => x.toLowerCase() === v.toLowerCase())) {
+      setDraft('')
+      return
+    }
+    if (values.length >= MAX_PREF_ITEMS) return
+    onChange([...values, v])
+    setDraft('')
+  }
+  return (
+    <div>
+      <h4 className="text-xs text-gray-300 font-medium mb-1.5">{label}</h4>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {values.map((v, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-700/70 text-gray-100 text-xs"
+            >
+              {v}
+              <button
+                onClick={() => onChange(values.filter((_, idx) => idx !== i))}
+                className="ml-0.5 text-gray-400 hover:text-white"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                aria-label="remove"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.slice(0, MAX_PREF_LEN))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            handleAdd()
+          }
+        }}
+        placeholder={placeholder}
+        disabled={values.length >= MAX_PREF_ITEMS}
+        className="w-full px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500 disabled:opacity-50"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        maxLength={MAX_PREF_LEN}
+      />
+    </div>
+  )
+}
+
+function SpeechSlider({ value, onChange, lowLabel, highLabel }) {
+  const v = typeof value === 'number' ? value : 0.5
+  const isMiddle = v >= 0.35 && v <= 0.65
+  return (
+    <div className="space-y-1">
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={v}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full accent-purple-400 h-1"
+      />
+      <div className="flex justify-between text-[10px]">
+        <span className={isMiddle || v < 0.5 ? 'text-gray-400' : 'text-gray-500'}>{lowLabel}</span>
+        <span className={isMiddle || v >= 0.5 ? 'text-gray-400' : 'text-gray-500'}>{highLabel}</span>
       </div>
     </div>
   )

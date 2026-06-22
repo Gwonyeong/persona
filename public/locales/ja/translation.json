@@ -882,7 +882,23 @@
       },
       "userAddressLabel": "キャラクターが呼ぶ呼称",
       "userAddressPlaceholder": "例：あなた、君、名前",
-      "userAddressHint": "空欄ならキャラクターデフォルトを使用"
+      "userAddressHint": "空欄ならキャラクターデフォルトを使用",
+      "preferencesLabel": "追加の好み",
+      "preferencesHint": "キャラクターのデフォルトに追加（既存項目は維持）",
+      "likesLabel": "好きなもの・食べ物",
+      "likesPlaceholder": "Enterで追加（例：ラテ）",
+      "hobbiesLabel": "趣味・関心",
+      "hobbiesPlaceholder": "Enterで追加（例：ウェブ漫画）",
+      "speechLabel": "話し方の強度",
+      "speechHint": "中央ならキャラクターのデフォルトのまま",
+      "friendlinessLow": "フォーマル",
+      "friendlinessHigh": "フレンドリー",
+      "cheerfulnessLow": "落ち着き",
+      "cheerfulnessHigh": "陽気",
+      "emojiLow": "絵文字少なめ",
+      "emojiHigh": "絵文字多め",
+      "laughLow": "笑い表現少なめ",
+      "laughHigh": "笑い表現多め"
     }
   }
 }
