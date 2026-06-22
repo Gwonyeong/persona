@@ -563,6 +563,68 @@ export default function AdminMaskPass() {
     return t.rewardType
   }
 
+  function isVideoUrl(url) {
+    return !!url && /\.(mp4|webm|mov)$/i.test(url)
+  }
+  function isImageUrl(url) {
+    return !!url && /\.(png|jpe?g|webp|gif)$/i.test(url)
+  }
+
+  function RewardPreview({ tier }) {
+    const payload = tier.rewardPayload || {}
+    const preview = payload.preview || {}
+    if (tier.rewardType === 'VOICE' && payload.audioUrl) {
+      return <audio src={payload.audioUrl} controls className="w-full max-w-xs mt-2" />
+    }
+    if (tier.rewardType === 'PROFILE' && preview.imageUrl) {
+      return (
+        <img
+          src={preview.imageUrl}
+          alt=""
+          className="mt-2 max-h-28 rounded border border-gray-800"
+        />
+      )
+    }
+    if (tier.rewardType === 'GALLERY') {
+      const items = Array.isArray(preview.images) && preview.images.length > 0
+        ? preview.images
+        : preview.thumbnailUrl
+          ? [{ id: 'thumb', url: preview.thumbnailUrl }]
+          : []
+      if (items.length === 0) return null
+      return (
+        <div className="mt-2 flex gap-1.5 flex-wrap">
+          {items.slice(0, 6).map((img) => {
+            const url = img.url || img.imageUrl || img.thumbnailUrl
+            if (!url) return null
+            return isVideoUrl(url) ? (
+              <video
+                key={img.id || url}
+                src={url}
+                controls
+                muted
+                className="h-20 w-20 object-cover rounded border border-gray-800 bg-black"
+              />
+            ) : isImageUrl(url) ? (
+              <img
+                key={img.id || url}
+                src={url}
+                alt=""
+                className="h-20 w-20 object-cover rounded border border-gray-800"
+              />
+            ) : null
+          })}
+          {items.length > 6 && (
+            <div className="h-20 w-20 flex items-center justify-center rounded border border-gray-800 bg-gray-950 text-xs text-gray-400">
+              +{items.length - 6}
+            </div>
+          )}
+        </div>
+      )
+    }
+    return null
+  }
+
   return (
     <div className="p-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-4">
@@ -595,7 +657,7 @@ export default function AdminMaskPass() {
             {editing?.id === t.id ? (
               <TierForm initial={t} characters={characters} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
             ) : (
-              <div className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-xl">
+              <div className="flex items-start gap-3 p-3 bg-gray-900 border border-gray-800 rounded-xl">
                 <div className="w-16 text-center flex-shrink-0">
                   <p className="text-base font-bold text-gray-100">{t.threshold.toLocaleString()}</p>
                   <p className="text-[10px] text-gray-500">마스크</p>
@@ -620,6 +682,7 @@ export default function AdminMaskPass() {
                       )}
                     </div>
                   )}
+                  <RewardPreview tier={t} />
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-gray-500">클레임 {t._count?.claims || 0}</p>
