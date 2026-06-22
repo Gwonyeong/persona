@@ -818,5 +818,19 @@
       "switchedToPhone": "📱 メッセンジャーモードに切り替えました",
       "autoFallbackToast": "📱 一緒にいる友達がいないのでメッセンジャーモードに切り替えました"
     }
+  },
+  "memory": {
+    "button": "記憶",
+    "modal": {
+      "title": "{{name}}の記憶",
+      "subtitle": "{{used}}/{{total}} スロット",
+      "empty": "まだ覚えていることはありません",
+      "capWarning": "記憶がいっぱいです。新しい記憶が追加されると、古い記憶から消えます。",
+      "unlockButton": "+10 スロット",
+      "capReachedButton": "解放完了",
+      "unlockSuccess": "+10 スロットを追加しました",
+      "insufficientMasks": "マスクが足りません",
+      "unlockError": "解放に失敗しました"
+    }
   }
 }

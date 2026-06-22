@@ -818,5 +818,19 @@
       "switchedToPhone": "📱 메신저 모드로 전환했어요",
       "autoFallbackToast": "📱 함께 있는 친구가 없어서 메신저 모드로 전환했어요"
     }
+  },
+  "memory": {
+    "button": "기억",
+    "modal": {
+      "title": "{{name}}의 기억",
+      "subtitle": "{{used}}/{{total}} 슬롯",
+      "empty": "아직 캐릭터가 기억하는 내용이 없어요",
+      "capWarning": "기억이 가득 찼어요. 새 기억이 추가되면 가장 오래된 기억이 사라져요.",
+      "unlockButton": "+10 슬롯",
+      "capReachedButton": "최대 해금 완료",
+      "unlockSuccess": "+10 슬롯 추가했어요",
+      "insufficientMasks": "마스크가 부족해요",
+      "unlockError": "해금에 실패했어요"
+    }
   }
 }

@@ -11,6 +11,7 @@ import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
 import CallSheet from '../../components/CallSheet'
 import InsufficientMasksModal from '../../components/InsufficientMasksModal'
+import MemoryModal from '../../components/MemoryModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -611,6 +612,9 @@ export default function Chat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showInputButtons, setShowInputButtons] = useState(true)
   const [showReport, setShowReport] = useState(false)
+  // 장기기억(LTM) 슬롯 — 책 버튼 색 결정에 used/count 사용. 모달이 갱신할 때마다 onUpdate로 반영.
+  const [showMemoryModal, setShowMemoryModal] = useState(false)
+  const [memorySnapshot, setMemorySnapshot] = useState(null) // { slot:{used,count,capReached} }
   const [showCallChooser, setShowCallChooser] = useState(false)
   // null 이면 통화 닫힘, 'simple' 이면 CallSheet 오픈 (continue 모드는 deprecated).
   const [activeCallMode, setActiveCallMode] = useState(null)
@@ -814,6 +818,16 @@ export default function Chat() {
       // 404 등은 무시 — 비어있는 세션으로 간주.
       setCallSessionMeta({ turnCount: 0, lastCallAt: null })
     }
+  }, [id])
+
+  // 장기기억 슬롯 스냅샷 — 책 버튼 색 결정용 (가득 차면 강조색).
+  // 모달 열 때 한 번 더 fetch하므로 실패해도 색만 부정확 — 조용히 무시.
+  useEffect(() => {
+    if (!id) return
+    api
+      .get(`/memory/conversations/${id}`)
+      .then((res) => setMemorySnapshot(res))
+      .catch(() => {})
   }, [id])
 
   useEffect(() => {
@@ -1669,6 +1683,26 @@ export default function Chat() {
                 </span>
               </button>
             )}
+            {(() => {
+              const isMemoryFull =
+                memorySnapshot?.slot && memorySnapshot.slot.used >= memorySnapshot.slot.count
+              return (
+                <button
+                  onClick={() => setShowMemoryModal(true)}
+                  className={`w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors ${
+                    isMemoryFull ? 'ring-2 ring-amber-400' : ''
+                  }`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  aria-label={t('memory.button')}
+                  title={t('memory.button')}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isMemoryFull ? '#fcd34d' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                </button>
+              )
+            })()}
             <div className="relative">
               {showGalleryTooltip && (
                 <div className="absolute top-full right-0 mt-2 whitespace-nowrap pointer-events-none animate-fade-in z-30">
@@ -2289,6 +2323,13 @@ export default function Chat() {
           onClose={() => setShowReport(false)}
         />
       )}
+      <MemoryModal
+        open={showMemoryModal}
+        conversationId={conversation.id}
+        characterName={character?.name}
+        onClose={() => setShowMemoryModal(false)}
+        onUpdate={(s) => setMemorySnapshot(s)}
+      />
       {showGallery && (
         <GalleryBottomSheet
           characterId={conversation.characterId}

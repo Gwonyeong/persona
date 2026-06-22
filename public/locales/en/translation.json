@@ -818,5 +818,19 @@
       "switchedToPhone": "📱 Switched to messenger mode",
       "autoFallbackToast": "📱 No one is with you — switched to messenger mode"
     }
+  },
+  "memory": {
+    "button": "Memory",
+    "modal": {
+      "title": "{{name}}'s memory",
+      "subtitle": "{{used}}/{{total}} slots",
+      "empty": "No memories yet",
+      "capWarning": "Memory is full. New memories will overwrite the oldest ones.",
+      "unlockButton": "+10 slots",
+      "capReachedButton": "Max unlocked",
+      "unlockSuccess": "+10 slots added",
+      "insufficientMasks": "Not enough masks",
+      "unlockError": "Failed to unlock"
+    }
   }
 }
