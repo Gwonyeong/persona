@@ -596,6 +596,9 @@ export default function Chat() {
   const [unlockingVideo, setUnlockingVideo] = useState(false)
   // 본 이미지 marked 추적 — 중복 호출 방지 (per session)
   const markedSeenRef = useRef(new Set())
+  // read polling burst 윈도우 종료 시각(ms). send() 호출 시 + 60초로 갱신.
+  // heartbeat useEffect의 5초 interval이 이 값을 보고 그 동안만 read 호출.
+  const readPollUntilRef = useRef(0)
   // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
   const [backgroundImage, setBackgroundImage] = useState(null)
   // 캐릭터 표정 sprite 뒤 backdrop — AI가 scene에 따라 자동 선택. 채팅방 배경과 독립.
@@ -868,14 +871,18 @@ export default function Chat() {
     })
   }, [id, token])
 
-  // 채팅 페이지에 있는 동안 주기적으로 읽음 처리 (heartbeat)
+  // 읽음 처리 — 이벤트 기반 burst polling.
+  // 평소엔 polling 안 함. 메시지 전송 시 send() 핸들러가 readPollUntilRef를 갱신해
+  // 그 시점부터 60초 동안만 5초 간격으로 read 호출 → 캐릭터 응답·후속 메시지가 도착하는
+  // 짧은 윈도우에서만 unread가 잘못 잡히는 걸 방지. 진입·퇴장 시는 항상 1회 호출.
   useEffect(() => {
-    // 진입 시 즉시 읽음 처리
     api.post(`/conversations/${id}/read`).catch(() => {})
 
     const interval = setInterval(() => {
-      api.post(`/conversations/${id}/read`).catch(() => {})
-    }, 5000) // 5초마다
+      if (readPollUntilRef.current > Date.now()) {
+        api.post(`/conversations/${id}/read`).catch(() => {})
+      }
+    }, 5000)
 
     return () => {
       clearInterval(interval)
@@ -953,6 +960,8 @@ export default function Chat() {
     const feedToSend = attachedFeed
     setInput('')
     setSending(true)
+    // read polling burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
+    readPollUntilRef.current = Date.now() + 60000
     setAttachedFeed(null)
     setShowGalleryTooltip(false)
     const feedImage = feedToSend?.images?.[0]?.filePath || null
