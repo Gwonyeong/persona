@@ -49,34 +49,43 @@ function emptyDraft() {
   }
 }
 
-// 프리셋 한 줄 미리보기 — list 카드용
+// 프리셋 미리보기 — list 카드용. 칩(관계/말투/거리/호칭) + 컨셉/성격은 별도 줄.
 function presetPreview(preset, t) {
-  const parts = []
+  const chips = []
   if (preset.relationship) {
     const label =
       preset.relationship.presetType === 'custom'
         ? preset.relationship.customLabel
         : t(`personality.edit.relationshipPresets.${preset.relationship.presetType}`)
-    parts.push(label)
+    if (label) chips.push({ key: 'rel', label })
   }
-  if (preset.honorificLevel) parts.push(t(`personality.edit.honorific.${preset.honorificLevel}`))
-  if (preset.physicalDistance) parts.push(t(`personality.edit.distance.${preset.physicalDistance}`))
-  if (preset.userAddress) parts.push(`"${preset.userAddress}"`)
-  if (preset.conceptOverride) {
-    const c = preset.conceptOverride
-    parts.push(`💭 ${c.length > 25 ? c.slice(0, 25) + '…' : c}`)
+  if (preset.honorificLevel)
+    chips.push({ key: 'hon', label: t(`personality.edit.honorific.${preset.honorificLevel}`) })
+  if (preset.physicalDistance)
+    chips.push({ key: 'dist', label: t(`personality.edit.distance.${preset.physicalDistance}`) })
+  if (preset.userAddress) chips.push({ key: 'addr', label: `호칭 "${preset.userAddress}"` })
+  return {
+    chips,
+    concept: preset.conceptOverride || null,
+    traits: Array.isArray(preset.traitsOverride) ? preset.traitsOverride : [],
   }
-  return parts.join(' · ')
 }
 
 function originalPreview(original, t) {
   if (!original) return null
-  const parts = []
-  if (original.relationship) parts.push(original.relationship)
-  if (original.honorificLevel) parts.push(t(`personality.edit.honorific.${original.honorificLevel}`))
-  if (original.physicalDistance) parts.push(t(`personality.edit.distance.${original.physicalDistance}`))
-  if (original.defaultUserNickname) parts.push(`"${original.defaultUserNickname}"`)
-  return parts.length > 0 ? parts.join(' · ') : null
+  const chips = []
+  if (original.relationship) chips.push({ key: 'rel', label: original.relationship })
+  if (original.honorificLevel)
+    chips.push({ key: 'hon', label: t(`personality.edit.honorific.${original.honorificLevel}`) })
+  if (original.physicalDistance)
+    chips.push({ key: 'dist', label: t(`personality.edit.distance.${original.physicalDistance}`) })
+  if (original.defaultUserNickname)
+    chips.push({ key: 'addr', label: `호칭 "${original.defaultUserNickname}"` })
+  return {
+    chips,
+    concept: original.concept || null,
+    traits: Array.isArray(original.coreTraits) ? original.coreTraits : [],
+  }
 }
 
 export default function PersonalityModal({ open, conversationId, characterName, onClose }) {
@@ -389,7 +398,13 @@ export default function PersonalityModal({ open, conversationId, characterName, 
   )
 }
 
+// preview 는 { chips: [{key,label}], concept: string|null, traits: string[] } 또는 null.
 function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, onEdit }) {
+  const chips = preview?.chips || []
+  const concept = preview?.concept || null
+  const traits = preview?.traits || []
+  const hasAnyDetail = chips.length > 0 || concept || traits.length > 0
+
   return (
     <div
       onClick={onSelect}
@@ -411,10 +426,46 @@ function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, o
             )}
           </div>
           {subtitle && <p className="text-[10px] text-gray-500 mt-0.5">{subtitle}</p>}
-          {preview && (
-            <p className="text-[11px] text-gray-300 mt-1.5 leading-snug break-words whitespace-pre-wrap">
-              {preview}
-            </p>
+          {hasAnyDetail && (
+            <div className="mt-2 space-y-1.5">
+              {chips.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {chips.map((c) => (
+                    <span
+                      key={c.key}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-200 leading-tight"
+                    >
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {concept && (
+                <div className="flex items-start gap-1.5">
+                  <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">컨셉</span>
+                  <span className="text-[11px] text-gray-300 leading-snug break-words line-clamp-2">
+                    {concept}
+                  </span>
+                </div>
+              )}
+              {traits.length > 0 && (
+                <div className="flex items-start gap-1.5">
+                  <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">성격</span>
+                  <ul className="text-[11px] text-gray-300 leading-snug list-disc list-inside space-y-0.5 min-w-0">
+                    {traits.slice(0, 3).map((tr, i) => (
+                      <li key={i} className="break-words line-clamp-1">
+                        {tr}
+                      </li>
+                    ))}
+                    {traits.length > 3 && (
+                      <li className="text-gray-500 list-none">
+                        +{traits.length - 3}개
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
           )}
         </div>
         {onEdit && (
