@@ -110,7 +110,7 @@
       "needLight": "通話はライトプラン限定機能です",
       "lightOnlyTitle": "この機能を利用するにはプランが必要です！",
       "lightOnlyDesc": "通話機能はライトプラン以上で\n利用できます。",
-      "viewSubscription": "3日間無料で始める",
+      "viewSubscription": "サブスクで始める",
       "freeCount": "あと{{count}}回無料",
       "updateRequired": "通話を利用するにはアプリを更新してください",
       "permissionDenied": "マイクの権限が必要です",
@@ -308,9 +308,8 @@
     "free": "無料",
     "light": "ライト",
     "perMonth": "/月",
-    "trial": "初3日間無料",
     "instantMasks": "マスク10個 即時支給！",
-    "startFree": "無料で始める",
+    "startFree": "ライトに登録",
     "manageSubscription": "サブスク管理",
     "googlePlayError": "Google Play決済を利用できません。",
     "tokenNotFound": "購入トークンが見つかりません。",
@@ -326,7 +325,6 @@
     "lightBenefit2": "会話キャラクター数制限なし",
     "lightBenefit4": "広告なしのすっきり体験",
     "lightBenefit5": "無制限のグループチャット運営",
-    "lightTrialNote": "初3日間は無料！体験期間中に解約すれば料金は発生しません。",
     "freeBoxTagline": "10人のキャラクターと気軽に始めよう",
     "signupBonusBubble": "登録後すぐにマスク30個追加プレゼント！",
     "feature": {
@@ -496,7 +494,7 @@
     "reviewButton": "レビューを書く",
     "reviewLater": "後で",
     "freeLimitReached": "無料プランは最大{{limit}}名のキャラクターとチャットできます",
-    "freeLimitCta": "3日間無料体験"
+    "freeLimitCta": "ライトに登録"
   },
   "masks": {
     "pkg30": "30個",
