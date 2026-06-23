@@ -72,7 +72,7 @@ export default function HomeBannerSlider() {
       <div
         ref={trackRef}
         className="relative w-full overflow-hidden rounded-xl bg-gray-900 select-none"
-        style={{ aspectRatio: '16 / 5', touchAction: 'pan-y' }}
+        style={{ aspectRatio: '16 / 9', touchAction: 'pan-y' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
