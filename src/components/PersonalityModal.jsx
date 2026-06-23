@@ -443,7 +443,7 @@ function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, o
               {concept && (
                 <div className="flex items-start gap-1.5">
                   <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">컨셉</span>
-                  <span className="text-[11px] text-gray-300 leading-snug break-words line-clamp-2">
+                  <span className="text-[11px] text-gray-300 leading-snug break-words whitespace-pre-wrap">
                     {concept}
                   </span>
                 </div>
@@ -452,16 +452,11 @@ function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, o
                 <div className="flex items-start gap-1.5">
                   <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">성격</span>
                   <ul className="text-[11px] text-gray-300 leading-snug list-disc list-inside space-y-0.5 min-w-0">
-                    {traits.slice(0, 3).map((tr, i) => (
-                      <li key={i} className="break-words line-clamp-1">
+                    {traits.map((tr, i) => (
+                      <li key={i} className="break-words whitespace-pre-wrap">
                         {tr}
                       </li>
                     ))}
-                    {traits.length > 3 && (
-                      <li className="text-gray-500 list-none">
-                        +{traits.length - 3}개
-                      </li>
-                    )}
                   </ul>
                 </div>
               )}
