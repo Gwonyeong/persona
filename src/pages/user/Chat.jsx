@@ -12,6 +12,7 @@ import MaskIcon from '../../components/MaskIcon'
 import CallSheet from '../../components/CallSheet'
 import InsufficientMasksModal from '../../components/InsufficientMasksModal'
 import MemoryModal from '../../components/MemoryModal'
+import PersonalityModal from '../../components/PersonalityModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -618,6 +619,8 @@ export default function Chat() {
   // 장기기억(LTM) 슬롯 — 책 버튼 색 결정에 used/count 사용. 모달이 갱신할 때마다 onUpdate로 반영.
   const [showMemoryModal, setShowMemoryModal] = useState(false)
   const [memorySnapshot, setMemorySnapshot] = useState(null) // { slot:{used,count,capReached} }
+  // 캐릭터 personality 프리셋 — 활성 프리셋 content가 시스템 프롬프트에 주입됨.
+  const [showPersonalityModal, setShowPersonalityModal] = useState(false)
   const [showCallChooser, setShowCallChooser] = useState(false)
   // null 이면 통화 닫힘, 'simple' 이면 CallSheet 오픈 (continue 모드는 deprecated).
   const [activeCallMode, setActiveCallMode] = useState(null)
@@ -1692,6 +1695,18 @@ export default function Chat() {
                 </span>
               </button>
             )}
+            <button
+              onClick={() => setShowPersonalityModal(true)}
+              className="w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label={t('personality.button')}
+              title={t('personality.button')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
             {(() => {
               const isMemoryFull =
                 memorySnapshot?.slot && memorySnapshot.slot.used >= memorySnapshot.slot.count
@@ -2338,6 +2353,12 @@ export default function Chat() {
         characterName={character?.name}
         onClose={() => setShowMemoryModal(false)}
         onUpdate={(s) => setMemorySnapshot(s)}
+      />
+      <PersonalityModal
+        open={showPersonalityModal}
+        conversationId={conversation.id}
+        characterName={character?.name}
+        onClose={() => setShowPersonalityModal(false)}
       />
       {showGallery && (
         <GalleryBottomSheet

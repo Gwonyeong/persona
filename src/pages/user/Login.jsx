@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -21,6 +21,7 @@ export default function Login() {
   const googleBtnRef = useRef(null)
   const inWebView = isWebView()
   const hadTokenRef = useRef(!!token)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const returnTo = searchParams.get('returnTo') || '/'
 
@@ -72,6 +73,7 @@ export default function Login() {
 
   const handleCredentialResponse = async (response) => {
     try {
+      setErrorMessage('')
       const { token: newToken, user } = await api.post('/auth/google', {
         credential: response.credential,
       })
@@ -81,6 +83,11 @@ export default function Login() {
       goBack()
     } catch (error) {
       console.error('Login failed:', error)
+      if (error?.data?.code === 'RESIGNUP_BLOCKED') {
+        setErrorMessage(t('login.resignupBlocked'))
+      } else {
+        setErrorMessage(error?.data?.error || error?.message || '')
+      }
     }
   }
 
@@ -139,6 +146,20 @@ export default function Login() {
             Pesona
           </h1>
         </div>
+
+        {errorMessage && (
+          <div
+            className="mb-4 px-4 py-3 rounded-xl text-sm text-white/90 leading-relaxed text-center"
+            style={{
+              maxWidth: 360,
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+            }}
+            role="alert"
+          >
+            {errorMessage}
+          </div>
+        )}
 
         <div className="flex items-center justify-center w-full">
           {inWebView ? (

@@ -353,6 +353,7 @@
     "bookmarks": "ブックマーク、フォロー、通知設定",
     "profile": "プロフィール情報（ニックネーム、アバター）",
     "irreversible": "削除されたデータは復元できません。",
+    "noResignup": "退会後は同じGoogleアカウントで再登録できません。",
     "confirmCheckbox": "上記の内容を確認し、アカウント削除に同意します",
     "button": "アカウントを削除"
   },
@@ -379,7 +380,8 @@
     "description": "この機能を利用するにはログインしてください。",
     "googleLogin": "Googleでログイン",
     "heroSubtitle": "あなたを理解してくれるAI彼女",
-    "termsAgreement": "続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+    "termsAgreement": "続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。",
+    "resignupBlocked": "このアカウントは退会済みのため、再登録できません。別のGoogleアカウントをお試しください。"
   },
   "welcome": {
     "title": "こんにちは～ 会えて嬉しいです！",
@@ -889,9 +891,6 @@
       "traitsLabel": "性格",
       "traitsHint": "キャラクターの本質。追加・編集・削除自由",
       "traitsItemPlaceholder": "Enterで追加（例：自分の感情に鈍感）",
-      "situationLabel": "現在の状況",
-      "situationHint": "一時的な状況・コンテキストメモ",
-      "situationPlaceholder": "例：今週は試験期間でピリピリ / 休暇で済州島旅行中",
       "preferencesLabel": "追加の好み",
       "preferencesHint": "キャラクターのデフォルトに追加（既存項目は維持）",
       "likesLabel": "好きなもの・食べ物",

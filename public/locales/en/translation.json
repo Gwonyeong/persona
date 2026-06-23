@@ -353,6 +353,7 @@
     "bookmarks": "Bookmarks, follows, notification settings",
     "profile": "Profile info (nickname, avatar)",
     "irreversible": "Deleted data cannot be recovered.",
+    "noResignup": "After deletion, you cannot re-register with the same Google account.",
     "confirmCheckbox": "I have read the above and agree to delete my account",
     "button": "Delete Account"
   },
@@ -379,7 +380,8 @@
     "description": "Please login to use this feature.",
     "googleLogin": "Sign in with Google",
     "heroSubtitle": "Your AI girlfriend who truly understands you",
-    "termsAgreement": "By continuing, you agree to the Terms of Service and Privacy Policy."
+    "termsAgreement": "By continuing, you agree to the Terms of Service and Privacy Policy.",
+    "resignupBlocked": "This account has been deleted and cannot be re-registered. Please use a different Google account."
   },
   "welcome": {
     "title": "Hi there~ So nice to meet you!",
@@ -889,9 +891,6 @@
       "traitsLabel": "Personality",
       "traitsHint": "Character's core traits — add, edit, or remove freely",
       "traitsItemPlaceholder": "Enter to add (e.g. Oblivious to own feelings)",
-      "situationLabel": "Current situation",
-      "situationHint": "Temporary situation or context note",
-      "situationPlaceholder": "e.g. Stressed because of exams this week / On vacation in Jeju",
       "preferencesLabel": "Additional preferences",
       "preferencesHint": "Adds on top of character defaults (originals are kept)",
       "likesLabel": "Likes · Food",
