@@ -6,7 +6,7 @@ import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
-import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
+import { isAdMobAvailable, initAdMob, showRewardedAd, prepareRewardedAd } from '../../lib/admob'
 import { requestInAppReview } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
@@ -93,21 +93,30 @@ export default function MaskShop() {
     }
     if (!adMobAvailable) return
     let cancelled = false
-    // 8초 안에 init이 떨어지지 않으면 SDK 사용 불가로 간주하고 버튼 자체를 숨긴다.
+    // 12초 안에 prepare가 떨어지지 않으면 SDK/광고 사용 불가로 간주하고 버튼 자체를 숨긴다.
     const timeoutId = setTimeout(() => {
       if (cancelled) return
-      console.warn('[MaskShop] AdMob init timeout — hiding reward ad button')
+      console.warn('[MaskShop] AdMob prepare timeout — hiding reward ad button')
       setAdMobAvailable(false)
-    }, 8000)
-    initAdMob().then((ok) => {
+    }, 12000)
+    ;(async () => {
+      const initOk = await initAdMob()
+      if (cancelled) return
+      if (!initOk) {
+        clearTimeout(timeoutId)
+        setAdMobAvailable(false)
+        return
+      }
+      // 클릭→재생 사이 대기를 없애기 위해 진입 시점에 광고를 미리 로드.
+      const prepOk = await prepareRewardedAd()
       if (cancelled) return
       clearTimeout(timeoutId)
-      if (ok) {
+      if (prepOk) {
         setAdMobReady(true)
       } else {
         setAdMobAvailable(false)
       }
-    })
+    })()
     return () => { cancelled = true; clearTimeout(timeoutId) }
   }, [adMobAvailable])
 
@@ -624,6 +633,13 @@ export default function MaskShop() {
                         }
                       }
                       setAdLoading(false)
+                      // 다음 시청을 위해 새 광고 미리 prep (남은 횟수 있을 때만).
+                      if (adRewardRemaining - 1 > 0) {
+                        setAdMobReady(false)
+                        prepareRewardedAd().then((ok) => {
+                          if (ok) setAdMobReady(true)
+                        })
+                      }
                     }}
                     disabled={!canClaim}
                     className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${

@@ -167,7 +167,7 @@
     "watchAdRemaining": "本日あと{{count}}回",
     "watchAdClaimed": "本日すべて受け取り済み",
     "watchAdLimit": "1日5回",
-    "watchAdLoading": "広告を準備中...",
+    "watchAdLoading": "少々お待ちください...",
     "comingSoon": "他の方法も近日追加予定",
     "dailyCheckin": "出席チェック",
     "dailyCheckinDesc": "1日1回無料マスクをもらえます",
