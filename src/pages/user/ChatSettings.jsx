@@ -70,8 +70,6 @@ export default function ChatSettings() {
     return <div className="flex items-center justify-center h-screen text-gray-400">{t('common.loading')}</div>
   }
 
-  const userName = user?.name || ''
-
   return (
     <div className="absolute inset-0 flex flex-col bg-gray-950 z-20">
       <header
