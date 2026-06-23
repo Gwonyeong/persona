@@ -26,6 +26,7 @@ export default function LazyVideo({
   const wrapperRef = useRef(null)
   const videoRef = useRef(null)
   const [inView, setInView] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const controlled = active !== undefined
 
   useEffect(() => {
@@ -53,16 +54,23 @@ export default function LazyVideo({
   // 메타데이터만 로드해도 #t=0.001 프래그먼트가 첫 프레임을 강제 디코드/표시한다.
   const videoSrc = src ? (src.includes('#') ? src : `${src}#t=0.001`) : null
 
+  // src 또는 마운트 상태가 바뀌면 첫 프레임 디코드를 다시 기다린다.
+  useEffect(() => {
+    setLoaded(false)
+  }, [videoSrc, mountVideo])
+
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    if (shouldPlay) {
+    // 첫 프레임 디코드(onLoadedData) 이전에는 play() 호출하지 않는다 — 모바일 WebView에서
+    // 재생 준비 안 된 상태로 play()를 시도하면 네이티브 재생 버튼 오버레이가 뜬다.
+    if (shouldPlay && loaded) {
       try { v.currentTime = 0 } catch {}
       v.play().catch(() => {})
-    } else {
+    } else if (!shouldPlay) {
       v.pause()
     }
-  }, [shouldPlay, videoSrc])
+  }, [shouldPlay, loaded, videoSrc])
 
   return (
     <div ref={wrapperRef} className={`relative overflow-hidden ${className}`}>
@@ -84,6 +92,7 @@ export default function LazyVideo({
           loop
           playsInline
           preload="auto"
+          onLoadedData={() => setLoaded(true)}
           className={`absolute inset-0 w-full h-full pointer-events-none ${objectCls}`}
         />
       )}
