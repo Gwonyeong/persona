@@ -110,7 +110,7 @@
       "needLight": "Calls are a Light subscription feature",
       "lightOnlyTitle": "You'll need a plan to use this feature!",
       "lightOnlyDesc": "Calls are available on the Light plan\nor higher.",
-      "viewSubscription": "Start 3-day free trial",
+      "viewSubscription": "Start subscription",
       "freeCount": "{{count}} free!",
       "updateRequired": "Please update the app to use calls",
       "permissionDenied": "Microphone permission required",
@@ -308,9 +308,8 @@
     "free": "Free",
     "light": "Light",
     "perMonth": "/mo",
-    "trial": "Free for 3 days",
     "instantMasks": "Get 10 masks instantly!",
-    "startFree": "Start Free Trial",
+    "startFree": "Subscribe to Light",
     "manageSubscription": "Manage Subscription",
     "googlePlayError": "Google Play billing is not available.",
     "tokenNotFound": "Purchase token not found.",
@@ -326,7 +325,6 @@
     "lightBenefit2": "No character limit",
     "lightBenefit4": "Ad-free clean experience",
     "lightBenefit5": "Unlimited group chats",
-    "lightTrialNote": "First 3 days are free! Cancel during trial and you won't be charged.",
     "freeBoxTagline": "Start chatting with 10 characters for free",
     "signupBonusBubble": "Get 30 extra masks the moment you sign up!",
     "feature": {
@@ -496,7 +494,7 @@
     "reviewButton": "Leave a Review",
     "reviewLater": "Maybe later",
     "freeLimitReached": "Free plan can chat with up to {{limit}} characters",
-    "freeLimitCta": "Start 3-day free trial"
+    "freeLimitCta": "Subscribe to Light"
   },
   "masks": {
     "pkg30": "30",

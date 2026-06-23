@@ -42,7 +42,6 @@ export default function Subscription() {
       tier: 'LIGHT',
       name: t('subscription.light'),
       price: t('pricing.light'),
-      trial: t('subscription.trial'),
       features: {
         chat: t('subscription.featureValue.maskCost'),
         dailyMasks: t('subscription.featureValue.thirtyPerDay'),
@@ -110,6 +109,15 @@ export default function Subscription() {
 
       useStore.getState().setSubscription(serverRes.subscription)
       window.gtag?.('event', 'subscription_purchase', { plan: 'light_plan' })
+      const conv = import.meta.env.VITE_GADS_CONVERSION_SUBSCRIBE
+      if (conv) {
+        window.gtag?.('event', 'conversion', {
+          send_to: conv,
+          value: 9900,
+          currency: 'KRW',
+          transaction_id: serverRes.subscription?.purchaseToken || serverRes.subscription?.id || undefined,
+        })
+      }
       const meRes = await api.get('/auth/me')
       if (meRes.user) useStore.getState().setUser(meRes.user)
 
@@ -210,9 +218,6 @@ export default function Subscription() {
                   {plan.price}
                   {plan.id && <span className="text-gray-600">{t('subscription.perMonth')}</span>}
                 </p>
-                {plan.trial && !isCurrent && (
-                  <p className="text-[10px] text-green-400 font-semibold mt-1">{plan.trial}</p>
-                )}
               </div>
             )
           })}
@@ -292,9 +297,6 @@ export default function Subscription() {
             </li>
           ))}
         </ul>
-        <p className="text-xs text-green-400/80 mt-3">
-          {t('subscription.lightTrialNote')}
-        </p>
       </div>
 
       {/* 하단 링크 */}

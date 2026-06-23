@@ -308,9 +308,6 @@ export default function MaskShop() {
                   {t('pricing.light')}
                   <span className="text-gray-500 font-normal text-xs">{t('subscription.perMonth')}</span>
                 </p>
-                {currentTier !== 'LIGHT' && (
-                  <p className="text-[10px] text-green-400 font-semibold mt-0.5">{t('subscription.trial')}</p>
-                )}
               </div>
             </div>
 
@@ -366,8 +363,6 @@ export default function MaskShop() {
                 {subLoading ? t('common.processing') : t('subscription.startFree')}
               </button>
             )}
-
-            <p className="text-[10px] text-green-400/80 text-center mt-3">{t('subscription.lightTrialNote')}</p>
           </div>
 
           {subError && (
