@@ -10,8 +10,6 @@ let AdModule = null
 let initialized = false
 let bannerVisible = false
 let bannerLoading = false
-let rewardedPrepared = false
-let rewardedPreparing = null
 
 export function isAdMobAvailable() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
@@ -40,61 +38,30 @@ export async function initAdMob() {
   }
 }
 
-// 리워드 광고를 미리 로드해둔다. 클릭 후 광고 표시 사이의 대기 없이 즉시 재생.
-// 이미 prepare 중이면 같은 promise를 반환, 이미 끝난 상태면 true를 즉시 반환.
-export async function prepareRewardedAd() {
-  if (!isAdMobAvailable() || !REWARDED_AD_ID) return false
-  if (rewardedPrepared) return true
-  if (rewardedPreparing) return rewardedPreparing
-  rewardedPreparing = (async () => {
-    try {
-      if (!initialized) {
-        const ok = await initAdMob()
-        if (!ok) return false
-      }
-      await AdMob.prepareRewardVideoAd({ adId: REWARDED_AD_ID })
-      rewardedPrepared = true
-      return true
-    } catch (e) {
-      console.error('AdMob prepare rewarded failed:', e)
-      return false
-    } finally {
-      rewardedPreparing = null
-    }
-  })()
-  return rewardedPreparing
-}
-
 export async function showRewardedAd() {
   if (!AdMob || !REWARDED_AD_ID) throw new Error('AdMob not available')
 
-  // prepare 미완료 시 즉석에서 로드 (폴백). 정상 흐름에선 prepareRewardedAd로 미리 준비되어 있음.
-  if (!rewardedPrepared) {
-    await AdMob.prepareRewardVideoAd({ adId: REWARDED_AD_ID })
-    rewardedPrepared = true
-  }
+  await AdMob.prepareRewardVideoAd({ adId: REWARDED_AD_ID })
 
   return new Promise((resolve, reject) => {
-    const cleanup = () => {
+    const rewardListener = AdMob.addListener('onRewardedVideoAdReward', (reward) => {
       rewardListener.remove()
       dismissListener.remove()
       failListener.remove()
-      // 한 번 표시되거나 실패하면 ad는 소비된 상태. 다음 표시 전엔 새로 prepare 해야 함.
-      rewardedPrepared = false
-    }
-
-    const rewardListener = AdMob.addListener('onRewardedVideoAdReward', (reward) => {
-      cleanup()
       resolve(reward)
     })
 
     const dismissListener = AdMob.addListener('onRewardedVideoAdDismissed', () => {
-      cleanup()
+      rewardListener.remove()
+      dismissListener.remove()
+      failListener.remove()
       reject(new Error('AD_DISMISSED'))
     })
 
-    const failListener = AdMob.addListener('onRewardedVideoAdFailedToLoad', () => {
-      cleanup()
+    const failListener = AdMob.addListener('onRewardedVideoAdFailedToLoad', (error) => {
+      rewardListener.remove()
+      dismissListener.remove()
+      failListener.remove()
       reject(new Error('AD_FAILED'))
     })
 
