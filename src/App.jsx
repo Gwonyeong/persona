@@ -150,10 +150,15 @@ function App() {
 
   // 네이티브 앱 딥링크 인증 수신
   useEffect(() => {
-    window.__handleNativeAuth = (nativeToken, nativeUser) => {
+    window.__handleNativeAuth = (nativeToken, nativeUser, isNewUserFlag) => {
       try {
         setToken(nativeToken)
         setUser(JSON.parse(decodeURIComponent(nativeUser)))
+        if (isNewUserFlag === '1' || isNewUserFlag === 1 || isNewUserFlag === true) {
+          window.gtag?.('event', 'sign_up', { method: 'google_webview' })
+          const conv = import.meta.env.VITE_GADS_CONVERSION_SIGNUP
+          if (conv) window.gtag?.('event', 'conversion', { send_to: conv })
+        }
       } catch (e) {
         console.error('Native auth handling failed:', e)
       }

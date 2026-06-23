@@ -74,12 +74,17 @@ export default function Login() {
   const handleCredentialResponse = async (response) => {
     try {
       setErrorMessage('')
-      const { token: newToken, user } = await api.post('/auth/google', {
+      const { token: newToken, user, isNewUser } = await api.post('/auth/google', {
         credential: response.credential,
       })
       setToken(newToken)
       setUser(user)
       window.gtag?.('event', 'login', { method: 'google' })
+      if (isNewUser) {
+        window.gtag?.('event', 'sign_up', { method: 'google' })
+        const conv = import.meta.env.VITE_GADS_CONVERSION_SIGNUP
+        if (conv) window.gtag?.('event', 'conversion', { send_to: conv })
+      }
       goBack()
     } catch (error) {
       console.error('Login failed:', error)

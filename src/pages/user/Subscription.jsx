@@ -110,6 +110,15 @@ export default function Subscription() {
 
       useStore.getState().setSubscription(serverRes.subscription)
       window.gtag?.('event', 'subscription_purchase', { plan: 'light_plan' })
+      const conv = import.meta.env.VITE_GADS_CONVERSION_SUBSCRIBE
+      if (conv) {
+        window.gtag?.('event', 'conversion', {
+          send_to: conv,
+          value: 9900,
+          currency: 'KRW',
+          transaction_id: serverRes.subscription?.purchaseToken || serverRes.subscription?.id || undefined,
+        })
+      }
       const meRes = await api.get('/auth/me')
       if (meRes.user) useStore.getState().setUser(meRes.user)
 
