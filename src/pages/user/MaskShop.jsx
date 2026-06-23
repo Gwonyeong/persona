@@ -52,7 +52,6 @@ export default function MaskShop() {
   const [adRewardRemaining, setAdRewardRemaining] = useState(0)
   const [adLoading, setAdLoading] = useState(false)
   const [adMobReady, setAdMobReady] = useState(false)
-  const [adMobAvailable, setAdMobAvailable] = useState(() => isAdMobAvailable())
   const [maskModalTab, setMaskModalTab] = useState('daily')
   const [missions, setMissions] = useState(null)
   const [claimingMission, setClaimingMission] = useState(null)
@@ -91,25 +90,10 @@ export default function MaskShop() {
         }
       })
     }
-    if (!adMobAvailable) return
-    let cancelled = false
-    // 8초 안에 init이 떨어지지 않으면 SDK 사용 불가로 간주하고 버튼 자체를 숨긴다.
-    const timeoutId = setTimeout(() => {
-      if (cancelled) return
-      console.warn('[MaskShop] AdMob init timeout — hiding reward ad button')
-      setAdMobAvailable(false)
-    }, 8000)
-    initAdMob().then((ok) => {
-      if (cancelled) return
-      clearTimeout(timeoutId)
-      if (ok) {
-        setAdMobReady(true)
-      } else {
-        setAdMobAvailable(false)
-      }
-    })
-    return () => { cancelled = true; clearTimeout(timeoutId) }
-  }, [adMobAvailable])
+    if (isAdMobAvailable()) {
+      initAdMob().then(setAdMobReady)
+    }
+  }, [])
 
   const handleSubscribe = async () => {
     if (requireLogin()) return
@@ -600,69 +584,56 @@ export default function MaskShop() {
                 </div>
               </button>
 
-              {adMobAvailable && (() => {
-                const isAdLoading = !adMobReady || adLoading
-                const canClaim = adMobReady && adRewardAvailable && !adLoading
-                return (
-                  <button
-                    onClick={async () => {
-                      if (requireLogin()) return
-                      if (!canClaim) return
-                      setAdLoading(true)
-                      try {
-                        await showRewardedAd()
-                        const result = await api.post('/masks/ad-reward')
-                        setMasks(result.masks)
-                        const newRemaining = adRewardRemaining - 1
-                        setAdRewardRemaining(newRemaining)
-                        setAdRewardAvailable(newRemaining > 0)
-                      } catch (e) {
-                        if (e.message === 'AD_DISMISSED') {
-                          // 광고를 끝까지 시청하지 않음
-                        } else if (e.message !== 'AD_FAILED') {
-                          console.error('Ad reward error:', e)
-                        }
+              {adMobReady && (
+                <button
+                  onClick={async () => {
+                    if (requireLogin()) return
+                    if (!adRewardAvailable || adLoading) return
+                    setAdLoading(true)
+                    try {
+                      await showRewardedAd()
+                      const result = await api.post('/masks/ad-reward')
+                      setMasks(result.masks)
+                      const newRemaining = adRewardRemaining - 1
+                      setAdRewardRemaining(newRemaining)
+                      setAdRewardAvailable(newRemaining > 0)
+                    } catch (e) {
+                      if (e.message === 'AD_DISMISSED') {
+                        // 광고를 끝까지 시청하지 않음
+                      } else if (e.message !== 'AD_FAILED') {
+                        console.error('Ad reward error:', e)
                       }
-                      setAdLoading(false)
-                    }}
-                    disabled={!canClaim}
-                    className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
-                      canClaim
-                        ? 'border-amber-500/50 bg-amber-500/10'
-                        : 'border-gray-700 bg-gray-800/50'
-                    }`}
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">🎬</span>
-                      <div className="text-left">
-                        <p className="text-sm font-bold text-gray-100">{t('myPage.watchAd')}</p>
-                        <p className="text-xs text-gray-400">
-                          {isAdLoading
-                            ? t('myPage.watchAdLoading')
-                            : adRewardAvailable
-                              ? t('myPage.watchAdRemaining', { count: adRewardRemaining })
-                              : t('myPage.watchAdClaimed')}
-                        </p>
-                      </div>
+                    }
+                    setAdLoading(false)
+                  }}
+                  disabled={!adRewardAvailable || adLoading}
+                  className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
+                    adRewardAvailable
+                      ? 'border-amber-500/50 bg-amber-500/10'
+                      : 'border-gray-700 bg-gray-800/50'
+                  }`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🎬</span>
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-gray-100">{t('myPage.watchAd')}</p>
+                      <p className="text-xs text-gray-400">
+                        {adRewardAvailable ? t('myPage.watchAdRemaining', { count: adRewardRemaining }) : t('myPage.watchAdClaimed')}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {canClaim && (
-                        <>
-                          <MaskIcon className="text-lg" />
-                          <span className="text-sm font-bold text-amber-400">+3</span>
-                        </>
-                      )}
-                      {isAdLoading && (
-                        <span className="text-xs text-gray-500">{t('common.loading')}</span>
-                      )}
-                      {!isAdLoading && !adRewardAvailable && (
-                        <span className="text-xs text-gray-500">{t('myPage.watchAdLimit')}</span>
-                      )}
-                    </div>
-                  </button>
-                )
-              })()}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {adRewardAvailable && (
+                      <>
+                        <MaskIcon className="text-lg" />
+                        <span className="text-sm font-bold text-amber-400">+3</span>
+                      </>
+                    )}
+                    {!adRewardAvailable && <span className="text-xs text-gray-500">{t('myPage.watchAdLimit')}</span>}
+                  </div>
+                </button>
+              )}
               {/* 피드 좋아요 3개 데일리 */}
               <button
                 onClick={async () => {
