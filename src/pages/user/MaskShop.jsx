@@ -52,7 +52,7 @@ export default function MaskShop() {
   const [adRewardRemaining, setAdRewardRemaining] = useState(0)
   const [adLoading, setAdLoading] = useState(false)
   const [adMobReady, setAdMobReady] = useState(false)
-  const [adMobAvailable] = useState(() => isAdMobAvailable())
+  const [adMobAvailable, setAdMobAvailable] = useState(() => isAdMobAvailable())
   const [maskModalTab, setMaskModalTab] = useState('daily')
   const [missions, setMissions] = useState(null)
   const [claimingMission, setClaimingMission] = useState(null)
@@ -91,9 +91,24 @@ export default function MaskShop() {
         }
       })
     }
-    if (adMobAvailable) {
-      initAdMob().then(setAdMobReady)
-    }
+    if (!adMobAvailable) return
+    let cancelled = false
+    // 8초 안에 init이 떨어지지 않으면 SDK 사용 불가로 간주하고 버튼 자체를 숨긴다.
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return
+      console.warn('[MaskShop] AdMob init timeout — hiding reward ad button')
+      setAdMobAvailable(false)
+    }, 8000)
+    initAdMob().then((ok) => {
+      if (cancelled) return
+      clearTimeout(timeoutId)
+      if (ok) {
+        setAdMobReady(true)
+      } else {
+        setAdMobAvailable(false)
+      }
+    })
+    return () => { cancelled = true; clearTimeout(timeoutId) }
   }, [adMobAvailable])
 
   const handleSubscribe = async () => {
