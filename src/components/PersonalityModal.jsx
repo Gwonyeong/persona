@@ -14,7 +14,6 @@ const MAX_USER_ADDRESS_LEN = 20
 const MAX_CONCEPT_LEN = 200
 const MAX_TRAIT_LEN = 200
 const MAX_TRAIT_ITEMS = 8
-const MAX_SITUATION_LEN = 300
 
 const RELATIONSHIP_PRESETS = ['friend', 'lover', 'soulmate', 'colleague', 'mentor', 'roommate']
 const HONORIFIC_LEVELS = ['strict', 'mixed', 'casual']
@@ -44,7 +43,6 @@ function emptyDraft() {
     userAddress: '',
     conceptOverride: '',
     traitsOverride: [],
-    situationNote: '',
     addedLikes: [],
     addedHobbies: [],
     speech: null,
@@ -127,7 +125,7 @@ export default function PersonalityModal({ open, conversationId, characterName, 
 
   const presets = state?.presets || []
   const slot = state?.slot
-  const slotCount = slot?.count ?? 1
+  const slotCount = slot?.count ?? 0
   const used = presets.length
   const unlockCost = slot?.unlockCost ?? 10
   const original = state?.original
@@ -209,7 +207,6 @@ export default function PersonalityModal({ open, conversationId, characterName, 
       name: (draft.name || '').slice(0, MAX_NAME_LEN),
       userAddress: (draft.userAddress || '').trim().slice(0, MAX_USER_ADDRESS_LEN),
       conceptOverride: (draft.conceptOverride || '').trim().slice(0, MAX_CONCEPT_LEN),
-      situationNote: (draft.situationNote || '').trim().slice(0, MAX_SITUATION_LEN),
     }
     const next = isNewDraft
       ? [...presets, cleaned]
@@ -606,22 +603,6 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
             placeholder={t('personality.edit.traitsItemPlaceholder')}
             maxLen={MAX_TRAIT_LEN}
             maxItems={MAX_TRAIT_ITEMS}
-          />
-        </section>
-
-        {/* ⑦ 상황 메모 */}
-        <section className="space-y-2">
-          <div>
-            <h3 className="text-sm text-white font-semibold">{t('personality.edit.situationLabel')}</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">{t('personality.edit.situationHint')}</p>
-          </div>
-          <AutoTextarea
-            value={draft?.situationNote || ''}
-            onChange={(e) => setDraft({ ...draft, situationNote: e.target.value.slice(0, MAX_SITUATION_LEN) })}
-            placeholder={t('personality.edit.situationPlaceholder')}
-            className="w-full px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500"
-            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            maxLength={MAX_SITUATION_LEN}
           />
         </section>
 
