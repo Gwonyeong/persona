@@ -163,7 +163,7 @@
     "purchaseFailed": "決済に失敗しました",
     "earnMasks": "マスクを獲得",
     "watchAd": "広告を見てマスクをゲット",
-    "watchAdAvailable": "広告を視聴してマスク5個をもらえます",
+    "watchAdAvailable": "広告を視聴してマスク3個をもらえます",
     "watchAdRemaining": "本日あと{{count}}回",
     "watchAdClaimed": "本日すべて受け取り済み",
     "watchAdLimit": "1日3回",
