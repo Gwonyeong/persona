@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
@@ -9,8 +9,12 @@ import MaskIcon from './MaskIcon'
 // 2~3단계(취향 추가 / 말투 강도)는 schema에 자리만 두고 UI는 아직 미노출.
 
 const MAX_NAME_LEN = 50
-const MAX_CUSTOM_LABEL_LEN = 50
+const MAX_CUSTOM_LABEL_LEN = 100
 const MAX_USER_ADDRESS_LEN = 20
+const MAX_CONCEPT_LEN = 200
+const MAX_TRAIT_LEN = 200
+const MAX_TRAIT_ITEMS = 8
+const MAX_SITUATION_LEN = 300
 
 const RELATIONSHIP_PRESETS = ['friend', 'lover', 'soulmate', 'colleague', 'mentor', 'roommate']
 const HONORIFIC_LEVELS = ['strict', 'mixed', 'casual']
@@ -38,6 +42,9 @@ function emptyDraft() {
     honorificLevel: null,
     physicalDistance: null,
     userAddress: '',
+    conceptOverride: '',
+    traitsOverride: [],
+    situationNote: '',
     addedLikes: [],
     addedHobbies: [],
     speech: null,
@@ -57,6 +64,10 @@ function presetPreview(preset, t) {
   if (preset.honorificLevel) parts.push(t(`personality.edit.honorific.${preset.honorificLevel}`))
   if (preset.physicalDistance) parts.push(t(`personality.edit.distance.${preset.physicalDistance}`))
   if (preset.userAddress) parts.push(`"${preset.userAddress}"`)
+  if (preset.conceptOverride) {
+    const c = preset.conceptOverride
+    parts.push(`💭 ${c.length > 25 ? c.slice(0, 25) + '…' : c}`)
+  }
   return parts.join(' · ')
 }
 
@@ -163,7 +174,30 @@ export default function PersonalityModal({ open, conversationId, characterName, 
   }
 
   const handleStartNew = () => {
-    setDraft(emptyDraft())
+    // 새 프리셋: 캐릭터 기본값들을 미리 선택 상태로 채움 → 사용자가 원하는 부분만 변경.
+    const initial = emptyDraft()
+    if (original) {
+      if (original.relationship) {
+        // 캐릭터 기본 relationship 텍스트 → custom + customLabel.
+        // 표준 6 프리셋(friend/lover/...)에 정확히 매칭이 어렵고, 자유 텍스트라 custom 슬롯이 자연스러움.
+        const label = String(original.relationship)
+          .replace(/^[^=]+\s*=\s*/, '')
+          .trim()
+          .slice(0, MAX_CUSTOM_LABEL_LEN)
+        if (label) initial.relationship = { presetType: 'custom', customLabel: label }
+      }
+      if (original.honorificLevel) initial.honorificLevel = original.honorificLevel
+      if (original.physicalDistance) initial.physicalDistance = original.physicalDistance
+      if (original.defaultUserNickname) initial.userAddress = original.defaultUserNickname
+      if (original.concept) initial.conceptOverride = String(original.concept).slice(0, MAX_CONCEPT_LEN)
+      if (Array.isArray(original.coreTraits) && original.coreTraits.length > 0) {
+        initial.traitsOverride = original.coreTraits
+          .filter((t) => typeof t === 'string' && t.trim())
+          .slice(0, MAX_TRAIT_ITEMS)
+          .map((t) => t.slice(0, MAX_TRAIT_LEN))
+      }
+    }
+    setDraft(initial)
     setIsNewDraft(true)
     setMode('edit')
   }
@@ -174,6 +208,8 @@ export default function PersonalityModal({ open, conversationId, characterName, 
       ...draft,
       name: (draft.name || '').slice(0, MAX_NAME_LEN),
       userAddress: (draft.userAddress || '').trim().slice(0, MAX_USER_ADDRESS_LEN),
+      conceptOverride: (draft.conceptOverride || '').trim().slice(0, MAX_CONCEPT_LEN),
+      situationNote: (draft.situationNote || '').trim().slice(0, MAX_SITUATION_LEN),
     }
     const next = isNewDraft
       ? [...presets, cleaned]
@@ -430,8 +466,7 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
         {/* 이름 */}
         <div>
-          <input
-            type="text"
+          <AutoTextarea
             value={draft?.name || ''}
             onChange={(e) => setDraft({ ...draft, name: e.target.value.slice(0, MAX_NAME_LEN) })}
             placeholder={t('personality.edit.namePlaceholder')}
@@ -478,8 +513,7 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
             </button>
           </div>
           {isCustom && (
-            <input
-              type="text"
+            <AutoTextarea
               value={draft.relationship?.customLabel || ''}
               onChange={(e) =>
                 setDraft({
@@ -543,11 +577,58 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
           </div>
         </section>
 
+        {/* ⑤ 컨셉 override */}
+        <section className="space-y-2">
+          <div>
+            <h3 className="text-sm text-white font-semibold">{t('personality.edit.conceptLabel')}</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">{t('personality.edit.conceptHint')}</p>
+          </div>
+          <AutoTextarea
+            value={draft?.conceptOverride || ''}
+            onChange={(e) => setDraft({ ...draft, conceptOverride: e.target.value.slice(0, MAX_CONCEPT_LEN) })}
+            placeholder={t('personality.edit.conceptPlaceholder')}
+            className="w-full px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            maxLength={MAX_CONCEPT_LEN}
+          />
+        </section>
+
+        {/* ⑥ 성격 (coreTraits) */}
+        <section className="space-y-2">
+          <div>
+            <h3 className="text-sm text-white font-semibold">{t('personality.edit.traitsLabel')}</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">{t('personality.edit.traitsHint')}</p>
+          </div>
+          <ChipInput
+            label=""
+            values={draft?.traitsOverride || []}
+            onChange={(v) => setDraft({ ...draft, traitsOverride: v })}
+            placeholder={t('personality.edit.traitsItemPlaceholder')}
+            maxLen={MAX_TRAIT_LEN}
+            maxItems={MAX_TRAIT_ITEMS}
+          />
+        </section>
+
+        {/* ⑦ 상황 메모 */}
+        <section className="space-y-2">
+          <div>
+            <h3 className="text-sm text-white font-semibold">{t('personality.edit.situationLabel')}</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">{t('personality.edit.situationHint')}</p>
+          </div>
+          <AutoTextarea
+            value={draft?.situationNote || ''}
+            onChange={(e) => setDraft({ ...draft, situationNote: e.target.value.slice(0, MAX_SITUATION_LEN) })}
+            placeholder={t('personality.edit.situationPlaceholder')}
+            className="w-full px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            maxLength={MAX_SITUATION_LEN}
+          />
+        </section>
+
         {/* ② 호칭 */}
         <section className="space-y-2">
           <h3 className="text-sm text-white font-semibold">{t('personality.edit.userAddressLabel')}</h3>
-          <input
-            type="text"
+          <AutoTextarea
             value={draft?.userAddress || ''}
             onChange={(e) => setDraft({ ...draft, userAddress: e.target.value.slice(0, MAX_USER_ADDRESS_LEN) })}
             placeholder={t('personality.edit.userAddressPlaceholder')}
@@ -637,22 +718,44 @@ function EditView({ draft, setDraft, saving, isNewDraft, onSave, onCancel, onDel
   )
 }
 
-function ChipInput({ label, values, onChange, placeholder }) {
+// 한 줄로 시작했다가 텍스트가 길어지면 줄바꿈 기준으로 자동 확장.
+// 모바일에서 긴 텍스트가 가로로 잘리지 않게 — input 대신 사용.
+function AutoTextarea({ className = '', value, onChange, ...props }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }, [value])
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      rows={1}
+      className={`resize-none overflow-hidden ${className}`}
+      {...props}
+    />
+  )
+}
+
+function ChipInput({ label, values, onChange, placeholder, maxLen = MAX_PREF_LEN, maxItems = MAX_PREF_ITEMS }) {
   const [draft, setDraft] = useState('')
   const handleAdd = () => {
-    const v = draft.trim().slice(0, MAX_PREF_LEN)
+    const v = draft.trim().slice(0, maxLen)
     if (!v) return
     if (values.some((x) => x.toLowerCase() === v.toLowerCase())) {
       setDraft('')
       return
     }
-    if (values.length >= MAX_PREF_ITEMS) return
+    if (values.length >= maxItems) return
     onChange([...values, v])
     setDraft('')
   }
   return (
     <div>
-      <h4 className="text-xs text-gray-300 font-medium mb-1.5">{label}</h4>
+      {label && <h4 className="text-xs text-gray-300 font-medium mb-1.5">{label}</h4>}
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {values.map((v, i) => (
@@ -679,7 +782,7 @@ function ChipInput({ label, values, onChange, placeholder }) {
       <input
         type="text"
         value={draft}
-        onChange={(e) => setDraft(e.target.value.slice(0, MAX_PREF_LEN))}
+        onChange={(e) => setDraft(e.target.value.slice(0, maxLen))}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
@@ -687,10 +790,10 @@ function ChipInput({ label, values, onChange, placeholder }) {
           }
         }}
         placeholder={placeholder}
-        disabled={values.length >= MAX_PREF_ITEMS}
+        disabled={values.length >= maxItems}
         className="w-full px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500 disabled:opacity-50"
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        maxLength={MAX_PREF_LEN}
+        maxLength={maxLen}
       />
     </div>
   )
