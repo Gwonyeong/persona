@@ -55,6 +55,7 @@ export default function DeleteAccount() {
             </li>
           </ul>
           <p className="text-xs text-red-400 mt-4">{t('deleteAccount.irreversible')}</p>
+          <p className="text-xs text-red-400 mt-1">{t('deleteAccount.noResignup')}</p>
         </div>
 
         <button

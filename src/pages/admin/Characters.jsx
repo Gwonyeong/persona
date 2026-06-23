@@ -456,6 +456,9 @@ export default function Characters() {
     .filter((c) => (nationality === 'all' ? true : getNationality(c) === nationality))
     .slice()
     .sort((a, b) => {
+      if (sortBy === 'recentConversations') {
+        return (b.recentConversations7d || 0) - (a.recentConversations7d || 0)
+      }
       if (sortBy === 'conversations') {
         return (b._count?.conversations || 0) - (a._count?.conversations || 0)
       }
@@ -961,6 +964,7 @@ export default function Characters() {
         >
           <option value="name">이름순</option>
           <option value="conversations">대화 수 (내림차)</option>
+          <option value="recentConversations">최근 1주 대화 수</option>
           <option value="nationality">국적</option>
         </select>
       </div>
@@ -1021,6 +1025,7 @@ export default function Characters() {
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">이름</th>
                 <th className="p-3">대화 수</th>
+                <th className="p-3">최근 1주</th>
                 <th className="p-3">V2 첫인사</th>
                 <th className="p-3">선제</th>
                 <th className="p-3">TTS</th>
@@ -1047,6 +1052,13 @@ export default function Characters() {
                     </div>
                   </td>
                   <td className="p-3">{c._count.conversations}</td>
+                  <td className="p-3">
+                    {c.recentConversations7d > 0 ? (
+                      <span className="text-indigo-300 font-medium">{c.recentConversations7d}</span>
+                    ) : (
+                      <span className="text-gray-600">0</span>
+                    )}
+                  </td>
                   <td className="p-3">
                     {(() => {
                       const hasKo = !!c.firstMessageV2

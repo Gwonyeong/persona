@@ -901,13 +901,16 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
             const needsVideo = !isVid && !img.videoFilePath
             // Ghost — 영상 row 인데 그 URL이 이미 다른 이미지에 연결됨 (linkedUrls 기준)
             const isGhost = isVid && linkedUrls.has(img.filePath)
+            // 이미지 row에 연결된 영상이 있으면 셀 하단에 함께 미리보기
+            const hasLinkedVideoPreview = !isVid && !!img.videoFilePath
             return (
               <div
                 key={img.id}
-                className={`relative group rounded-md overflow-hidden bg-gray-800 ${
+                className={`rounded-md overflow-hidden bg-gray-800 ${
                   needsVideo ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-gray-900' : ''
                 }`}
               >
+                <div className="relative group">
                 <div className="aspect-[3/4]">
                   <ExpressionThumb src={img.filePath} className="w-full h-full object-cover" />
                 </div>
@@ -997,6 +1000,23 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
+                </div>
+                {hasLinkedVideoPreview && (
+                  <div className="bg-black border-t border-emerald-700/40 relative">
+                    <video
+                      src={img.videoFilePath}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      className="w-full aspect-[3/4] object-cover"
+                    />
+                    <span className="absolute top-1 left-1 text-[9px] font-bold bg-emerald-500/90 text-white px-1.5 py-0.5 rounded-full pointer-events-none">
+                      🔗 연결 영상
+                    </span>
+                  </div>
+                )}
               </div>
             )
           }

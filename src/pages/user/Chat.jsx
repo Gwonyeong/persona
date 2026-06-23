@@ -11,6 +11,8 @@ import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import MaskIcon from '../../components/MaskIcon'
 import CallSheet from '../../components/CallSheet'
 import InsufficientMasksModal from '../../components/InsufficientMasksModal'
+import MemoryModal from '../../components/MemoryModal'
+import PersonalityModal from '../../components/PersonalityModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
@@ -595,6 +597,9 @@ export default function Chat() {
   const [unlockingVideo, setUnlockingVideo] = useState(false)
   // 본 이미지 marked 추적 — 중복 호출 방지 (per session)
   const markedSeenRef = useRef(new Set())
+  // read polling burst 윈도우 종료 시각(ms). send() 호출 시 + 60초로 갱신.
+  // heartbeat useEffect의 5초 interval이 이 값을 보고 그 동안만 read 호출.
+  const readPollUntilRef = useRef(0)
   // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
   const [backgroundImage, setBackgroundImage] = useState(null)
   // 캐릭터 표정 sprite 뒤 backdrop — AI가 scene에 따라 자동 선택. 채팅방 배경과 독립.
@@ -611,6 +616,11 @@ export default function Chat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true)
   const [showInputButtons, setShowInputButtons] = useState(true)
   const [showReport, setShowReport] = useState(false)
+  // 장기기억(LTM) 슬롯 — 책 버튼 색 결정에 used/count 사용. 모달이 갱신할 때마다 onUpdate로 반영.
+  const [showMemoryModal, setShowMemoryModal] = useState(false)
+  const [memorySnapshot, setMemorySnapshot] = useState(null) // { slot:{used,count,capReached} }
+  // 캐릭터 personality 프리셋 — 활성 프리셋 content가 시스템 프롬프트에 주입됨.
+  const [showPersonalityModal, setShowPersonalityModal] = useState(false)
   const [showCallChooser, setShowCallChooser] = useState(false)
   // null 이면 통화 닫힘, 'simple' 이면 CallSheet 오픈 (continue 모드는 deprecated).
   const [activeCallMode, setActiveCallMode] = useState(null)
@@ -816,6 +826,16 @@ export default function Chat() {
     }
   }, [id])
 
+  // 장기기억 슬롯 스냅샷 — 책 버튼 색 결정용 (가득 차면 강조색).
+  // 모달 열 때 한 번 더 fetch하므로 실패해도 색만 부정확 — 조용히 무시.
+  useEffect(() => {
+    if (!id) return
+    api
+      .get(`/memory/conversations/${id}`)
+      .then((res) => setMemorySnapshot(res))
+      .catch(() => {})
+  }, [id])
+
   useEffect(() => {
     initialLoadRef.current = true
     refetchCallSessionMeta()
@@ -854,14 +874,18 @@ export default function Chat() {
     })
   }, [id, token])
 
-  // 채팅 페이지에 있는 동안 주기적으로 읽음 처리 (heartbeat)
+  // 읽음 처리 — 이벤트 기반 burst polling.
+  // 평소엔 polling 안 함. 메시지 전송 시 send() 핸들러가 readPollUntilRef를 갱신해
+  // 그 시점부터 60초 동안만 5초 간격으로 read 호출 → 캐릭터 응답·후속 메시지가 도착하는
+  // 짧은 윈도우에서만 unread가 잘못 잡히는 걸 방지. 진입·퇴장 시는 항상 1회 호출.
   useEffect(() => {
-    // 진입 시 즉시 읽음 처리
     api.post(`/conversations/${id}/read`).catch(() => {})
 
     const interval = setInterval(() => {
-      api.post(`/conversations/${id}/read`).catch(() => {})
-    }, 5000) // 5초마다
+      if (readPollUntilRef.current > Date.now()) {
+        api.post(`/conversations/${id}/read`).catch(() => {})
+      }
+    }, 5000)
 
     return () => {
       clearInterval(interval)
@@ -939,6 +963,8 @@ export default function Chat() {
     const feedToSend = attachedFeed
     setInput('')
     setSending(true)
+    // read polling burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
+    readPollUntilRef.current = Date.now() + 60000
     setAttachedFeed(null)
     setShowGalleryTooltip(false)
     const feedImage = feedToSend?.images?.[0]?.filePath || null
@@ -1562,8 +1588,8 @@ export default function Chat() {
             {/* 미해금 영상 카드 — 메시지 박스 바로 위 우측 */}
             {bubbleNeedsUnlock && (
               <div
-                className="absolute right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto"
-                style={{ aspectRatio: '9 / 16', bottom: 'calc(30% + 8px)' }}
+                className="absolute right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto z-30"
+                style={{ aspectRatio: '9 / 16', bottom: 'calc(42% + 8px)' }}
                 onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
               >
                 <CrossfadeMedia
@@ -1669,6 +1695,38 @@ export default function Chat() {
                 </span>
               </button>
             )}
+            <button
+              onClick={() => setShowPersonalityModal(true)}
+              className="w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label={t('personality.button')}
+              title={t('personality.button')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
+            {(() => {
+              const isMemoryFull =
+                memorySnapshot?.slot && memorySnapshot.slot.used >= memorySnapshot.slot.count
+              return (
+                <button
+                  onClick={() => setShowMemoryModal(true)}
+                  className={`w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors ${
+                    isMemoryFull ? 'ring-2 ring-amber-400' : ''
+                  }`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  aria-label={t('memory.button')}
+                  title={t('memory.button')}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isMemoryFull ? '#fcd34d' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                </button>
+              )
+            })()}
             <div className="relative">
               {showGalleryTooltip && (
                 <div className="absolute top-full right-0 mt-2 whitespace-nowrap pointer-events-none animate-fade-in z-30">
@@ -2289,6 +2347,19 @@ export default function Chat() {
           onClose={() => setShowReport(false)}
         />
       )}
+      <MemoryModal
+        open={showMemoryModal}
+        conversationId={conversation.id}
+        characterName={character?.name}
+        onClose={() => setShowMemoryModal(false)}
+        onUpdate={(s) => setMemorySnapshot(s)}
+      />
+      <PersonalityModal
+        open={showPersonalityModal}
+        conversationId={conversation.id}
+        characterName={character?.name}
+        onClose={() => setShowPersonalityModal(false)}
+      />
       {showGallery && (
         <GalleryBottomSheet
           characterId={conversation.characterId}

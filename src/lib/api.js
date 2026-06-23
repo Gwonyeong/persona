@@ -1,7 +1,15 @@
 import useStore from '../store/useStore'
 import i18n from '../i18n'
+import { transformUserNameTokens } from './userName'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+
+// 모든 API 응답의 문자열 필드에 박혀 있는 {userName} placeholder 를 사용자 닉네임으로
+// 치환. 컴포넌트는 별도 처리 필요 없음. 인증 안 됨/로그인 전엔 '유저' 로 폴백.
+function resolveUserName() {
+  const user = useStore.getState().user
+  return user?.name || '유저'
+}
 
 async function request(path, options = {}) {
   const token = useStore.getState().token
@@ -30,7 +38,7 @@ async function request(path, options = {}) {
     throw err
   }
 
-  return data
+  return transformUserNameTokens(data, resolveUserName())
 }
 
 async function streamRequest(path, body, onEvent) {
@@ -80,7 +88,8 @@ async function streamRequest(path, body, onEvent) {
         // SSE 메시지 종결: 누적된 event/data를 dispatch
         if (eventType && dataLine !== null) {
           try {
-            onEvent(eventType, JSON.parse(dataLine))
+            const parsed = JSON.parse(dataLine)
+            onEvent(eventType, transformUserNameTokens(parsed, resolveUserName()))
           } catch {}
         }
         eventType = null

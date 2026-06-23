@@ -353,6 +353,7 @@
     "bookmarks": "ブックマーク、フォロー、通知設定",
     "profile": "プロフィール情報（ニックネーム、アバター）",
     "irreversible": "削除されたデータは復元できません。",
+    "noResignup": "退会後は同じGoogleアカウントで再登録できません。",
     "confirmCheckbox": "上記の内容を確認し、アカウント削除に同意します",
     "button": "アカウントを削除"
   },
@@ -379,7 +380,8 @@
     "description": "この機能を利用するにはログインしてください。",
     "googleLogin": "Googleでログイン",
     "heroSubtitle": "あなたを理解してくれるAI彼女",
-    "termsAgreement": "続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+    "termsAgreement": "続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。",
+    "resignupBlocked": "このアカウントは退会済みのため、再登録できません。別のGoogleアカウントをお試しください。"
   },
   "welcome": {
     "title": "こんにちは～ 会えて嬉しいです！",
@@ -817,6 +819,94 @@
       "switchedToInPerson": "🧑 一緒にいる友達とだけ話します",
       "switchedToPhone": "📱 メッセンジャーモードに切り替えました",
       "autoFallbackToast": "📱 一緒にいる友達がいないのでメッセンジャーモードに切り替えました"
+    }
+  },
+  "memory": {
+    "button": "記憶",
+    "modal": {
+      "title": "{{name}}の記憶",
+      "subtitle": "{{used}}/{{total}} スロット",
+      "empty": "まだ覚えていることはありません",
+      "capWarning": "記憶がいっぱいです。新しい記憶が追加されると、古い記憶から消えます。",
+      "unlockButton": "+10 スロット",
+      "capReachedButton": "解放完了",
+      "unlockSuccess": "+10 スロットを追加しました",
+      "insufficientMasks": "マスクが足りません",
+      "unlockError": "解放に失敗しました"
+    }
+  },
+  "personality": {
+    "button": "性格",
+    "modal": {
+      "title": "{{name}}の性格",
+      "subtitle": "{{used}}/{{total}} スロット",
+      "originalLabel": "オリジナル",
+      "originalHint": "キャラクターのデフォルト関係・呼び方（編集不可）",
+      "activeBadge": "アクティブ",
+      "untitled": "名前なし",
+      "emptyPresetHint": "タップして新しい性格を作成",
+      "unlockButton": "+1 スロット",
+      "unlockSuccess": "+1 スロットを追加しました",
+      "insufficientMasks": "マスクが足りません",
+      "unlockError": "解放に失敗しました",
+      "saveError": "保存に失敗しました"
+    },
+    "edit": {
+      "title": "性格を編集",
+      "namePlaceholder": "名前（例：優しいバージョン）",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "delete": "削除",
+      "deleteConfirm": "この性格を削除しますか？",
+      "relationshipLabel": "関係",
+      "relationshipHint": "このキャラクターがあなたをどう扱うか",
+      "relationshipPresets": {
+        "friend": "友達",
+        "lover": "恋人",
+        "soulmate": "ソウルメイト",
+        "colleague": "会社の同僚",
+        "mentor": "メンター",
+        "roommate": "ルームメイト",
+        "custom": "自由入力"
+      },
+      "relationshipCustomPlaceholder": "例：小さい頃からの幼なじみ",
+      "honorificLabel": "話し方",
+      "honorific": {
+        "strict": "常に敬語",
+        "mixed": "混合",
+        "casual": "タメ口"
+      },
+      "distanceLabel": "距離感",
+      "distance": {
+        "professional": "プロフェッショナル",
+        "close": "近い",
+        "intimate": "親密"
+      },
+      "userAddressLabel": "キャラクターが呼ぶ呼称",
+      "userAddressPlaceholder": "例：あなた、君、名前",
+      "userAddressHint": "空欄ならキャラクターデフォルトを使用",
+      "conceptLabel": "コンセプト",
+      "conceptHint": "キャラクターの核心コンセプトを上書き",
+      "conceptPlaceholder": "例：ツンデレな後輩 / 落ち着いた姉",
+      "traitsLabel": "性格",
+      "traitsHint": "キャラクターの本質。追加・編集・削除自由",
+      "traitsItemPlaceholder": "Enterで追加（例：自分の感情に鈍感）",
+      "preferencesLabel": "追加の好み",
+      "preferencesHint": "キャラクターのデフォルトに追加（既存項目は維持）",
+      "likesLabel": "好きなもの・食べ物",
+      "likesPlaceholder": "Enterで追加（例：ラテ）",
+      "hobbiesLabel": "趣味・関心",
+      "hobbiesPlaceholder": "Enterで追加（例：ウェブ漫画）",
+      "speechLabel": "話し方の強度",
+      "speechHint": "中央ならキャラクターのデフォルトのまま",
+      "friendlinessLow": "フォーマル",
+      "friendlinessHigh": "フレンドリー",
+      "cheerfulnessLow": "落ち着き",
+      "cheerfulnessHigh": "陽気",
+      "emojiLow": "絵文字少なめ",
+      "emojiHigh": "絵文字多め",
+      "laughLow": "笑い表現少なめ",
+      "laughHigh": "笑い表現多め"
     }
   }
 }

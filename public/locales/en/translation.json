@@ -353,6 +353,7 @@
     "bookmarks": "Bookmarks, follows, notification settings",
     "profile": "Profile info (nickname, avatar)",
     "irreversible": "Deleted data cannot be recovered.",
+    "noResignup": "After deletion, you cannot re-register with the same Google account.",
     "confirmCheckbox": "I have read the above and agree to delete my account",
     "button": "Delete Account"
   },
@@ -379,7 +380,8 @@
     "description": "Please login to use this feature.",
     "googleLogin": "Sign in with Google",
     "heroSubtitle": "Your AI girlfriend who truly understands you",
-    "termsAgreement": "By continuing, you agree to the Terms of Service and Privacy Policy."
+    "termsAgreement": "By continuing, you agree to the Terms of Service and Privacy Policy.",
+    "resignupBlocked": "This account has been deleted and cannot be re-registered. Please use a different Google account."
   },
   "welcome": {
     "title": "Hi there~ So nice to meet you!",
@@ -817,6 +819,94 @@
       "switchedToInPerson": "🧑 Only with characters who are here",
       "switchedToPhone": "📱 Switched to messenger mode",
       "autoFallbackToast": "📱 No one is with you — switched to messenger mode"
+    }
+  },
+  "memory": {
+    "button": "Memory",
+    "modal": {
+      "title": "{{name}}'s memory",
+      "subtitle": "{{used}}/{{total}} slots",
+      "empty": "No memories yet",
+      "capWarning": "Memory is full. New memories will overwrite the oldest ones.",
+      "unlockButton": "+10 slots",
+      "capReachedButton": "Max unlocked",
+      "unlockSuccess": "+10 slots added",
+      "insufficientMasks": "Not enough masks",
+      "unlockError": "Failed to unlock"
+    }
+  },
+  "personality": {
+    "button": "Personality",
+    "modal": {
+      "title": "{{name}}'s personality",
+      "subtitle": "{{used}}/{{total}} slots",
+      "originalLabel": "Original",
+      "originalHint": "Character default relationship & address (read-only)",
+      "activeBadge": "Active",
+      "untitled": "Untitled",
+      "emptyPresetHint": "Tap to create a new personality",
+      "unlockButton": "+1 slot",
+      "unlockSuccess": "+1 slot added",
+      "insufficientMasks": "Not enough masks",
+      "unlockError": "Failed to unlock",
+      "saveError": "Failed to save"
+    },
+    "edit": {
+      "title": "Edit personality",
+      "namePlaceholder": "Name (e.g. Gentle version)",
+      "cancel": "Cancel",
+      "save": "Save",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this personality?",
+      "relationshipLabel": "Relationship",
+      "relationshipHint": "How this character treats you",
+      "relationshipPresets": {
+        "friend": "Friend",
+        "lover": "Lover",
+        "soulmate": "Soulmate",
+        "colleague": "Colleague",
+        "mentor": "Mentor",
+        "roommate": "Roommate",
+        "custom": "Custom"
+      },
+      "relationshipCustomPlaceholder": "e.g. A cousin I've known since childhood",
+      "honorificLabel": "Speech style",
+      "honorific": {
+        "strict": "Always polite",
+        "mixed": "Mixed",
+        "casual": "Casual"
+      },
+      "distanceLabel": "Closeness",
+      "distance": {
+        "professional": "Professional",
+        "close": "Close",
+        "intimate": "Intimate"
+      },
+      "userAddressLabel": "How character calls you",
+      "userAddressPlaceholder": "e.g. babe, hon, name",
+      "userAddressHint": "Leave blank to use character default",
+      "conceptLabel": "Concept",
+      "conceptHint": "Override the character's core concept (one line)",
+      "conceptPlaceholder": "e.g. Tsundere junior / Cool older sister",
+      "traitsLabel": "Personality",
+      "traitsHint": "Character's core traits — add, edit, or remove freely",
+      "traitsItemPlaceholder": "Enter to add (e.g. Oblivious to own feelings)",
+      "preferencesLabel": "Additional preferences",
+      "preferencesHint": "Adds on top of character defaults (originals are kept)",
+      "likesLabel": "Likes · Food",
+      "likesPlaceholder": "Enter to add (e.g. latte)",
+      "hobbiesLabel": "Hobbies · Interests",
+      "hobbiesPlaceholder": "Enter to add (e.g. webtoons)",
+      "speechLabel": "Speech intensity",
+      "speechHint": "Middle = character default",
+      "friendlinessLow": "Formal",
+      "friendlinessHigh": "Friendly",
+      "cheerfulnessLow": "Calm",
+      "cheerfulnessHigh": "Cheerful",
+      "emojiLow": "Few emojis",
+      "emojiHigh": "Many emojis",
+      "laughLow": "Less laughter",
+      "laughHigh": "More laughter"
     }
   }
 }

@@ -353,6 +353,7 @@
     "bookmarks": "북마크, 팔로우, 알림 설정",
     "profile": "프로필 정보 (닉네임, 아바타)",
     "irreversible": "삭제된 데이터는 복구할 수 없습니다.",
+    "noResignup": "탈퇴 후에는 동일한 Google 계정으로 다시 가입할 수 없습니다.",
     "confirmCheckbox": "위 내용을 확인했으며, 탈퇴에 동의합니다",
     "button": "탈퇴하기"
   },
@@ -379,7 +380,8 @@
     "description": "이 기능을 사용하려면 로그인해주세요.",
     "googleLogin": "Google로 로그인",
     "heroSubtitle": "나를 이해해주는 AI 여자친구",
-    "termsAgreement": "진행함으로써 약관과 개인정보처리방침에 동의합니다."
+    "termsAgreement": "진행함으로써 약관과 개인정보처리방침에 동의합니다.",
+    "resignupBlocked": "이 계정은 회원 탈퇴 처리되어 재가입이 불가능합니다. 다른 Google 계정으로 시도해 주세요."
   },
   "welcome": {
     "title": "안녕하세요~ 만나서 반가워요!",
@@ -817,6 +819,94 @@
       "switchedToInPerson": "🧑 같이 있는 친구들과만 대화해요",
       "switchedToPhone": "📱 메신저 모드로 전환했어요",
       "autoFallbackToast": "📱 함께 있는 친구가 없어서 메신저 모드로 전환했어요"
+    }
+  },
+  "memory": {
+    "button": "기억",
+    "modal": {
+      "title": "{{name}}의 기억",
+      "subtitle": "{{used}}/{{total}} 슬롯",
+      "empty": "아직 캐릭터가 기억하는 내용이 없어요",
+      "capWarning": "기억이 가득 찼어요. 새 기억이 추가되면 가장 오래된 기억이 사라져요.",
+      "unlockButton": "+10 슬롯",
+      "capReachedButton": "최대 해금 완료",
+      "unlockSuccess": "+10 슬롯 추가했어요",
+      "insufficientMasks": "마스크가 부족해요",
+      "unlockError": "해금에 실패했어요"
+    }
+  },
+  "personality": {
+    "button": "성격",
+    "modal": {
+      "title": "{{name}}의 성격",
+      "subtitle": "{{used}}/{{total}} 슬롯",
+      "originalLabel": "원본",
+      "originalHint": "캐릭터 기본 관계·호칭 (편집 불가)",
+      "activeBadge": "활성",
+      "untitled": "이름 없음",
+      "emptyPresetHint": "탭해서 새 성격 만들기",
+      "unlockButton": "+1 슬롯",
+      "unlockSuccess": "+1 슬롯 추가했어요",
+      "insufficientMasks": "마스크가 부족해요",
+      "unlockError": "해금에 실패했어요",
+      "saveError": "저장에 실패했어요"
+    },
+    "edit": {
+      "title": "성격 편집",
+      "namePlaceholder": "이름 (예: 다정한 버전)",
+      "cancel": "취소",
+      "save": "저장",
+      "delete": "삭제",
+      "deleteConfirm": "이 성격을 삭제할까요?",
+      "relationshipLabel": "관계",
+      "relationshipHint": "이 캐릭터가 나를 어떤 존재로 대할지",
+      "relationshipPresets": {
+        "friend": "친구",
+        "lover": "연인",
+        "soulmate": "소울메이트",
+        "colleague": "회사 동료",
+        "mentor": "멘토",
+        "roommate": "룸메이트",
+        "custom": "직접 입력"
+      },
+      "relationshipCustomPlaceholder": "예: 어릴 때부터 알던 사촌",
+      "honorificLabel": "말투 정책",
+      "honorific": {
+        "strict": "항상 존댓말",
+        "mixed": "혼용",
+        "casual": "반말"
+      },
+      "distanceLabel": "거리감",
+      "distance": {
+        "professional": "직업적",
+        "close": "가까움",
+        "intimate": "친밀"
+      },
+      "userAddressLabel": "캐릭터가 부르는 호칭",
+      "userAddressPlaceholder": "예: 오빠, 자기, 그대",
+      "userAddressHint": "비워두면 캐릭터 기본 호칭 사용",
+      "conceptLabel": "컨셉",
+      "conceptHint": "캐릭터의 핵심 컨셉 한 줄 변경",
+      "conceptPlaceholder": "예: 츤츤한 후배 / 차분한 누나",
+      "traitsLabel": "성격",
+      "traitsHint": "캐릭터 본질. 추가/수정/삭제 자유롭게",
+      "traitsItemPlaceholder": "Enter로 추가 (예: 자기 감정에 둔감)",
+      "preferencesLabel": "추가 취향",
+      "preferencesHint": "캐릭터 기본 취향에 더해서 추가 (기존 항목은 그대로)",
+      "likesLabel": "좋아하는 것 · 음식",
+      "likesPlaceholder": "Enter로 추가 (예: 라떼)",
+      "hobbiesLabel": "취미·관심사",
+      "hobbiesPlaceholder": "Enter로 추가 (예: 웹툰)",
+      "speechLabel": "말투 강도",
+      "speechHint": "중간이면 캐릭터 기본 말투 그대로",
+      "friendlinessLow": "격식",
+      "friendlinessHigh": "친근",
+      "cheerfulnessLow": "차분",
+      "cheerfulnessHigh": "발랄",
+      "emojiLow": "이모지 적게",
+      "emojiHigh": "이모지 많이",
+      "laughLow": "ㅋㅋ·ㅎㅎ 적게",
+      "laughHigh": "ㅋㅋ·ㅎㅎ 많이"
     }
   }
 }
