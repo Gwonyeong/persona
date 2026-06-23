@@ -60,6 +60,13 @@ export default function MaskShop() {
   const [checkinClaimed, setCheckinClaimed] = useState(null)
   const [claimingCheckin, setClaimingCheckin] = useState(false)
   const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
+  const [toast, setToast] = useState(null) // { kind: 'error' | 'success', text }
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 2400)
+    return () => clearTimeout(id)
+  }, [toast])
 
   const requireLogin = () => {
     if (!token) {
@@ -217,7 +224,7 @@ export default function MaskShop() {
   }
 
   return (
-    <div className="px-4 pt-4 pb-8">
+    <div className="relative px-4 pt-4 pb-8">
       <Helmet>
         <title>{t('maskShop.title')}</title>
       </Helmet>
@@ -599,9 +606,11 @@ export default function MaskShop() {
                       setAdRewardAvailable(newRemaining > 0)
                     } catch (e) {
                       if (e.message === 'AD_DISMISSED') {
-                        // 광고를 끝까지 시청하지 않음
-                      } else if (e.message !== 'AD_FAILED') {
-                        console.error('Ad reward error:', e)
+                        // 광고를 끝까지 시청하지 않음 — 토스트 없이 조용히 무시
+                      } else {
+                        // No fill / AD_FAILED / 기타 SDK 에러: 사용자에게 안내
+                        setToast({ kind: 'error', text: t('myPage.watchAdNoFill') })
+                        if (e.message !== 'AD_FAILED') console.error('Ad reward error:', e)
                       }
                     }
                     setAdLoading(false)
@@ -723,6 +732,18 @@ export default function MaskShop() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {toast && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 px-4 py-2 rounded-md text-xs text-white shadow-lg z-50 max-w-[90%] text-center"
+          style={{
+            bottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+            background: toast.kind === 'success' ? 'rgba(16,185,129,0.92)' : 'rgba(239,68,68,0.92)',
+          }}
+        >
+          {toast.text}
         </div>
       )}
     </div>
