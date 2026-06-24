@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
@@ -10,6 +11,7 @@ const THUMB_SLIDE_INTERVAL_MS = 2000
 const LOCKED_MEDIA_STYLE = { filter: 'blur(3px)', transform: 'scale(1.03)' }
 
 export default function Scenario() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const { token } = useStore()
@@ -44,13 +46,13 @@ export default function Scenario() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-dvh bg-black text-gray-400 gap-3">
-        <p>시나리오를 불러오지 못했습니다.</p>
-        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>돌아가기</button>
+        <p>{t('scenario.loadFailed')}</p>
+        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>{t('scenario.goBack')}</button>
       </div>
     )
   }
   if (!scenario) {
-    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">로딩 중...</div>
+    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">{t('scenario.loading')}</div>
   }
 
   return (
@@ -68,7 +70,7 @@ export default function Scenario() {
             onClick={() => navigate(-1)}
             className="w-9 h-9 flex items-center justify-center text-white"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="뒤로"
+            aria-label={t('scenario.back')}
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
@@ -99,11 +101,11 @@ export default function Scenario() {
         {/* 파트 리스트 */}
         <div className="px-4 pt-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold text-gray-200">파트</h3>
-            <span className="text-[11px] text-gray-500">{parts.length}개</span>
+            <h3 className="text-sm font-bold text-gray-200">{t('scenario.partsLabel')}</h3>
+            <span className="text-[11px] text-gray-500">{t('scenario.partsCount', { count: parts.length })}</span>
           </div>
           {parts.length === 0 ? (
-            <p className="text-xs text-gray-500 mt-3">아직 공개된 파트가 없어요.</p>
+            <p className="text-xs text-gray-500 mt-3">{t('scenario.noParts')}</p>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {parts.map((s) => {
@@ -160,10 +162,10 @@ export default function Scenario() {
                     )}
 
                     {s.progress?.status === 'COMPLETED' && (
-                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-600/90 text-white text-[10px] rounded-full font-semibold">완료</div>
+                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-600/90 text-white text-[10px] rounded-full font-semibold">{t('scenario.completed')}</div>
                     )}
                     {s.progress?.status === 'IN_PROGRESS' && (
-                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-indigo-600/90 text-white text-[10px] rounded-full font-semibold">진행 중</div>
+                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-indigo-600/90 text-white text-[10px] rounded-full font-semibold">{t('scenario.inProgress')}</div>
                     )}
                     {s.status === 'TEST' && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 bg-amber-600/90 text-white text-[10px] rounded-full font-semibold">TEST</div>

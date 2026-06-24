@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
 import MaskIcon from './MaskIcon'
 
 const PURCHASE_TABS = [
-  { key: 'UNBOUGHT', label: '미구매' },
-  { key: 'BOUGHT', label: '구매' },
+  { key: 'UNBOUGHT', labelKey: 'gift.tabUnbought' },
+  { key: 'BOUGHT', labelKey: 'gift.tabBought' },
 ]
 
 // 채팅 페이지의 선물 바텀시트
@@ -14,6 +15,7 @@ const PURCHASE_TABS = [
 // - 미구매: 썸네일 + 이름 + 비용 + 해금 콘텐츠 블러 미리보기 (기존 row 레이아웃)
 // - 구매: 썸네일 + 이름만 (해금 콘텐츠는 갤러리 바텀시트 → 선물 탭에서 확인)
 export default function GiftBottomSheet({ characterId, characterName, conversationId, onClose, onGiftSent, onOutfitApplied }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { masks, setMasks } = useStore()
 
@@ -91,7 +93,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
       onClose?.()
     } catch (err) {
       console.error('Apply outfit error:', err)
-      alert('의상 변경에 실패했어요.')
+      alert(t('gift.outfitChangeFailed'))
     } finally {
       setApplyingId(null)
     }
@@ -100,7 +102,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
   const confirmSend = async () => {
     if (!pendingGift) return
     if (masks < pendingGift.maskCost) {
-      alert('마스크가 부족합니다.')
+      alert(t('gift.insufficientMasks'))
       onClose?.()
       navigate('/subscription')
       return
@@ -126,15 +128,15 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
     } catch (err) {
       console.error('Send gift error:', err)
       if (err.status === 402) {
-        alert('마스크가 부족합니다.')
+        alert(t('gift.insufficientMasks'))
         onClose?.()
         navigate('/subscription')
       } else if (err.status === 409) {
-        alert('이미 선물한 항목입니다.')
+        alert(t('gift.alreadyGifted'))
         setGifts((prev) => prev.map((g) => (g.id === pendingGift.id ? { ...g, unlocked: true } : g)))
         setPendingGift(null)
       } else {
-        alert('선물 전송에 실패했습니다.')
+        alert(t('gift.sendFailed'))
       }
     } finally {
       setSending(false)
@@ -176,7 +178,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
             <div className="w-9 h-1 rounded-full bg-gray-600" />
           </div>
           <div className="flex items-center justify-between px-4 pb-2">
-            <h3 className="text-sm font-bold text-white">{characterName}에게 선물하기</h3>
+            <h3 className="text-sm font-bold text-white">{t('gift.sheetTitle', { name: characterName })}</h3>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1 text-xs text-gray-300">
                 <MaskIcon className="w-3.5 h-3.5" />
@@ -197,20 +199,20 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
           {/* 구매 상태 탭 (미구매 / 구매) */}
           <div className="border-t border-gray-800 px-2 pt-1">
             <div className="flex">
-              {PURCHASE_TABS.map((t) => {
-                const count = t.key === 'BOUGHT' ? boughtCount : unboughtCount
+              {PURCHASE_TABS.map((pt) => {
+                const count = pt.key === 'BOUGHT' ? boughtCount : unboughtCount
                 return (
                   <button
-                    key={t.key}
-                    onClick={() => setTab(t.key)}
+                    key={pt.key}
+                    onClick={() => setTab(pt.key)}
                     className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      tab === t.key
+                      tab === pt.key
                         ? 'border-white text-white'
                         : 'border-transparent text-gray-500 hover:text-gray-300'
                     }`}
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    {t.label}
+                    {t(pt.labelKey)}
                     <span className="ml-1 text-xs opacity-70">({count})</span>
                   </button>
                 )
@@ -222,12 +224,12 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
         {/* 리스트 — 1행 = 1선물 (좌: 썸네일 / 우: 해금 콘텐츠 블러 미리보기) */}
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
-            <div className="text-center text-gray-500 py-12 text-sm">불러오는 중...</div>
+            <div className="text-center text-gray-500 py-12 text-sm">{t('gift.loading')}</div>
           ) : filtered.length === 0 ? (
             <div className="text-center text-gray-500 py-12 text-sm">
               {tab === 'BOUGHT'
-                ? '아직 선물한 항목이 없어요.'
-                : (gifts.length > 0 ? '모든 선물을 보냈어요!' : '등록된 선물이 없습니다.')}
+                ? t('gift.emptyBought')
+                : (gifts.length > 0 ? t('gift.allSent') : t('gift.emptyGifts'))}
             </div>
           ) : (
             <div className={tab === 'BOUGHT' ? 'grid grid-cols-3 gap-2' : 'flex flex-col gap-2'}>
@@ -254,7 +256,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
                         </div>
                         {g.adminOnly && (
                           <div className="absolute top-1.5 left-1.5 bg-amber-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
-                            테스트
+                            {t('gift.test')}
                           </div>
                         )}
                       </div>
@@ -269,7 +271,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
                             className="w-full py-1 text-[10px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded disabled:opacity-50"
                             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                           >
-                            {isApplying ? '변경 중...' : '착용시키기'}
+                            {isApplying ? t('gift.applying') : t('gift.apply')}
                           </button>
                         </div>
                       )}
@@ -300,7 +302,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
                         <div className="flex items-center gap-1.5 min-w-0">
                           {g.adminOnly && (
                             <span className="flex-shrink-0 text-[9px] font-bold bg-amber-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wide">
-                              테스트
+                              {t('gift.test')}
                             </span>
                           )}
                           <p className="text-[13px] text-white font-medium truncate">{g.name}</p>
@@ -355,7 +357,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
                         </div>
                       ) : (
                         <div className="h-12 flex items-center">
-                          <span className="text-[10px] text-gray-500 italic">해금 콘텐츠 없음</span>
+                          <span className="text-[10px] text-gray-500 italic">{t('gift.noUnlockContent')}</span>
                         </div>
                       )}
                     </div>
@@ -378,11 +380,11 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
               </div>
               <p className="text-base text-white font-bold mb-1">{pendingGift.name}</p>
               <p className="text-xs text-gray-400 mb-4">
-                {characterName}에게 선물하시겠습니까?
+                {t('gift.confirmSend', { name: characterName })}
               </p>
               <div className="flex items-center gap-1 text-sm text-white bg-gray-800 px-3 py-1.5 rounded-full mb-4">
                 <MaskIcon className="w-3.5 h-3.5" />
-                <span>{pendingGift.maskCost} 차감</span>
+                <span>{t('gift.deductAmount', { count: pendingGift.maskCost })}</span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -392,7 +394,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
                 className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={confirmSend}
@@ -400,7 +402,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
                 className="flex-1 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {sending ? '전송 중...' : '선물하기'}
+                {sending ? t('gift.sending') : t('gift.send')}
               </button>
             </div>
           </div>
@@ -413,7 +415,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
           <div className="absolute inset-0 bg-black/80" />
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 pt-5 pb-3 text-center">
-              <p className="text-xs text-emerald-400 mb-1">🎁 선물 완료</p>
+              <p className="text-xs text-emerald-400 mb-1">{t('gift.completed')}</p>
               <p className="text-base font-bold text-white">{result.gift.name}</p>
             </div>
             {result.contents.length > 0 ? (
@@ -468,19 +470,19 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
               </>
             ) : (
               <div className="px-5 py-6 text-center text-xs text-gray-500">
-                해금된 콘텐츠가 없습니다.
+                {t('gift.noUnlockedContent')}
               </div>
             )}
             <div className="px-5 py-4 flex flex-col gap-2">
               <p className="text-[11px] text-gray-500 text-center">
-                해금한 콘텐츠는 캐릭터 상세의 갤러리 탭에서 다시 볼 수 있습니다.
+                {t('gift.rewatchHint')}
               </p>
               <button
                 onClick={closeResult}
                 className="w-full py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                닫기
+                {t('common.close')}
               </button>
             </div>
           </div>
