@@ -2,11 +2,18 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
+import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
 import MaskIcon from '../../components/MaskIcon'
+
+const LANGUAGES = [
+  { code: 'ko', flag: 'kr', label: '한국어' },
+  { code: 'en', flag: 'us', label: 'English' },
+  { code: 'ja', flag: 'jp', label: '日本語' },
+]
 // import AdBanner from '../../components/AdBanner'
 
 function resizeImage(file, maxSize = 512) {
@@ -43,7 +50,18 @@ export default function MyPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [pushStatus, setPushStatus] = useState('default')
+  const [showLangModal, setShowLangModal] = useState(false)
   const fileInputRef = useRef(null)
+
+  const currentLang = LANGUAGES.find((l) => l.code === i18n.language?.split('-')[0]) || LANGUAGES[1]
+
+  const changeLanguage = async (code) => {
+    await i18n.changeLanguage(code)
+    setShowLangModal(false)
+    if (token) {
+      api.put('/auth/language', { language: code }).catch(() => {})
+    }
+  }
 
   useEffect(() => {
     getPushPermissionStatus().then(setPushStatus)
@@ -108,7 +126,7 @@ export default function MyPage() {
   const avatarDisplay = previewUrl || dbUser?.avatarUrl
 
   return (
-    <div className="px-4 pt-4">
+    <div className="relative px-4 pt-4">
       <Helmet>
         <title>{t('myPage.title')}</title>
         <meta name="description" content={t('myPage.metaDescription')} />
@@ -254,6 +272,26 @@ export default function MyPage() {
           </button>
         )}
         <button
+          onClick={() => setShowLangModal(true)}
+          className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <span className="text-gray-200">{t('myPage.language')}</span>
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full overflow-hidden ring-1 ring-gray-700 flex-shrink-0">
+              <img
+                src={`https://flagcdn.com/w80/${currentLang.flag}.png`}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <span className="text-gray-400 text-[13px]">{currentLang.label}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+        </button>
+        <button
           onClick={() => navigate('/adult-verify')}
           className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -308,6 +346,46 @@ export default function MyPage() {
         </button>
       </div>
       </>
+      )}
+
+      {/* 언어 선택 모달 */}
+      {showLangModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowLangModal(false)} />
+          <div className="relative bg-gray-900 border border-gray-800 rounded-2xl p-5 w-full max-w-xs">
+            <h2 className="text-base font-bold text-white text-center mb-4">{t('myPage.language')}</h2>
+            <div className="flex flex-col gap-1.5">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => changeLanguage(lang.code)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                    currentLang.code === lang.code
+                      ? 'bg-indigo-600/15 border border-indigo-500/50'
+                      : 'bg-gray-800/50 border border-gray-700 hover:border-gray-600'
+                  }`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <div className="w-7 h-7 rounded-full overflow-hidden ring-1 ring-black/20 flex-shrink-0">
+                    <img
+                      src={`https://flagcdn.com/w80/${lang.flag}.png`}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className={`text-sm font-medium ${currentLang.code === lang.code ? 'text-indigo-300' : 'text-gray-200'}`}>
+                    {lang.label}
+                  </span>
+                  {currentLang.code === lang.code && (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-indigo-400">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
