@@ -73,7 +73,29 @@ export default function CharacterCard({ character, reducedData }) {
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-14">
-        <p className="font-semibold text-sm truncate text-white">{c.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-semibold text-sm truncate text-white flex-1 min-w-0">{c.name}</p>
+          <div className="flex items-center gap-1.5 flex-shrink-0 text-[10px] font-semibold text-white leading-none tabular-nums">
+            <span className="flex items-center gap-0.5">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              <span style={{ display: 'inline-block', width: '2ch', textAlign: 'right' }}>{c.imageUnlocked ?? 0}</span>
+              <span>/</span>
+              <span style={{ display: 'inline-block', width: '2ch', textAlign: 'right' }}>{c.imageTotal ?? 0}</span>
+            </span>
+            <span className="flex items-center gap-0.5">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />
+              </svg>
+              <span style={{ display: 'inline-block', width: '2ch', textAlign: 'right' }}>{c.videoUnlocked ?? 0}</span>
+              <span>/</span>
+              <span style={{ display: 'inline-block', width: '2ch', textAlign: 'right' }}>{c.videoTotal ?? 0}</span>
+            </span>
+          </div>
+        </div>
         {c.description && (
           <p className="mt-1 text-[11px] text-gray-300 leading-snug line-clamp-2">
             {c.description}
