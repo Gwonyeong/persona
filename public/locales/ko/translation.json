@@ -1043,7 +1043,20 @@
     "hideUiTitle": "UI 숨기기 — 다시 누르면 복귀",
     "labelMe": "나",
     "labelCharacterFallback": "캐릭터",
-    "replay": "다시 재생"
+    "replay": "다시 재생",
+    "chooserTitle": "통화 시작",
+    "continueLabel": "📞 통화 기록 이어서",
+    "turnsCount": "{{count}}턴",
+    "continueDesc": "이전 통화 맥락을 그대로 이어 받습니다.",
+    "newCall": "✨ 새로 통화하기",
+    "newCallResetDesc": "이전 통화 기록을 지우고 새로 시작합니다.",
+    "newCallFreshDesc": "캐릭터와 가벼운 음성 통화를 시작합니다."
+  },
+  "chat2": {
+    "giftSent": "을(를) 선물했습니다",
+    "timeLabel": "시간",
+    "actionMenuOpen": "기능 버튼 열기",
+    "actionMenuClose": "기능 버튼 닫기"
   },
   "story": {
     "badge": "스토리"

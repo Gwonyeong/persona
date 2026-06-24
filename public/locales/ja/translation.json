@@ -1043,7 +1043,20 @@
     "hideUiTitle": "UIを隠す — もう一度押すと戻ります",
     "labelMe": "わたし",
     "labelCharacterFallback": "キャラクター",
-    "replay": "再生"
+    "replay": "再生",
+    "chooserTitle": "通話を始める",
+    "continueLabel": "📞 通話履歴を続ける",
+    "turnsCount": "{{count}}ターン",
+    "continueDesc": "前回の通話の文脈をそのまま引き継ぎます。",
+    "newCall": "✨ 新しく通話する",
+    "newCallResetDesc": "前回の通話履歴を削除して新しく開始します。",
+    "newCallFreshDesc": "キャラクターと気軽に音声通話を始めます。"
+  },
+  "chat2": {
+    "giftSent": "をプレゼントしました",
+    "timeLabel": "時間",
+    "actionMenuOpen": "アクションメニューを開く",
+    "actionMenuClose": "アクションメニューを閉じる"
   },
   "story": {
     "badge": "ストーリー"

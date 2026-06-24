@@ -1043,7 +1043,20 @@
     "hideUiTitle": "Hide UI — tap again to restore",
     "labelMe": "Me",
     "labelCharacterFallback": "Character",
-    "replay": "Replay"
+    "replay": "Replay",
+    "chooserTitle": "Start a call",
+    "continueLabel": "📞 Continue previous call",
+    "turnsCount": "{{count}} turns",
+    "continueDesc": "Picks up where the previous call left off.",
+    "newCall": "✨ Start a new call",
+    "newCallResetDesc": "Wipes the previous call history and starts fresh.",
+    "newCallFreshDesc": "Start a casual voice call with the character."
+  },
+  "chat2": {
+    "giftSent": "was gifted",
+    "timeLabel": "Time",
+    "actionMenuOpen": "Open action menu",
+    "actionMenuClose": "Close action menu"
   },
   "story": {
     "badge": "Story"

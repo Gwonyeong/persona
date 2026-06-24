@@ -444,7 +444,7 @@ const MessageBubble = memo(function MessageBubble({
           <div className="text-xs text-pink-200 leading-relaxed">
             <span className="text-pink-300">🎁 </span>
             <span className="text-pink-100 font-medium">{msg.giftName || ''}</span>
-            <span className="text-pink-300/80">을(를) 선물했습니다</span>
+            <span className="text-pink-300/80">{t('chat2.giftSent')}</span>
           </div>
         </div>
       </div>
@@ -1635,7 +1635,7 @@ export default function Chat() {
                         ].filter(Boolean)
                         return parts.length > 0 ? (
                           <div className="flex items-baseline gap-2">
-                            <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">시간</span>
+                            <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat2.timeLabel')}</span>
                             <span className="text-xs text-amber-200/90">{parts.join(' · ')}</span>
                           </div>
                         ) : null
@@ -1956,7 +1956,7 @@ export default function Chat() {
                 showInputButtons ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="기능 버튼 열기"
+              aria-label={t('chat2.actionMenuOpen')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" />
@@ -2070,7 +2070,7 @@ export default function Chat() {
               onClick={() => setShowInputButtons(false)}
               className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="기능 버튼 닫기"
+              aria-label={t('chat2.actionMenuClose')}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -2573,7 +2573,7 @@ export default function Chat() {
             style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-white text-base font-semibold mb-4">통화 시작</h3>
+            <h3 className="text-white text-base font-semibold mb-4">{t('call.chooserTitle')}</h3>
 
             <div className="flex flex-col gap-2.5">
               {/* 이전 통화 기록이 있으면 '이어서' 버튼 — simple 모드로 열되 connect 가 GET 으로 history 시드 */}
@@ -2584,12 +2584,12 @@ export default function Chat() {
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <div className="text-indigo-100 font-medium text-sm flex items-center gap-2">
-                    📞 통화 기록 이어서
+                    {t('call.continueLabel')}
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-100">
-                      {callSessionMeta.turnCount}턴
+                      {t('call.turnsCount', { count: callSessionMeta.turnCount })}
                     </span>
                   </div>
-                  <div className="text-gray-400 text-xs mt-1">이전 통화 맥락을 그대로 이어 받습니다.</div>
+                  <div className="text-gray-400 text-xs mt-1">{t('call.continueDesc')}</div>
                 </button>
               )}
               {/* 새로 통화 — 기존 CallSession 을 wipe 한 뒤 빈 컨텍스트로 시작 */}
@@ -2605,11 +2605,11 @@ export default function Chat() {
                 className="text-left bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-3 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                <div className="text-gray-100 font-medium text-sm">✨ 새로 통화하기</div>
+                <div className="text-gray-100 font-medium text-sm">{t('call.newCall')}</div>
                 <div className="text-gray-400 text-xs mt-1">
                   {callSessionMeta && callSessionMeta.turnCount > 0
-                    ? '이전 통화 기록을 지우고 새로 시작합니다.'
-                    : '캐릭터와 가벼운 음성 통화를 시작합니다.'}
+                    ? t('call.newCallResetDesc')
+                    : t('call.newCallFreshDesc')}
                 </div>
               </button>
             </div>
