@@ -6,11 +6,10 @@ import { Capacitor } from '@capacitor/core'
 import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import TagFilterBar from '../../components/TagFilterBar'
-import useTagFilter from '../../hooks/useTagFilter'
 import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import RecentStoriesRow from '../../components/RecentStoriesRow'
+import FollowedCharactersRow from '../../components/FollowedCharactersRow'
 import FeaturedCharacterSlider from '../../components/FeaturedCharacterSlider'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
 import CharacterCard from '../../components/CharacterCard'
@@ -57,12 +56,10 @@ export default function Home() {
   const [characters, setCharacters] = useState([])
   const [featuredCharacters, setFeaturedCharacters] = useState([])
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('default')
   const [showLangModal, setShowLangModal] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [appVersion, setAppVersion] = useState(null)
-  const { selectedTags, tagCategories, applyTags, filterByTags } = useTagFilter('homeFilter')
   const reducedData = usePrefersReducedData()
   const navigate = useNavigate()
 
@@ -77,11 +74,15 @@ export default function Home() {
   }
 
   const [unclaimedPassCount, setUnclaimedPassCount] = useState(0)
+  const [followedIds, setFollowedIds] = useState(null)
   useEffect(() => {
     if (token) {
       api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
       api.get('/notifications/unread-count').then(({ count }) => setUnreadNotifCount(count)).catch(() => {})
       api.get('/mask-pass').then(({ unclaimedEligibleCount }) => setUnclaimedPassCount(unclaimedEligibleCount || 0)).catch(() => {})
+      api.get('/follows').then(({ characterIds }) => setFollowedIds(characterIds || [])).catch(() => setFollowedIds([]))
+    } else {
+      setFollowedIds(null)
     }
   }, [token])
 
@@ -100,9 +101,8 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
-    if (sort !== 'default') params.set('sort', sort)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
-  }, [search, sort, i18nInstance.language, safetyMode])
+  }, [search, i18nInstance.language, safetyMode])
 
   // 1:1 슬라이더는 search/sort/filter와 무관 — AROUSED 이미지 보유 캐릭터를
   // 가장 최근 흥분 이미지 업로드 시점 기준 최신순으로 로드.
@@ -131,8 +131,15 @@ export default function Home() {
     [characters, recentJoinedIds]
   )
 
+  const followedCharacters = useMemo(() => {
+    if (!followedIds) return null
+    if (followedIds.length === 0) return []
+    const idSet = new Set(followedIds)
+    return characters.filter((c) => idSet.has(c.id))
+  }, [characters, followedIds])
+
   return (
-    <div className="relative px-4 pt-4 pb-2">
+    <div className="relative px-4 pb-2">
       <Helmet>
         <title>{t('home.title')}</title>
         <meta name="description" content={t('home.metaDescription')} />
@@ -140,12 +147,15 @@ export default function Home() {
         <meta property="og:description" content={t('home.ogDescription')} />
       </Helmet>
 
-      {/* 헤더 + 검색 + 필터 + 광고 */}
-      <div className="bg-gray-950 pb-4 mb-4 -mx-4 px-4 border-b border-gray-700">
-        {/* 검색 모달 — 헤더 영역에 absolute로 떠 있음 (sticky 부모를 따라 항상 최상단) */}
+      {/* 상단 헤더 바 — 화면 상단 고정 (sticky) */}
+      <div
+        className="sticky top-0 z-30 bg-gray-950 -mx-4 px-4 pb-3"
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}
+      >
+        {/* 검색 모달 — 헤더 영역에 absolute로 떠 있음 */}
         {showSearchModal && (
           <div
-            className="absolute top-0 left-0 right-0 z-50 bg-gray-950 border-b border-gray-800 -mx-4 px-4 pt-4 pb-3"
+            className="absolute top-0 left-0 right-0 z-50 bg-gray-950 border-b border-gray-800 px-4 pb-3"
             style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}
           >
             <div className="flex items-center gap-2">
@@ -189,7 +199,7 @@ export default function Home() {
         )}
 
         {/* 헤더 */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">Pesona</h1>
           <div className="flex items-center gap-2">
             {/* 언어 깃발 버튼 — 마이페이지로 이동 예정
@@ -235,7 +245,7 @@ export default function Home() {
             {token && (
               <button
                 onClick={() => navigate('/mask-pass')}
-                aria-label="마스크 패스"
+                aria-label={t('home.maskPassAria')}
                 className="relative w-8 h-8 flex items-center justify-center rounded-full text-amber-300 hover:text-amber-200 hover:bg-amber-900/30 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
@@ -261,31 +271,21 @@ export default function Home() {
             )}
           </div>
         </div>
+      </div>
 
+      {/* 비-sticky 영역 — 배너/스토리/팔로우/안전모드 토글 */}
+      <div className="bg-gray-950 pb-4 mb-4 -mx-4 px-4 pt-4 border-b border-gray-700">
         {/* 광고 배너 (어드민 관리) */}
         <HomeBannerSlider />
 
         {/* 최근 공개된 스토리 */}
         <RecentStoriesRow />
 
-        {/* 정렬 탭 + 필터 */}
-        <div className="flex items-center gap-2 pb-2">
-          <div className="flex gap-1.5">
-            {['default', 'popular', 'follow'].map((key) => (
-              <button
-                key={key}
-                onClick={() => setSort(key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  sort === key
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {t(`home.sort.${key}`)}
-              </button>
-            ))}
-          </div>
+        {/* 팔로우한 페소나 — 로그인 유저에 한해 노출 */}
+        <FollowedCharactersRow characters={followedCharacters} />
+
+        {/* 안전모드 토글 — NSFW 게이트 */}
+        <div className="flex items-center pb-2">
           <button
             onClick={toggleSafety}
             disabled={safetyBusy}
@@ -314,13 +314,6 @@ export default function Home() {
             </svg>
             <span>{safetyMode ? 'SAFE' : '19+'}</span>
           </button>
-          <div className="flex-1 min-w-0">
-            <TagFilterBar
-              selectedTags={selectedTags}
-              tagCategories={tagCategories}
-              onApply={applyTags}
-            />
-          </div>
         </div>
 
         {/* 광고 */}
@@ -348,17 +341,17 @@ export default function Home() {
       />
 
       {/* 캐릭터 그리드 — 최근 합류 4명 제외 */}
-      {filterByTags(gridCharacters).length === 0 ? (
+      {gridCharacters.length === 0 ? (
         <div className="text-center text-gray-500 py-20">
           <p>{t('home.emptyCharacters')}</p>
         </div>
       ) : (
         <>
           <h2 className="text-sm font-medium text-gray-400 mb-2">
-            다른 매력적인 페소나들
+            {t('home.otherCharacters')}
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            {filterByTags(gridCharacters).map((c) => (
+            {gridCharacters.map((c) => (
               <CharacterCard
                 key={c.id}
                 character={c}
@@ -371,31 +364,31 @@ export default function Home() {
 
       {/* 사업자 정보 푸터 */}
       <footer className="mt-8 pt-6 pb-4 border-t border-gray-800 text-[11px] text-gray-500 leading-relaxed">
-        <p className="font-semibold text-gray-400 mb-2">사업자 정보</p>
+        <p className="font-semibold text-gray-400 mb-2">{t('home.bizInfoTitle')}</p>
         <dl className="space-y-1">
           <div className="flex gap-2">
-            <dt className="w-20 flex-shrink-0 text-gray-600">상호</dt>
-            <dd>파드켓</dd>
+            <dt className="w-20 flex-shrink-0 text-gray-600">{t('home.bizLabelName')}</dt>
+            <dd>{t('home.bizValueName')}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-20 flex-shrink-0 text-gray-600">대표자</dt>
-            <dd>조권영</dd>
+            <dt className="w-20 flex-shrink-0 text-gray-600">{t('home.bizLabelRep')}</dt>
+            <dd>{t('home.bizValueRep')}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-20 flex-shrink-0 text-gray-600">사업자등록번호</dt>
+            <dt className="w-20 flex-shrink-0 text-gray-600">{t('home.bizLabelRegNo')}</dt>
             <dd>467-15-02791</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-20 flex-shrink-0 text-gray-600">주소</dt>
-            <dd>서울특별시 마포구 월드컵북로6길 19-10</dd>
+            <dt className="w-20 flex-shrink-0 text-gray-600">{t('home.bizLabelAddress')}</dt>
+            <dd>{t('home.bizValueAddress')}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-20 flex-shrink-0 text-gray-600">유선전화</dt>
+            <dt className="w-20 flex-shrink-0 text-gray-600">{t('home.bizLabelPhone')}</dt>
             <dd>070-8094-0654</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-20 flex-shrink-0 text-gray-600">통신판매신고번호</dt>
-            <dd>2025-서울마포-2857</dd>
+            <dt className="w-20 flex-shrink-0 text-gray-600">{t('home.bizLabelMailOrderNo')}</dt>
+            <dd>{t('home.bizValueMailOrderNo')}</dd>
           </div>
         </dl>
         {appVersion && (
