@@ -27,6 +27,11 @@ function formatKST(iso) {
   return d.toLocaleString('ko-KR', { hour12: false })
 }
 
+const EMPTY_TR = {
+  en: { title: '', body: '' },
+  ja: { title: '', body: '' },
+}
+
 export default function Notifications() {
   const [notifications, setNotifications] = useState([])
   const [page, setPage] = useState(1)
@@ -38,6 +43,9 @@ export default function Notifications() {
   const [userResults, setUserResults] = useState([])
   const [saving, setSaving] = useState(false)
   const [detail, setDetail] = useState(null)
+  const [trForm, setTrForm] = useState(EMPTY_TR)
+  const [trSaving, setTrSaving] = useState(false)
+  const [retranslating, setRetranslating] = useState(false)
   const [idInput, setIdInput] = useState('')
   const [idInputError, setIdInputError] = useState('')
 
@@ -145,6 +153,44 @@ export default function Notifications() {
   const openDetail = async (id) => {
     const { notification } = await api.get(`/notifications/admin/${id}`)
     setDetail(notification)
+    setTrForm({
+      en: { title: notification.translations?.en?.title || '', body: notification.translations?.en?.body || '' },
+      ja: { title: notification.translations?.ja?.title || '', body: notification.translations?.ja?.body || '' },
+    })
+  }
+
+  const saveTranslations = async () => {
+    if (!detail) return
+    setTrSaving(true)
+    try {
+      const { notification } = await api.put(`/notifications/${detail.id}/translations`, {
+        translations: trForm,
+      })
+      setDetail(notification)
+      alert('번역 저장 완료')
+    } catch (e) {
+      alert('번역 저장 실패: ' + (e.message || ''))
+    } finally {
+      setTrSaving(false)
+    }
+  }
+
+  const retranslate = async () => {
+    if (!detail) return
+    if (!confirm('한국어 원문으로 다시 번역합니다. 기존 수정 내용이 덮어쓰입니다. 계속할까요?')) return
+    setRetranslating(true)
+    try {
+      const { notification } = await api.post(`/notifications/${detail.id}/retranslate`)
+      setDetail(notification)
+      setTrForm({
+        en: { title: notification.translations?.en?.title || '', body: notification.translations?.en?.body || '' },
+        ja: { title: notification.translations?.ja?.title || '', body: notification.translations?.ja?.body || '' },
+      })
+    } catch (e) {
+      alert('재번역 실패: ' + (e.message || ''))
+    } finally {
+      setRetranslating(false)
+    }
   }
 
   return (
@@ -500,6 +546,56 @@ export default function Notifications() {
                   </div>
                 </div>
               )}
+
+              {/* 자동 번역 미리보기 + 수정 */}
+              <div className="border border-gray-800 rounded-lg p-3 bg-gray-800/30 mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <div className="text-xs font-semibold text-gray-200">🌐 다국어 번역 (Gemini 자동 번역)</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">
+                      유저에게는 user.language로 자동 픽되어 노출됩니다.
+                    </div>
+                  </div>
+                  <button
+                    onClick={retranslate}
+                    disabled={retranslating || trSaving}
+                    className="text-[11px] px-2 py-1 bg-amber-700/50 hover:bg-amber-700 text-amber-100 rounded disabled:opacity-50"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {retranslating ? '번역 중...' : '🔄 다시 번역'}
+                  </button>
+                </div>
+                {[
+                  { lang: 'en', label: 'English' },
+                  { lang: 'ja', label: '日本語' },
+                ].map(({ lang, label }) => (
+                  <div key={lang} className="mt-3 first:mt-2">
+                    <div className="text-[10px] text-gray-500 mb-1 uppercase tracking-wider">{label}</div>
+                    <input
+                      value={trForm[lang].title}
+                      onChange={(e) => setTrForm({ ...trForm, [lang]: { ...trForm[lang], title: e.target.value } })}
+                      placeholder="(자동 번역됨)"
+                      maxLength={100}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none mb-1.5"
+                    />
+                    <textarea
+                      value={trForm[lang].body}
+                      onChange={(e) => setTrForm({ ...trForm, [lang]: { ...trForm[lang], body: e.target.value } })}
+                      rows={3}
+                      maxLength={2000}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none resize-none"
+                    />
+                  </div>
+                ))}
+                <button
+                  onClick={saveTranslations}
+                  disabled={trSaving || retranslating}
+                  className="mt-3 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {trSaving ? '저장 중...' : '✏️ 번역 수정안 저장'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
