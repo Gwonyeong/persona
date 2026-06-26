@@ -132,6 +132,16 @@ export default function Terms() {
             <h2 className="text-base font-semibold text-gray-100 mb-2">{t('terms.s12Title')}</h2>
             <p>{t('terms.s12Content')}</p>
           </section>
+
+          <section>
+            <h2 className="text-base font-semibold text-gray-100 mb-2">{t('terms.s13Title')}</h2>
+            <p className="mb-2">{t('terms.s13Intro')}</p>
+            <ol className="list-decimal list-inside space-y-1.5">
+              {t('terms.s13Items', { returnObjects: true }).map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ol>
+          </section>
         </div>
 
         {/* 운영자 정보 */}

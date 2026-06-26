@@ -261,6 +261,22 @@ export default function Home() {
             )}
             {token && (
               <button
+                onClick={() => navigate('/gacha')}
+                aria-label="가챠"
+                className="relative w-8 h-8 flex items-center justify-center rounded-full text-fuchsia-300 hover:text-fuchsia-200 hover:bg-fuchsia-900/30 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 12v9H4v-9" />
+                  <path d="M22 7H2v5h20V7z" />
+                  <path d="M12 22V7" />
+                  <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                  <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                </svg>
+              </button>
+            )}
+            {token && (
+              <button
                 onClick={() => navigate('/mask-shop')}
                 className="flex items-center gap-1.5"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', background: 'transparent' }}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import JSZip from 'jszip'
@@ -135,35 +135,44 @@ export default function Expressions() {
   }, [])
 
   // 같은 (styleId, emotion)에 여러 이미지 허용 — 추가/삭제/업데이트 별도 핸들러.
-  const addImage = (characterId, image) => {
+  // 이제 스타일 단위로 동작 — characterId + styleId 인자.
+  const patchStyle = (characterId, styleId, mapImages) => {
     setCharacters((prev) =>
       prev.map((c) => {
-        if (c.id !== characterId || !c.defaultStyle) return c
-        const next = [
-          ...c.defaultStyle.images,
-          { id: image.id, emotion: image.emotion, filePath: image.filePath, videoFilePath: image.videoFilePath ?? null },
-        ]
-        return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
+        if (c.id !== characterId) return c
+        const nextStyles = (c.styles || []).map((s) =>
+          s.id === styleId ? { ...s, images: mapImages(s.images) } : s,
+        )
+        const nextDefault =
+          c.defaultStyle && c.defaultStyle.id === styleId
+            ? { ...c.defaultStyle, images: mapImages(c.defaultStyle.images) }
+            : c.defaultStyle
+        return { ...c, styles: nextStyles, defaultStyle: nextDefault }
       }),
     )
   }
-  const removeImage = (characterId, imageId) => {
-    setCharacters((prev) =>
-      prev.map((c) => {
-        if (c.id !== characterId || !c.defaultStyle) return c
-        const next = c.defaultStyle.images.filter((i) => i.id !== imageId)
-        return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
-      }),
+  const addImage = (characterId, styleId, image) => {
+    patchStyle(characterId, styleId, (imgs) => [
+      ...imgs,
+      {
+        id: image.id,
+        emotion: image.emotion,
+        filePath: image.filePath,
+        videoFilePath: image.videoFilePath ?? null,
+      },
+    ])
+  }
+  const removeImage = (characterId, styleId, imageId) => {
+    patchStyle(characterId, styleId, (imgs) => imgs.filter((i) => i.id !== imageId))
+  }
+  const updateImage = (characterId, styleId, imageId, patch) => {
+    patchStyle(characterId, styleId, (imgs) =>
+      imgs.map((i) => (i.id === imageId ? { ...i, ...patch } : i)),
     )
   }
-  const updateImage = (characterId, imageId, patch) => {
-    setCharacters((prev) =>
-      prev.map((c) => {
-        if (c.id !== characterId || !c.defaultStyle) return c
-        const next = c.defaultStyle.images.map((i) => (i.id === imageId ? { ...i, ...patch } : i))
-        return { ...c, defaultStyle: { ...c.defaultStyle, images: next } }
-      }),
-    )
+
+  const reloadOverview = () => {
+    api.get('/admin/expressions-overview').then(({ characters }) => setCharacters(characters || []))
   }
 
   // 공개/비공개로 먼저 분할 → 필터·페이징은 분할된 집합 안에서 동작.
@@ -329,16 +338,42 @@ export default function Expressions() {
                 </tr>
               </thead>
               <tbody>
-                {paged.map((c) => (
-                  <CharacterRow
-                    key={c.id}
-                    character={c}
-                    emotions={currentEmotions}
-                    onAddImage={(img) => addImage(c.id, img)}
-                    onRemoveImage={(imageId) => removeImage(c.id, imageId)}
-                    onUpdateImage={(imageId, patch) => updateImage(c.id, imageId, patch)}
-                  />
-                ))}
+                {paged.map((c) => {
+                  const styles = c.styles || (c.defaultStyle ? [c.defaultStyle] : [])
+                  return (
+                    <Fragment key={c.id}>
+                      {styles.length === 0 ? (
+                        <CharacterRow
+                          character={c}
+                          style={null}
+                          isFirstStyle
+                          emotions={currentEmotions}
+                          onAddImage={() => {}}
+                          onRemoveImage={() => {}}
+                          onUpdateImage={() => {}}
+                        />
+                      ) : (
+                        styles.map((s, i) => (
+                          <CharacterRow
+                            key={s.id}
+                            character={c}
+                            style={s}
+                            isFirstStyle={i === 0}
+                            emotions={currentEmotions}
+                            onAddImage={(img) => addImage(c.id, s.id, img)}
+                            onRemoveImage={(imageId) => removeImage(c.id, s.id, imageId)}
+                            onUpdateImage={(imageId, patch) => updateImage(c.id, s.id, imageId, patch)}
+                          />
+                        ))
+                      )}
+                      <AddStyleRow
+                        character={c}
+                        colSpan={currentEmotions.length + 1}
+                        onAdded={reloadOverview}
+                      />
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -460,8 +495,91 @@ function ExpressionPromptReference({ emotions }) {
   )
 }
 
-function CharacterRow({ character, emotions, onAddImage, onRemoveImage, onUpdateImage }) {
-  const style = character.defaultStyle
+function AddStyleRow({ character, colSpan, onAdded }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [unlockMode, setUnlockMode] = useState('DEFAULT')
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      await api.post(`/admin/characters/${character.id}/styles`, {
+        name: name.trim(),
+        description: '',
+        unlockMode,
+      })
+      setName('')
+      setUnlockMode('DEFAULT')
+      setOpen(false)
+      onAdded?.()
+    } catch (err) {
+      alert('스타일 추가 실패: ' + (err?.data?.error || err?.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <tr className="border-b border-gray-800/60 bg-gray-950/40">
+      <td colSpan={colSpan} className="sticky left-0 z-10 bg-gray-950/40 px-4 py-2">
+        {open ? (
+          <div className="flex items-center gap-2 pl-11">
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submit()
+                if (e.key === 'Escape') setOpen(false)
+              }}
+              placeholder="새 스타일명 (예: 교복, 비키니)"
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white w-48"
+            />
+            <select
+              value={unlockMode}
+              onChange={(e) => setUnlockMode(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white"
+              style={NO_OUTLINE}
+            >
+              <option value="DEFAULT">기본 (대화 해금)</option>
+              <option value="GACHA">가챠 전용</option>
+            </select>
+            <button
+              onClick={submit}
+              disabled={saving || !name.trim()}
+              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
+              style={NO_OUTLINE}
+            >
+              추가
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false)
+                setName('')
+              }}
+              className="text-xs text-gray-400 hover:text-white"
+              style={NO_OUTLINE}
+            >
+              취소
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setOpen(true)}
+            className="pl-11 text-[11px] text-gray-500 hover:text-indigo-300"
+            style={NO_OUTLINE}
+          >
+            + 이 캐릭터에 스타일 추가
+          </button>
+        )}
+      </td>
+    </tr>
+  )
+}
+
+function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddImage, onRemoveImage, onUpdateImage }) {
   const [frameGalleryOpen, setFrameGalleryOpen] = useState(false)
   const [aiGenOpen, setAiGenOpen] = useState(false)
 
@@ -477,24 +595,37 @@ function CharacterRow({ character, emotions, onAddImage, onRemoveImage, onUpdate
 
   return (
     <>
-      <tr className="border-b border-gray-800/60 last:border-b-0">
-        <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 min-w-[180px]">
-          <div className="flex items-center gap-3">
-            {character.profileImage ? (
-              <img src={character.profileImage} alt="" className="w-8 h-8 rounded-full object-cover bg-gray-800" />
+      <tr className={`${isFirstStyle ? 'border-t-2 border-gray-700/80' : ''} border-b border-gray-800/60`}>
+        <td className="sticky left-0 z-10 bg-gray-900 px-4 py-3 min-w-[200px]">
+          <div className="flex items-start gap-3">
+            {isFirstStyle ? (
+              character.profileImage ? (
+                <img src={character.profileImage} alt="" className="w-8 h-8 rounded-full object-cover bg-gray-800 flex-shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gray-800 flex-shrink-0" />
+              )
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gray-800" />
+              <div className="w-8 flex-shrink-0" />
             )}
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-medium text-white truncate">{character.name}</p>
-                {!character.isPublic && (
-                  <span className="text-[10px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded">비공개</span>
-                )}
-              </div>
+            <div className="min-w-0 flex-1">
+              {isFirstStyle && (
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-white truncate">{character.name}</p>
+                  {!character.isPublic && (
+                    <span className="text-[10px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded">비공개</span>
+                  )}
+                </div>
+              )}
               {style ? (
                 <>
-                  <p className="text-[11px] text-gray-500 truncate">스타일: {style.name}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-[11px] text-gray-300 truncate">{style.name}</p>
+                    {style.unlockMode === 'GACHA' && (
+                      <span className="text-[9px] bg-fuchsia-900/60 text-fuchsia-300 px-1 py-0.5 rounded font-semibold">
+                        GACHA
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-1 flex items-center gap-2">
                     <button
                       onClick={() => setFrameGalleryOpen(true)}
@@ -515,13 +646,7 @@ function CharacterRow({ character, emotions, onAddImage, onRemoveImage, onUpdate
                   </div>
                 </>
               ) : (
-                <Link
-                  to={`/admin/characters/${character.id}/styles`}
-                  className="text-[11px] text-amber-400 hover:text-amber-300"
-                  style={NO_OUTLINE}
-                >
-                  스타일 추가하기 →
-                </Link>
+                <p className="text-[11px] text-gray-500 mt-0.5">스타일 없음 (아래에서 추가)</p>
               )}
             </div>
           </div>
@@ -3966,7 +4091,7 @@ function VideoJobsPanel({ characters, onAddImage }) {
     for (const job of jobs) {
       if (job.status === 'uploaded' && job.uploadedImage && !consumedRef.current.has(job.id)) {
         consumedRef.current.add(job.id)
-        onAddImage?.(job.characterId, { ...job.uploadedImage, emotion: job.emotion })
+        onAddImage?.(job.characterId, job.styleId, { ...job.uploadedImage, emotion: job.emotion })
       }
     }
   }, [jobs, onAddImage])

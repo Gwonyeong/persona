@@ -604,7 +604,7 @@
     "pageTitle": "Terms of Service - Pesona",
     "metaDescription": "Pesona Terms of Service.",
     "heading": "Terms of Service",
-    "effectiveDate": "Effective: March 19, 2026",
+    "effectiveDate": "Effective: June 26, 2026 (added provisions on probability-based items)",
     "operatorLabel": "Operator",
     "operatorName": "Gwonyeong Jo",
     "emailLabel": "Email",
@@ -630,7 +630,8 @@
     "s4Features": [
       "Chat with AI characters",
       "Character browsing and search",
-      "Mission and reward system"
+      "Mission and reward system",
+      "Probability-based item (gacha) reward system"
     ],
     "s5Title": "Article 5 (Registration and Accounts)",
     "s5Items": [
@@ -641,9 +642,9 @@
     "s6Title": "Article 6 (Masks and Virtual Currency)",
     "s6Items": [
       "Users receive 30 masks upon registration.",
-      "Masks are used for conversations with AI characters.",
-      "Additional masks can be earned by completing missions.",
-      "Masks are non-refundable for cash."
+      "Masks are used for conversations with AI characters, probability-based item (gacha) draws, and other in-service features.",
+      "Additional masks can be earned by completing missions, daily rewards, watching ads, and similar activities.",
+      "Masks are non-refundable for cash, and masks once spent are not recoverable."
     ],
     "s7Title": "Article 7 (User Obligations)",
     "s7Content": "Users must not engage in the following activities:",
@@ -670,7 +671,20 @@
     "s11Title": "Article 11 (Privacy)",
     "s11Content": "Matters concerning the processing of users' personal information are governed by the separate <link>Privacy Policy</link>.",
     "s12Title": "Article 12 (Dispute Resolution)",
-    "s12Content": "Any disputes between the Service and users shall be resolved in accordance with applicable laws and submitted to the competent court."
+    "s12Content": "Any disputes between the Service and users shall be resolved in accordance with applicable laws and submitted to the competent court.",
+    "s13Title": "Article 13 (Probability-Based Items / Gacha)",
+    "s13Intro": "The Service provides probability-based items (hereinafter \"gacha\") where rewards are determined randomly upon spending masks. In compliance with applicable laws including the Korean Game Industry Promotion Act, the following information is disclosed:",
+    "s13Items": [
+      "Definition: A \"probability-based item\" refers to a system in which users spend masks to receive a reward determined randomly according to predetermined probabilities.",
+      "Disclosure of Odds: For each gacha box, the rarity-tier probabilities, number of reward slots per tier, effective per-item odds, and pity (guarantee) system are disclosed in the \"Odds\" menu on each box's detail page. Users may review the odds at any time before drawing.",
+      "Draw Method: The system first selects a rarity tier according to the disclosed probabilities, then randomly picks one of the user's unowned rewards within that tier. Rewards already owned are automatically excluded from the draw pool, so the effective odds may vary based on the user's collection status.",
+      "Dynamic Pool Rewards: Certain rewards such as \"Random Expression Image\" and \"Random Expression + Video Bundle\" are drawn uniformly from the pool of expression images of all publicly available characters that the user does not yet own. As new characters and expressions are added, the pool size may change accordingly, which is reflected in real time on the box detail page.",
+      "Pity System: Each gacha box has a defined cumulative draw count (e.g., 30 draws) after which the user may directly select one unowned reward from the box. The pity counter is tracked per box and resets to zero upon receiving the guaranteed reward.",
+      "Age Restriction: The gacha feature is available only to users aged 19 or older who have completed identity verification, in compliance with the Korean Juvenile Protection Act and related policies.",
+      "Payment and Refunds: Masks spent on gacha draws and rewards obtained through draws are non-refundable and non-recoverable. However, in cases of clearly identified system errors causing reward omissions, the operator may provide reasonable compensation.",
+      "Right to Modify: The Service may modify gacha box configurations, reward lists, rarity probabilities, pity thresholds, costs, and other elements as required for operational or technical reasons. Material changes adverse to users will be announced at least 7 days in advance via in-service notices.",
+      "Advertising Disclosure: When the Service promotes or advertises gacha boxes, such content will clearly indicate that probability-based items are included."
+    ]
   },
   "privacy": {
     "pageTitle": "Privacy Policy - Pesona",
@@ -1108,7 +1122,7 @@
     "bizInfo1": "Business: PadKet / Representative: Cho Gwonyeong",
     "bizInfo2": "Business registration no.: 467-15-02791",
     "bizInfo3": "Address: 19-10, World Cup buk-ro 6-gil, Mapo-gu, Seoul, Korea",
-    "bizInfo4": "Phone: +82-10-5418-3486",
+    "bizInfo4": "Phone: +82-70-8094-0654",
     "bizInfo5": "Mail-order business no.: 2025-Seoul Mapo-2857",
     "bizInfo6": "Email: busGwonyeong@gmail.com"
   }
