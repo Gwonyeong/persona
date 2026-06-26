@@ -24,6 +24,11 @@ export default function ChatSettings() {
   const [saving, setSaving] = useState(false)
   const [savingChatMode, setSavingChatMode] = useState(false)
 
+  // 채팅 스타일 토글 — 캐릭터별 disabledStyleIds 관리
+  const [characterId, setCharacterId] = useState(null)
+  const [styleData, setStyleData] = useState(null) // { styles, hasNewStyle, seenAt }
+  const [savingStyles, setSavingStyles] = useState(false)
+
   useEffect(() => {
     if (!token) {
       navigate('/login')
@@ -33,12 +38,37 @@ export default function ChatSettings() {
       .then(({ conversation }) => {
         setSpriteMode(conversation?.spriteMode || 'BUBBLE')
         setChatMode(conversation?.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
-        // V2 판별 — dataV2 또는 character.promptDataV2 존재 시
         setIsV2(!!(conversation?.dataV2 || conversation?.character?.promptDataV2))
+        const charId = conversation?.characterId
+        if (charId) {
+          setCharacterId(charId)
+          api.get(`/chat-styles/${charId}`).then(setStyleData).catch(() => {})
+          // 페이지 진입 = 새 스타일 인디케이터 해제
+          api.post(`/chat-styles/${charId}/mark-seen`).catch(() => {})
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [id, token, navigate])
+
+  const toggleStyle = async (styleId) => {
+    if (!styleData || savingStyles) return
+    const next = styleData.styles.map((s) =>
+      s.id === styleId ? { ...s, disabled: !s.disabled } : s,
+    )
+    setStyleData({ ...styleData, styles: next })
+    const disabledStyleIds = next.filter((s) => s.disabled).map((s) => s.id)
+    setSavingStyles(true)
+    try {
+      await api.put(`/chat-styles/${characterId}`, { disabledStyleIds })
+    } catch (err) {
+      // 실패 시 롤백
+      setStyleData(styleData)
+      alert('저장 실패: ' + (err?.data?.error || err?.message))
+    } finally {
+      setSavingStyles(false)
+    }
+  }
 
   const handleSelect = async (mode) => {
     if (saving || mode === spriteMode) return
@@ -132,6 +162,68 @@ export default function ChatSettings() {
             })}
           </div>
         </section>
+        )}
+
+        {/* 채팅 스타일 토글 — 캐릭터의 스타일 중 어떤 것을 표정 매칭 풀에 포함할지 */}
+        {styleData?.styles?.length > 1 && (
+          <section>
+            <h2 className="text-sm font-semibold text-white mb-1">스타일 선택</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              채팅 표정에 사용할 스타일을 켜고 끌 수 있어요. 여러 스타일을 켜두면 매번 그 중에서
+              랜덤으로 표정 이미지가 나와요.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {styleData.styles.map((s) => {
+                const off = s.disabled
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleStyle(s.id)}
+                    disabled={savingStyles}
+                    className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16"
+                    style={NO_OUTLINE}
+                  >
+                    <div
+                      className={`relative w-14 h-14 rounded-full p-[2px] ${
+                        off
+                          ? 'bg-gray-700/60'
+                          : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                      }`}
+                    >
+                      <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
+                        <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-800">
+                          {s.thumb ? (
+                            <img
+                              src={s.thumb}
+                              alt={s.name}
+                              draggable={false}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              style={off ? { filter: 'grayscale(1) brightness(0.5)' } : undefined}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
+                              ?
+                            </div>
+                          )}
+                          {s.isNew && (
+                            <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-gray-950" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] w-full text-center truncate leading-tight ${
+                        off ? 'text-gray-500' : 'text-white font-semibold'
+                      }`}
+                    >
+                      {s.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
         )}
 
         <section>

@@ -79,15 +79,19 @@ export default function AdminGacha() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{b.name}</h3>
-                  <span
-                    className={`px-1.5 py-0.5 text-[10px] rounded font-semibold ${
-                      b.isActive
-                        ? 'bg-emerald-900/60 text-emerald-300'
-                        : 'bg-gray-800 text-gray-400'
-                    }`}
-                  >
-                    {b.isActive ? 'ACTIVE' : 'INACTIVE'}
-                  </span>
+                  {!b.isActive ? (
+                    <span className="px-1.5 py-0.5 text-[10px] rounded font-semibold bg-gray-800 text-gray-400">
+                      비공개
+                    </span>
+                  ) : b.adminOnly ? (
+                    <span className="px-1.5 py-0.5 text-[10px] rounded font-semibold bg-sky-900/60 text-sky-300">
+                      어드민만
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 text-[10px] rounded font-semibold bg-emerald-900/60 text-emerald-300">
+                      공개
+                    </span>
+                  )}
                 </div>
                 {b.description && (
                   <p className="text-xs text-gray-400 mt-1">{b.description}</p>
@@ -231,7 +235,8 @@ function BoxBasicForm({ box, onSaved }) {
     coverImage: box.coverImage || '',
     cost: box.cost,
     bulkCost: box.bulkCost ?? '',
-    isActive: box.isActive,
+    // 노출 모드: HIDDEN(비공개) / ADMIN(어드민만) / PUBLIC(모두 공개)
+    visibility: !box.isActive ? 'HIDDEN' : box.adminOnly ? 'ADMIN' : 'PUBLIC',
     pityCount: box.pityCount,
     freeDrawCount: box.freeDrawCount ?? 0,
     startsAt: box.startsAt ? box.startsAt.slice(0, 16) : '',
@@ -249,7 +254,8 @@ function BoxBasicForm({ box, onSaved }) {
         coverImage: form.coverImage || null,
         cost: Number(form.cost),
         bulkCost: form.bulkCost === '' ? null : Number(form.bulkCost),
-        isActive: form.isActive,
+        isActive: form.visibility !== 'HIDDEN',
+        adminOnly: form.visibility === 'ADMIN',
         pityCount: Number(form.pityCount),
         freeDrawCount: Number(form.freeDrawCount),
         startsAt: form.startsAt || null,
@@ -371,13 +377,18 @@ function BoxBasicForm({ box, onSaved }) {
             className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
           />
         </label>
-        <label className="text-xs text-gray-400 flex items-center gap-2 mt-5">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-          />
-          ACTIVE (유저에게 노출)
+        <label className="text-xs text-gray-400">
+          노출 모드
+          <select
+            value={form.visibility}
+            onChange={(e) => setForm({ ...form, visibility: e.target.value })}
+            className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <option value="HIDDEN">비공개 (숨김)</option>
+            <option value="ADMIN">어드민만 (테스트용)</option>
+            <option value="PUBLIC">모두 공개</option>
+          </select>
         </label>
         <label className="text-xs text-gray-400">
           시작 (선택)

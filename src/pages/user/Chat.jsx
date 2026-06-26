@@ -574,6 +574,8 @@ export default function Chat() {
   const navigate = useNavigate()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
+  // 채팅 스타일 토글 상태 — { styles: [{id, unlocked, disabled, ...}], hasNewStyle: bool }
+  const [chatStyles, setChatStyles] = useState(null)
   // 렌더 페이지네이션 — 처음엔 최근 PAGE_SIZE개만 DOM에 그려서 입력 lag 차단
   const PAGE_SIZE = 50
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -841,6 +843,13 @@ export default function Chat() {
     refetchCallSessionMeta()
     api.get(`/conversations/${id}/messages`).then(({ conversation: conv, seenRecords }) => {
       setConversation(conv)
+      // 채팅 스타일 on/off 상태 — 표정 매칭 풀 + 신규 인디케이터에 사용
+      if (conv?.characterId) {
+        api
+          .get(`/chat-styles/${conv.characterId}`)
+          .then((data) => setChatStyles(data))
+          .catch(() => setChatStyles(null))
+      }
       if (seenRecords) {
         const unlockedIds = new Set(
           seenRecords.filter((r) => r.videoUnlockedAt).map((r) => r.characterImageId)
@@ -1382,22 +1391,32 @@ export default function Chat() {
     if (!conversation) return null
     const ch = conversation.character
     if (!ch) return null
-    const style = ch.styles?.find((s) => s.id === conversation.currentStyleId) || ch.styles?.[0]
-    if (!style) return null
+    // 활성 스타일 풀 — chatStyles.styles 중 disabled=false. 없으면 전체 styles 폴백.
+    const activeStyleIds = chatStyles?.styles
+      ? new Set(chatStyles.styles.filter((s) => !s.disabled).map((s) => s.id))
+      : null
+    const activeStyles = activeStyleIds
+      ? (ch.styles || []).filter((s) => activeStyleIds.has(s.id))
+      : ch.styles || []
+    if (!activeStyles.length) return null
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
       if (msg.role !== 'CHARACTER' || !msg.emotion) continue
-      // 이미지 row만 후보로 — filePath가 영상인 standalone row는 제외
-      const candidates = style.images?.filter((img) => img.emotion === msg.emotion && !isVideoUrl(img.filePath)) || []
+      // 활성 스타일들의 emotion 이미지 후보 합집합 — 영상 row 제외
+      const candidates = activeStyles.flatMap((style) =>
+        (style.images || [])
+          .filter((img) => img.emotion === msg.emotion && !isVideoUrl(img.filePath))
+          .map((img) => ({ ...img, styleId: style.id })),
+      )
       if (candidates.length === 0) continue
-      if (candidates.length === 1) return { ...candidates[0], styleId: style.id }
+      if (candidates.length === 1) return candidates[0]
       const seed = String(msg.createdAt || '') + '|' + i
       let h = 0
       for (let s = 0; s < seed.length; s++) h = ((h << 5) - h + seed.charCodeAt(s)) | 0
-      return { ...candidates[Math.abs(h) % candidates.length], styleId: style.id }
+      return candidates[Math.abs(h) % candidates.length]
     }
     return null
-  }, [messages, conversation])
+  }, [messages, conversation, chatStyles])
 
   const latestCharacterSpriteUrl = latestCharacterSprite?.filePath ?? null
 
@@ -1750,18 +1769,30 @@ export default function Chat() {
                 {showGalleryBadge && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full" />}
               </button>
             </div>
-            {/* 채팅 설정 페이지 진입 */}
-            <button
-              onClick={() => navigate(`/chats/${id}/settings`)}
-              className="w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={t('chatSettings.title')}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
+            {/* 채팅 설정 페이지 진입 — 새 스타일 보유 시 emerald 보더 + 툴팁 */}
+            <div className="relative">
+              <button
+                onClick={() => navigate(`/chats/${id}/settings`)}
+                className={`w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow-lg transition-colors border-2 ${
+                  chatStyles?.hasNewStyle
+                    ? 'border-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.45)]'
+                    : 'border-gray-700/50'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                aria-label={t('chatSettings.title')}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              {chatStyles?.hasNewStyle && (
+                <div className="absolute right-0 top-full mt-1.5 px-2.5 py-1 rounded-md bg-emerald-500 text-emerald-950 text-[10px] font-bold whitespace-nowrap shadow-lg pointer-events-none">
+                  새 스타일! 설정에서 적용해보세요
+                  <div className="absolute -top-1 right-3 w-2 h-2 rotate-45 bg-emerald-500" />
+                </div>
+              )}
+            </div>
           </div>
           )}
         </div>
