@@ -81,7 +81,7 @@ export default function Gacha() {
   )
 }
 
-const RARITY_ORDER = ['MYTHIC', 'LEGENDARY', 'EPIC', 'RARE', 'COMMON']
+const RARITY_ORDER = ['S', 'A', 'B', 'C', 'D']
 
 function pickTopRarity(previewItems) {
   if (!previewItems?.length) return []

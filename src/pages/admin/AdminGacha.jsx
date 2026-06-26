@@ -2,20 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 
-const RARITIES = ['COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'MYTHIC']
+// 등급 — S(최고) ~ D(최하). 어드민 UI 셀렉트/그리드는 이 순서로 노출.
+const RARITIES = ['S', 'A', 'B', 'C', 'D']
 const RARITY_COLORS = {
-  COMMON: 'text-gray-300 bg-gray-800',
-  RARE: 'text-sky-300 bg-sky-950/60',
-  EPIC: 'text-violet-300 bg-violet-950/60',
-  LEGENDARY: 'text-amber-300 bg-amber-950/60',
-  MYTHIC: 'text-fuchsia-300 bg-fuchsia-950/60',
+  S: 'text-fuchsia-300 bg-fuchsia-950/60',
+  A: 'text-amber-300 bg-amber-950/60',
+  B: 'text-violet-300 bg-violet-950/60',
+  C: 'text-sky-300 bg-sky-950/60',
+  D: 'text-gray-300 bg-gray-800',
 }
 
-// 박스 추가 시 기본 — 3등급 (가장 단순). 편집에서 등급 추가/제거 가능.
-const DEFAULT_RATES = { COMMON: 70, RARE: 25, EPIC: 5 }
+// 박스 추가 시 기본 — 3등급 (가장 단순, 낮은 등급부터). 편집에서 등급 추가/제거 가능.
+const DEFAULT_RATES = { D: 70, C: 25, B: 5 }
 
 // 등급 추가 시 후보 기본값 — 각 등급의 "흔히 쓰이는" 비율.
-const RARITY_DEFAULT_HINT = { COMMON: 60, RARE: 25, EPIC: 12, LEGENDARY: 2.5, MYTHIC: 0.5 }
+const RARITY_DEFAULT_HINT = { S: 0.5, A: 2.5, B: 12, C: 25, D: 60 }
 
 export default function AdminGacha() {
   const [boxes, setBoxes] = useState([])
@@ -863,7 +864,7 @@ function refDescriptor(item) {
 function AddItemForm({ box, characters, onClose, onCreated }) {
   // 박스가 사용하는 등급만 옵션으로 — 사용 안 한 등급에 아이템 박으면 추첨 풀에서 빠짐.
   const boxRarities = RARITIES.filter((r) => box.rarityRates?.[r] != null)
-  const [rarity, setRarity] = useState(boxRarities[0] || 'COMMON')
+  const [rarity, setRarity] = useState(boxRarities[0] || 'D')
   const [rewardType, setRewardType] = useState('EXPRESSION_IMAGE')
   const [characterId, setCharacterId] = useState('')
   const [variantId, setVariantId] = useState('')

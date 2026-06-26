@@ -6,11 +6,11 @@ import useStore from '../../store/useStore'
 import MaskIcon from '../../components/MaskIcon'
 
 const RARITY_COLORS = {
-  COMMON: 'from-gray-600 to-gray-700 text-gray-100',
-  RARE: 'from-sky-700 to-sky-900 text-sky-100',
-  EPIC: 'from-violet-700 to-violet-900 text-violet-100',
-  LEGENDARY: 'from-amber-600 to-amber-800 text-amber-100',
-  MYTHIC: 'from-fuchsia-600 to-fuchsia-900 text-fuchsia-100',
+  S: 'from-fuchsia-600 to-fuchsia-900 text-fuchsia-100',
+  A: 'from-amber-600 to-amber-800 text-amber-100',
+  B: 'from-violet-700 to-violet-900 text-violet-100',
+  C: 'from-sky-700 to-sky-900 text-sky-100',
+  D: 'from-gray-600 to-gray-700 text-gray-100',
 }
 
 const REWARD_TYPE_LABEL = {
@@ -21,13 +21,13 @@ const REWARD_TYPE_LABEL = {
   STYLE_SET: '스타일 세트',
 }
 
-const RARITY_ORDER = ['MYTHIC', 'LEGENDARY', 'EPIC', 'RARE', 'COMMON']
+const RARITY_ORDER = ['S', 'A', 'B', 'C', 'D']
 const RARITY_LABEL_COLOR = {
-  COMMON: 'text-gray-300',
-  RARE: 'text-sky-300',
-  EPIC: 'text-violet-300',
-  LEGENDARY: 'text-amber-300',
-  MYTHIC: 'text-fuchsia-300',
+  S: 'text-fuchsia-300',
+  A: 'text-amber-300',
+  B: 'text-violet-300',
+  C: 'text-sky-300',
+  D: 'text-gray-300',
 }
 
 // 미리보기 후보 중 가장 높은 등급의 아이템만 추려서 반환 (최대 4개).
@@ -666,7 +666,7 @@ function OddsModal({ box, items, previewItems, onClose }) {
 }
 
 function ItemTile({ item }) {
-  const colorCls = RARITY_COLORS[item.rarity] || RARITY_COLORS.COMMON
+  const colorCls = RARITY_COLORS[item.rarity] || RARITY_COLORS.D
   return (
     <div
       className={`relative aspect-square rounded-lg overflow-hidden bg-gradient-to-br ${colorCls} ${
@@ -777,7 +777,7 @@ function ResultModal({ result, items, onClose, onPityPick, onViewCharacter }) {
 }
 
 function ResultCard({ result }) {
-  const colorCls = RARITY_COLORS[result.rarity] || RARITY_COLORS.COMMON
+  const colorCls = RARITY_COLORS[result.rarity] || RARITY_COLORS.D
   const isExpression =
     result.rewardType === 'EXPRESSION_IMAGE' || result.rewardType === 'EXPRESSION_BUNDLE'
   const isStyleSet = result.rewardType === 'STYLE_SET'
@@ -841,7 +841,8 @@ function ResultCard({ result }) {
 }
 
 // 박스 rarityRates에서 확률이 가장 낮은 등급을 선택. 동률은 더 희귀한 쪽 우선.
-const RARITY_RANK = { MYTHIC: 0, LEGENDARY: 1, EPIC: 2, RARE: 3, COMMON: 4 }
+// S(최고) > A > B > C > D(최하)
+const RARITY_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 }
 function getPityRarity(rarityRates) {
   if (!rarityRates) return null
   const entries = Object.entries(rarityRates).filter(
