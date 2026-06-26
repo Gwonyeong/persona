@@ -62,6 +62,14 @@ export default function MaskShop() {
   const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
   const [toast, setToast] = useState(null) // { kind: 'error' | 'success', text }
 
+  // 다른 페이지에서 스크롤된 상태로 진입해도 상점은 항상 최상단부터 보이게.
+  // UserLayout 의 main 이 실제 스크롤 컨테이너 — 그쪽을 0 으로.
+  useEffect(() => {
+    const main = document.querySelector('main')
+    if (main) main.scrollTop = 0
+    else window.scrollTo(0, 0)
+  }, [])
+
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2400)
