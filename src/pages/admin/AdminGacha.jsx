@@ -110,6 +110,7 @@ function NewBoxForm({ onCreated }) {
   const [name, setName] = useState('')
   const [cost, setCost] = useState(10)
   const [pityCount, setPityCount] = useState(30)
+  const [freeDrawCount, setFreeDrawCount] = useState(0)
   const [creating, setCreating] = useState(false)
 
   const submit = async () => {
@@ -120,11 +121,13 @@ function NewBoxForm({ onCreated }) {
         name,
         cost: Number(cost),
         pityCount: Number(pityCount),
+        freeDrawCount: Number(freeDrawCount),
         rarityRates: DEFAULT_RATES,
       })
       setName('')
       setCost(10)
       setPityCount(30)
+      setFreeDrawCount(0)
       onCreated()
     } catch (err) {
       alert('생성 실패: ' + (err?.data?.error || err?.message))
@@ -136,7 +139,7 @@ function NewBoxForm({ onCreated }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
       <h3 className="text-sm font-semibold mb-3">새 박스 추가</h3>
-      <div className="grid grid-cols-[1fr_120px_120px_auto] gap-2">
+      <div className="grid grid-cols-[1fr_110px_110px_110px_auto] gap-2">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -157,6 +160,14 @@ function NewBoxForm({ onCreated }) {
           placeholder="천장 회수"
           className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm"
         />
+        <input
+          type="number"
+          min="0"
+          value={freeDrawCount}
+          onChange={(e) => setFreeDrawCount(e.target.value)}
+          placeholder="무료 횟수"
+          className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm"
+        />
         <button
           disabled={creating}
           onClick={submit}
@@ -168,7 +179,7 @@ function NewBoxForm({ onCreated }) {
       </div>
       <p className="mt-2 text-[11px] text-gray-500">
         기본 등급 확률 {Object.entries(DEFAULT_RATES).map(([k, v]) => `${k} ${v}%`).join(' · ')} 로 생성.
-        편집에서 변경 가능.
+        무료 횟수는 유저당 평생 1회 제공(10회 묶음에는 적용 안 됨). 편집에서 변경 가능.
       </p>
     </div>
   )
@@ -222,6 +233,7 @@ function BoxBasicForm({ box, onSaved }) {
     bulkCost: box.bulkCost ?? '',
     isActive: box.isActive,
     pityCount: box.pityCount,
+    freeDrawCount: box.freeDrawCount ?? 0,
     startsAt: box.startsAt ? box.startsAt.slice(0, 16) : '',
     endsAt: box.endsAt ? box.endsAt.slice(0, 16) : '',
   })
@@ -239,6 +251,7 @@ function BoxBasicForm({ box, onSaved }) {
         bulkCost: form.bulkCost === '' ? null : Number(form.bulkCost),
         isActive: form.isActive,
         pityCount: Number(form.pityCount),
+        freeDrawCount: Number(form.freeDrawCount),
         startsAt: form.startsAt || null,
         endsAt: form.endsAt || null,
       })
@@ -344,6 +357,17 @@ function BoxBasicForm({ box, onSaved }) {
             type="number"
             value={form.pityCount}
             onChange={(e) => setForm({ ...form, pityCount: e.target.value })}
+            className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
+          />
+        </label>
+        <label className="text-xs text-gray-400">
+          무료 횟수 (유저당 평생)
+          <input
+            type="number"
+            min="0"
+            value={form.freeDrawCount}
+            onChange={(e) => setForm({ ...form, freeDrawCount: e.target.value })}
+            placeholder="0"
             className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
           />
         </label>

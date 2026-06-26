@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
+import MaskIcon from '../../components/MaskIcon'
 
 const RARITY_COLORS = {
   COMMON: 'from-gray-600 to-gray-700 text-gray-100',
@@ -142,7 +143,9 @@ export default function GachaBox() {
 
   const { box, items, progress, pity } = status
   const masks = user?.masks ?? 0
-  const canAfford = masks >= box.cost
+  const freeRemaining = status.free?.remaining || 0
+  const has1Free = freeRemaining > 0
+  const canAfford = has1Free || masks >= box.cost
   const canAfford10 = masks >= (box.bulkCost ?? box.cost * 10)
   const pityProgressPct = pity.threshold > 0 ? Math.min(100, (pity.count / pity.threshold) * 100) : 0
 
@@ -173,7 +176,7 @@ export default function GachaBox() {
           style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
         >
           <Link
-            to="/gacha"
+            to="/"
             className="px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm text-sm text-white hover:bg-black/70"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
@@ -187,8 +190,8 @@ export default function GachaBox() {
             >
               확률표
             </button>
-            <span className="px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm text-xs font-semibold text-amber-200">
-              🎭 {masks}
+            <span className="px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm text-xs font-semibold text-amber-200 inline-flex items-center gap-1">
+              <MaskIcon /> {masks}
             </span>
           </div>
         </div>
@@ -221,18 +224,28 @@ export default function GachaBox() {
           <button
             disabled={drawing || !canAfford || progress.completed}
             onClick={() => draw(1)}
-            className="py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold disabled:bg-gray-700 disabled:text-gray-500"
+            className={`py-3 rounded-xl text-white font-semibold disabled:bg-gray-700 disabled:text-gray-500 inline-flex items-center justify-center gap-1 ${
+              has1Free
+                ? 'bg-emerald-600 hover:bg-emerald-500'
+                : 'bg-indigo-600 hover:bg-indigo-500'
+            }`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            1회 — {box.cost}🎭
+            {has1Free ? (
+              <>1회 — 무료 ({freeRemaining}회 남음)</>
+            ) : (
+              <>
+                1회 — {box.cost} <MaskIcon />
+              </>
+            )}
           </button>
           <button
             disabled={drawing || !canAfford10 || progress.completed}
             onClick={() => draw(10)}
-            className="py-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-semibold disabled:bg-gray-700 disabled:text-gray-500"
+            className="py-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-semibold disabled:bg-gray-700 disabled:text-gray-500 inline-flex items-center justify-center gap-1"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            10회 — {box.bulkCost ?? box.cost * 10}🎭
+            10회 — {box.bulkCost ?? box.cost * 10} <MaskIcon />
           </button>
         </div>
 
@@ -242,7 +255,7 @@ export default function GachaBox() {
             className="mt-3 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            🎁 천장 보상 받기 (원하는 상품 선택)
+            🎁 원하는 보상을 선택할 수 있어요!
           </button>
         )}
 
@@ -388,6 +401,7 @@ function DetailPreviewTile({ item }) {
           videoUrl={videos[videoIdx]}
           index={videoIdx}
           total={videos.length}
+          totalVideoCount={item.totalVideoCount ?? videos.length}
           characterName={item.characterName}
           characterProfileImage={item.characterProfileImage}
           onNext={() => setVideoIdx((i) => (i + 1) % videos.length)}
@@ -398,7 +412,7 @@ function DetailPreviewTile({ item }) {
   )
 }
 
-function PreviewVideoModal({ videoUrl, index, total, characterName, characterProfileImage, onNext, onClose }) {
+function PreviewVideoModal({ videoUrl, index, total, totalVideoCount, characterName, characterProfileImage, onNext, onClose }) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
@@ -459,6 +473,16 @@ function PreviewVideoModal({ videoUrl, index, total, characterName, characterPro
             </button>
           )}
         </div>
+
+        {/* 우측 아래 — 현재 풀 외 추가 영상 어필 태그 */}
+        {totalVideoCount - total > 0 && (
+          <div className="absolute bottom-14 right-3 z-10 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-sm text-white text-xs font-semibold shadow-lg ring-1 ring-white/20 inline-flex items-center gap-1">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <polygon points="6 4 20 12 6 20 6 4" />
+            </svg>
+            이외에도 {totalVideoCount - total}개의 영상이 있어요!
+          </div>
+        )}
       </div>
     </div>
   )

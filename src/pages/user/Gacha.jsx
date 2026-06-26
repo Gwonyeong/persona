@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../../lib/api'
+import MaskIcon from '../../components/MaskIcon'
 
 export default function Gacha() {
   const [boxes, setBoxes] = useState(null)
@@ -185,11 +186,15 @@ function GachaBoxCard({ box, onExit }) {
         </svg>
       </button>
 
-      {pityReady && (
+      {pityReady ? (
         <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-amber-500 text-amber-950 text-[10px] font-bold shadow-lg">
           🎁 천장 보장 가능
         </div>
-      )}
+      ) : box.free?.remaining > 0 ? (
+        <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-emerald-950 text-[10px] font-bold shadow-lg">
+          🎟 무료 {box.free.remaining}회
+        </div>
+      ) : null}
 
       <div
         className="absolute inset-x-0 bottom-0 p-4 space-y-2"
@@ -225,7 +230,7 @@ function GachaBoxCard({ box, onExit }) {
 
         <div className="flex items-center justify-between pt-1">
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-200 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
-            🎭 {box.cost} / 회
+            <MaskIcon /> {box.cost} / 회
           </span>
           <span className="text-[11px] text-white/80 group-hover:text-white">뽑기 →</span>
         </div>
