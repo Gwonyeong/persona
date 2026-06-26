@@ -73,9 +73,9 @@ export default function CharacterCard({ character, reducedData }) {
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-14">
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <p className="font-semibold text-sm truncate text-white flex-1 min-w-0">{c.name}</p>
-          <div className="flex items-center gap-1.5 flex-shrink-0 text-[10px] font-semibold text-white leading-none tabular-nums">
+          <div className="flex flex-col items-end gap-0.5 flex-shrink-0 text-[10px] font-semibold text-white leading-tight tabular-nums">
             <span className="flex items-center gap-0.5">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
