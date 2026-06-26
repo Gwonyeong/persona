@@ -280,7 +280,7 @@ export default function ChatList() {
                           <p className={`font-semibold text-sm truncate ${isUnread ? 'text-white' : 'text-gray-300'}`}>{conv.character.name}</p>
                           {isV2 && (
                             <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-px rounded-md bg-violet-500/20 text-violet-300 border border-violet-400/30">
-                              스토리
+                              {t('story.badge')}
                             </span>
                           )}
                           <span className="text-xs text-gray-500 flex-shrink-0">{timeAgo(conv.updatedAt)}</span>

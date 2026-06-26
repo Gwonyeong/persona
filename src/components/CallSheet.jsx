@@ -208,8 +208,8 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           onClick={(e) => { e.stopPropagation(); setUiHidden(true) }}
           className="text-gray-100 hover:text-white text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]"
           style={BUTTON_RESET}
-          aria-label="UI 숨기기"
-          title="UI 숨기기 — 다시 누르면 복귀"
+          aria-label={t('call.hideUi')}
+          title={t('call.hideUiTitle')}
         >
           ✕
         </button>
@@ -292,7 +292,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
             >
               {tail.map((m, i) => {
                 const isUser = m.role === 'user'
-                const label = isUser ? '나' : (character?.name || '캐릭터')
+                const label = isUser ? t('call.labelMe') : (character?.name || t('call.labelCharacterFallback'))
                 const canReplay = !isUser && !m.live && !!m.audioUrl
                 if (canReplay) {
                   return (
@@ -302,7 +302,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
                       onClick={(e) => { e.stopPropagation(); playAudioMsg(m.audioUrl) }}
                       className="w-full text-left bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/15 rounded-lg px-2.5 py-2 flex items-start gap-2 transition-colors cursor-pointer"
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      title="다시 재생"
+                      title={t('call.replay')}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-pink-200 flex-shrink-0 mt-0.5" aria-hidden="true">
                         <path d="M8 5v14l11-7z" />

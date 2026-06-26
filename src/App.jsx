@@ -66,7 +66,11 @@ import Survey from './pages/user/Survey'
 import AdminSurveys from './pages/admin/AdminSurveys'
 import AdminMaskPass from './pages/admin/AdminMaskPass'
 import AdminCharacterProfileVariants from './pages/admin/AdminCharacterProfileVariants'
+import AdminGacha from './pages/admin/AdminGacha'
+import AdminSpecialVoices from './pages/admin/AdminSpecialVoices'
 import MaskPass from './pages/user/MaskPass'
+import Gacha from './pages/user/Gacha'
+import GachaBox from './pages/user/GachaBox'
 import MessageNotification from './components/MessageNotification'
 import WelcomeMaskSheet from './components/WelcomeMaskSheet'
 import ImpersonationBanner from './components/ImpersonationBanner'
@@ -196,6 +200,8 @@ function App() {
         <Route path="characters/:id/storylines" element={<CharacterStorylines />} />
         <Route path="characters/:id/profile-variants" element={<AdminCharacterProfileVariants />} />
         <Route path="mask-pass" element={<AdminMaskPass />} />
+        <Route path="gacha" element={<AdminGacha />} />
+        <Route path="gacha/special-voices" element={<AdminSpecialVoices />} />
         <Route path="storylines" element={<StorylinesOverview />} />
         <Route path="storylines/analytics/premium" element={<StoryAnalyticsPremium />} />
         <Route path="storylines/:id" element={<StorylineEdit />} />
@@ -245,6 +251,8 @@ function App() {
         <Route path="/subscription" element={<Subscription />} />
         <Route path="/mask-shop" element={<MaskShop />} />
         <Route path="/mask-pass" element={<MaskPass />} />
+        <Route path="/gacha" element={<Gacha />} />
+        <Route path="/gacha/:id" element={<GachaBox />} />
         <Route path="/feedback" element={<FeedbackList />} />
         <Route path="/feedback/:id" element={<FeedbackDetail />} />
         <Route path="/feedback/write" element={<FeedbackWrite />} />

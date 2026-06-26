@@ -64,6 +64,10 @@ export default function UserLayout() {
     location.pathname.match(/^\/group-chats\/\d/) ||
     location.pathname === '/group-chats/new'
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
+  // 가챠 페이지는 박스가 화면을 풀-블리드로 채우는 디자인 — 탭바·푸터·하단 spacer 모두 숨김.
+  const isGachaPage = location.pathname.startsWith('/gacha')
+  const hideFooter = isFullscreenPage || isGachaPage
+  const hideNav = isFullscreenPage || isGachaPage
 
   const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
   const shouldShowBanner = !isFullscreenPage && isFreeTier
@@ -103,7 +107,7 @@ export default function UserLayout() {
         <Outlet />
 
         {/* 푸터 */}
-        {!isFullscreenPage && (
+        {!hideFooter && (
           <footer className="px-4 py-6 mt-4 border-t border-gray-800">
             <div className="flex justify-center gap-3 text-xs text-gray-500">
               <Link to="/about" className="hover:text-gray-300 transition-colors">{t('footer.about')}</Link>
@@ -119,8 +123,8 @@ export default function UserLayout() {
         )}
       </main>
 
-      {/* 하단 탭바 (채팅 / 캐릭터 풀스크린 페이지에서는 숨김) */}
-      {!isFullscreenPage && (
+      {/* 하단 탭바 (채팅 / 캐릭터 풀스크린 / 가챠 페이지에서는 숨김) */}
+      {!hideNav && (
       <nav className="relative z-[60] flex flex-shrink-0 border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm">
         {TABS.map((tab, i) => (
           <React.Fragment key={tab.to}>
@@ -177,7 +181,7 @@ export default function UserLayout() {
           - reserveBannerSlot=true → AdMob 네이티브 배너가 화면 절대 하단에 오버레이됨.
             spacer 높이를 (배너 ~60px + safe-area)로 확보해 nav 오탭/가림 방지.
           - false → safe-area 패딩만 (LIGHT 구독자 / iOS / web). */}
-      {!isFullscreenPage && (
+      {!hideNav && (
         <div
           className="flex-shrink-0 bg-gray-900/95"
           style={

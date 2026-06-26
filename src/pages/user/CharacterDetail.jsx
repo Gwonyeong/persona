@@ -330,10 +330,17 @@ export default function CharacterDetail() {
     }
   }, [id])
 
+  // 스타일 탭 — 캐릭터의 모든 스타일 중 선택. null이면 첫 스타일.
+  const [selectedStyleId, setSelectedStyleId] = useState(null)
+  const selectedStyle = useMemo(() => {
+    const list = character?.styles || []
+    return list.find((s) => s.id === selectedStyleId) || list[0] || null
+  }, [character, selectedStyleId])
+
   // 표정 슬라이드 — normal은 감정당 랜덤 1장, aroused는 모든 이미지 노출(갤러리 UI)
   // 이미지 row만 후보 (standalone 영상 row 제외)
   const expressionRows = useMemo(() => {
-    const images = character?.styles?.[0]?.images
+    const images = selectedStyle?.images
     if (!images?.length) return { normal: [], aroused: [] }
     const pickOne = (emotion) => {
       const matching = images.filter((img) => img.emotion === emotion && !isVideoUrl(img.filePath))
@@ -351,7 +358,7 @@ export default function CharacterDetail() {
       normal: NORMAL_EMOTIONS.map(pickOne).filter(Boolean),
       aroused: arousedAll,
     }
-  }, [character])
+  }, [selectedStyle])
 
   // 표정 영상 해금 — 10마스크
   const EXPRESSION_VIDEO_COST = 10
@@ -363,7 +370,7 @@ export default function CharacterDetail() {
   const handleUnlockExpressionVideo = async (img) => {
     if (!user) return goToLogin()
     if ((user.masks ?? 0) < EXPRESSION_VIDEO_COST) {
-      alert('마스크가 부족합니다.')
+      alert(t('character.insufficientMasks'))
       navigate('/subscription')
       return
     }
@@ -386,10 +393,10 @@ export default function CharacterDetail() {
       if (res.masks !== undefined) setUser({ ...user, masks: res.masks })
     } catch (err) {
       if (err?.error === 'INSUFFICIENT_MASKS') {
-        alert('마스크가 부족합니다.')
+        alert(t('character.insufficientMasks'))
         navigate('/subscription')
       } else {
-        alert('해금에 실패했어요.')
+        alert(t('character.unlockFailed'))
       }
     } finally {
       setUnlockingExpImageId(null)
@@ -442,7 +449,7 @@ export default function CharacterDetail() {
               {hasStories && (
                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2 ${storyViewed ? 'bg-gray-700/80' : 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400'}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                  <span className="text-[10px] text-white font-semibold">스토리</span>
+                  <span className="text-[10px] text-white font-semibold">{t('character.storyBadge')}</span>
                 </div>
               )}
               <div className="flex items-center gap-2 flex-wrap">
@@ -470,7 +477,7 @@ export default function CharacterDetail() {
             onClick={() => navigate(-1)}
             className="absolute left-3 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
             style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="뒤로가기"
+            aria-label={t('character.back')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6" />
@@ -483,8 +490,8 @@ export default function CharacterDetail() {
               onClick={() => setShowProfilePicker(true)}
               className="absolute right-16 z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
               style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="프로필 이미지 변경"
-              title="프로필 이미지 변경"
+              aria-label={t('character.changeProfileImage')}
+              title={t('character.changeProfileImage')}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -529,6 +536,40 @@ export default function CharacterDetail() {
                   </span>
                 )
               })}
+            </div>
+          )}
+
+          {/* 스타일 탭 — 캐릭터의 모든 스타일 (해금 안 한 GACHA 스타일은 흑색 silhouette) */}
+          {(character.styles?.length || 0) > 1 && (
+            <StyleTabsRow
+              styles={character.styles}
+              selectedStyleId={selectedStyle?.id || null}
+              onSelect={setSelectedStyleId}
+            />
+          )}
+
+          {/* 선택된 스타일이 해금 안 된 GACHA 면 안내 배너 + 가챠 바로가기 */}
+          {selectedStyle && !selectedStyle.unlocked && (
+            <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60 flex items-center gap-3">
+              <span className="text-lg">🎁</span>
+              <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">
+                이 복장은 <strong>선물 뽑기</strong>에서 획득할 수 있어요!
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const { boxes } = await api.get('/gacha/boxes')
+                    const first = boxes?.[0]
+                    navigate(first ? `/gacha/${first.id}` : '/gacha')
+                  } catch {
+                    navigate('/gacha')
+                  }
+                }}
+                className="flex-shrink-0 px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-100 text-xs font-bold border border-gray-600"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                바로가기 →
+              </button>
             </div>
           )}
 
@@ -598,17 +639,16 @@ export default function CharacterDetail() {
                             />
                           )}
 
-                          {/* 본 + 영상 미해금 → 블러 영상 */}
+                          {/* 본 + 영상 미해금 → 전체 블러 영상.
+                              scale로 흐려진 가장자리를 컨테이너 밖으로 밀어내 균일 블러 + 원본 프레임 유출 방지,
+                              transform이 GPU 합성 레이어를 강제해 진입 첫 페인트부터 블러가 적용되게 함 */}
                           {seen && hasVideo && !videoUnlocked && (
-                            <>
-                              <video
-                                src={img.videoFilePath}
-                                className="absolute inset-0 w-full h-full object-cover"
-                                style={{ filter: 'blur(14px)' }}
-                                autoPlay loop muted playsInline
-                              />
-                              <div className="absolute inset-0 bg-black/30" />
-                            </>
+                            <video
+                              src={img.videoFilePath}
+                              className="absolute inset-0 w-full h-full object-cover object-bottom"
+                              style={{ filter: 'blur(16px)', transform: 'scale(1.25)', willChange: 'filter, transform' }}
+                              autoPlay loop muted playsInline
+                            />
                           )}
 
                           {/* 영상 있는 본 이미지 → 중앙 재생 버튼 */}
@@ -621,7 +661,7 @@ export default function CharacterDetail() {
                               disabled={isUnlocking}
                               className="absolute inset-0 flex items-center justify-center disabled:opacity-60"
                               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                              aria-label={videoUnlocked ? '영상 재생' : '영상 해금'}
+                              aria-label={videoUnlocked ? t('character.playVideo') : t('character.unlockVideo')}
                             >
                               <div className="flex flex-col items-center gap-1">
                                 <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-lg">
@@ -655,8 +695,8 @@ export default function CharacterDetail() {
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     >
                       {arousedExpanded
-                        ? '접기'
-                        : `더 보기 (+${expressionRows.aroused.length - EXPRESSION_INITIAL_LIMIT})`}
+                        ? t('character.collapse')
+                        : t('character.showMore', { count: expressionRows.aroused.length - EXPRESSION_INITIAL_LIMIT })}
                     </button>
                   )}
                 </div>
@@ -713,10 +753,10 @@ export default function CharacterDetail() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className={`text-[10px] mb-0.5 ${isAroused ? 'text-pink-300' : 'text-gray-400'}`}>
-                        {isAroused ? '흥분' : '일반'}
+                        {isAroused ? t('character.voiceLabelAroused') : t('character.voiceLabelNormal')}
                       </p>
                       <p className={`text-sm leading-snug line-clamp-2 ${locked ? 'text-gray-500' : 'text-gray-100'}`}>
-                        {locked ? 'Safety Mode 해제 시 재생할 수 있어요' : sample.text}
+                        {locked ? t('character.voiceLockedHint') : sample.text}
                       </p>
                     </div>
                   </button>
@@ -746,8 +786,8 @@ export default function CharacterDetail() {
           {(scenarios.length > 0 || storylines.length > 0) && (
             <div className="mt-5">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-bold text-gray-200">스토리</h3>
-                <span className="text-[11px] text-gray-500">{scenarios.length + storylines.length}개</span>
+                <h3 className="text-sm font-bold text-gray-200">{t('character.storySection')}</h3>
+                <span className="text-[11px] text-gray-500">{t('character.storyCountSuffix', { count: scenarios.length + storylines.length })}</span>
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide snap-x snap-mandatory">
                 {/* 시나리오 카드 */}
@@ -779,7 +819,7 @@ export default function CharacterDetail() {
                     )}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent px-3 pt-10 pb-3 text-left">
                       <p className="font-semibold text-sm text-white line-clamp-1">{sc.title}</p>
-                      <p className="text-[11px] text-gray-300 mt-1">파트 {sc.partCount}개</p>
+                      <p className="text-[11px] text-gray-300 mt-1">{t('character.partCount', { count: sc.partCount })}</p>
                     </div>
                   </button>
                 ))}
@@ -908,7 +948,7 @@ export default function CharacterDetail() {
               className={`flex-1 flex justify-center py-2.5 border-b-2 transition-colors ${activeTab === 'gift' ? 'border-white text-white' : 'border-transparent text-gray-500'}`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               data-onboarding-target="tab-gift"
-              aria-label="선물"
+              aria-label={t('character.giftButton')}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 12 20 22 4 22 4 12" />
@@ -1017,8 +1057,8 @@ export default function CharacterDetail() {
         {activeTab === 'gift' && (
           giftUnlocks.length === 0 ? (
             <div className="text-center text-gray-500 py-16 px-6">
-              <p className="text-sm">아직 선물한 항목이 없습니다.</p>
-              <p className="text-xs text-gray-600 mt-1">채팅 화면의 🎁 버튼에서 선물할 수 있어요.</p>
+              <p className="text-sm">{t('character.emptyGifts')}</p>
+              <p className="text-xs text-gray-600 mt-1">{t('character.emptyGiftsHint')}</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4 py-3">
@@ -1160,7 +1200,7 @@ export default function CharacterDetail() {
             onClick={() => setExpVideoLightboxUrl(null)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="닫기"
+            aria-label={t('common.close')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -1304,20 +1344,20 @@ export default function CharacterDetail() {
               <div>
                 {chatModal.step === 'mode' && (
                   <>
-                    <h3 className="text-base font-bold text-white">대화 시작</h3>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{character?.name}와(과) 어떻게 만날까요?</p>
+                    <h3 className="text-base font-bold text-white">{t('character.chatModalTitle')}</h3>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{t('character.chatModalDesc', { name: character?.name })}</p>
                   </>
                 )}
                 {chatModal.step === 'preset' && (
                   <>
-                    <h3 className="text-base font-bold text-white">시작 상태 선택</h3>
-                    <p className="text-[11px] text-gray-400 mt-0.5">관계의 출발점에 따라 호감도/친밀도가 달라집니다.</p>
+                    <h3 className="text-base font-bold text-white">{t('character.presetSelectTitle')}</h3>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{t('character.presetSelectDesc')}</p>
                   </>
                 )}
                 {(chatModal.step === 'confirm-basic' || chatModal.step === 'confirm-concept') && (
                   <>
-                    <h3 className="text-base font-bold text-white">대화를 새로 시작할까요?</h3>
-                    <p className="text-[11px] text-red-300 mt-0.5">기존 대화 내용이 삭제되며 되돌릴 수 없습니다.</p>
+                    <h3 className="text-base font-bold text-white">{t('character.restartConfirmTitle')}</h3>
+                    <p className="text-[11px] text-red-300 mt-0.5">{t('character.restartConfirmDesc')}</p>
                   </>
                 )}
               </div>
@@ -1338,8 +1378,8 @@ export default function CharacterDetail() {
                   <div className="flex items-start gap-3 mb-3">
                     <span className="text-2xl leading-none mt-0.5">💬</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white">기본 채팅</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">자유롭게 대화하는 일반 모드</p>
+                      <p className="text-sm font-semibold text-white">{t('character.basicChat')}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{t('character.basicChatDesc')}</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -1349,7 +1389,7 @@ export default function CharacterDetail() {
                       className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     >
-                      {existingConv ? '이어서 대화' : '대화 시작'}
+                      {existingConv ? t('character.continueChat') : t('character.startChat')}
                     </button>
                     {existingConv && (
                       <button
@@ -1358,7 +1398,7 @@ export default function CharacterDetail() {
                         className="px-3 py-2.5 text-[11px] text-red-300 border border-red-400/40 hover:bg-red-400/10 disabled:opacity-50 rounded-xl transition-colors"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        새로 시작
+                        {t('character.restartConfirm')}
                       </button>
                     )}
                   </div>
@@ -1371,12 +1411,12 @@ export default function CharacterDetail() {
                       <span className="text-2xl leading-none mt-0.5">🎬</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-violet-100">컨셉 채팅</p>
+                          <p className="text-sm font-semibold text-violet-100">{t('character.conceptChat')}</p>
                           <span className="text-[9px] font-bold px-1.5 py-px rounded-md bg-violet-500/30 text-violet-200 border border-violet-400/40 tracking-wide">
-                            스토리
+                            {t('character.storyBadge')}
                           </span>
                         </div>
-                        <p className="text-[11px] text-violet-200/70 mt-0.5">에피소드·시간·관계가 진화하는 미연시 모드</p>
+                        <p className="text-[11px] text-violet-200/70 mt-0.5">{t('character.conceptChatDesc')}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -1388,7 +1428,7 @@ export default function CharacterDetail() {
                             className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
                             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                           >
-                            이어서 진행
+                            {t('character.continueStory')}
                           </button>
                           <button
                             onClick={() => setChatModal({ open: true, step: 'confirm-concept' })}
@@ -1396,7 +1436,7 @@ export default function CharacterDetail() {
                             className="px-3 py-2.5 text-[11px] text-violet-200 border border-violet-400/40 hover:bg-violet-400/10 disabled:opacity-50 rounded-xl transition-colors"
                             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                           >
-                            새로 시작
+                            {t('character.restartConfirm')}
                           </button>
                         </>
                       ) : (
@@ -1406,7 +1446,7 @@ export default function CharacterDetail() {
                           className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
                           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                         >
-                          스토리 시작
+                          {t('character.startStory')}
                         </button>
                       )}
                     </div>
@@ -1423,7 +1463,7 @@ export default function CharacterDetail() {
                   className="self-start text-[11px] text-gray-400 hover:text-white mb-1 flex items-center gap-1"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  ← 모드 다시 선택
+                  {t('character.backToModeSelect')}
                 </button>
                 {v2Presets.startingPresets.map((p) => (
                   <button
@@ -1436,8 +1476,8 @@ export default function CharacterDetail() {
                     <div className="text-sm font-semibold text-violet-100">{p.label}</div>
                     <div className="text-[11px] text-violet-200/80 mt-1">{p.description}</div>
                     <div className="text-[10px] text-violet-300/60 mt-1.5 flex gap-2 flex-wrap">
-                      <span>친밀도 {p.familiarity} · 호감도 {p.affinity}</span>
-                      {p.userNickname && <span>· 호칭 <strong className="text-violet-200">{p.userNickname}</strong></span>}
+                      <span>{t('character.familiarity')} {p.familiarity} · {t('character.affinity')} {p.affinity}</span>
+                      {p.userNickname && <span>· {t('character.nickname')} <strong className="text-violet-200">{p.userNickname}</strong></span>}
                     </div>
                   </button>
                 ))}
@@ -1451,8 +1491,8 @@ export default function CharacterDetail() {
                     <span className="text-2xl leading-none mt-0.5">⚠️</span>
                     <div className="flex-1 min-w-0 text-[12px] text-red-100/90 leading-relaxed">
                       {chatModal.step === 'confirm-basic'
-                        ? '지금까지 나눈 기본 채팅 대화 기록이 모두 삭제되고 새 대화로 시작합니다.'
-                        : '지금까지 진행된 컨셉 채팅(스토리)의 호감도·친밀도·에피소드 진행 상황이 모두 초기화됩니다.'}
+                        ? t('character.resetBasicDesc')
+                        : t('character.resetConceptDesc')}
                     </div>
                   </div>
                 </div>
@@ -1463,7 +1503,7 @@ export default function CharacterDetail() {
                     className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-200 text-sm font-semibold rounded-xl transition-colors"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    취소
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={() => {
@@ -1474,7 +1514,7 @@ export default function CharacterDetail() {
                     className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    삭제하고 새로 시작
+                    {t('character.deleteAndStart')}
                   </button>
                 </div>
               </div>
@@ -1482,6 +1522,76 @@ export default function CharacterDetail() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// 스타일 탭 — 캐릭터의 모든 스타일을 가로 스크롤 그리드로. 팔로우한 페소나 디자인 차용.
+// 해금 안 한 GACHA 스타일은 그라데이션 ring 대신 흑색 ring + grayscale + brightness 다운.
+function StyleTabsRow({ styles, selectedStyleId, onSelect }) {
+  if (!styles?.length) return null
+  return (
+    <div className="mt-3 -mx-4 px-4">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+        {styles.map((s) => {
+          const thumb = s.images?.find((i) => !i.filePath?.match(/\.(mp4|webm|mov|m4v)(\?|$)/i))?.filePath || null
+          const isSelected = s.id === selectedStyleId
+          const locked = !s.unlocked
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onSelect(s.id)}
+              className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <div
+                className={`relative w-14 h-14 rounded-full p-[2px] ${
+                  locked
+                    ? 'bg-gradient-to-br from-gray-700 to-gray-900'
+                    : isSelected
+                      ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                      : 'bg-gray-700/60'
+                }`}
+              >
+                <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
+                  <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-800">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={s.name}
+                        draggable={false}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={
+                          locked
+                            ? { filter: 'grayscale(1) brightness(0.15)' }
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
+                        ?
+                      </div>
+                    )}
+                    {locked && (
+                      <div className="absolute inset-0 flex items-center justify-center text-base">
+                        🔒
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] w-full text-center truncate leading-tight ${
+                  isSelected ? 'text-white font-semibold' : 'text-gray-400'
+                }`}
+              >
+                {s.name}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

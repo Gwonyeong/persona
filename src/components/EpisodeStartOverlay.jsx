@@ -4,10 +4,12 @@
 //
 // 부모 컨테이너(#root max-width 480px)에 absolute로 배치 — viewport 전체를 차지하지 않음.
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const HOLD_MS = 1000
 
 export default function EpisodeStartOverlay({ episode, onDismiss }) {
+  const { t } = useTranslation()
   const [progress, setProgress] = useState(0)
   const [mounted, setMounted] = useState(false)
   const startTimeRef = useRef(null)
@@ -64,7 +66,7 @@ export default function EpisodeStartOverlay({ episode, onDismiss }) {
   if (!episode) return null
 
   const snap = episode.snapshot || {}
-  const title = snap.title || '에피소드 시작'
+  const title = snap.title || t('episode.defaultTitle')
   const successCondition = snap.endsWhen || ''
 
   // 원형 진행바 (SVG)
@@ -99,7 +101,7 @@ export default function EpisodeStartOverlay({ episode, onDismiss }) {
         {successCondition && (
           <div className="w-full bg-emerald-500/8 border border-emerald-400/30 rounded-2xl px-4 py-3 mb-8">
             <p className="text-[10px] tracking-widest text-emerald-300/80 mb-1.5 font-medium">
-              완료 조건
+              {t('episode.successCondition')}
             </p>
             <p className="text-xs text-gray-100 leading-relaxed">
               {successCondition}
@@ -140,7 +142,7 @@ export default function EpisodeStartOverlay({ episode, onDismiss }) {
           </svg>
         </button>
         <p className="text-[11px] text-gray-400 mt-3">
-          1초간 길게 눌러 진행하기
+          {t('episode.holdToContinue')}
         </p>
       </div>
     </div>

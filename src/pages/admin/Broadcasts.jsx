@@ -48,6 +48,11 @@ function formatKST(iso) {
   return d.toLocaleString('ko-KR', { hour12: false })
 }
 
+const EMPTY_TR = {
+  en: { title: '', body: '' },
+  ja: { title: '', body: '' },
+}
+
 export default function Broadcasts() {
   const [broadcasts, setBroadcasts] = useState([])
   const [editing, setEditing] = useState(null)
@@ -57,6 +62,9 @@ export default function Broadcasts() {
   const [removeImage, setRemoveImage] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [trForm, setTrForm] = useState(EMPTY_TR)
+  const [trSaving, setTrSaving] = useState(false)
+  const [retranslating, setRetranslating] = useState(false)
   const fileInputRef = useRef(null)
 
   const load = () => {
@@ -83,6 +91,10 @@ export default function Broadcasts() {
     setImageFile(null)
     setImagePreview(null)
     setRemoveImage(false)
+    setTrForm({
+      en: { title: b.translations?.en?.title || '', body: b.translations?.en?.body || '' },
+      ja: { title: b.translations?.ja?.title || '', body: b.translations?.ja?.body || '' },
+    })
     setEditing(b)
   }
 
@@ -91,6 +103,45 @@ export default function Broadcasts() {
     setImageFile(null)
     setImagePreview(null)
     setRemoveImage(false)
+    setTrForm(EMPTY_TR)
+  }
+
+  // 자동 번역 결과를 어드민 수정안으로 저장
+  const saveTranslations = async () => {
+    if (!editing || editing === 'new') return
+    setTrSaving(true)
+    try {
+      const { broadcast } = await api.put(`/admin/broadcasts/${editing.id}/translations`, {
+        translations: trForm,
+      })
+      setEditing(broadcast)
+      load()
+      alert('번역 저장 완료')
+    } catch (e) {
+      alert('번역 저장 실패: ' + (e.message || ''))
+    } finally {
+      setTrSaving(false)
+    }
+  }
+
+  // 현재 한국어 원문으로 재번역
+  const retranslate = async () => {
+    if (!editing || editing === 'new') return
+    if (!confirm('한국어 원문으로 다시 번역합니다. 기존 수정 내용이 덮어쓰입니다. 계속할까요?')) return
+    setRetranslating(true)
+    try {
+      const { broadcast } = await api.post(`/admin/broadcasts/${editing.id}/retranslate`)
+      setEditing(broadcast)
+      setTrForm({
+        en: { title: broadcast.translations?.en?.title || '', body: broadcast.translations?.en?.body || '' },
+        ja: { title: broadcast.translations?.ja?.title || '', body: broadcast.translations?.ja?.body || '' },
+      })
+      load()
+    } catch (e) {
+      alert('재번역 실패: ' + (e.message || ''))
+    } finally {
+      setRetranslating(false)
+    }
   }
 
   const onPickFile = (e) => {
@@ -121,6 +172,7 @@ export default function Broadcasts() {
 
     setSaving(true)
     try {
+      let saved
       if (editing === 'new') {
         const fd = new FormData()
         fd.append('title', form.title)
@@ -128,23 +180,34 @@ export default function Broadcasts() {
         if (form.linkPath) fd.append('linkPath', form.linkPath)
         fd.append('scheduledAt', iso)
         if (imageFile) fd.append('image', imageFile)
-        await api.post('/admin/broadcasts', fd)
+        const res = await api.post('/admin/broadcasts', fd)
+        saved = res.broadcast
       } else {
-        await api.put(`/admin/broadcasts/${editing.id}`, {
+        const res = await api.put(`/admin/broadcasts/${editing.id}`, {
           title: form.title,
           body: form.body,
           linkPath: form.linkPath,
           scheduledAt: iso,
         })
+        saved = res.broadcast
         if (imageFile) {
           const fd = new FormData()
           fd.append('image', imageFile)
-          await api.put(`/admin/broadcasts/${editing.id}/image`, fd)
+          const r = await api.put(`/admin/broadcasts/${editing.id}/image`, fd)
+          saved = r.broadcast || saved
         } else if (removeImage && editing.imageUrl) {
-          await api.delete(`/admin/broadcasts/${editing.id}/image`)
+          const r = await api.delete(`/admin/broadcasts/${editing.id}/image`)
+          saved = r.broadcast || saved
         }
       }
-      close()
+      // 저장 후 모달 유지 → 번역 결과 미리보기/수정 가능
+      if (saved) {
+        setEditing(saved)
+        setTrForm({
+          en: { title: saved.translations?.en?.title || '', body: saved.translations?.en?.body || '' },
+          ja: { title: saved.translations?.ja?.title || '', body: saved.translations?.ja?.body || '' },
+        })
+      }
       load()
     } catch (e) {
       alert('저장 실패: ' + (e.message || ''))
@@ -440,6 +503,64 @@ export default function Broadcasts() {
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none disabled:text-gray-500 resize-none"
                 />
               </div>
+
+              {/* 자동 번역 미리보기 + 수정 — 저장된 broadcast에만 노출 */}
+              {editing && editing !== 'new' && (
+                <div className="border border-gray-700 rounded-lg p-3 bg-gray-800/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <div className="text-xs font-semibold text-gray-200">🌐 다국어 번역 (Gemini 자동 번역)</div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        한국어 원문 저장 시 자동 생성됩니다. 직접 수정하거나 다시 번역할 수 있어요.
+                      </div>
+                    </div>
+                    {!isReadOnly && (
+                      <button
+                        onClick={retranslate}
+                        disabled={retranslating || trSaving}
+                        className="text-[11px] px-2 py-1 bg-amber-700/50 hover:bg-amber-700 text-amber-100 rounded disabled:opacity-50"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        {retranslating ? '번역 중...' : '🔄 다시 번역'}
+                      </button>
+                    )}
+                  </div>
+                  {[
+                    { lang: 'en', label: 'English' },
+                    { lang: 'ja', label: '日本語' },
+                  ].map(({ lang, label }) => (
+                    <div key={lang} className="mt-3 first:mt-2">
+                      <div className="text-[10px] text-gray-500 mb-1 uppercase tracking-wider">{label}</div>
+                      <input
+                        value={trForm[lang].title}
+                        onChange={(e) => setTrForm({ ...trForm, [lang]: { ...trForm[lang], title: e.target.value } })}
+                        disabled={isReadOnly}
+                        placeholder="(자동 번역됨)"
+                        maxLength={60}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none mb-1.5 disabled:text-gray-500"
+                      />
+                      <textarea
+                        value={trForm[lang].body}
+                        onChange={(e) => setTrForm({ ...trForm, [lang]: { ...trForm[lang], body: e.target.value } })}
+                        disabled={isReadOnly}
+                        rows={2}
+                        maxLength={200}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none resize-none disabled:text-gray-500"
+                      />
+                    </div>
+                  ))}
+                  {!isReadOnly && (
+                    <button
+                      onClick={saveTranslations}
+                      disabled={trSaving || retranslating}
+                      className="mt-3 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {trSaving ? '저장 중...' : '✏️ 번역 수정안 저장'}
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs text-gray-400 mb-1.5">탭 시 이동할 페이지</label>

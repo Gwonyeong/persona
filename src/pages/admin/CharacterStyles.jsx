@@ -309,6 +309,7 @@ export default function CharacterStyles() {
   const [character, setCharacter] = useState(null)
   const [newStyleName, setNewStyleName] = useState('')
   const [newStyleDesc, setNewStyleDesc] = useState('')
+  const [newStyleUnlockMode, setNewStyleUnlockMode] = useState('DEFAULT')
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(null) // "styleId-emotion"
 
@@ -326,9 +327,16 @@ export default function CharacterStyles() {
     await api.post(`/admin/characters/${id}/styles`, {
       name: newStyleName,
       description: newStyleDesc,
+      unlockMode: newStyleUnlockMode,
     })
     setNewStyleName('')
     setNewStyleDesc('')
+    setNewStyleUnlockMode('DEFAULT')
+    load()
+  }
+
+  const setStyleUnlockMode = async (styleId, unlockMode) => {
+    await api.put(`/admin/styles/${styleId}`, { unlockMode })
     load()
   }
 
@@ -392,6 +400,15 @@ export default function CharacterStyles() {
             placeholder="설명 (선택)"
             className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
           />
+          <select
+            value={newStyleUnlockMode}
+            onChange={(e) => setNewStyleUnlockMode(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <option value="DEFAULT">기본 (대화 해금)</option>
+            <option value="GACHA">가챠 전용</option>
+          </select>
           <button
             onClick={addStyle}
             className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 whitespace-nowrap"
@@ -400,6 +417,9 @@ export default function CharacterStyles() {
             추가
           </button>
         </div>
+        <p className="mt-2 text-[11px] text-gray-500">
+          가챠 전용 스타일은 일반 대화 해금 풀에서 제외되고, 가챠 STYLE_SET 보상으로만 통째 해금됩니다.
+        </p>
       </div>
 
       {/* 스타일별 이미지 그리드 */}
@@ -410,18 +430,36 @@ export default function CharacterStyles() {
           <div key={style.id} className="bg-gray-900 rounded-lg border border-gray-800 p-4 mb-4">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="font-semibold">{style.name}</h3>
+                <h3 className="font-semibold flex items-center gap-2">
+                  {style.name}
+                  {style.unlockMode === 'GACHA' && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-fuchsia-900/60 text-fuchsia-300 border border-fuchsia-700/50">
+                      GACHA 전용
+                    </span>
+                  )}
+                </h3>
                 {style.description && (
                   <p className="text-xs text-gray-400">{style.description}</p>
                 )}
               </div>
-              <button
-                onClick={() => removeStyle(style.id)}
-                className="text-red-400 hover:text-red-300 text-xs"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                스타일 삭제
-              </button>
+              <div className="flex items-center gap-3">
+                <select
+                  value={style.unlockMode || 'DEFAULT'}
+                  onChange={(e) => setStyleUnlockMode(style.id, e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <option value="DEFAULT">기본</option>
+                  <option value="GACHA">가챠 전용</option>
+                </select>
+                <button
+                  onClick={() => removeStyle(style.id)}
+                  className="text-red-400 hover:text-red-300 text-xs"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  스타일 삭제
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-5 gap-3">

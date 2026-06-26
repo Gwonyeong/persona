@@ -84,10 +84,15 @@ function FilePicker({ accept, file, currentUrl, onPick, label }) {
   )
 }
 
-function TierForm({ initial, characters, onSubmit, onCancel, busy }) {
+function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslationsUpdated }) {
   const [threshold, setThreshold] = useState(initial?.threshold ?? '')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [rewardType, setRewardType] = useState(initial?.rewardType || 'MASK')
+  // translations 패널 — 어드민이 자동 번역 결과 확인/수정 (기존 tier에만 노출)
+  const [trEn, setTrEn] = useState(initial?.translations?.en?.title || '')
+  const [trJa, setTrJa] = useState(initial?.translations?.ja?.title || '')
+  const [trSaving, setTrSaving] = useState(false)
+  const [retranslating, setRetranslating] = useState(false)
 
   // 타입별 필드
   const payload = initial?.rewardPayload || {}
@@ -201,6 +206,89 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy }) {
           />
         </label>
       </div>
+
+      {/* 자동 번역 미리보기 + 수정 — 기존 tier에만 노출 */}
+      {initial?.id && title && (
+        <div className="border border-gray-700 rounded-lg p-3 bg-gray-800/30">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <div className="text-xs font-semibold text-gray-200">🌐 라벨 다국어 번역 (Gemini 자동)</div>
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                유저에게는 user.language로 자동 픽됩니다. 직접 수정 가능.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!confirm('한국어 원문으로 다시 번역합니다. 기존 수정 내용이 덮어쓰입니다. 계속할까요?')) return
+                setRetranslating(true)
+                try {
+                  const { api } = await import('../../lib/api')
+                  const { tier } = await api.post(`/admin/mask-pass-tiers/${initial.id}/retranslate`)
+                  setTrEn(tier.translations?.en?.title || '')
+                  setTrJa(tier.translations?.ja?.title || '')
+                  if (onTranslationsUpdated) onTranslationsUpdated(tier)
+                } catch (e) {
+                  alert('재번역 실패: ' + (e.message || ''))
+                } finally {
+                  setRetranslating(false)
+                }
+              }}
+              disabled={retranslating || trSaving}
+              className="text-[11px] px-2 py-1 bg-amber-700/50 hover:bg-amber-700 text-amber-100 rounded disabled:opacity-50"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {retranslating ? '번역 중...' : '🔄 다시 번역'}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider">English</span>
+              <input
+                value={trEn}
+                onChange={(e) => setTrEn(e.target.value)}
+                placeholder="(자동 번역됨)"
+                className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider">日本語</span>
+              <input
+                value={trJa}
+                onChange={(e) => setTrJa(e.target.value)}
+                placeholder="(자동 번역됨)"
+                className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              setTrSaving(true)
+              try {
+                const { api } = await import('../../lib/api')
+                const { tier } = await api.put(`/admin/mask-pass-tiers/${initial.id}/translations`, {
+                  translations: {
+                    en: { title: trEn },
+                    ja: { title: trJa },
+                  },
+                })
+                if (onTranslationsUpdated) onTranslationsUpdated(tier)
+                alert('번역 저장 완료')
+              } catch (e) {
+                alert('번역 저장 실패: ' + (e.message || ''))
+              } finally {
+                setTrSaving(false)
+              }
+            }}
+            disabled={trSaving || retranslating}
+            className="mt-3 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {trSaving ? '저장 중...' : '✏️ 번역 수정안 저장'}
+          </button>
+        </div>
+      )}
 
       <label className="block">
         <span className="text-xs text-gray-400">보상 타입</span>

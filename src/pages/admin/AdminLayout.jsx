@@ -11,18 +11,26 @@ const NAV_ITEMS = [
     children: [
       { to: '/admin/characters', label: '캐릭터 관리' },
       { to: '/admin/storylines', label: '스토리' },
-      { to: '/admin/base-images', label: '베이스 이미지' },
-      { to: '/admin/affinity-images', label: '호감도 이미지' },
       { to: '/admin/expressions', label: '표정 이미지' },
+      { to: '/admin/base-images', label: '베이스 이미지', deprecated: true },
+      { to: '/admin/affinity-images', label: '호감도 이미지', deprecated: true },
     ],
   },
   { to: '/admin/banners', label: '광고 배너' },
   { to: '/admin/mask-pass', label: '마스크 패스' },
+  {
+    key: 'gacha',
+    label: '가챠',
+    children: [
+      { to: '/admin/gacha', label: '박스 관리' },
+      { to: '/admin/gacha/special-voices', label: '특별 보이스' },
+    ],
+  },
   { to: '/admin/broadcasts', label: '푸시 알림' },
   { to: '/admin/notifications', label: '인앱 알림' },
   { to: '/admin/users', label: '유저 관리' },
   { to: '/admin/surveys', label: '설문조사' },
-  { to: '/admin/inquiries', label: '문의 관리' },
+  { to: '/admin/inquiries', label: '문의 관리', badgeKey: 'pendingInquiries' },
   {
     key: 'finance',
     label: '재무',
@@ -103,6 +111,27 @@ export default function AdminLayout() {
       .catch(() => setAuthorized(false))
   }, [token])
 
+  const [badges, setBadges] = useState({ pendingInquiries: 0 })
+
+  useEffect(() => {
+    if (!authorized) return
+    let cancelled = false
+    const refresh = () => {
+      api
+        .get('/inquiries/admin/pending-count')
+        .then(({ count }) => {
+          if (!cancelled) setBadges((prev) => ({ ...prev, pendingInquiries: count }))
+        })
+        .catch(() => {})
+    }
+    refresh()
+    const interval = setInterval(refresh, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [authorized, location.pathname])
+
   if (!token) return <Navigate to="/" replace />
   if (authorized === null) {
     return (
@@ -163,12 +192,21 @@ export default function AdminLayout() {
                           className={({ isActive }) =>
                             `block pl-8 pr-4 py-2 text-sm transition-colors ${
                               isActive
-                                ? 'bg-gray-800 text-white font-medium'
+                                ? child.deprecated
+                                  ? 'bg-gray-800/60 text-gray-400 font-medium'
+                                  : 'bg-gray-800 text-white font-medium'
+                                : child.deprecated
+                                ? 'text-gray-600 hover:text-gray-400 hover:bg-gray-800/30'
                                 : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                             }`
                           }
                         >
                           {child.label}
+                          {child.deprecated && (
+                            <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-600">
+                              deprecated
+                            </span>
+                          )}
                         </NavLink>
                       ))}
                     </div>
@@ -176,20 +214,29 @@ export default function AdminLayout() {
                 </div>
               )
             }
+            const badgeCount = item.badgeKey ? badges[item.badgeKey] || 0 : 0
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `block px-4 py-2.5 text-sm transition-colors ${
+                  `flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
                     isActive
                       ? 'bg-gray-800 text-white font-medium'
                       : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                   }`
                 }
               >
-                {item.label}
+                <span>{item.label}</span>
+                {badgeCount > 0 && (
+                  <span
+                    className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none"
+                    title={`답변 대기 ${badgeCount}건`}
+                  >
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
               </NavLink>
             )
           })}

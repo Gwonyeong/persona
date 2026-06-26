@@ -33,7 +33,7 @@ export default function RecentStoriesRow() {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <h2 className="text-sm font-semibold text-gray-200">
-            {t('home.recentStories', '최근 공개된 스토리')}
+            {t('home.recentStories')}
           </h2>
           <span
             className="px-1.5 py-[1px] bg-red-500 text-white text-[9px] font-bold rounded-md leading-none"
@@ -46,7 +46,7 @@ export default function RecentStoriesRow() {
 
       {stories.length === 0 ? (
         <p className="text-xs text-gray-500 py-3 text-center">
-          곧 새로운 스토리가 출시돼요!
+          {t('home.noStories')}
         </p>
       ) : (
       <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
