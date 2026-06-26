@@ -330,10 +330,17 @@ export default function CharacterDetail() {
     }
   }, [id])
 
+  // 스타일 탭 — 캐릭터의 모든 스타일 중 선택. null이면 첫 스타일.
+  const [selectedStyleId, setSelectedStyleId] = useState(null)
+  const selectedStyle = useMemo(() => {
+    const list = character?.styles || []
+    return list.find((s) => s.id === selectedStyleId) || list[0] || null
+  }, [character, selectedStyleId])
+
   // 표정 슬라이드 — normal은 감정당 랜덤 1장, aroused는 모든 이미지 노출(갤러리 UI)
   // 이미지 row만 후보 (standalone 영상 row 제외)
   const expressionRows = useMemo(() => {
-    const images = character?.styles?.[0]?.images
+    const images = selectedStyle?.images
     if (!images?.length) return { normal: [], aroused: [] }
     const pickOne = (emotion) => {
       const matching = images.filter((img) => img.emotion === emotion && !isVideoUrl(img.filePath))
@@ -351,7 +358,7 @@ export default function CharacterDetail() {
       normal: NORMAL_EMOTIONS.map(pickOne).filter(Boolean),
       aroused: arousedAll,
     }
-  }, [character])
+  }, [selectedStyle])
 
   // 표정 영상 해금 — 10마스크
   const EXPRESSION_VIDEO_COST = 10
@@ -532,6 +539,40 @@ export default function CharacterDetail() {
             </div>
           )}
 
+          {/* 스타일 탭 — 캐릭터의 모든 스타일 (해금 안 한 GACHA 스타일은 흑색 silhouette) */}
+          {(character.styles?.length || 0) > 1 && (
+            <StyleTabsRow
+              styles={character.styles}
+              selectedStyleId={selectedStyle?.id || null}
+              onSelect={setSelectedStyleId}
+            />
+          )}
+
+          {/* 선택된 스타일이 해금 안 된 GACHA 면 안내 배너 + 가챠 바로가기 */}
+          {selectedStyle && !selectedStyle.unlocked && (
+            <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60 flex items-center gap-3">
+              <span className="text-lg">🎁</span>
+              <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">
+                이 복장은 <strong>선물 뽑기</strong>에서 획득할 수 있어요!
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const { boxes } = await api.get('/gacha/boxes')
+                    const first = boxes?.[0]
+                    navigate(first ? `/gacha/${first.id}` : '/gacha')
+                  } catch {
+                    navigate('/gacha')
+                  }
+                }}
+                className="flex-shrink-0 px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-100 text-xs font-bold border border-gray-600"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                바로가기 →
+              </button>
+            </div>
+          )}
+
           {/* 표정 슬라이드 — 1행: 일반 / 2행: 흥분 (safetyMode면 블러) */}
           {(expressionRows.normal.length > 0 || expressionRows.aroused.length > 0) && (
             <div className="mt-4 space-y-2">
@@ -598,17 +639,16 @@ export default function CharacterDetail() {
                             />
                           )}
 
-                          {/* 본 + 영상 미해금 → 블러 영상 */}
+                          {/* 본 + 영상 미해금 → 전체 블러 영상.
+                              scale로 흐려진 가장자리를 컨테이너 밖으로 밀어내 균일 블러 + 원본 프레임 유출 방지,
+                              transform이 GPU 합성 레이어를 강제해 진입 첫 페인트부터 블러가 적용되게 함 */}
                           {seen && hasVideo && !videoUnlocked && (
-                            <>
-                              <video
-                                src={img.videoFilePath}
-                                className="absolute inset-0 w-full h-full object-cover"
-                                style={{ filter: 'blur(14px)' }}
-                                autoPlay loop muted playsInline
-                              />
-                              <div className="absolute inset-0 bg-black/30" />
-                            </>
+                            <video
+                              src={img.videoFilePath}
+                              className="absolute inset-0 w-full h-full object-cover object-bottom"
+                              style={{ filter: 'blur(16px)', transform: 'scale(1.25)', willChange: 'filter, transform' }}
+                              autoPlay loop muted playsInline
+                            />
                           )}
 
                           {/* 영상 있는 본 이미지 → 중앙 재생 버튼 */}
@@ -1482,6 +1522,76 @@ export default function CharacterDetail() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// 스타일 탭 — 캐릭터의 모든 스타일을 가로 스크롤 그리드로. 팔로우한 페소나 디자인 차용.
+// 해금 안 한 GACHA 스타일은 그라데이션 ring 대신 흑색 ring + grayscale + brightness 다운.
+function StyleTabsRow({ styles, selectedStyleId, onSelect }) {
+  if (!styles?.length) return null
+  return (
+    <div className="mt-3 -mx-4 px-4">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+        {styles.map((s) => {
+          const thumb = s.images?.find((i) => !i.filePath?.match(/\.(mp4|webm|mov|m4v)(\?|$)/i))?.filePath || null
+          const isSelected = s.id === selectedStyleId
+          const locked = !s.unlocked
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onSelect(s.id)}
+              className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              <div
+                className={`relative w-14 h-14 rounded-full p-[2px] ${
+                  locked
+                    ? 'bg-gradient-to-br from-gray-700 to-gray-900'
+                    : isSelected
+                      ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                      : 'bg-gray-700/60'
+                }`}
+              >
+                <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
+                  <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-800">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={s.name}
+                        draggable={false}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={
+                          locked
+                            ? { filter: 'grayscale(1) brightness(0.15)' }
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
+                        ?
+                      </div>
+                    )}
+                    {locked && (
+                      <div className="absolute inset-0 flex items-center justify-center text-base">
+                        🔒
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] w-full text-center truncate leading-tight ${
+                  isSelected ? 'text-white font-semibold' : 'text-gray-400'
+                }`}
+              >
+                {s.name}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

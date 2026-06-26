@@ -187,8 +187,8 @@ function GachaBoxCard({ box, onExit }) {
       </button>
 
       {pityReady ? (
-        <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-amber-500 text-amber-950 text-[10px] font-bold shadow-lg">
-          🎁 천장 보장 가능
+        <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-emerald-950 text-[10px] font-bold shadow-lg">
+          🎁 확정 보상 가능
         </div>
       ) : box.free?.remaining > 0 ? (
         <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-emerald-950 text-[10px] font-bold shadow-lg">
@@ -213,7 +213,7 @@ function GachaBoxCard({ box, onExit }) {
           <div>
             <div className="flex justify-between text-[10px] text-gray-200 mb-1 drop-shadow">
               <span className="font-semibold">
-                천장 {box.pity.count}/{box.pity.threshold}
+                확정 보상 {box.pity.count}/{box.pity.threshold}
               </span>
               {!pityReady && (
                 <span className="opacity-80">{box.pity.threshold - box.pity.count}회 남음</span>
@@ -221,7 +221,7 @@ function GachaBoxCard({ box, onExit }) {
             </div>
             <div className="h-1 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
               <div
-                className="h-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all"
+                className="h-full bg-gradient-to-r from-emerald-400 to-emerald-300 transition-all"
                 style={{ width: `${pityPct}%` }}
               />
             </div>

@@ -252,7 +252,7 @@ export default function GachaBox() {
         {pity.ready && (
           <button
             onClick={() => setShowPityPick(true)}
-            className="mt-3 w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold"
+            className="mt-3 w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             🎁 원하는 보상을 선택할 수 있어요!
@@ -262,14 +262,14 @@ export default function GachaBox() {
         {pity.threshold > 0 && !pity.ready && (
           <div className="mt-3">
             <div className="flex justify-between text-[11px] text-gray-400 mb-1">
-              <span>천장까지 {pity.threshold - pity.count}회 남음</span>
+              <span>확정 보상까지 {pity.threshold - pity.count}회 남음</span>
               <span>
                 {pity.count}/{pity.threshold}
               </span>
             </div>
             <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all"
+                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all"
                 style={{ width: `${pityProgressPct}%` }}
               />
             </div>
@@ -285,6 +285,10 @@ export default function GachaBox() {
           onPityPick={() => {
             setDrawResult(null)
             setShowPityPick(true)
+          }}
+          onViewCharacter={(charId) => {
+            setDrawResult(null)
+            navigate(`/characters/${charId}`)
           }}
         />
       )}
@@ -547,11 +551,11 @@ function OddsModal({ box, items, previewItems, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
-          {/* 천장 안내 */}
+          {/* 확정 보상 안내 */}
           {box.pityCount > 0 && (
-            <div className="bg-amber-950/40 border border-amber-700/40 rounded-lg p-3">
-              <p className="text-[11px] text-amber-200 leading-relaxed">
-                <strong>🎁 천장 시스템</strong> — 이 박스에서 누적 {box.pityCount}회 추첨 시
+            <div className="bg-emerald-950/40 border border-emerald-700/40 rounded-lg p-3">
+              <p className="text-[11px] text-emerald-200 leading-relaxed">
+                <strong>🎁 확정 보상</strong> — 이 박스에서 누적 {box.pityCount}회 추첨 시
                 박스 내 미보유 보상 중 1개를 직접 선택할 수 있습니다.
               </p>
             </div>
@@ -688,7 +692,7 @@ function ItemTile({ item }) {
   )
 }
 
-function ResultModal({ result, items, onClose, onPityPick }) {
+function ResultModal({ result, items, onClose, onPityPick, onViewCharacter }) {
   const results = result.results || []
   // 결과 카드에 맞는 item 데이터를 합침 (previewUrl 등)
   const enriched = results.map((r) => {
@@ -701,6 +705,10 @@ function ResultModal({ result, items, onClose, onPityPick }) {
   })
 
   const isSingle = enriched.length === 1
+  // 결과에 STYLE_SET 이 포함되어 있으면 첫 번째 STYLE_SET 의 캐릭터로 바로가기 버튼 노출
+  const styleSetReward = enriched.find((r) => r.rewardType === 'STYLE_SET')
+  const styleSetCharacterId = styleSetReward?.snapshot?.payload?.characterId
+  const styleSetCharacterName = styleSetReward?.snapshot?.payload?.characterName
 
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -727,14 +735,14 @@ function ResultModal({ result, items, onClose, onPityPick }) {
 
         <div className="p-5 pt-3 flex-shrink-0 space-y-3">
           {result.blockedReason === 'PITY_REACHED' && (
-            <div className="p-3 rounded-lg bg-amber-900/40 border border-amber-700/50 text-center">
-              <p className="text-amber-200 text-xs">🎁 천장에 도달했어요! 원하는 상품을 선택하세요.</p>
+            <div className="p-3 rounded-lg bg-emerald-900/40 border border-emerald-700/50 text-center">
+              <p className="text-emerald-200 text-xs">🎁 확정 보상에 도달했어요! 원하는 상품을 선택하세요.</p>
               <button
                 onClick={onPityPick}
-                className="mt-2 px-4 py-2 bg-amber-500 text-amber-950 text-xs font-bold rounded-full"
+                className="mt-2 px-4 py-2 bg-emerald-500 text-emerald-950 text-xs font-bold rounded-full"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                천장 보상 받기
+                확정 보상 받기
               </button>
             </div>
           )}
@@ -743,6 +751,16 @@ function ResultModal({ result, items, onClose, onPityPick }) {
             <p className="text-center text-xs text-gray-400">
               남은 회차는 풀이 비어서 진행하지 못했어요.
             </p>
+          )}
+
+          {styleSetCharacterId && (
+            <button
+              onClick={() => onViewCharacter?.(styleSetCharacterId)}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {styleSetCharacterName ? `${styleSetCharacterName} 바로 확인하기 →` : '바로 확인하기 →'}
+            </button>
           )}
 
           <button
@@ -762,6 +780,7 @@ function ResultCard({ result }) {
   const colorCls = RARITY_COLORS[result.rarity] || RARITY_COLORS.COMMON
   const isExpression =
     result.rewardType === 'EXPRESSION_IMAGE' || result.rewardType === 'EXPRESSION_BUNDLE'
+  const isStyleSet = result.rewardType === 'STYLE_SET'
   const characterName = result.snapshot?.payload?.characterName
   const characterProfileImage = result.snapshot?.payload?.characterProfileImage
   // 표정+영상 세트면 결과 카드 본체에 영상 재생, 그 외엔 이미지
@@ -769,10 +788,13 @@ function ResultCard({ result }) {
     result.rewardType === 'EXPRESSION_BUNDLE'
       ? result.snapshot?.payload?.videoFilePath
       : null
-  // EXPRESSION: 캡션은 캐릭터명만. 그 외 타입은 displayName + 그 옆에 프로필 이미지.
+  // EXPRESSION: 캡션은 캐릭터명만. STYLE_SET: 캐릭터명 위에 스타일명 작게. 그 외: displayName.
   const captionText = isExpression
     ? characterName || ''
-    : result.displayName || REWARD_TYPE_LABEL[result.rewardType]
+    : isStyleSet
+      ? characterName || ''
+      : result.displayName || REWARD_TYPE_LABEL[result.rewardType]
+  const subText = isStyleSet ? result.displayName : null
 
   return (
     <div className={`relative aspect-[9/16] rounded-lg overflow-hidden bg-gradient-to-br ${colorCls}`}>
@@ -793,6 +815,11 @@ function ResultCard({ result }) {
         </div>
       )}
       <div className="absolute inset-x-0 bottom-0 px-2 py-1.5 bg-gradient-to-t from-black/85 to-transparent">
+        {subText && (
+          <div className="text-[10px] text-white/80 font-semibold truncate drop-shadow mb-0.5">
+            {subText}
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           {characterProfileImage && (
             <img
@@ -836,7 +863,7 @@ function PityPickModal({ box, items, onClose, onPick }) {
       <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 max-w-sm">
           <p className="text-sm text-center">
-            천장 등급({pityRarity})에 받을 수 있는 보상이 모두 채워져 있어요.
+            확정 보상 등급({pityRarity})에 받을 수 있는 보상이 모두 채워져 있어요.
           </p>
           <button
             onClick={onClose}
@@ -852,9 +879,9 @@ function PityPickModal({ box, items, onClose, onPick }) {
 
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 border border-amber-700/50 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+      <div className="bg-gray-900 border border-emerald-700/50 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
         <div className="p-5 pb-3 flex-shrink-0 text-center">
-          <h2 className="text-base font-bold text-amber-200">🎁 천장 보상</h2>
+          <h2 className="text-base font-bold text-emerald-200">🎁 확정 보상</h2>
           <p className="text-xs text-gray-400 mt-1">
             <span className={`font-semibold ${RARITY_LABEL_COLOR[pityRarity] || 'text-white'}`}>
               {pityRarity}
@@ -864,7 +891,7 @@ function PityPickModal({ box, items, onClose, onPick }) {
         </div>
 
         <div className="px-5 overflow-y-auto flex-1">
-          <div className="grid grid-cols-2 gap-3 pb-2">
+          <div className="grid grid-cols-2 gap-3 pb-2 pt-1">
             {candidates.map((it) => {
               const active = selectedId === it.id
               return (
@@ -874,14 +901,14 @@ function PityPickModal({ box, items, onClose, onPick }) {
                   onClick={() => setSelectedId(it.id)}
                   className={`relative rounded-lg overflow-hidden transition-all ${
                     active
-                      ? 'ring-2 ring-amber-400 scale-[1.02]'
-                      : 'ring-0 hover:ring-1 hover:ring-white/30'
+                      ? 'ring-2 ring-inset ring-emerald-400'
+                      : 'ring-0 hover:ring-1 hover:ring-inset hover:ring-white/30'
                   }`}
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <PityCandidateTile item={it} />
                   {active && (
-                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-400 text-amber-950 text-[11px] font-bold flex items-center justify-center">
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-emerald-400 text-emerald-950 text-[11px] font-bold flex items-center justify-center shadow">
                       ✓
                     </div>
                   )}
@@ -902,7 +929,7 @@ function PityPickModal({ box, items, onClose, onPick }) {
           <button
             disabled={!selectedId}
             onClick={() => onPick(selectedId)}
-            className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-sm rounded-lg disabled:opacity-50"
+            className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold text-sm rounded-lg disabled:opacity-50"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             받기
