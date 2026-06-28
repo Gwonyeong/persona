@@ -407,6 +407,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
               <thead>
                 <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                   <th className="p-3">유저</th>
+                  <th className="p-3">요금제</th>
+                  <th className="p-3">보유 마스크</th>
                   <th className="p-3">구매 횟수</th>
                   <th className="p-3">누적 매출</th>
                   <th className="p-3">누적 순수익</th>
@@ -433,6 +435,20 @@ function FinanceMaskPurchasesView({ items, summary }) {
                           <div className="text-xs text-gray-500">{b.email}</div>
                         </div>
                       </div>
+                    </td>
+                    <td className="p-3">
+                      {b.isFree ? (
+                        <span className="inline-block rounded px-1.5 py-0.5 text-xs bg-gray-800 text-gray-400 border border-gray-700">
+                          무료
+                        </span>
+                      ) : (
+                        <span className="inline-block rounded px-1.5 py-0.5 text-xs bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                          {b.tier || 'LIGHT'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-amber-300 font-medium">
+                      {(b.masks ?? 0).toLocaleString('ko-KR')}
                     </td>
                     <td className="p-3 text-gray-300">{b.purchaseCount.toLocaleString('ko-KR')}</td>
                     <td className="p-3 text-gray-400">{fmtKrw(b.revenueKrw)}</td>
