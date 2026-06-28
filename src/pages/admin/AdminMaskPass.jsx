@@ -84,6 +84,72 @@ function FilePicker({ accept, file, currentUrl, onPick, label }) {
   )
 }
 
+function CharacterPicker({ characters, value, onChange, requireVoiceId = false }) {
+  // 공개(isPublic) 캐릭터만 노출 — 프로필/특별 이미지/보이스 보상 대상 선택용
+  const [query, setQuery] = useState('')
+  const publicCharacters = characters.filter((c) => c.isPublic)
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? publicCharacters.filter((c) => (c.name || '').toLowerCase().includes(q))
+    : publicCharacters
+
+  return (
+    <div className="mt-1">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="이름으로 검색"
+        className="w-full px-3 py-2 mb-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+      />
+      <div className="max-h-64 overflow-y-auto flex flex-wrap gap-3 p-2 bg-gray-950 border border-gray-700 rounded-lg">
+        {filtered.length === 0 && (
+          <p className="w-full text-xs text-gray-500 text-center py-4">
+            {publicCharacters.length === 0 ? '공개된 캐릭터가 없어요' : '검색 결과가 없어요'}
+          </p>
+        )}
+        {filtered.map((c) => {
+          const selected = String(value) === String(c.id)
+          const disabled = requireVoiceId && !c.voiceId
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(c.id)}
+              title={`#${c.id} ${c.name}${disabled ? ' (voiceId 없음)' : ''}`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              className={`flex flex-col items-center gap-1 w-16 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              <div
+                className={`relative w-14 h-14 rounded-full overflow-hidden border-2 transition-colors ${
+                  selected ? 'border-amber-400' : 'border-transparent hover:border-gray-600'
+                }`}
+              >
+                {c.profileImage ? (
+                  <img src={c.profileImage} alt={c.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-600 text-[10px]">
+                    No img
+                  </div>
+                )}
+                {selected && (
+                  <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
+                    <span className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-[11px] text-gray-900 font-bold">
+                      ✓
+                    </span>
+                  </div>
+                )}
+              </div>
+              <span className="text-[10px] text-gray-300 truncate w-full text-center">{c.name}</span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslationsUpdated }) {
   const [threshold, setThreshold] = useState(initial?.threshold ?? '')
   const [title, setTitle] = useState(initial?.title ?? '')
@@ -346,21 +412,15 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
 
         {rewardType === 'VOICE' && (
           <>
-            <label className="block">
+            <div>
               <span className="text-xs text-gray-400">대상 캐릭터 (해당 캐릭터의 voiceId로 합성)</span>
-              <select
+              <CharacterPicker
+                characters={characters}
                 value={characterId}
-                onChange={(e) => setCharacterId(e.target.value)}
-                className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
-              >
-                <option value="">— 선택 —</option>
-                {characters.map((c) => (
-                  <option key={c.id} value={c.id} disabled={!c.voiceId}>
-                    #{c.id} {c.name} {!c.voiceId ? '(voiceId 없음)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onChange={setCharacterId}
+                requireVoiceId
+              />
+            </div>
             <label className="block">
               <span className="text-xs text-gray-400">대사 (저장 시 ElevenLabs로 합성, 최대 300자)</span>
               <textarea
@@ -394,21 +454,10 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
 
         {rewardType === 'PROFILE' && (
           <>
-            <label className="block">
+            <div>
               <span className="text-xs text-gray-400">대상 캐릭터</span>
-              <select
-                value={characterId}
-                onChange={(e) => setCharacterId(e.target.value)}
-                className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
-              >
-                <option value="">— 선택 —</option>
-                {characters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    #{c.id} {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <CharacterPicker characters={characters} value={characterId} onChange={setCharacterId} />
+            </div>
             <FilePicker
               accept={ACCEPT_BY_TYPE.PROFILE}
               file={file}
@@ -430,21 +479,10 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
 
         {rewardType === 'GALLERY' && (
           <>
-            <label className="block">
+            <div>
               <span className="text-xs text-gray-400">대상 캐릭터</span>
-              <select
-                value={characterId}
-                onChange={(e) => setCharacterId(e.target.value)}
-                className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
-              >
-                <option value="">— 선택 —</option>
-                {characters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    #{c.id} {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <CharacterPicker characters={characters} value={characterId} onChange={setCharacterId} />
+            </div>
 
             {/* 기존 이미지 + 새 파일 통합 그리드 */}
             {(existingGalleryImages.length > 0 || galleryFiles.length > 0) && (
