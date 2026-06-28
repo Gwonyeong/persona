@@ -76,6 +76,7 @@ const EMPTY_FORM = {
   description: '',
   concept: '',
   personality: '',
+  promptDataV1Text: '',  // V1 채팅 MR 소스 (JSON 문자열로 편집)
   firstMessage: '',
   firstMessageV2Text: { ko: '', en: '', ja: '' },
   firstMessageV2Draft: false,
@@ -499,11 +500,16 @@ export default function Characters() {
     if (c.translations?.ja?.firstMessageV2) {
       try { v2Text.ja = JSON.stringify(c.translations.ja.firstMessageV2, null, 2) } catch { /* keep '' */ }
     }
+    let promptDataV1Text = ''
+    if (c.promptDataV1) {
+      try { promptDataV1Text = JSON.stringify(c.promptDataV1, null, 2) } catch { /* keep '' */ }
+    }
     setForm({
       name: c.name,
       description: c.description,
       concept: c.concept || '',
       personality: c.personality,
+      promptDataV1Text,
       firstMessage: c.firstMessage,
       firstMessageV2Text: v2Text,
       firstMessageV2Draft: !!c.firstMessageV2Draft,
@@ -561,10 +567,27 @@ export default function Characters() {
       else delete nextTranslations[lang]
     }
 
-    const { firstMessageV2Text, translations: _trUnused, firstMessageV2Draft: _draftUnused, ...rest } = form
+    // promptDataV1 JSON 파싱 (빈 문자열 → null 로 초기화)
+    let promptDataV1 = null
+    const pdv1Raw = (form.promptDataV1Text || '').trim()
+    if (pdv1Raw) {
+      try {
+        promptDataV1 = JSON.parse(pdv1Raw)
+      } catch (e) {
+        alert(`promptDataV1 JSON 파싱 실패: ${e.message}`)
+        return
+      }
+      if (typeof promptDataV1 !== 'object' || Array.isArray(promptDataV1)) {
+        alert('promptDataV1은 JSON 객체여야 합니다.')
+        return
+      }
+    }
+
+    const { firstMessageV2Text, promptDataV1Text: _pdv1Unused, translations: _trUnused, firstMessageV2Draft: _draftUnused, ...rest } = form
     const draftFlag = asDraft === undefined ? !!form.firstMessageV2Draft : !!asDraft
     const data = {
       ...rest,
+      promptDataV1,
       firstMessageV2,
       firstMessageV2Draft: draftFlag,
       translations: Object.keys(nextTranslations).length > 0 ? nextTranslations : null,
@@ -1455,15 +1478,67 @@ export default function Characters() {
                 />
               </div>
 
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">성격 설정 (프롬프트)</label>
-                <textarea
-                  value={form.personality}
-                  onChange={(e) => setForm({ ...form, personality: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-32 resize-none"
-                  placeholder="캐릭터의 말투, 성격, 배경 스토리 등을 자세히 작성"
-                />
-              </div>
+              {(() => {
+                // promptDataV1에 coreTraits가 있으면 V1 채팅이 MR 빌더를 쓰므로 personality는 미반영.
+                let mrActive = false
+                const raw = (form.promptDataV1Text || '').trim()
+                if (raw) {
+                  try { mrActive = !!JSON.parse(raw)?.coreTraits } catch { mrActive = false }
+                }
+                return (
+                  <>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <label className="text-sm text-gray-400">성격 설정 (프롬프트)</label>
+                        {mrActive && (
+                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-gray-700 border border-gray-600 text-gray-300 font-medium">
+                            V1(MR) 캐릭터 — 채팅 미반영
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        value={form.personality}
+                        onChange={(e) => setForm({ ...form, personality: e.target.value })}
+                        className={`w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-32 resize-none ${mrActive ? 'opacity-60' : ''}`}
+                        placeholder="캐릭터의 말투, 성격, 배경 스토리 등을 자세히 작성"
+                      />
+                      {mrActive && (
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          이 캐릭터는 아래 <span className="text-gray-300">promptDataV1</span>을 채팅 소스로 사용합니다. 이 필드는 어드민 표시/레거시 폴백용이며 채팅에 반영되지 않습니다.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* V1 채팅 데이터 (promptDataV1, JSON) */}
+                    <div className="border border-gray-700 rounded-lg p-3 bg-gray-900/40">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <label className="text-sm font-medium text-gray-200">V1 채팅 데이터 (promptDataV1, JSON)</label>
+                        {raw && (
+                          mrActive ? (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-emerald-900/60 border border-emerald-700 text-emerald-300 font-medium">
+                              MR 활성 (채팅 소스)
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-900/60 border border-amber-700 text-amber-300 font-medium">
+                              coreTraits 없음 — MR 미활성
+                            </span>
+                          )
+                        )}
+                      </div>
+                      <textarea
+                        value={form.promptDataV1Text}
+                        onChange={(e) => setForm({ ...form, promptDataV1Text: e.target.value })}
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono h-64 resize-y"
+                        placeholder='MRPrompt 스키마 JSON. 비워두면 promptDataV1 초기화(레거시 personality 사용). 예: { "identity": {...}, "coreTraits": [...], "speechBaseline": {...}, "sceneFacets": [...] }'
+                        spellCheck={false}
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        V1 채팅이 실제로 읽는 데이터. <span className="text-gray-300">coreTraits</span>가 있어야 MR 빌더가 활성화됩니다. DB가 master이며 <span className="text-gray-300">data/v1-mrprompt/</span> 파일과는 <span className="text-gray-300">rebuild-v1-mrprompt-from-db.js</span>로 동기화하세요.
+                      </p>
+                    </div>
+                  </>
+                )
+              })()}
 
               <div>
                 <label className="text-sm text-gray-400 block mb-1">
