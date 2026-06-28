@@ -710,8 +710,6 @@ export default function ChatV2() {
   const [generatingImage, setGeneratingImage] = useState(false)
   const [showGalleryTooltip, setShowGalleryTooltip] = useState(false)
   const [galleryTooltipText, setGalleryTooltipText] = useState('')
-  const [showGalleryBadge, setShowGalleryBadge] = useState(false)
-  const affinityThresholdsRef = useRef([])
   const [showImageGenModal, setShowImageGenModal] = useState(false)
   const [showSelfieModal, setShowSelfieModal] = useState(false)
   const [previewFeedImages, setPreviewFeedImages] = useState([])
@@ -899,12 +897,6 @@ export default function ChatV2() {
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'NPC' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
-      // 호감도 해금 임계치 로드
-      api.get(`/characters/${conv.characterId}/gallery`).then(({ galleryContents }) => {
-        affinityThresholdsRef.current = (galleryContents || [])
-          .filter((c) => c.unlockType === 'AFFINITY')
-          .map((c) => c.affinityThreshold)
-      }).catch(() => {})
       // 초기 로드 시 즉시 맨 아래로
       requestAnimationFrame(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -1160,19 +1152,7 @@ export default function ChatV2() {
               })
             }
             if (data.affinity !== undefined) {
-              setConversation((prev) => {
-                const oldAffinity = prev.affinity || 0
-                const newAffinity = data.affinity
-                const crossed = affinityThresholdsRef.current.some(
-                  (th) => oldAffinity < th && newAffinity >= th
-                )
-                if (crossed) {
-                  setGalleryTooltipText(t('chat.affinityUnlocked'))
-                  setShowGalleryTooltip(true)
-                  setShowGalleryBadge(true)
-                }
-                return { ...prev, affinity: newAffinity }
-              })
+              setConversation((prev) => ({ ...prev, affinity: data.affinity }))
             }
             if (data.characterStatus) {
               setCharacterStatus(data.characterStatus)
@@ -1647,7 +1627,6 @@ export default function ChatV2() {
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <polyline points="21 15 16 10 5 21" />
                 </svg>
-                {showGalleryBadge && <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full" />}
               </button>
             </div>
             {/* 채팅 설정 페이지 진입 */}
@@ -2228,13 +2207,10 @@ export default function ChatV2() {
           characterId={conversation.characterId}
           characterName={character.name}
           conversationId={conversation.id}
-          affinity={conversation.affinity ?? 0}
           allowBackgroundChange={false}
           onClose={() => setShowGallery(false)}
           onAttachFeed={(feed) => setAttachedFeed(feed)}
           onBackgroundChange={(url) => setBackgroundImage(url)}
-          affinityBadge={showGalleryBadge}
-          onAffinityBadgeClear={() => setShowGalleryBadge(false)}
           onGiftSent={({ message, thanksMessages = [], imageBubble, affinity }) => {
             // 선물 GIFT 버블 → 캐릭터 감사 인사 → (있다면) 이미지 버블 순으로 append
             setMessages((prev) => [
