@@ -61,6 +61,7 @@ export default function UserLayout() {
   const [hasUnread, setHasUnread] = useState(false)
   const isChatPage =
     location.pathname.match(/^\/chats\/\d/) ||
+    location.pathname.match(/^\/chats-v2\/\d/) ||
     location.pathname.match(/^\/group-chats\/\d/) ||
     location.pathname === '/group-chats/new'
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
