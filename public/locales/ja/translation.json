@@ -196,7 +196,7 @@
     "watchAdAvailable": "広告を視聴してマスク3個をもらえます",
     "watchAdRemaining": "本日あと{{count}}回",
     "watchAdClaimed": "本日すべて受け取り済み",
-    "watchAdLimit": "1日5回",
+    "watchAdLimit": "1日3回",
     "watchAdNoFill": "現在視聴できる広告がありません。後ほどお試しください",
     "comingSoon": "他の方法も近日追加予定",
     "dailyCheckin": "出席チェック",

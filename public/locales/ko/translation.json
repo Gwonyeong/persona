@@ -196,7 +196,7 @@
     "watchAdAvailable": "광고를 시청하고 가면 3개를 받으세요",
     "watchAdRemaining": "오늘 {{count}}회 남음",
     "watchAdClaimed": "오늘 이미 다 받았어요",
-    "watchAdLimit": "하루 5회",
+    "watchAdLimit": "하루 3회",
     "watchAdNoFill": "지금은 시청할 수 있는 광고가 없어요. 잠시 후 다시 시도해주세요",
     "comingSoon": "더 많은 방법이 곧 추가됩니다",
     "dailyCheckin": "출석체크",

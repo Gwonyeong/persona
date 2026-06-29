@@ -644,7 +644,7 @@ export default function MaskShop() {
                     {adRewardAvailable && (
                       <>
                         <MaskIcon className="text-lg" />
-                        <span className="text-sm font-bold text-amber-400">+3</span>
+                        <span className="text-sm font-bold text-amber-400">+5</span>
                       </>
                     )}
                     {!adRewardAvailable && <span className="text-xs text-gray-500">{t('myPage.watchAdLimit')}</span>}

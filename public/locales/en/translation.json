@@ -196,7 +196,7 @@
     "watchAdAvailable": "Watch an ad and get 3 masks",
     "watchAdRemaining": "{{count}} left today",
     "watchAdClaimed": "All claimed today",
-    "watchAdLimit": "5 per day",
+    "watchAdLimit": "3 per day",
     "watchAdNoFill": "No ads available right now. Please try again later",
     "comingSoon": "More ways coming soon",
     "dailyCheckin": "Daily Check-in",
