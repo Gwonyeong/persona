@@ -158,10 +158,22 @@
       "modeSimpleDesc": "過去の会話や状態を反映しない一回限りの通話。履歴・要約に残りません"
     }
   },
+  "collection": {
+    "title": "コレクション",
+    "empty": "まだ獲得したアイテムがありません",
+    "emptyDesc": "キャラクターと会話してボイス・画像・動画を集めましょう",
+    "emptyTab": "この種類のアイテムはありません",
+    "tabVoices": "ボイス",
+    "tabImages": "画像",
+    "tabVideos": "動画",
+    "tabOutfits": "衣装"
+  },
   "myPage": {
     "title": "マイページ - Pesona",
     "metaDescription": "Pesonaのプロフィール設定とアカウント管理ページです。",
     "heading": "マイ",
+    "tabProfile": "プロフィール",
+    "tabCollection": "コレクション",
     "loginRequired": "ログインが必要です",
     "loginRequiredDesc": "ログインするとプロフィール管理、会話履歴の保存などの機能を利用できます。",
     "nickname": "ニックネーム",
