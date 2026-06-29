@@ -158,10 +158,22 @@
       "modeSimpleDesc": "이전 대화·상태와 상관없이 일회성으로 통화만. 채팅 기록·요약에 반영되지 않아요"
     }
   },
+  "collection": {
+    "title": "보관함",
+    "empty": "아직 획득한 아이템이 없어요",
+    "emptyDesc": "캐릭터와 대화하며 보이스·이미지·영상을 모아보세요",
+    "emptyTab": "이 종류의 아이템이 없어요",
+    "tabVoices": "보이스",
+    "tabImages": "이미지",
+    "tabVideos": "영상",
+    "tabOutfits": "의상"
+  },
   "myPage": {
     "title": "마이페이지 - Pesona",
     "metaDescription": "Pesona 프로필 설정 및 계정 관리 페이지입니다.",
     "heading": "마이",
+    "tabProfile": "프로필",
+    "tabCollection": "보관함",
     "loginRequired": "로그인이 필요합니다",
     "loginRequiredDesc": "로그인하면 프로필 관리, 대화 기록 저장 등 다양한 기능을 이용할 수 있습니다.",
     "nickname": "닉네임",
@@ -184,7 +196,7 @@
     "watchAdAvailable": "광고를 시청하고 가면 3개를 받으세요",
     "watchAdRemaining": "오늘 {{count}}회 남음",
     "watchAdClaimed": "오늘 이미 다 받았어요",
-    "watchAdLimit": "하루 5회",
+    "watchAdLimit": "하루 3회",
     "watchAdNoFill": "지금은 시청할 수 있는 광고가 없어요. 잠시 후 다시 시도해주세요",
     "comingSoon": "더 많은 방법이 곧 추가됩니다",
     "dailyCheckin": "출석체크",
@@ -456,7 +468,6 @@
     "loadMore": "더 보기",
     "imageCount": "이미지 {{count}}장",
     "tabFeed": "피드",
-    "tabAffinity": "호감도",
     "tabMission": "미션",
     "tabMemories": "추억",
     "emptyGenerated": "생성된 이미지가 없습니다.",
@@ -903,7 +914,21 @@
       "capReachedButton": "최대 해금 완료",
       "unlockSuccess": "+10 슬롯 추가했어요",
       "insufficientMasks": "마스크가 부족해요",
-      "unlockError": "해금에 실패했어요"
+      "unlockError": "해금에 실패했어요",
+      "addButton": "기억 직접 추가",
+      "newPlaceholder": "캐릭터가 꼭 기억할 내용을 적어주세요",
+      "pin": "고정",
+      "pinHint": "기억을 직접 추가·수정할 수 있어요. 고정(🔒)한 기억은 시간이 지나도 사라지지 않아요.",
+      "save": "저장",
+      "cancel": "취소",
+      "delete": "삭제",
+      "slotFull": "슬롯이 가득 찼어요",
+      "saved": "기억을 수정했어요",
+      "added": "기억을 추가했어요",
+      "deleted": "기억을 삭제했어요",
+      "saveError": "저장에 실패했어요",
+      "staleError": "기억이 방금 바뀌었어요. 다시 시도해주세요",
+      "tooLong": "최대 {{max}}자까지 쓸 수 있어요"
     }
   },
   "personality": {

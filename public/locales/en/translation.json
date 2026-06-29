@@ -158,10 +158,22 @@
       "modeSimpleDesc": "One-off call with no context. Nothing is added to chat history or summary"
     }
   },
+  "collection": {
+    "title": "Collection",
+    "empty": "No items collected yet",
+    "emptyDesc": "Chat with characters to collect voices, images, and videos",
+    "emptyTab": "No items of this type",
+    "tabVoices": "Voices",
+    "tabImages": "Images",
+    "tabVideos": "Videos",
+    "tabOutfits": "Outfits"
+  },
   "myPage": {
     "title": "My Page - Pesona",
     "metaDescription": "Manage your Pesona profile and account settings.",
     "heading": "My",
+    "tabProfile": "Profile",
+    "tabCollection": "Collection",
     "loginRequired": "Login required",
     "loginRequiredDesc": "Login to manage your profile, save chat history, and access more features.",
     "nickname": "Nickname",
@@ -184,7 +196,7 @@
     "watchAdAvailable": "Watch an ad and get 3 masks",
     "watchAdRemaining": "{{count}} left today",
     "watchAdClaimed": "All claimed today",
-    "watchAdLimit": "5 per day",
+    "watchAdLimit": "3 per day",
     "watchAdNoFill": "No ads available right now. Please try again later",
     "comingSoon": "More ways coming soon",
     "dailyCheckin": "Daily Check-in",
@@ -456,7 +468,6 @@
     "loadMore": "Load more",
     "imageCount": "{{count}} images",
     "tabFeed": "Feed",
-    "tabAffinity": "Affinity",
     "tabMission": "Mission",
     "tabMemories": "Memories",
     "emptyGenerated": "No generated images.",
@@ -903,7 +914,21 @@
       "capReachedButton": "Max unlocked",
       "unlockSuccess": "+10 slots added",
       "insufficientMasks": "Not enough masks",
-      "unlockError": "Failed to unlock"
+      "unlockError": "Failed to unlock",
+      "addButton": "Add a memory",
+      "newPlaceholder": "Write something the character should always remember",
+      "pin": "Pin",
+      "pinHint": "You can add or edit memories. Pinned (🔒) memories never fade over time.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "slotFull": "Slots are full",
+      "saved": "Memory updated",
+      "added": "Memory added",
+      "deleted": "Memory deleted",
+      "saveError": "Failed to save",
+      "staleError": "This memory just changed. Please try again",
+      "tooLong": "Up to {{max}} characters"
     }
   },
   "personality": {

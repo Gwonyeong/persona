@@ -51,6 +51,7 @@ export default function MyPage() {
   const [saving, setSaving] = useState(false)
   const [pushStatus, setPushStatus] = useState('default')
   const [showLangModal, setShowLangModal] = useState(false)
+  const [activeTab, setActiveTab] = useState('profile')
   const fileInputRef = useRef(null)
 
   const currentLang = LANGUAGES.find((l) => l.code === i18n.language?.split('-')[0]) || LANGUAGES[1]
@@ -148,6 +149,29 @@ export default function MyPage() {
             {t('common.login')}
           </button>
         </div>
+      ) : (
+      <>
+      {/* 탭: 프로필 / 보관함 */}
+      <div className="flex gap-1 mb-4 bg-gray-900 border border-gray-800 rounded-xl p-1">
+        {[
+          { key: 'profile', label: t('myPage.tabProfile') },
+          { key: 'collection', label: t('myPage.tabCollection') },
+        ].map((tb) => (
+          <button
+            key={tb.key}
+            onClick={() => setActiveTab(tb.key)}
+            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+              activeTab === tb.key ? 'bg-gray-800 text-white' : 'text-gray-500'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'collection' ? (
+        <CollectionGrid navigate={navigate} t={t} />
       ) : (
       <>
       {/* 프로필 */}
@@ -347,6 +371,8 @@ export default function MyPage() {
       </div>
       </>
       )}
+      </>
+      )}
 
       {/* 언어 선택 모달 */}
       {showLangModal && (
@@ -387,6 +413,58 @@ export default function MyPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// 보관함 탭 — 애셋 보유 캐릭터 그리드. 선택 시 /collection/:id 로 이동.
+function CollectionGrid({ navigate, t }) {
+  const [chars, setChars] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    api.get('/collection')
+      .then((res) => { if (alive) setChars(res.characters || []) })
+      .catch(() => { if (alive) setChars([]) })
+    return () => { alive = false }
+  }, [])
+
+  if (chars === null) {
+    return <p className="text-center text-sm text-gray-500 py-16">{t('common.loading')}</p>
+  }
+  if (chars.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-sm text-gray-400 mb-1">{t('collection.empty')}</p>
+        <p className="text-xs text-gray-600">{t('collection.emptyDesc')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {chars.map(({ character, counts, total }) => (
+        <button
+          key={character.id}
+          onClick={() => navigate(`/collection/${character.id}`)}
+          className="flex flex-col items-center gap-2"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <div className="relative w-20 h-20 rounded-full overflow-hidden border border-gray-700 bg-gray-800">
+            {character.profileImage ? (
+              <img src={character.profileImage} alt={character.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-600 text-xl">
+                {character.name?.[0] || '?'}
+              </div>
+            )}
+            <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center border-2 border-gray-950">
+              {total}
+            </span>
+          </div>
+          <span className="text-xs text-gray-300 truncate w-full text-center">{character.name}</span>
+        </button>
+      ))}
     </div>
   )
 }

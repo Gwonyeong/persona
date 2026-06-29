@@ -158,10 +158,22 @@
       "modeSimpleDesc": "過去の会話や状態を反映しない一回限りの通話。履歴・要約に残りません"
     }
   },
+  "collection": {
+    "title": "コレクション",
+    "empty": "まだ獲得したアイテムがありません",
+    "emptyDesc": "キャラクターと会話してボイス・画像・動画を集めましょう",
+    "emptyTab": "この種類のアイテムはありません",
+    "tabVoices": "ボイス",
+    "tabImages": "画像",
+    "tabVideos": "動画",
+    "tabOutfits": "衣装"
+  },
   "myPage": {
     "title": "マイページ - Pesona",
     "metaDescription": "Pesonaのプロフィール設定とアカウント管理ページです。",
     "heading": "マイ",
+    "tabProfile": "プロフィール",
+    "tabCollection": "コレクション",
     "loginRequired": "ログインが必要です",
     "loginRequiredDesc": "ログインするとプロフィール管理、会話履歴の保存などの機能を利用できます。",
     "nickname": "ニックネーム",
@@ -184,7 +196,7 @@
     "watchAdAvailable": "広告を視聴してマスク3個をもらえます",
     "watchAdRemaining": "本日あと{{count}}回",
     "watchAdClaimed": "本日すべて受け取り済み",
-    "watchAdLimit": "1日5回",
+    "watchAdLimit": "1日3回",
     "watchAdNoFill": "現在視聴できる広告がありません。後ほどお試しください",
     "comingSoon": "他の方法も近日追加予定",
     "dailyCheckin": "出席チェック",
@@ -456,7 +468,6 @@
     "loadMore": "もっと見る",
     "imageCount": "画像{{count}}枚",
     "tabFeed": "フィード",
-    "tabAffinity": "好感度",
     "tabMission": "ミッション",
     "tabMemories": "思い出",
     "emptyGenerated": "生成された画像がありません。",
@@ -903,7 +914,21 @@
       "capReachedButton": "解放完了",
       "unlockSuccess": "+10 スロットを追加しました",
       "insufficientMasks": "マスクが足りません",
-      "unlockError": "解放に失敗しました"
+      "unlockError": "解放に失敗しました",
+      "addButton": "記憶を追加",
+      "newPlaceholder": "キャラクターに覚えておいてほしいことを書いてください",
+      "pin": "固定",
+      "pinHint": "記憶を直接追加・編集できます。固定（🔒）した記憶は時間が経っても消えません。",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "delete": "削除",
+      "slotFull": "スロットが満杯です",
+      "saved": "記憶を更新しました",
+      "added": "記憶を追加しました",
+      "deleted": "記憶を削除しました",
+      "saveError": "保存に失敗しました",
+      "staleError": "記憶が変更されました。もう一度お試しください",
+      "tooLong": "最大{{max}}文字まで"
     }
   },
   "personality": {

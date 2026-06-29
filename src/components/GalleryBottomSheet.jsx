@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
-import GalleryGrid from './GalleryGrid'
 import ImageSlideViewer from './ImageSlideViewer'
 import MaskIcon from './MaskIcon'
 
-export default function GalleryBottomSheet({ characterId, characterName, conversationId, affinity, onClose, onAttachFeed, onBackgroundChange, affinityBadge, onAffinityBadgeClear, onGiftSent, onOutfitApplied, allowBackgroundChange = true }) {
+export default function GalleryBottomSheet({ characterId, characterName, conversationId, onClose, onAttachFeed, onBackgroundChange, onGiftSent, onOutfitApplied, allowBackgroundChange = true }) {
   // allowBackgroundChange — false면 "배경으로 설정" 액션을 모두 숨김 (V2 채팅용).
   // V2에서는 AI가 backgroundImage를 mode 기반으로 자동 갱신하므로 유저 수동 변경이 충돌.
   const navigate = useNavigate()
@@ -15,7 +14,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const token = useStore((s) => s.token)
   const masks = useStore((s) => s.masks)
   const setMasks = useStore((s) => s.setMasks)
-  const [contents, setContents] = useState([])
   const [feedPosts, setFeedPosts] = useState([])
   const [generatedImages, setGeneratedImages] = useState([])
   const [expressions, setExpressions] = useState([])
@@ -31,7 +29,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const [selectedFeed, setSelectedFeed] = useState(null)
   const [bgPickMode, setBgPickMode] = useState(false)
   const [bgPickImages, setBgPickImages] = useState(null) // 다중 이미지 선택용 { images: [] }
-  const [showAffinityBadge, setShowAffinityBadge] = useState(!!affinityBadge)
   const [bgSelected, setBgSelected] = useState(null) // 선택된 이미지 URL
   const [purchaseTab, setPurchaseTab] = useState('UNBOUGHT') // GIFT 탭 내부 하위 탭
   const [pendingGift, setPendingGift] = useState(null)
@@ -87,7 +84,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     }
 
     Promise.all(promises).then(([galleryRes, charRes, genRes, giftRes]) => {
-      setContents(galleryRes.galleryContents || [])
       setExpressions(galleryRes.expressions || [])
       setFeedPosts(charRes.character?.feedPosts || [])
       if (genRes) setGeneratedImages(genRes.images || [])
@@ -202,29 +198,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     setResult(null)
   }
 
-  const filtered = contents
-    .filter((item) => item.unlockType === tab)
-    .sort((a, b) => (b.affinityThreshold ?? 0) - (a.affinityThreshold ?? 0))
-
-  const handleContentClick = (content) => {
-    if (bgPickMode) {
-      if (content.images?.length > 1) {
-        setBgPickImages(content.images)
-        setBgSelected(null)
-      } else if (content.images?.length === 1) {
-        setBgSelected(content.images[0].filePath)
-        setBgPickImages(null)
-      }
-      return
-    }
-    setSlideViewer({
-      images: content.images,
-      title: content.title,
-      description: content.description,
-      initialIndex: 0,
-    })
-  }
-
   const handleBgFeedClick = (post) => {
     if (!bgPickMode) {
       setSelectedFeed(selectedFeed?.id === post.id ? null : post)
@@ -253,6 +226,13 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
       return
     }
     setBgSelected(img.filePath)
+    setBgPickImages(null)
+  }
+
+  // 표정 배경 선택 — 영상 표정은 연결된 정지 이미지(imageFilePath)를 배경으로 사용
+  const handleBgExpressionClick = (exp) => {
+    if (!bgPickMode || !exp.seen) return
+    setBgSelected(exp.imageFilePath)
     setBgPickImages(null)
   }
 
@@ -308,15 +288,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
         </svg>
       ),
       label: t('gallery.tabFeed'),
-    },
-    {
-      key: 'AFFINITY',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
-      ),
-      label: t('gallery.tabAffinity'),
     },
     {
       key: 'GENERATED',
@@ -394,10 +365,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                   key={t.key}
                   onClick={() => {
                     setTab(t.key); setBgPickImages(null); setBgSelected(null)
-                    if (t.key === 'AFFINITY' && showAffinityBadge) {
-                      setShowAffinityBadge(false)
-                      onAffinityBadgeClear?.()
-                    }
                   }}
                   className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                     tab === t.key
@@ -408,9 +375,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 >
                   {t.icon}
                   <span>{t.label}</span>
-                  {t.key === 'AFFINITY' && showAffinityBadge && (
-                    <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-                  )}
                 </button>
               ))}
             </div>
@@ -539,15 +503,6 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                     </div>
                   )}
                 </>
-              )}
-              {(tab === 'AFFINITY' || tab === 'MISSION') && (
-                <GalleryGrid
-                  contents={filtered}
-                  affinity={affinity}
-                  onContentClick={handleContentClick}
-                  bgPickMode={bgPickMode}
-                  bgSelected={bgSelected}
-                />
               )}
               {tab === 'GIFT' && (
                 <>
@@ -779,11 +734,15 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                           const seen = exp.seen
                           const videoUnlocked = exp.videoUnlocked
                           const isUnlocking = unlockingImageId === exp.characterImageId
+                          const isBgSelected = bgPickMode && seen && bgSelected === exp.imageFilePath
 
                           return (
                             <div
                               key={exp.characterImageId}
-                              className="relative rounded-xl overflow-hidden bg-gray-800 border border-gray-700"
+                              onClick={bgPickMode ? () => handleBgExpressionClick(exp) : undefined}
+                              className={`relative rounded-xl overflow-hidden bg-gray-800 border ${
+                                isBgSelected ? 'border-indigo-500' : 'border-gray-700'
+                              } ${bgPickMode && seen ? 'cursor-pointer' : ''}`}
                               style={{ aspectRatio: '9 / 16' }}
                             >
                               {/* 베이스 — 이미지 */}
@@ -829,10 +788,11 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                 </>
                               )}
 
-                              {/* 영상 있는 본 이미지 → 중앙 재생 버튼 */}
+                              {/* 영상 있는 본 이미지 → 중앙 재생 버튼 (배경 선택 모드에서는 정지 이미지 선택) */}
                               {seen && hasVideo && (
                                 <button
                                   onClick={() => {
+                                    if (bgPickMode) { handleBgExpressionClick(exp); return }
                                     if (videoUnlocked) setVideoLightboxUrl(exp.videoFilePath)
                                     else handleUnlockExpressionVideo(exp)
                                   }}
@@ -863,6 +823,16 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                 </button>
                               )}
 
+                              {/* 배경 선택됨 → 체크 오버레이 */}
+                              {isBgSelected && (
+                                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 pointer-events-none">
+                                  <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         })}
