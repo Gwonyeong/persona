@@ -914,7 +914,21 @@
       "capReachedButton": "최대 해금 완료",
       "unlockSuccess": "+10 슬롯 추가했어요",
       "insufficientMasks": "마스크가 부족해요",
-      "unlockError": "해금에 실패했어요"
+      "unlockError": "해금에 실패했어요",
+      "addButton": "기억 직접 추가",
+      "newPlaceholder": "캐릭터가 꼭 기억할 내용을 적어주세요",
+      "pin": "고정",
+      "pinHint": "기억을 직접 추가·수정할 수 있어요. 고정(🔒)한 기억은 시간이 지나도 사라지지 않아요.",
+      "save": "저장",
+      "cancel": "취소",
+      "delete": "삭제",
+      "slotFull": "슬롯이 가득 찼어요",
+      "saved": "기억을 수정했어요",
+      "added": "기억을 추가했어요",
+      "deleted": "기억을 삭제했어요",
+      "saveError": "저장에 실패했어요",
+      "staleError": "기억이 방금 바뀌었어요. 다시 시도해주세요",
+      "tooLong": "최대 {{max}}자까지 쓸 수 있어요"
     }
   },
   "personality": {

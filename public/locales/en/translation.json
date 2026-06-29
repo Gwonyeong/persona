@@ -914,7 +914,21 @@
       "capReachedButton": "Max unlocked",
       "unlockSuccess": "+10 slots added",
       "insufficientMasks": "Not enough masks",
-      "unlockError": "Failed to unlock"
+      "unlockError": "Failed to unlock",
+      "addButton": "Add a memory",
+      "newPlaceholder": "Write something the character should always remember",
+      "pin": "Pin",
+      "pinHint": "You can add or edit memories. Pinned (🔒) memories never fade over time.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "slotFull": "Slots are full",
+      "saved": "Memory updated",
+      "added": "Memory added",
+      "deleted": "Memory deleted",
+      "saveError": "Failed to save",
+      "staleError": "This memory just changed. Please try again",
+      "tooLong": "Up to {{max}} characters"
     }
   },
   "personality": {
