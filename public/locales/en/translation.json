@@ -105,6 +105,8 @@
     "safetyHintCtaVerify": "Verify Now",
     "errorSend": "Failed to send message",
     "errorRefunded": "Message failed — masks have been refunded",
+    "minorBlockedWarned": "Your message was blocked for inappropriate (child-related sexual) content. Repeated attempts will consume masks and may restrict your account.",
+    "minorBlocked": "Your message was blocked for inappropriate (child-related sexual) content. (Masks were deducted.)",
     "imageGenRequest": "Request",
     "errorImageGen": "Failed to send photo — masks have been refunded",
     "errorTTS": "Voice generation failed",
@@ -928,7 +930,9 @@
       "deleted": "Memory deleted",
       "saveError": "Failed to save",
       "staleError": "This memory just changed. Please try again",
-      "tooLong": "Up to {{max}} characters"
+      "tooLong": "Up to {{max}} characters",
+      "minorBlockedWarned": "Blocked as inappropriate (child-related) content. Repeated attempts may restrict your account.",
+      "minorBlocked": "Blocked as inappropriate (child-related) content."
     }
   },
   "personality": {

@@ -101,6 +101,9 @@ export default function MemoryModal({ open, conversationId, characterName, onClo
       return setToast({ kind: 'error', text: t('memory.modal.staleError') })
     }
     if (code === 'FACT_TOO_LONG') return setToast({ kind: 'error', text: t('memory.modal.tooLong', { max: MAX_FACT_LEN }) })
+    if (code === 'MINOR_CONTENT_BLOCKED') {
+      return setToast({ kind: 'error', text: t(err?.data?.warned ? 'memory.modal.minorBlockedWarned' : 'memory.modal.minorBlocked') })
+    }
     setToast({ kind: 'error', text: t('memory.modal.saveError') })
   }
 

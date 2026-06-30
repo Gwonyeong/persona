@@ -105,6 +105,8 @@
     "safetyHintCtaVerify": "성인 인증하기",
     "errorSend": "메시지 전송에 실패했습니다",
     "errorRefunded": "메시지 전송에 실패하여 마스크가 복구되었습니다",
+    "minorBlockedWarned": "아동·청소년 관련 부적절한 내용으로 메시지가 검열되었습니다. 반복 시 마스크가 차감되고 이용이 제한될 수 있습니다.",
+    "minorBlocked": "아동·청소년 관련 부적절한 내용으로 메시지가 검열되었습니다. (마스크가 차감되었습니다)",
     "imageGenRequest": "요청하기",
     "errorImageGen": "사진 전송에 실패하여 마스크가 복구되었습니다",
     "errorTTS": "음성 생성에 실패했습니다",
@@ -928,7 +930,9 @@
       "deleted": "기억을 삭제했어요",
       "saveError": "저장에 실패했어요",
       "staleError": "기억이 방금 바뀌었어요. 다시 시도해주세요",
-      "tooLong": "최대 {{max}}자까지 쓸 수 있어요"
+      "tooLong": "최대 {{max}}자까지 쓸 수 있어요",
+      "minorBlockedWarned": "아동·청소년 관련 부적절한 내용으로 검열되었어요. 반복 시 이용이 제한될 수 있어요",
+      "minorBlocked": "아동·청소년 관련 부적절한 내용으로 검열되었어요"
     }
   },
   "personality": {
