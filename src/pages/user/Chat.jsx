@@ -2135,7 +2135,8 @@ export default function Chat() {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
               {(() => {
                 const voiceActive = voiceMode && character?.voiceId
-                const voiceSurcharge = voiceActive && !canUseFreeVoice ? 4 : 0
+                // 흥분 모드(NSFW)는 보이스 추가요금 +3 (서버 computeChatMaskCost와 일치)
+                const voiceSurcharge = voiceActive && !canUseFreeVoice ? (safetyMode === false ? 7 : 4) : 0
                 const cost = (chatModel === 'ADVANCED' ? 3 : 1) + voiceSurcharge
                 return (
                   <span className="absolute inset-0 flex items-center justify-center pointer-events-none">

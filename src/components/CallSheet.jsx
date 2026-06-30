@@ -401,7 +401,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
         </div>
 
         <p className="text-[11px] text-gray-500">
-          {t('chat.call.costPerTurn', { count: COST_PER_TURN })} · {t('chat.call.secured')}
+          {t('chat.call.costPerTurn', { count: COST_PER_TURN + (safetyMode === false ? 3 : 0) })} · {t('chat.call.secured')}
         </p>
       </div>
       )}
