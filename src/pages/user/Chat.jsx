@@ -804,10 +804,10 @@ export default function Chat() {
   useBackHandler(showReport, () => setShowReport(false))
   useBackHandler(showModelSheet, () => setShowModelSheet(false))
 
-  const showError = (msg) => {
+  const showError = (msg, duration = 3000) => {
     setErrorToast(msg)
     if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
-    errorTimerRef.current = setTimeout(() => setErrorToast(null), 3000)
+    errorTimerRef.current = setTimeout(() => setErrorToast(null), duration)
   }
 
   // CallSession 메타 fetch — '통화 기록 이어서' 버튼 노출/턴 수 표시용.
@@ -1148,6 +1148,14 @@ export default function Chat() {
       })
     } catch (error) {
       console.error(error)
+      // 미성년 성적 콘텐츠 검열 차단 — 재시도/환불 안내 대신 명확한 검열 메시지.
+      if (error.data?.error === 'MINOR_CONTENT_BLOCKED' || error.message === 'MINOR_CONTENT_BLOCKED') {
+        setMessages((prev) => prev.filter((m) => m._round !== roundId && m.id !== tempUserMsg.id))
+        setShowTyping(false)
+        setSending(false)
+        showError(error.data?.warned ? t('chat.minorBlockedWarned') : t('chat.minorBlocked'), 5000)
+        return
+      }
       // Insufficient masks — 작성 메시지 보존 + in-context 결제 모달 노출
       if (error.message?.includes('Insufficient masks')) {
         setMessages((prev) => prev.filter((m) => m._round !== roundId && m.id !== tempUserMsg.id))
