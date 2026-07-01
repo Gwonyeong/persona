@@ -630,6 +630,10 @@ export default function Chat() {
   const [voiceMode, setVoiceMode] = useState(false)
   // Safety Mode: true=SFW 유지(기본), false=NSFW 허용. 인증된 유저만 OFF 가능.
   const [safetyMode, setSafetyMode] = useState(true)
+  // 추천답변 {question, normal, sexual} — 유저 차례(마지막이 캐릭터 발화)일 때 마지막 버블 아래 노출
+  const [suggestedReplies, setSuggestedReplies] = useState(null)
+  // 채팅 설정의 추천답변 on/off (per conversation, 기본 ON)
+  const [suggestedRepliesEnabled, setSuggestedRepliesEnabled] = useState(true)
   const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
   // 표정 sprite 출력 모드: 'FULL' | 'BUBBLE'(기본) | 'OFF'. 설정 페이지에서 변경.
   const [spriteMode, setSpriteMode] = useState('BUBBLE')
@@ -861,12 +865,16 @@ export default function Chat() {
       if (conv.characterStatus) setCharacterStatus(conv.characterStatus)
       setVoiceMode(!!conv.voiceMode)
       setSafetyMode(conv.safetyMode !== false)
+      setSuggestedRepliesEnabled(conv.suggestedRepliesEnabled !== false)
       setSpriteMode(['FULL', 'BUBBLE', 'BACKGROUND', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
       setChatMode(conv.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
       setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
+      // 추천답변: 대화의 마지막 발화가 캐릭터일 때(=유저 차례)만 그 메시지의 suggestedReplies 노출
+      const visibleTail = [...conv.messages].filter((m) => ['CHARACTER', 'USER', 'NARRATION', 'GENERATED_IMAGE', 'GIFT'].includes(m.role)).pop()
+      setSuggestedReplies(visibleTail?.role === 'CHARACTER' ? (visibleTail.suggestedReplies || null) : null)
       // 초기 로드 시 즉시 맨 아래로
       requestAnimationFrame(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -963,6 +971,7 @@ export default function Chat() {
     const text = input.trim()
     const feedToSend = attachedFeed
     setInput('')
+    setSuggestedReplies(null)
     setSending(true)
     // read polling burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
     readPollUntilRef.current = Date.now() + 60000
@@ -1100,6 +1109,7 @@ export default function Chat() {
             })
             const lastCharMsg = rawCharMsgs[rawCharMsgs.length - 1]
             if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
+            setSuggestedReplies(data.suggestedReplies || null)
             setShowTyping(false)
             setSending(false)
             window.gtag?.('event', 'chat_message', { conversation_id: id })
@@ -1343,6 +1353,21 @@ export default function Chat() {
       textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
     })
   }, [input])
+
+  // 추천답변 칩 클릭 → 입력창 채우기(편집 후 전송). 즉시 전송하지 않음.
+  const fillSuggestion = useCallback((text) => {
+    if (!text) return
+    const v = String(text).slice(0, 300)
+    setInput(v)
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      ta.setSelectionRange(v.length, v.length)
+      ta.style.height = 'auto'
+      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
+    })
+  }, [])
 
   // 채팅 투어 (early return 위에 hook 호출 — Rules of Hooks)
   const tourActive = !!user && !user.onboardingState?.chatTour
@@ -1903,6 +1928,55 @@ export default function Chat() {
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" fill="none" strokeDasharray="42 100" strokeLinecap="round" />
             </svg>
             <span className="text-[10px]">{t('chat.finalizing', { defaultValue: '응답 마무리 중...' })}</span>
+          </div>
+        )}
+        {suggestedRepliesEnabled && suggestedReplies && !sending && (
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {suggestedReplies.question && (
+              <button
+                type="button"
+                onClick={() => fillSuggestion(suggestedReplies.question)}
+                className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-gray-800 border border-gray-700 text-gray-200 hover:border-indigo-500 hover:text-white transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                💬 {suggestedReplies.question}
+              </button>
+            )}
+            {suggestedReplies.normal && (
+              <button
+                type="button"
+                onClick={() => fillSuggestion(suggestedReplies.normal)}
+                className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-gray-800 border border-gray-700 text-gray-200 hover:border-indigo-500 hover:text-white transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {suggestedReplies.normal}
+              </button>
+            )}
+            {safetyMode ? (
+              <button
+                type="button"
+                onClick={() => setShowAdultVerifyPrompt(true)}
+                title={t('chat.suggestedSexualLocked', { defaultValue: '성인 모드에서 잠금 해제' })}
+                className="relative px-4 py-2 rounded-full text-xs bg-rose-900/30 border border-rose-700/40 overflow-hidden"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <span className="blur-[3px] select-none text-rose-200/80">두근거리는 한마디…</span>
+                <span className="absolute inset-0 flex items-center justify-center text-rose-200">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                </span>
+              </button>
+            ) : (
+              suggestedReplies.sexual && (
+                <button
+                  type="button"
+                  onClick={() => fillSuggestion(suggestedReplies.sexual)}
+                  className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-rose-900/40 border border-rose-700/50 text-rose-200 hover:border-rose-400 hover:text-rose-100 transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {suggestedReplies.sexual}
+                </button>
+              )
+            )}
           </div>
         )}
         <div ref={messagesEndRef} />

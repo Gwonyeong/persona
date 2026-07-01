@@ -23,6 +23,9 @@ export default function ChatSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingChatMode, setSavingChatMode] = useState(false)
+  // 추천 답변 on/off (per conversation, 기본 ON)
+  const [suggestedRepliesEnabled, setSuggestedRepliesEnabled] = useState(true)
+  const [savingSuggested, setSavingSuggested] = useState(false)
 
   // 채팅 스타일 토글 — 캐릭터별 disabledStyleIds 관리
   const [characterId, setCharacterId] = useState(null)
@@ -38,6 +41,7 @@ export default function ChatSettings() {
       .then(({ conversation }) => {
         setSpriteMode(conversation?.spriteMode || 'BUBBLE')
         setChatMode(conversation?.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
+        setSuggestedRepliesEnabled(conversation?.suggestedRepliesEnabled !== false)
         setIsV2(!!(conversation?.dataV2 || conversation?.character?.promptDataV2))
         const charId = conversation?.characterId
         if (charId) {
@@ -93,6 +97,21 @@ export default function ChatSettings() {
       console.error('Update chat mode error:', err)
     } finally {
       setSavingChatMode(false)
+    }
+  }
+
+  const handleToggleSuggested = async () => {
+    if (savingSuggested) return
+    const next = !suggestedRepliesEnabled
+    setSuggestedRepliesEnabled(next)
+    setSavingSuggested(true)
+    try {
+      await api.patch(`/conversations/${id}/suggested-replies`, { enabled: next })
+    } catch (err) {
+      console.error('Update suggested replies error:', err)
+      setSuggestedRepliesEnabled(!next) // 롤백
+    } finally {
+      setSavingSuggested(false)
     }
   }
 
@@ -161,6 +180,28 @@ export default function ChatSettings() {
               )
             })}
           </div>
+        </section>
+        )}
+
+        {/* 추천 답변 on/off — V1 채팅 전용 (V2는 추천답변 미생성) */}
+        {!isV2 && (
+        <section>
+          <h2 className="text-sm font-semibold text-white mb-1">{t('chatSettings.suggestedReplies.heading', { defaultValue: '추천 답변' })}</h2>
+          <p className="text-xs text-gray-500 mb-4">{t('chatSettings.suggestedReplies.description', { defaultValue: '대화마다 보낼 만한 답변을 입력창 위에 추천해줍니다. 끄면 추천이 표시되지 않습니다.' })}</p>
+          <button
+            onClick={handleToggleSuggested}
+            disabled={savingSuggested}
+            className={`w-full flex items-center justify-between gap-3 text-left p-4 rounded-xl border bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors ${savingSuggested ? 'opacity-60 cursor-not-allowed' : ''}`}
+            style={NO_OUTLINE}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white">{t('chatSettings.suggestedReplies.toggleLabel', { defaultValue: '추천 답변 표시' })}</p>
+              <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{suggestedRepliesEnabled ? t('chatSettings.suggestedReplies.on', { defaultValue: '켜짐 — 매 대화마다 추천 표시' }) : t('chatSettings.suggestedReplies.off', { defaultValue: '꺼짐 — 추천 미표시' })}</p>
+            </div>
+            <span className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors ${suggestedRepliesEnabled ? 'bg-indigo-500' : 'bg-gray-600'}`}>
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${suggestedRepliesEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+            </span>
+          </button>
         </section>
         )}
 
