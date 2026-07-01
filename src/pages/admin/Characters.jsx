@@ -84,8 +84,6 @@ const EMPTY_FORM = {
   tags: [],
   customTags: '',
   initialAffinity: 0,
-  followerCount: 0,
-  followingCount: 0,
   voiceId: '',
   isPublic: false,
   proactiveEnabled: false,
@@ -517,8 +515,6 @@ export default function Characters() {
       tags: c.tags.filter((t) => t.includes(':')),
       customTags: c.tags.filter((t) => !t.includes(':')).join(', '),
       initialAffinity: c.initialAffinity || 0,
-      followerCount: c.followerCount || 0,
-      followingCount: c.followingCount || 0,
       voiceId: c.voiceId || '',
       isPublic: c.isPublic,
       proactiveEnabled: c.proactiveEnabled || false,
@@ -623,7 +619,7 @@ export default function Characters() {
     load()
   }
 
-  // 음성 샘플 — DeepSeek로 대사 생성 (저장 안 함)
+  // 음성 샘플 — Gemini로 대사 생성 (저장 안 함)
   const generateVoiceSampleText = async (kind) => {
     if (!editing || editing === 'new') return
     setVoiceSampleBusy((prev) => ({ ...prev, [kind]: 'text' }))
@@ -1188,7 +1184,7 @@ export default function Characters() {
       {/* 생성/수정 모달 */}
       {editing && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-lg max-h-[90vh] overflow-auto p-6">
+          <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-3xl max-h-[90vh] overflow-auto p-6">
             <h3 className="text-lg font-bold mb-4">
               {editing === 'new' ? '새 캐릭터' : '캐릭터 수정'}
             </h3>
@@ -1499,7 +1495,7 @@ export default function Characters() {
                       <textarea
                         value={form.personality}
                         onChange={(e) => setForm({ ...form, personality: e.target.value })}
-                        className={`w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-32 resize-none ${mrActive ? 'opacity-60' : ''}`}
+                        className={`w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm h-64 resize-y ${mrActive ? 'opacity-60' : ''}`}
                         placeholder="캐릭터의 말투, 성격, 배경 스토리 등을 자세히 작성"
                       />
                       {mrActive && (
@@ -1528,7 +1524,7 @@ export default function Characters() {
                       <textarea
                         value={form.promptDataV1Text}
                         onChange={(e) => setForm({ ...form, promptDataV1Text: e.target.value })}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono h-64 resize-y"
+                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono h-96 resize-y"
                         placeholder='MRPrompt 스키마 JSON. 비워두면 promptDataV1 초기화(레거시 personality 사용). 예: { "identity": {...}, "coreTraits": [...], "speechBaseline": {...}, "sceneFacets": [...] }'
                         spellCheck={false}
                       />
@@ -1839,29 +1835,6 @@ export default function Characters() {
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label className="text-sm text-gray-400 block mb-1">팔로워 수</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.followerCount}
-                    onChange={(e) => setForm({ ...form, followerCount: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-sm text-gray-400 block mb-1">팔로잉 수</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.followingCount}
-                    onChange={(e) => setForm({ ...form, followingCount: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -1957,7 +1930,7 @@ export default function Characters() {
                     <label className="text-sm font-medium text-gray-200">음성 샘플 (상세 페이지 버블)</label>
                     <span className="text-[10px] text-gray-500">각 카드는 독립 저장</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 mb-3">'딥시크로 생성' → 텍스트 검토 → 'TTS 생성 + 저장'. aroused는 클라이언트에서 Safety Mode OFF일 때만 재생됨.</p>
+                  <p className="text-[10px] text-gray-500 mb-3">'Gemini로 생성' → 텍스트 검토 → 'TTS 생성 + 저장'. aroused는 클라이언트에서 Safety Mode OFF일 때만 재생됨.</p>
                   {['normal', 'aroused'].map((kind) => {
                     const busy = voiceSampleBusy[kind]
                     const sample = voiceSamples[kind] || { text: '', audioUrl: '' }
@@ -1973,7 +1946,7 @@ export default function Characters() {
                             className="text-[11px] px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
                             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                           >
-                            {busy === 'text' ? '생성 중…' : '딥시크로 대사 생성'}
+                            {busy === 'text' ? '생성 중…' : 'Gemini로 대사 생성'}
                           </button>
                         </div>
                         <textarea

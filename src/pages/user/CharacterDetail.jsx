@@ -14,6 +14,12 @@ function getImageUrl(filePath) {
   return null
 }
 
+// 음성 샘플 표시용: ElevenLabs v3 대괄호 태그([whimpering] 등)는 어드민 전용이므로
+// 유저 화면에서는 벗겨서 보여준다. 한국어 신음(하아/흐읏)은 대사이므로 유지.
+function stripVoiceTags(s) {
+  return (s || '').replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
 function isVideoUrl(url) {
   if (!url || typeof url !== 'string') return false
   const clean = url.split('?')[0].toLowerCase()
@@ -756,7 +762,7 @@ export default function CharacterDetail() {
                         {isAroused ? t('character.voiceLabelAroused') : t('character.voiceLabelNormal')}
                       </p>
                       <p className={`text-sm leading-snug line-clamp-2 ${locked ? 'text-gray-500' : 'text-gray-100'}`}>
-                        {locked ? t('character.voiceLockedHint') : sample.text}
+                        {locked ? t('character.voiceLockedHint') : stripVoiceTags(sample.text)}
                       </p>
                     </div>
                   </button>
