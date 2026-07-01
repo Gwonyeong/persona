@@ -14,16 +14,67 @@ function getImageUrl(filePath) {
   return null
 }
 
-// 음성 샘플 표시용: ElevenLabs v3 대괄호 태그([whimpering] 등)는 어드민 전용이므로
-// 유저 화면에서는 벗겨서 보여준다. 한국어 신음(하아/흐읏)은 대사이므로 유지.
-function stripVoiceTags(s) {
-  return (s || '').replace(/\[[^\]]*\]/g, '').replace(/\s{2,}/g, ' ').trim()
-}
-
 function isVideoUrl(url) {
   if (!url || typeof url !== 'string') return false
   const clean = url.split('?')[0].toLowerCase()
   return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v')
+}
+
+// 예시 음성 재생 칩 (일반 / 흥분). audioUrl 있는 샘플만 노출.
+// 흥분(aroused) 샘플은 성인인증(adultVerified) 안 된 유저에게 잠금.
+// variant: 'overlay'(프로필 이미지 위, 반투명) | 'sheet'(바텀시트 상단, 솔리드)
+function VoiceSampleChips({ character, user, playingVoice, onToggle, onLockedTap, t, variant = 'sheet' }) {
+  const samples = character?.voiceSamples
+  if (!samples?.normal?.audioUrl && !samples?.aroused?.audioUrl) return null
+  const overlay = variant === 'overlay'
+  const iconSize = overlay ? 11 : 13
+  return (
+    <div className={`flex items-center gap-2 ${overlay ? 'mb-2 pointer-events-auto' : 'flex-wrap'}`}>
+      {['normal', 'aroused'].map((kind) => {
+        const sample = samples?.[kind]
+        if (!sample?.audioUrl) return null
+        const isAroused = kind === 'aroused'
+        const locked = isAroused && !user?.adultVerified
+        const isPlaying = playingVoice === kind
+        // 잠긴 흥분 칩은 비활성이 아니라 클릭 시 성인인증으로 유도한다.
+        return (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => (locked ? onLockedTap?.() : onToggle(kind, sample.audioUrl))}
+            title={locked ? t('character.voiceLockedHint') : undefined}
+            className={`inline-flex items-center gap-1.5 rounded-full border font-semibold ${locked ? 'opacity-75' : ''} ${
+              overlay
+                ? `pl-1 pr-2.5 py-1 text-[11px] backdrop-blur-sm ${isAroused ? 'bg-pink-500/25 border-pink-400/40 text-pink-50' : 'bg-black/45 border-white/25 text-white'}`
+                : `pl-1.5 pr-3 py-1.5 text-xs ${isAroused ? 'bg-pink-500/10 border-pink-500/30 text-pink-200' : 'bg-gray-800 border-gray-700 text-gray-100'}`
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <span className={`flex-shrink-0 rounded-full flex items-center justify-center ${overlay ? 'w-5 h-5' : 'w-6 h-6'} ${
+              isAroused ? 'bg-pink-500/80 text-white' : overlay ? 'bg-white/25 text-white' : 'bg-indigo-600 text-white'
+            }`}>
+              {locked ? (
+                <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              ) : isPlaying ? (
+                <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              ) : (
+                <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="6 4 20 12 6 20" />
+                </svg>
+              )}
+            </span>
+            {isAroused ? t('character.voiceLabelAroused') : t('character.voiceLabelNormal')}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function getCharacterOnlineStatus(activeHours) {
@@ -450,33 +501,38 @@ export default function CharacterDetail() {
             )}
             {/* 하단 그라데이션 딤드 — 페이지 bg(gray-950)와 일치해서 경계 안 보이게 */}
             <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-gray-950 via-gray-950/70 to-transparent pointer-events-none" />
-            {/* 하단 오버레이 — 스토리 뱃지 + 이름 + 소개 */}
-            <div className="absolute inset-x-0 bottom-0 px-4 pb-5 pt-14 text-left pointer-events-none">
-              {hasStories && (
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2 ${storyViewed ? 'bg-gray-700/80' : 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400'}`}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                  <span className="text-[10px] text-white font-semibold">{t('character.storyBadge')}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-bold text-xl text-white">{character.name}</p>
-                {onlineStatus === 'free' && (
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                )}
-                {(existingConv?.affinity ?? 0) >= 20 && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/30 text-indigo-200 rounded-full">
-                    {isFollowing ? t('character.mutualFollow') : t('character.followsYou')}
-                  </span>
-                )}
+          </button>
+
+          {/* 하단 오버레이 — 예시 음성 + 스토리 뱃지 + 이름 + 소개.
+              스토리 버튼 밖 형제로 분리(버튼 중첩 방지). 컨테이너는 pointer-events-none로
+              이미지 탭(스토리 열기)을 통과시키고, 음성 칩만 pointer-events-auto로 클릭을 받는다. */}
+          <div className="absolute inset-x-0 bottom-0 px-4 pb-5 pt-14 text-left pointer-events-none">
+            {/* 예시 음성 (이름 위) */}
+            <VoiceSampleChips variant="overlay" character={character} user={user} playingVoice={playingVoice} onToggle={toggleVoiceSample} onLockedTap={() => navigate('/adult-verify')} t={t} />
+            {hasStories && (
+              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2 ${storyViewed ? 'bg-gray-700/80' : 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400'}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                <span className="text-[10px] text-white font-semibold">{t('character.storyBadge')}</span>
               </div>
-              {character.concept && (
-                <p className="text-sm text-gray-300 mt-1">{character.concept}</p>
+            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-bold text-xl text-white">{character.name}</p>
+              {onlineStatus === 'free' && (
+                <div className="w-2 h-2 rounded-full bg-green-500" />
               )}
-              {character.description && (
-                <p className="text-sm text-gray-200 mt-1.5 leading-relaxed line-clamp-3">{character.description}</p>
+              {(existingConv?.affinity ?? 0) >= 20 && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-indigo-600/30 text-indigo-200 rounded-full">
+                  {isFollowing ? t('character.mutualFollow') : t('character.followsYou')}
+                </span>
               )}
             </div>
-          </button>
+            {character.concept && (
+              <p className="text-sm text-gray-300 mt-1">{character.concept}</p>
+            )}
+            {character.description && (
+              <p className="text-sm text-gray-200 mt-1.5 leading-relaxed line-clamp-3">{character.description}</p>
+            )}
+          </div>
 
           {/* 뒤로가기 (좌상단) */}
           <button
@@ -707,67 +763,6 @@ export default function CharacterDetail() {
                   )}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* 음성 샘플 버블 — 일반 / 흥분. aroused는 safetyMode=false일 때만 재생 가능 */}
-          {(character.voiceSamples?.normal?.text || character.voiceSamples?.aroused?.text) && (
-            <div className="mt-4 flex flex-col gap-2">
-              {['normal', 'aroused'].map((kind) => {
-                const sample = character.voiceSamples?.[kind]
-                if (!sample?.text) return null
-                const isAroused = kind === 'aroused'
-                const locked = isAroused && (!user || user?.safetyMode)
-                const isPlaying = playingVoice === kind
-                const canPlay = !!sample.audioUrl && !locked
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => canPlay && toggleVoiceSample(kind, sample.audioUrl)}
-                    disabled={!canPlay}
-                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-2xl text-left transition-colors ${
-                      isAroused
-                        ? 'bg-pink-500/10 border border-pink-500/30 hover:bg-pink-500/15'
-                        : 'bg-gray-800 border border-gray-700 hover:bg-gray-750'
-                    } disabled:opacity-70 disabled:cursor-default`}
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    {/* 재생/잠금 아이콘 */}
-                    <span className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-                      locked
-                        ? 'bg-gray-700/60 text-gray-400'
-                        : isAroused
-                          ? 'bg-pink-500/80 text-white'
-                          : 'bg-indigo-600 text-white'
-                    }`}>
-                      {locked ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" />
-                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                      ) : isPlaying ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <rect x="6" y="5" width="4" height="14" rx="1" />
-                          <rect x="14" y="5" width="4" height="14" rx="1" />
-                        </svg>
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <polygon points="6 4 20 12 6 20" />
-                        </svg>
-                      )}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[10px] mb-0.5 ${isAroused ? 'text-pink-300' : 'text-gray-400'}`}>
-                        {isAroused ? t('character.voiceLabelAroused') : t('character.voiceLabelNormal')}
-                      </p>
-                      <p className={`text-sm leading-snug line-clamp-2 ${locked ? 'text-gray-500' : 'text-gray-100'}`}>
-                        {locked ? t('character.voiceLockedHint') : stripVoiceTags(sample.text)}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })}
             </div>
           )}
 
@@ -1379,6 +1374,8 @@ export default function CharacterDetail() {
 
             {chatModal.step === 'mode' && (
               <div className="flex flex-col gap-2.5">
+                {/* 예시 음성 (상단) — 흥분은 성인인증 안 된 유저에게 잠금 */}
+                <VoiceSampleChips variant="sheet" character={character} user={user} playingVoice={playingVoice} onToggle={toggleVoiceSample} onLockedTap={() => { closeChatModal(); navigate('/adult-verify') }} t={t} />
                 {/* 기본 채팅 카드 */}
                 <div className="rounded-2xl border border-gray-700/60 bg-gray-800/40 p-4">
                   <div className="flex items-start gap-3 mb-3">
