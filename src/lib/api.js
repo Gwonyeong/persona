@@ -38,6 +38,10 @@ async function request(path, options = {}) {
     throw err
   }
 
+  // 어드민 응답은 원본 유지 — {userName} placeholder를 실제 닉네임으로 바꾸면
+  // 캐릭터 데이터(promptDataV1·personality·firstMessageV2 등) 편집 시 원본을 알 수 없어 혼란.
+  // 어드민은 authoring 화면이므로 raw placeholder를 그대로 노출한다.
+  if (path.startsWith('/admin')) return data
   return transformUserNameTokens(data, resolveUserName())
 }
 
