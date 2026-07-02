@@ -71,6 +71,28 @@ const V2_LANGS = [
   { key: 'ja', label: '日本語' },
 ]
 
+// 각 인풋이 실제 어디에 쓰이는지 표시하는 배지. (사용처는 서버 코드 기준: ai.js/calls.js/conversations.js 확인값)
+const USAGE_STYLES = {
+  chat: 'bg-emerald-900/50 border-emerald-700 text-emerald-300',   // 1:1 V1 채팅 프롬프트 (MR)
+  first: 'bg-indigo-900/50 border-indigo-700 text-indigo-300',     // 첫 메시지
+  call: 'bg-purple-900/50 border-purple-700 text-purple-300',       // 통화
+  tts: 'bg-teal-900/50 border-teal-700 text-teal-300',              // 음성(TTS)
+  display: 'bg-sky-900/50 border-sky-700 text-sky-300',             // 사용자 노출(카드 등)
+  meta: 'bg-gray-700/50 border-gray-600 text-gray-400',             // 메타/기타
+  off: 'bg-gray-800 border-gray-700 text-gray-500 line-through',    // 미사용
+}
+function UsageTags({ items }) {
+  return (
+    <span className="inline-flex flex-wrap gap-1 align-middle ml-1">
+      {items.map(([label, kind], i) => (
+        <span key={i} className={`px-1.5 py-0.5 text-[9px] rounded border ${USAGE_STYLES[kind] || USAGE_STYLES.meta}`}>
+          {label}
+        </span>
+      ))}
+    </span>
+  )
+}
+
 const EMPTY_FORM = {
   name: '',
   description: '',
@@ -1445,7 +1467,7 @@ export default function Characters() {
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-gray-400 block mb-1">이름</label>
+                <label className="text-sm text-gray-400 block mb-1">이름<UsageTags items={[['1:1채팅', 'chat'], ['통화', 'call'], ['TTS', 'tts'], ['표시', 'display']]} /></label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -1455,7 +1477,7 @@ export default function Characters() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 block mb-1">소개</label>
+                <label className="text-sm text-gray-400 block mb-1">소개<UsageTags items={[['카드 표시', 'display']]} /></label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -1465,7 +1487,7 @@ export default function Characters() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 block mb-1">컨셉</label>
+                <label className="text-sm text-gray-400 block mb-1">컨셉<UsageTags items={[['카드 표시', 'display'], ['통화', 'call']]} /></label>
                 <input
                   value={form.concept}
                   onChange={(e) => setForm({ ...form, concept: e.target.value })}
@@ -1485,7 +1507,7 @@ export default function Characters() {
                   <>
                     <div>
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <label className="text-sm text-gray-400">성격 설정 (프롬프트)</label>
+                        <label className="text-sm text-gray-400">성격 설정 (프롬프트)<UsageTags items={[['통화', 'call'], ['TTS', 'tts'], ['피드·선물·의상', 'meta'], ['1:1채팅 미사용', 'off']]} /></label>
                         {mrActive && (
                           <span className="px-1.5 py-0.5 text-[10px] rounded bg-gray-700 border border-gray-600 text-gray-300 font-medium">
                             V1(MR) 캐릭터 — 채팅 미반영
@@ -1508,7 +1530,7 @@ export default function Characters() {
                     {/* V1 채팅 데이터 (promptDataV1, JSON) */}
                     <div className="border border-gray-700 rounded-lg p-3 bg-gray-900/40">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <label className="text-sm font-medium text-gray-200">V1 채팅 데이터 (promptDataV1, JSON)</label>
+                        <label className="text-sm font-medium text-gray-200">V1 채팅 데이터 (promptDataV1, JSON)<UsageTags items={[['1:1채팅 (MR·주 소스)', 'chat']]} /></label>
                         {raw && (
                           mrActive ? (
                             <span className="px-1.5 py-0.5 text-[10px] rounded bg-emerald-900/60 border border-emerald-700 text-emerald-300 font-medium">
@@ -1539,6 +1561,7 @@ export default function Characters() {
               <div>
                 <label className="text-sm text-gray-400 block mb-1">
                   첫 대사 <span className="text-red-400 font-semibold">(deprecated)</span>
+                  <UsageTags items={[['첫 메시지 (V2 없을때만)', 'first']]} />
                 </label>
                 <textarea
                   value={form.firstMessage}
@@ -1555,7 +1578,7 @@ export default function Characters() {
               <div className="border border-gray-700 rounded-lg p-3 bg-gray-900/40">
                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-200">첫 등장 V2 (JSON)</label>
+                    <label className="text-sm font-medium text-gray-200">첫 등장 V2 (JSON)<UsageTags items={[['첫 메시지 (주 소스)', 'first']]} /></label>
                     {form.firstMessageV2Draft && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-900/60 border border-amber-700 text-amber-300 font-medium">
                         임시 저장 (채팅에서 V1 사용 중)
@@ -1819,6 +1842,7 @@ export default function Characters() {
               <div>
                 <label className="text-sm text-gray-400 block mb-1">
                   시작 호감도: {form.initialAffinity}
+                  <UsageTags items={[['대화 시작값', 'meta']]} />
                 </label>
                 <input
                   type="range"
@@ -1842,8 +1866,7 @@ export default function Characters() {
                   onChange={(e) => setForm({ ...form, isPublic: e.target.checked })}
                   className="rounded"
                 />
-                공개
-              </label>
+                공개<UsageTags items={[['노출 여부', 'meta']]} /></label>
 
               {/* 선제 메시지 설정 */}
               <div className="border-t border-gray-700 pt-4 mt-2">
@@ -1854,8 +1877,7 @@ export default function Characters() {
                     onChange={(e) => setForm({ ...form, proactiveEnabled: e.target.checked })}
                     className="rounded"
                   />
-                  선제 메시지 활성화
-                </label>
+                  선제 메시지 활성화<UsageTags items={[['선제 푸시', 'meta']]} /></label>
 
                 {form.proactiveEnabled && (
                   <div className="space-y-3 pl-1">
@@ -1913,7 +1935,7 @@ export default function Characters() {
 
               {/* TTS 설정 */}
               <div className="border-t border-gray-700 pt-4 mt-2">
-                <label className="text-xs text-gray-400 block mb-1">ElevenLabs Voice ID (TTS)</label>
+                <label className="text-xs text-gray-400 block mb-1">ElevenLabs Voice ID (TTS)<UsageTags items={[['TTS', 'tts'], ['통화', 'call']]} /></label>
                 <input
                   value={form.voiceId}
                   onChange={(e) => setForm({ ...form, voiceId: e.target.value })}
