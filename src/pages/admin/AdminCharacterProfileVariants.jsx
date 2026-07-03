@@ -15,6 +15,7 @@ export default function AdminCharacterProfileVariants() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [uploadSource, setUploadSource] = useState('MASK_PASS') // 업로드 시 기본 획득처
   const fileRef = useRef(null)
 
   async function load() {
@@ -44,6 +45,7 @@ export default function AdminCharacterProfileVariants() {
       for (const file of files) {
         const fd = new FormData()
         fd.append('image', file)
+        fd.append('source', uploadSource)
         await api.post(`/admin/characters/${characterId}/profile-variants`, fd)
       }
       await load()
@@ -57,6 +59,15 @@ export default function AdminCharacterProfileVariants() {
   async function updateTitle(v, title) {
     try {
       await api.put(`/admin/profile-variants/${v.id}`, { title })
+      await load()
+    } catch (e) {
+      alert(e.data?.error || '수정 실패')
+    }
+  }
+
+  async function updateSource(v, source) {
+    try {
+      await api.put(`/admin/profile-variants/${v.id}`, { source })
       await load()
     } catch (e) {
       alert(e.data?.error || '수정 실패')
@@ -82,6 +93,19 @@ export default function AdminCharacterProfileVariants() {
         <h1 className="text-lg font-bold">
           프로필 이미지 풀 — {character?.name || `#${characterId}`}
         </h1>
+      </div>
+
+      {/* 업로드 시 획득처 선택 */}
+      <div className="mb-2 flex items-center gap-2">
+        <label className="text-xs text-gray-400">업로드 획득처:</label>
+        <select
+          value={uploadSource}
+          onChange={(e) => setUploadSource(e.target.value)}
+          className="px-2 py-1 text-xs bg-gray-950 border border-gray-800 rounded text-gray-200"
+        >
+          <option value="MASK_PASS">Mask Pass</option>
+          <option value="GACHA">Gacha</option>
+        </select>
       </div>
 
       {/* 드래그앤드랍 업로드 */}
@@ -130,6 +154,14 @@ export default function AdminCharacterProfileVariants() {
                 placeholder="라벨"
                 className="w-full px-2 py-1 text-xs bg-gray-950 border border-gray-800 rounded"
               />
+              <select
+                value={v.source || 'MASK_PASS'}
+                onChange={(e) => updateSource(v, e.target.value)}
+                className="mt-1.5 w-full px-2 py-1 text-xs bg-gray-950 border border-gray-800 rounded text-gray-200"
+              >
+                <option value="MASK_PASS">Mask Pass</option>
+                <option value="GACHA">Gacha</option>
+              </select>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] text-gray-500 font-mono">id: {v.id}</span>
                 <button

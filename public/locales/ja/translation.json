@@ -168,7 +168,13 @@
     "tabVoices": "ボイス",
     "tabImages": "画像",
     "tabVideos": "動画",
-    "tabOutfits": "衣装"
+    "tabOutfits": "衣装",
+    "voicesCollected": "特別ボイス",
+    "voicesChat": "会話で生成されたボイス",
+    "voicesChatMore": "最新{{count}}件のみ表示されます",
+    "outfitLockedGacha": "ギフトガチャで手に入ります！",
+    "goToGacha": "ギフトガチャへ",
+    "imagesMaskPass": "マスクパスで獲得した画像"
   },
   "myPage": {
     "title": "マイページ - Pesona",

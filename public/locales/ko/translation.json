@@ -168,7 +168,13 @@
     "tabVoices": "보이스",
     "tabImages": "이미지",
     "tabVideos": "영상",
-    "tabOutfits": "의상"
+    "tabOutfits": "의상",
+    "voicesCollected": "특별 보이스",
+    "voicesChat": "대화에서 생성된 목소리",
+    "voicesChatMore": "최근 {{count}}개만 표시돼요",
+    "outfitLockedGacha": "선물 뽑기에서 얻을 수 있어요!",
+    "goToGacha": "선물 뽑기 바로가기",
+    "imagesMaskPass": "마스크 패스에서 얻은 이미지"
   },
   "myPage": {
     "title": "마이페이지 - Pesona",

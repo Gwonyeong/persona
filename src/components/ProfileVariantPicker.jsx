@@ -48,6 +48,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
   }
 
   const variants = data?.variants || []
+  const lockedVariants = data?.lockedVariants || []
   const character = data?.character
 
   return (
@@ -108,9 +109,27 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
                   )}
                 </button>
               ))}
+
+              {/* 미보유 — 흑백 + 획득처 태그 (마스크 패스 / 가챠) */}
+              {lockedVariants.map((v) => (
+                <div
+                  key={`locked-${v.id}`}
+                  className="relative aspect-square rounded-xl overflow-hidden border-2 border-gray-800"
+                >
+                  <img src={v.imageUrl} alt={v.title || ''} className="w-full h-full object-cover grayscale opacity-70" />
+                  <span className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded text-black ${v.source === 'GACHA' ? 'bg-fuchsia-400/90' : 'bg-amber-500/90'}`}>
+                    {v.source === 'GACHA' ? 'Gacha' : 'Mask Pass'}
+                  </span>
+                  {v.title && (
+                    <span className="absolute bottom-1 left-1 right-1 text-[10px] text-center bg-black/60 text-gray-300 rounded px-1 py-0.5 truncate">
+                      {v.title}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
 
-            {variants.length === 0 && (
+            {variants.length === 0 && lockedVariants.length === 0 && (
               <p className="mt-4 text-xs text-center text-gray-500">
                 마스크 패스에서 프로필 이미지 보상을 받으면 여기에 추가돼요
               </p>

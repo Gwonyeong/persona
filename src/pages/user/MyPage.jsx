@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import i18n from '../../i18n'
@@ -51,7 +51,13 @@ export default function MyPage() {
   const [saving, setSaving] = useState(false)
   const [pushStatus, setPushStatus] = useState('default')
   const [showLangModal, setShowLangModal] = useState(false)
-  const [activeTab, setActiveTab] = useState('profile')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'collection' ? 'collection' : 'profile')
+  // 탭 전환 시 URL 쿼리 동기화 — 보관함 상세에서 뒤로가기(navigate(-1)) 시 보관함 탭 복원
+  const selectTab = (key) => {
+    setActiveTab(key)
+    setSearchParams(key === 'collection' ? { tab: 'collection' } : {}, { replace: true })
+  }
   const fileInputRef = useRef(null)
 
   const currentLang = LANGUAGES.find((l) => l.code === i18n.language?.split('-')[0]) || LANGUAGES[1]
@@ -159,7 +165,7 @@ export default function MyPage() {
         ].map((tb) => (
           <button
             key={tb.key}
-            onClick={() => setActiveTab(tb.key)}
+            onClick={() => selectTab(tb.key)}
             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
               activeTab === tb.key ? 'bg-gray-800 text-white' : 'text-gray-500'
             }`}
@@ -443,7 +449,7 @@ function CollectionGrid({ navigate, t }) {
 
   return (
     <div className="grid grid-cols-3 gap-3">
-      {chars.map(({ character, counts, total }) => (
+      {chars.map(({ character }) => (
         <button
           key={character.id}
           onClick={() => navigate(`/collection/${character.id}`)}
@@ -458,9 +464,6 @@ function CollectionGrid({ navigate, t }) {
                 {character.name?.[0] || '?'}
               </div>
             )}
-            <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center border-2 border-gray-950">
-              {total}
-            </span>
           </div>
           <span className="text-xs text-gray-300 truncate w-full text-center">{character.name}</span>
         </button>

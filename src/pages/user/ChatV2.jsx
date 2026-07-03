@@ -1625,7 +1625,7 @@ export default function ChatV2() {
                 </div>
               )}
               <button
-                onClick={() => { setShowGallery(true); setShowGalleryTooltip(false); setShowGalleryBadge(false) }}
+                onClick={() => { navigate(`/collection/${conversation.characterId}`); setShowGalleryTooltip(false); setShowGalleryBadge(false) }}
                 className="relative w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 data-onboarding-target="gallery-btn"

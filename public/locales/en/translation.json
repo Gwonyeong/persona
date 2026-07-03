@@ -168,7 +168,13 @@
     "tabVoices": "Voices",
     "tabImages": "Images",
     "tabVideos": "Videos",
-    "tabOutfits": "Outfits"
+    "tabOutfits": "Outfits",
+    "voicesCollected": "Special voices",
+    "voicesChat": "Voices from your chats",
+    "voicesChatMore": "Showing the latest {{count}} only",
+    "outfitLockedGacha": "You can get it from the gift draw!",
+    "goToGacha": "Go to gift draw",
+    "imagesMaskPass": "Images from Mask Pass"
   },
   "myPage": {
     "title": "My Page - Pesona",
