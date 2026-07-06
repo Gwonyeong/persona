@@ -1404,13 +1404,14 @@ export default function Chat() {
     if (!conversation) return null
     const ch = conversation.character
     if (!ch) return null
-    // 활성 스타일 풀 — chatStyles.styles 중 disabled=false. 없으면 전체 styles 폴백.
+    // 활성 스타일 풀 — chatStyles.styles 중 disabled=false.
+    // chatStyles 미로딩/실패 시엔 DEFAULT 스타일만 폴백(미구매 GACHA/SHOP 스프라이트 노출 방지).
     const activeStyleIds = chatStyles?.styles
       ? new Set(chatStyles.styles.filter((s) => !s.disabled).map((s) => s.id))
       : null
     const activeStyles = activeStyleIds
       ? (ch.styles || []).filter((s) => activeStyleIds.has(s.id))
-      : ch.styles || []
+      : (ch.styles || []).filter((s) => !s.unlockMode || s.unlockMode === 'DEFAULT')
     if (!activeStyles.length) return null
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
