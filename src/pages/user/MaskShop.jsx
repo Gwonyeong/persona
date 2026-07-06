@@ -927,7 +927,8 @@ export default function MaskShop() {
         >
           <div
             className="w-full rounded-t-3xl bg-gray-900 border-t border-gray-700 p-5"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
+            // FREE 티어 네이티브에서는 하단 AdMob 배너(~60px)가 시트를 덮으므로 그만큼 여백 추가
+            style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + ${20 + ((currentTier === 'FREE' && isAdMobAvailable()) ? 60 : 0)}px)` }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* 헤더: 캐릭터 프로필 + 이름 + 의상명 */}
