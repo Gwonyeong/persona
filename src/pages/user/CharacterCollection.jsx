@@ -58,7 +58,7 @@ export default function CharacterCollection() {
   const unlockVideo = async (vid) => {
     if (unlockingImageId) return
     if (masks < EXPRESSION_VIDEO_COST) {
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setUnlockingImageId(vid.characterImageId)
@@ -68,7 +68,7 @@ export default function CharacterCollection() {
       const fresh = await api.get(`/collection/${characterId}`)
       setData(fresh)
     } catch (err) {
-      if (err?.error === 'INSUFFICIENT_MASKS') navigate('/subscription')
+      if (err?.error === 'INSUFFICIENT_MASKS') navigate('/mask-shop?tab=subscription')
       else alert(t('common.error') || '해금에 실패했어요.')
     } finally {
       setUnlockingImageId(null)
@@ -92,7 +92,7 @@ export default function CharacterCollection() {
       return
     }
     if (masks < buyStyle.maskCost) {
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setPurchasing(true)
@@ -103,7 +103,7 @@ export default function CharacterCollection() {
       setData(fresh)
       setBuyStyle(null)
     } catch (err) {
-      if (err?.error === 'INSUFFICIENT_MASKS') navigate('/subscription')
+      if (err?.error === 'INSUFFICIENT_MASKS') navigate('/mask-shop?tab=subscription')
       else alert(t('common.error') || '구매에 실패했어요.')
     } finally {
       setPurchasing(false)

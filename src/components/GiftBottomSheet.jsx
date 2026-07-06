@@ -104,7 +104,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
     if (masks < pendingGift.maskCost) {
       alert(t('gift.insufficientMasks'))
       onClose?.()
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setSending(true)
@@ -130,7 +130,7 @@ export default function GiftBottomSheet({ characterId, characterName, conversati
       if (err.status === 402) {
         alert(t('gift.insufficientMasks'))
         onClose?.()
-        navigate('/subscription')
+        navigate('/mask-shop?tab=subscription')
       } else if (err.status === 409) {
         alert(t('gift.alreadyGifted'))
         setGifts((prev) => prev.map((g) => (g.id === pendingGift.id ? { ...g, unlocked: true } : g)))

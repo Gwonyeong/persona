@@ -97,7 +97,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     if (masks < EXPRESSION_VIDEO_COST) {
       alert('마스크가 부족합니다.')
       onClose?.()
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setUnlockingImageId(exp.characterImageId)
@@ -116,7 +116,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
       if (err?.error === 'INSUFFICIENT_MASKS') {
         alert('마스크가 부족합니다.')
         onClose?.()
-        navigate('/subscription')
+        navigate('/mask-shop?tab=subscription')
       } else {
         alert('해금에 실패했어요.')
       }
@@ -157,7 +157,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     if (masks < pendingGift.maskCost) {
       alert('마스크가 부족합니다.')
       onClose?.()
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setSending(true)
@@ -181,7 +181,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
       if (err.status === 402) {
         alert('마스크가 부족합니다.')
         onClose?.()
-        navigate('/subscription')
+        navigate('/mask-shop?tab=subscription')
       } else if (err.status === 409) {
         alert('이미 선물한 항목입니다.')
         setGifts((prev) => prev.map((g) => (g.id === pendingGift.id ? { ...g, unlocked: true } : g)))

@@ -260,7 +260,7 @@ export default function Banners() {
                 <input
                   value={form.linkUrl}
                   onChange={(e) => setForm({ ...form, linkUrl: e.target.value })}
-                  placeholder="/subscription 또는 https://..."
+                  placeholder="/mask-shop?tab=subscription 또는 https://..."
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none"
                 />
                 <p className="text-[11px] text-gray-500 mt-1">

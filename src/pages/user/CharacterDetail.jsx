@@ -428,7 +428,7 @@ export default function CharacterDetail() {
     if (!user) return goToLogin()
     if ((user.masks ?? 0) < EXPRESSION_VIDEO_COST) {
       alert(t('character.insufficientMasks'))
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setUnlockingExpImageId(img.id)
@@ -451,7 +451,7 @@ export default function CharacterDetail() {
     } catch (err) {
       if (err?.error === 'INSUFFICIENT_MASKS') {
         alert(t('character.insufficientMasks'))
-        navigate('/subscription')
+        navigate('/mask-shop?tab=subscription')
       } else {
         alert(t('character.unlockFailed'))
       }
@@ -472,7 +472,7 @@ export default function CharacterDetail() {
     }
     if ((user.masks ?? 0) < style.maskCost) {
       alert(t('character.insufficientMasks'))
-      navigate('/subscription')
+      navigate('/mask-shop?tab=subscription')
       return
     }
     setPurchasingStyleId(style.id)
@@ -493,7 +493,7 @@ export default function CharacterDetail() {
     } catch (err) {
       if (err?.error === 'INSUFFICIENT_MASKS') {
         alert(t('character.insufficientMasks'))
-        navigate('/subscription')
+        navigate('/mask-shop?tab=subscription')
       } else {
         alert(t('character.unlockFailed'))
       }
@@ -1377,7 +1377,7 @@ export default function CharacterDetail() {
           <div className="bg-gray-900/95 text-white text-sm px-4 py-3 rounded-xl shadow-lg backdrop-blur-sm border border-gray-700 pointer-events-auto flex flex-col gap-2 max-w-xs">
             <p className="leading-snug">{toast}</p>
             <button
-              onClick={() => { setToast(null); navigate('/subscription') }}
+              onClick={() => { setToast(null); navigate('/mask-shop?tab=subscription') }}
               className="self-stretch py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-500 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >

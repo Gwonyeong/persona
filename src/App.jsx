@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
 import useStore from './store/useStore'
@@ -54,7 +54,6 @@ import Refund from './pages/user/Refund'
 import DeleteAccount from './pages/user/DeleteAccount'
 import DeleteAccountInfo from './pages/user/DeleteAccountInfo'
 import PrivacyPolicy from './pages/user/PrivacyPolicy'
-import Subscription from './pages/user/Subscription'
 import MaskShop from './pages/user/MaskShop'
 import FeedbackList from './pages/user/FeedbackList'
 import FeedbackDetail from './pages/user/FeedbackDetail'
@@ -250,7 +249,8 @@ function App() {
         <Route path="/refund" element={<Refund />} />
         <Route path="/account/delete" element={<DeleteAccount />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/subscription" element={<Subscription />} />
+        {/* /subscription 은 마스크 상점 구독 탭으로 통합됨 — 기존 딥링크 호환용 리다이렉트 */}
+        <Route path="/subscription" element={<Navigate to="/mask-shop?tab=subscription" replace />} />
         <Route path="/mask-shop" element={<MaskShop />} />
         <Route path="/mask-pass" element={<MaskPass />} />
         <Route path="/gacha" element={<Gacha />} />

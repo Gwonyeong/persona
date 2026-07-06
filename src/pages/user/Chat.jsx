@@ -2644,7 +2644,7 @@ export default function Chat() {
                   {t('common.close')}
                 </button>
                 <button
-                  onClick={() => { setShowLightOnlyModal(false); navigate('/subscription') }}
+                  onClick={() => { setShowLightOnlyModal(false); navigate('/mask-shop?tab=subscription') }}
                   className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >

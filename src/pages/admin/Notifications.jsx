@@ -7,7 +7,7 @@ const LINK_OPTIONS = [
   { value: '/feed', label: '피드' },
   { value: '/chats', label: '채팅 목록' },
   { value: '/my', label: '마이페이지' },
-  { value: '/subscription', label: '구독' },
+  { value: '/mask-shop?tab=subscription', label: '구독' },
   { value: '/mask-shop', label: '마스크 샵' },
   { value: '/feedback', label: '피드백' },
 ]
