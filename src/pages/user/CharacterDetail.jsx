@@ -460,6 +460,48 @@ export default function CharacterDetail() {
     }
   }
 
+  // 상점 의상(SHOP 스타일) 구매 — 마스크 차감 후 통째 해금
+  const [purchasingStyleId, setPurchasingStyleId] = useState(null)
+  const handlePurchaseStyle = async (style) => {
+    if (!user) return goToLogin()
+    if (!style?.maskCost || style.maskCost <= 0 || purchasingStyleId) return
+    // 성인 전용 의상은 성인 인증 완료 유저만 구매 가능
+    if (style.adultOnly && !user.adultVerified) {
+      navigate('/adult-verify')
+      return
+    }
+    if ((user.masks ?? 0) < style.maskCost) {
+      alert(t('character.insufficientMasks'))
+      navigate('/subscription')
+      return
+    }
+    setPurchasingStyleId(style.id)
+    try {
+      const res = await api.post(`/characters/${id}/styles/${style.id}/purchase`, {})
+      setCharacter((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          styles: prev.styles.map((s) =>
+            s.id === style.id
+              ? { ...s, unlocked: true, images: s.images.map((i) => ({ ...i, seen: true, videoUnlocked: i.videoFilePath ? true : i.videoUnlocked })) }
+              : s,
+          ),
+        }
+      })
+      if (res.masks !== undefined) setUser({ ...user, masks: res.masks })
+    } catch (err) {
+      if (err?.error === 'INSUFFICIENT_MASKS') {
+        alert(t('character.insufficientMasks'))
+        navigate('/subscription')
+      } else {
+        alert(t('character.unlockFailed'))
+      }
+    } finally {
+      setPurchasingStyleId(null)
+    }
+  }
+
   if (!character) {
     return <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-400">{t('common.loading')}</div>
   }
@@ -610,8 +652,30 @@ export default function CharacterDetail() {
             />
           )}
 
+          {/* 선택된 스타일이 해금 안 된 SHOP 이면 마스크 구매 배너 */}
+          {selectedStyle && !selectedStyle.unlocked && selectedStyle.unlockMode === 'SHOP' && selectedStyle.maskCost > 0 && (
+            <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60 flex items-center gap-3">
+              <span className="text-lg">🛍️</span>
+              <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">
+                {t('character.styleShopBanner')}
+              </div>
+              <button
+                onClick={() => handlePurchaseStyle(selectedStyle)}
+                disabled={purchasingStyleId === selectedStyle.id}
+                className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {purchasingStyleId === selectedStyle.id
+                  ? t('common.loading')
+                  : selectedStyle.adultOnly && !user?.adultVerified
+                    ? t('maskShop.styleAdultVerify')
+                    : (<><MaskIcon size={12} /> {selectedStyle.maskCost}</>)}
+              </button>
+            </div>
+          )}
+
           {/* 선택된 스타일이 해금 안 된 GACHA 면 안내 배너 + 가챠 바로가기 */}
-          {selectedStyle && !selectedStyle.unlocked && (
+          {selectedStyle && !selectedStyle.unlocked && selectedStyle.unlockMode !== 'SHOP' && (
             <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60 flex items-center gap-3">
               <span className="text-lg">🎁</span>
               <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">

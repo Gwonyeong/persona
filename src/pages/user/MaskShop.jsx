@@ -22,10 +22,10 @@ async function verifyOnServer(productId, purchaseToken) {
 
 export default function MaskShop() {
   const { t } = useTranslation()
-  const { token, masks, setMasks, subscription } = useStore()
+  const { token, masks, setMasks, subscription, user } = useStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const initialTab = ['subscription', 'shop', 'free'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'shop'
+  const initialTab = ['subscription', 'shop', 'free', 'styles'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'shop'
 
   const PACKAGES = [
     { amount: 30, price: t('pricing.masks30'), originalPrice: t('pricing.masks30Original'), discount: '50%', label: t('masks.pkg30'), productId: 'masks_30' },
@@ -61,6 +61,10 @@ export default function MaskShop() {
   const [claimingCheckin, setClaimingCheckin] = useState(false)
   const [firstPurchaseEligible, setFirstPurchaseEligible] = useState(false)
   const [toast, setToast] = useState(null) // { kind: 'error' | 'success', text }
+  const [shopStyles, setShopStyles] = useState(null) // 상점 표정 스타일 목록 (lazy)
+  const [stylesLoading, setStylesLoading] = useState(false)
+  const [purchasingStyleId, setPurchasingStyleId] = useState(null)
+  const [detailStyle, setDetailStyle] = useState(null) // 의상 상세 모달 대상
 
   // 다른 페이지에서 스크롤된 상태로 진입해도 상점은 항상 최상단부터 보이게.
   // UserLayout 의 main 이 실제 스크롤 컨테이너 — 그쪽을 0 으로.
@@ -187,6 +191,47 @@ export default function MaskShop() {
     api.get('/masks/first-purchase-eligible').then(({ eligible }) => setFirstPurchaseEligible(eligible)).catch(() => {})
   }, [token])
 
+  // 표정 스타일 탭 진입 시 지연 로드
+  useEffect(() => {
+    if (activeTab !== 'styles' || shopStyles !== null || stylesLoading) return
+    setStylesLoading(true)
+    api.get('/characters/shop/styles')
+      .then(({ items }) => setShopStyles(items || []))
+      .catch(() => setShopStyles([]))
+      .finally(() => setStylesLoading(false))
+  }, [activeTab, shopStyles, stylesLoading])
+
+  // 상점 표정 스타일 구매 — 마스크 차감 후 통째 해금
+  const purchaseStyle = async (item) => {
+    if (requireLogin()) return
+    if (purchasingStyleId) return
+    // 성인 전용 의상은 성인 인증 완료 유저만 구매 가능
+    if (item.adultOnly && !user?.adultVerified) {
+      navigate('/adult-verify')
+      return
+    }
+    if (masks < item.maskCost) {
+      setDetailStyle(null)
+      setActiveTab('shop')
+      return
+    }
+    setPurchasingStyleId(item.styleId)
+    try {
+      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, {})
+      if (res.masks !== undefined) setMasks(res.masks)
+      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true } : s)))
+      setDetailStyle(null)
+      setToast({ kind: 'success', text: t('maskShop.stylePurchased') })
+    } catch (err) {
+      if (err?.error === 'INSUFFICIENT_MASKS') {
+        setDetailStyle(null)
+        setActiveTab('shop')
+      } else setToast({ kind: 'error', text: t('common.error') })
+    } finally {
+      setPurchasingStyleId(null)
+    }
+  }
+
   const handlePurchase = async () => {
     if (requireLogin()) return
     setPurchasing(true)
@@ -259,7 +304,7 @@ export default function MaskShop() {
 
       {/* 메인 탭 */}
       <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1">
-        {['subscription', 'shop', 'free'].map((tab) => (
+        {['subscription', 'shop', 'styles', 'free'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -271,9 +316,6 @@ export default function MaskShop() {
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             {t(`maskShop.tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`)}
-            {tab === 'subscription' && currentTier !== 'LIGHT' && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-            )}
           </button>
         ))}
       </div>
@@ -738,8 +780,244 @@ export default function MaskShop() {
                   <span>{t('myPage.missionReviewButton')}</span>
                 </button>
               )}
+
+              {/* 성인 인증 미션 (1회성) */}
+              {missions?.adultVerify?.claimed ? (
+                <div className="w-full flex items-center justify-center px-4 py-4 rounded-xl border border-gray-700 bg-gray-800/50">
+                  <span className="text-xs text-gray-500">{t('myPage.missionClaimed')}</span>
+                </div>
+              ) : missions?.adultVerify?.completed ? (
+                <button
+                  onClick={async () => {
+                    if (requireLogin()) return
+                    if (claimingMission) return
+                    setClaimingMission('adultVerify')
+                    try {
+                      const result = await api.post('/masks/adult-verify-reward')
+                      if (!result.alreadyClaimed && result.masks !== undefined) setMasks(result.masks)
+                      setMissions((prev) => ({ ...prev, adultVerify: { ...prev.adultVerify, claimed: true } }))
+                    } catch (e) {
+                      console.error('Adult verify reward error:', e)
+                    }
+                    setClaimingMission(null)
+                  }}
+                  disabled={claimingMission === 'adultVerify'}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl border border-rose-500/50 bg-rose-500/10 text-rose-300 font-bold text-sm hover:bg-rose-500/20 transition-all disabled:opacity-50"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <span>🔞</span>
+                  <span>{t('myPage.missionAdultVerifyClaim', { reward: missions?.adultVerify?.reward ?? 10 })}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (requireLogin()) return
+                    navigate('/adult-verify')
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-4 rounded-xl border border-rose-500/50 bg-rose-500/10 text-rose-300 font-bold text-sm hover:bg-rose-500/20 transition-all"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <span>🔞</span>
+                  <span>{t('myPage.missionAdultVerifyVerify', { reward: missions?.adultVerify?.reward ?? 10 })}</span>
+                </button>
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 표정 스타일 상점 탭 */}
+      {activeTab === 'styles' && (
+        <div>
+          <p className="text-xs text-gray-500 mb-4">{t('maskShop.stylesTagline')}</p>
+          {stylesLoading ? (
+            <p className="text-sm text-gray-500 text-center py-10">{t('common.loading')}</p>
+          ) : !shopStyles || shopStyles.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-10">{t('maskShop.stylesEmpty')}</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-x-2 gap-y-4">
+              {shopStyles.map((item) => {
+                const isBusy = purchasingStyleId === item.styleId
+                const needVerify = item.adultOnly && !user?.adultVerified
+                return (
+                  <button
+                    key={item.styleId}
+                    onClick={() => setDetailStyle(item)}
+                    className="flex flex-col items-center gap-1.5"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {/* 의상 썸네일 — 홈 스토리처럼 그라데이션 링 원형 */}
+                    <div
+                      className={`relative w-16 h-16 rounded-full p-[2px] ${
+                        item.owned
+                          ? 'bg-gradient-to-br from-emerald-400 to-teal-500'
+                          : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                      }`}
+                    >
+                      <div className="w-full h-full rounded-full bg-gray-950 p-[2px]">
+                        <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-800">
+                          {/* 미인증 유저에게 성인전용 의상: 미리보기 완전 숨김 + 가운데 safety */}
+                          {item.thumbnailUrl && !needVerify && (
+                            <img
+                              src={item.thumbnailUrl}
+                              alt={item.name || ''}
+                              draggable={false}
+                              className={`absolute inset-0 w-full h-full object-cover ${item.owned ? '' : 'brightness-[0.55]'}`}
+                              loading="lazy"
+                            />
+                          )}
+                          {needVerify && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 pointer-events-none">
+                              <span className="text-[10px] font-bold tracking-wide text-white/90 uppercase">safety</span>
+                            </div>
+                          )}
+                          {item.owned && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="w-6 h-6 rounded-full bg-emerald-600/85 flex items-center justify-center ring-1 ring-white/30">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* 캐릭터 프로필 이미지 + 이름 */}
+                    <div className="flex items-center gap-1 max-w-full px-0.5">
+                      {item.characterProfileImage ? (
+                        <img
+                          src={item.characterProfileImage}
+                          alt=""
+                          draggable={false}
+                          className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0 ring-1 ring-gray-700"
+                        />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full bg-gray-800 flex-shrink-0" />
+                      )}
+                      <span className="text-[11px] text-gray-200 truncate">{item.characterName}</span>
+                    </div>
+                    {/* 가격 / 상태 */}
+                    <span className="text-[10px] leading-tight w-full text-center truncate">
+                      {isBusy ? (
+                        <span className="text-gray-400">{t('common.loading')}</span>
+                      ) : item.owned ? (
+                        <span className="text-emerald-400 font-semibold">{t('maskShop.styleOwned')}</span>
+                      ) : needVerify ? (
+                        <span className="text-rose-300 font-semibold">{t('maskShop.styleAdultVerify')}</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 text-indigo-300 font-bold">
+                          <MaskIcon /> {item.maskCost}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 의상 상세 모달 — 흥분/도발 영상 블러 미리보기 + 구매 */}
+      {detailStyle && (
+        <div
+          className="fixed inset-0 z-[80] max-w-[480px] mx-auto bg-black/75 flex items-end"
+          onClick={() => { if (purchasingStyleId !== detailStyle.styleId) setDetailStyle(null) }}
+        >
+          <div
+            className="w-full rounded-t-3xl bg-gray-900 border-t border-gray-700 p-5"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더: 캐릭터 프로필 + 이름 + 의상명 */}
+            <div className="flex items-center gap-2 mb-4">
+              {detailStyle.characterProfileImage ? (
+                <img src={detailStyle.characterProfileImage} alt="" draggable={false} className="w-9 h-9 rounded-full object-cover ring-1 ring-gray-700" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-gray-800" />
+              )}
+              <div className="min-w-0">
+                <p className="text-[11px] text-gray-400 truncate">{detailStyle.characterName}</p>
+                <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
+                  {detailStyle.name}
+                  {detailStyle.adultOnly && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-600/90 text-white text-[9px] font-bold">19+</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* 미리보기 — 흥분/도발 영상 2개 (미보유 시 블러) */}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] text-gray-500">{t('maskShop.stylePreviewLabel')}</p>
+              {detailStyle.videoCount > 0 && (
+                <span className="text-[11px] font-semibold text-indigo-300">
+                  {t('maskShop.styleVideoCount', { count: detailStyle.videoCount })}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {(detailStyle.previewVideos?.length ? detailStyle.previewVideos : [detailStyle.thumbnailUrl]).slice(0, 2).map((src, idx) => (
+                <div key={idx} className="relative rounded-xl overflow-hidden bg-gray-800" style={{ aspectRatio: '9 / 16' }}>
+                  {src && (detailStyle.previewVideos?.length ? (
+                    <video
+                      src={src}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={detailStyle.owned ? undefined : { filter: 'blur(16px)', transform: 'scale(1.25)' }}
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      src={src}
+                      alt=""
+                      draggable={false}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={detailStyle.owned ? undefined : { filter: 'blur(16px)', transform: 'scale(1.25)' }}
+                    />
+                  ))}
+                  {!detailStyle.owned && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-9 h-9 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                          <rect x="3" y="11" width="18" height="11" rx="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-gray-500 text-center mb-3">{t('maskShop.styleUnlockNote')}</p>
+
+            {/* 구매 버튼 */}
+            {detailStyle.owned ? (
+              <div className="w-full py-3.5 rounded-xl bg-gray-800 text-gray-500 text-sm font-bold text-center">
+                {t('maskShop.styleOwned')}
+              </div>
+            ) : (
+              <button
+                onClick={() => purchaseStyle(detailStyle)}
+                disabled={purchasingStyleId === detailStyle.styleId}
+                className="w-full py-3.5 rounded-xl bg-indigo-600 text-white text-sm font-bold active:bg-indigo-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {purchasingStyleId === detailStyle.styleId ? (
+                  t('common.loading')
+                ) : detailStyle.adultOnly && !user?.adultVerified ? (
+                  t('maskShop.styleAdultVerify')
+                ) : (
+                  <><MaskIcon /> {detailStyle.maskCost} · {t('maskShop.stylePurchaseConfirm')}</>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

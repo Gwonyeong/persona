@@ -14,7 +14,8 @@
     "search": "검색",
     "edit": "수정",
     "user": "사용자",
-    "generate": "생성하기"
+    "generate": "생성하기",
+    "error": "오류가 발생했어요."
   },
   "home": {
     "title": "Pesona - AI 캐릭터 채팅 플랫폼",
@@ -174,7 +175,10 @@
     "voicesChatMore": "최근 {{count}}개만 표시돼요",
     "outfitLockedGacha": "선물 뽑기에서 얻을 수 있어요!",
     "goToGacha": "선물 뽑기 바로가기",
-    "imagesMaskPass": "마스크 패스에서 얻은 이미지"
+    "imagesMaskPass": "마스크 패스에서 얻은 이미지",
+    "outfitPurchaseDesc": "이 의상의 모든 표정·영상이 함께 해금돼요.",
+    "outfitPurchaseConfirm": "구매하기",
+    "needMoreMasks": "마스크가 부족해요"
   },
   "myPage": {
     "title": "마이페이지 - Pesona",
@@ -233,7 +237,9 @@
     "adminPage": "어드민 페이지",
     "inquiry": "문의",
     "adultVerify": "성인 인증",
-    "deleteAccount": "회원 탈퇴"
+    "deleteAccount": "회원 탈퇴",
+    "missionAdultVerifyVerify": "성인인증하고 마스크 {{reward}}개 받기",
+    "missionAdultVerifyClaim": "성인인증 완료! 마스크 {{reward}}개 받기"
   },
   "adultVerify": {
     "title": "성인 인증",
@@ -572,7 +578,8 @@
     "deleteAndStart": "삭제하고 새로 시작",
     "continueStory": "이어서 진행",
     "startStory": "스토리 시작",
-    "backToModeSelect": "← 모드 다시 선택"
+    "backToModeSelect": "← 모드 다시 선택",
+    "styleShopBanner": "이 복장은 마스크로 구매할 수 있어요!"
   },
   "masks": {
     "pkg30": "30개",
@@ -868,7 +875,17 @@
         "title": "AI 이미지 생성",
         "description": "원하는 상황과 표정의 캐릭터 이미지를 즉시 생성할 수 있어요."
       }
-    }
+    },
+    "tabStyles": "의상",
+    "stylesTagline": "마스크로 캐릭터 의상(표정 세트)을 구매하세요. 구매 시 표정·영상이 함께 해금됩니다.",
+    "stylesEmpty": "구매 가능한 의상이 아직 없어요.",
+    "styleOwned": "보유중",
+    "stylePurchased": "의상을 구매했어요!",
+    "styleAdultVerify": "성인인증",
+    "stylePreviewLabel": "미리보기",
+    "styleUnlockNote": "구매하면 이 의상의 모든 표정과 영상이 해금돼요.",
+    "stylePurchaseConfirm": "구매하기",
+    "styleVideoCount": "영상 {{count}}개"
   },
   "groupChat": {
     "title": "단체 톡방 - Pesona",

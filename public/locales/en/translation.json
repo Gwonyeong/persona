@@ -14,7 +14,8 @@
     "search": "Search",
     "edit": "Edit",
     "user": "User",
-    "generate": "Generate"
+    "generate": "Generate",
+    "error": "Something went wrong."
   },
   "home": {
     "title": "Pesona - AI Character Chat",
@@ -174,7 +175,10 @@
     "voicesChatMore": "Showing the latest {{count}} only",
     "outfitLockedGacha": "You can get it from the gift draw!",
     "goToGacha": "Go to gift draw",
-    "imagesMaskPass": "Images from Mask Pass"
+    "imagesMaskPass": "Images from Mask Pass",
+    "outfitPurchaseDesc": "All expressions and videos of this outfit unlock together.",
+    "outfitPurchaseConfirm": "Buy",
+    "needMoreMasks": "Not enough masks"
   },
   "myPage": {
     "title": "My Page - Pesona",
@@ -233,7 +237,9 @@
     "adminPage": "Admin Page",
     "inquiry": "Contact Us",
     "adultVerify": "Adult Verification",
-    "deleteAccount": "Delete Account"
+    "deleteAccount": "Delete Account",
+    "missionAdultVerifyVerify": "Verify your age & get {{reward}} masks",
+    "missionAdultVerifyClaim": "Age verified! Claim {{reward}} masks"
   },
   "adultVerify": {
     "title": "Adult Verification",
@@ -572,7 +578,8 @@
     "deleteAndStart": "Delete and start over",
     "continueStory": "Continue story",
     "startStory": "Start story",
-    "backToModeSelect": "← Choose mode again"
+    "backToModeSelect": "← Choose mode again",
+    "styleShopBanner": "You can buy this outfit with masks!"
   },
   "masks": {
     "pkg30": "30",
@@ -868,7 +875,17 @@
         "title": "AI Image Generation",
         "description": "Instantly generate character images in the situations and expressions you want."
       }
-    }
+    },
+    "tabStyles": "Outfits",
+    "stylesTagline": "Buy character outfits (expression sets) with masks. Purchase unlocks all expressions and videos.",
+    "stylesEmpty": "No outfits available for purchase yet.",
+    "styleOwned": "Owned",
+    "stylePurchased": "Outfit purchased!",
+    "styleAdultVerify": "Verify age",
+    "stylePreviewLabel": "Preview",
+    "styleUnlockNote": "Purchase unlocks all expressions and videos of this outfit.",
+    "stylePurchaseConfirm": "Buy",
+    "styleVideoCount": "{{count}} videos"
   },
   "groupChat": {
     "title": "Group Chat - Pesona",

@@ -14,7 +14,8 @@
     "search": "検索",
     "edit": "編集",
     "user": "ユーザー",
-    "generate": "生成する"
+    "generate": "生成する",
+    "error": "エラーが発生しました。"
   },
   "home": {
     "title": "Pesona - AIキャラクターチャット",
@@ -174,7 +175,10 @@
     "voicesChatMore": "最新{{count}}件のみ表示されます",
     "outfitLockedGacha": "ギフトガチャで手に入ります！",
     "goToGacha": "ギフトガチャへ",
-    "imagesMaskPass": "マスクパスで獲得した画像"
+    "imagesMaskPass": "マスクパスで獲得した画像",
+    "outfitPurchaseDesc": "この衣装のすべての表情・動画が一緒に解放されます。",
+    "outfitPurchaseConfirm": "購入する",
+    "needMoreMasks": "マスクが足りません"
   },
   "myPage": {
     "title": "マイページ - Pesona",
@@ -233,7 +237,9 @@
     "adminPage": "管理者ページ",
     "inquiry": "お問い合わせ",
     "adultVerify": "成人認証",
-    "deleteAccount": "アカウント削除"
+    "deleteAccount": "アカウント削除",
+    "missionAdultVerifyVerify": "成人認証してマスク{{reward}}個をもらう",
+    "missionAdultVerifyClaim": "成人認証完了！マスク{{reward}}個をもらう"
   },
   "adultVerify": {
     "title": "成人認証",
@@ -572,7 +578,8 @@
     "deleteAndStart": "削除して新規開始",
     "continueStory": "続けて進める",
     "startStory": "ストーリーを始める",
-    "backToModeSelect": "← モードを選び直す"
+    "backToModeSelect": "← モードを選び直す",
+    "styleShopBanner": "この衣装はマスクで購入できます！"
   },
   "masks": {
     "pkg30": "30個",
@@ -868,7 +875,17 @@
         "title": "AI画像生成",
         "description": "望むシチュエーションや表情のキャラクター画像を即座に生成できます。"
       }
-    }
+    },
+    "tabStyles": "衣装",
+    "stylesTagline": "マスクでキャラクターの衣装（表情セット）を購入できます。購入すると表情・動画がまとめて解放されます。",
+    "stylesEmpty": "購入できる衣装はまだありません。",
+    "styleOwned": "所有中",
+    "stylePurchased": "衣装を購入しました！",
+    "styleAdultVerify": "成人認証",
+    "stylePreviewLabel": "プレビュー",
+    "styleUnlockNote": "購入するとこの衣装のすべての表情と動画が解放されます。",
+    "stylePurchaseConfirm": "購入する",
+    "styleVideoCount": "動画{{count}}本"
   },
   "groupChat": {
     "title": "グループチャット - Pesona",

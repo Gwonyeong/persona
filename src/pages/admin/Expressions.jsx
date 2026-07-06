@@ -363,6 +363,7 @@ export default function Expressions() {
                             onAddImage={(img) => addImage(c.id, s.id, img)}
                             onRemoveImage={(imageId) => removeImage(c.id, s.id, imageId)}
                             onUpdateImage={(imageId, patch) => updateImage(c.id, s.id, imageId, patch)}
+                            onStyleChanged={reloadOverview}
                           />
                         ))
                       )}
@@ -499,19 +500,29 @@ function AddStyleRow({ character, colSpan, onAdded }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [unlockMode, setUnlockMode] = useState('DEFAULT')
+  const [maskCost, setMaskCost] = useState('')
+  const [adultOnly, setAdultOnly] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const submit = async () => {
     if (!name.trim()) return
+    if (unlockMode === 'SHOP' && !(parseInt(maskCost) > 0)) {
+      alert('상점 구매 스타일은 마스크 가격(1 이상)을 입력해주세요.')
+      return
+    }
     setSaving(true)
     try {
       await api.post(`/admin/characters/${character.id}/styles`, {
         name: name.trim(),
         description: '',
         unlockMode,
+        ...(unlockMode === 'SHOP' ? { maskCost: parseInt(maskCost) } : {}),
+        adultOnly,
       })
       setName('')
       setUnlockMode('DEFAULT')
+      setMaskCost('')
+      setAdultOnly(false)
       setOpen(false)
       onAdded?.()
     } catch (err) {
@@ -545,7 +556,29 @@ function AddStyleRow({ character, colSpan, onAdded }) {
             >
               <option value="DEFAULT">기본 (대화 해금)</option>
               <option value="GACHA">가챠 전용</option>
+              <option value="SHOP">상점 구매</option>
             </select>
+            {unlockMode === 'SHOP' && (
+              <input
+                type="number"
+                min="1"
+                value={maskCost}
+                onChange={(e) => setMaskCost(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
+                placeholder="마스크 가격"
+                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white w-24"
+                style={NO_OUTLINE}
+              />
+            )}
+            <label className="flex items-center gap-1 text-xs text-gray-300 cursor-pointer select-none" style={NO_OUTLINE}>
+              <input
+                type="checkbox"
+                checked={adultOnly}
+                onChange={(e) => setAdultOnly(e.target.checked)}
+                className="accent-rose-500"
+              />
+              19+
+            </label>
             <button
               onClick={submit}
               disabled={saving || !name.trim()}
@@ -579,9 +612,10 @@ function AddStyleRow({ character, colSpan, onAdded }) {
   )
 }
 
-function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddImage, onRemoveImage, onUpdateImage }) {
+function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddImage, onRemoveImage, onUpdateImage, onStyleChanged }) {
   const [frameGalleryOpen, setFrameGalleryOpen] = useState(false)
   const [aiGenOpen, setAiGenOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   // 한 emotion에 여러 이미지 가능 — 배열로 그룹화.
   const imagesByEmotion = useMemo(() => {
@@ -625,6 +659,21 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
                         GACHA
                       </span>
                     )}
+                    {style.unlockMode === 'SHOP' && (
+                      <span className="text-[9px] bg-amber-900/60 text-amber-300 px-1 py-0.5 rounded font-semibold">
+                        상점 {style.maskCost ? `${style.maskCost}` : '?'}
+                      </span>
+                    )}
+                    {style.unlockMode === 'SHOP' && style.shopActive === false && (
+                      <span className="text-[9px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded font-semibold">
+                        비공개
+                      </span>
+                    )}
+                    {style.adultOnly && (
+                      <span className="text-[9px] bg-rose-900/60 text-rose-300 px-1 py-0.5 rounded font-semibold">
+                        19+
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <button
@@ -642,6 +691,14 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
                       title="이미지 선택 → 분석 → 변형 or 영상 생성"
                     >
                       🤖 AI 생성
+                    </button>
+                    <button
+                      onClick={() => setEditOpen(true)}
+                      className="text-[10px] text-gray-300 hover:text-white"
+                      style={NO_OUTLINE}
+                      title="스타일 수정/삭제"
+                    >
+                      ⚙ 편집
                     </button>
                   </div>
                 </>
@@ -691,7 +748,144 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
         />,
         document.body,
       )}
+
+      {editOpen && style && createPortal(
+        <StyleEditModal
+          style={style}
+          onClose={() => setEditOpen(false)}
+          onChanged={() => { setEditOpen(false); onStyleChanged?.() }}
+        />,
+        document.body,
+      )}
     </>
+  )
+}
+
+// 스타일 수정/삭제 모달 — 이름·해금모드·상점가격·성인전용·상점공개 편집 + 삭제.
+function StyleEditModal({ style, onClose, onChanged }) {
+  const [name, setName] = useState(style.name || '')
+  const [unlockMode, setUnlockMode] = useState(style.unlockMode || 'DEFAULT')
+  const [maskCost, setMaskCost] = useState(style.maskCost ? String(style.maskCost) : '')
+  const [adultOnly, setAdultOnly] = useState(!!style.adultOnly)
+  const [shopActive, setShopActive] = useState(style.shopActive !== false)
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (!name.trim()) return
+    if (unlockMode === 'SHOP' && !(parseInt(maskCost) > 0)) {
+      alert('상점 구매 스타일은 마스크 가격(1 이상)을 입력해주세요.')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.put(`/admin/styles/${style.id}`, {
+        name: name.trim(),
+        unlockMode,
+        ...(unlockMode === 'SHOP' ? { maskCost: parseInt(maskCost), shopActive } : {}),
+        adultOnly,
+      })
+      onChanged?.()
+    } catch (err) {
+      alert('저장 실패: ' + (err?.data?.error || err?.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!confirm(`'${style.name}' 스타일과 모든 이미지를 삭제할까요? 되돌릴 수 없습니다.`)) return
+    setSaving(true)
+    try {
+      await api.delete(`/admin/styles/${style.id}`)
+      onChanged?.()
+    } catch (err) {
+      alert('삭제 실패: ' + (err?.data?.error || err?.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm bg-gray-900 border border-gray-700 rounded-xl p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-bold text-white mb-4">스타일 편집</h3>
+
+        <label className="block text-[11px] text-gray-400 mb-1">스타일명</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white mb-3"
+          style={NO_OUTLINE}
+        />
+
+        <label className="block text-[11px] text-gray-400 mb-1">해금 방식</label>
+        <select
+          value={unlockMode}
+          onChange={(e) => setUnlockMode(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white mb-3"
+          style={NO_OUTLINE}
+        >
+          <option value="DEFAULT">기본 (대화 해금)</option>
+          <option value="GACHA">가챠 전용</option>
+          <option value="SHOP">상점 구매</option>
+        </select>
+
+        {unlockMode === 'SHOP' && (
+          <>
+            <label className="block text-[11px] text-gray-400 mb-1">마스크 가격</label>
+            <input
+              type="number"
+              min="1"
+              value={maskCost}
+              onChange={(e) => setMaskCost(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white mb-3"
+              style={NO_OUTLINE}
+            />
+            <label className="flex items-center gap-2 text-xs text-gray-200 mb-3 cursor-pointer select-none">
+              <input type="checkbox" checked={shopActive} onChange={(e) => setShopActive(e.target.checked)} className="accent-indigo-500" />
+              상점에 공개 (해제 시 목록에서 숨김)
+            </label>
+          </>
+        )}
+
+        <label className="flex items-center gap-2 text-xs text-gray-200 mb-5 cursor-pointer select-none">
+          <input type="checkbox" checked={adultOnly} onChange={(e) => setAdultOnly(e.target.checked)} className="accent-rose-500" />
+          19+ 성인전용 (미인증 유저 구매 불가)
+        </label>
+
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={remove}
+            disabled={saving}
+            className="px-3 py-2 text-xs text-red-300 hover:text-red-200 disabled:opacity-50"
+            style={NO_OUTLINE}
+          >
+            삭제
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="px-3 py-2 text-xs text-gray-400 hover:text-white disabled:opacity-50"
+              style={NO_OUTLINE}
+            >
+              취소
+            </button>
+            <button
+              onClick={save}
+              disabled={saving || !name.trim()}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
+              style={NO_OUTLINE}
+            >
+              저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

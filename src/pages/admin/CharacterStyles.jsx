@@ -310,6 +310,8 @@ export default function CharacterStyles() {
   const [newStyleName, setNewStyleName] = useState('')
   const [newStyleDesc, setNewStyleDesc] = useState('')
   const [newStyleUnlockMode, setNewStyleUnlockMode] = useState('DEFAULT')
+  const [newStyleMaskCost, setNewStyleMaskCost] = useState('')
+  const [newStyleAdultOnly, setNewStyleAdultOnly] = useState(false)
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(null) // "styleId-emotion"
 
@@ -324,19 +326,39 @@ export default function CharacterStyles() {
 
   const addStyle = async () => {
     if (!newStyleName.trim()) return
+    if (newStyleUnlockMode === 'SHOP' && !(parseInt(newStyleMaskCost) > 0)) {
+      alert('상점 구매 스타일은 마스크 가격(1 이상)을 입력해주세요.')
+      return
+    }
     await api.post(`/admin/characters/${id}/styles`, {
       name: newStyleName,
       description: newStyleDesc,
       unlockMode: newStyleUnlockMode,
+      ...(newStyleUnlockMode === 'SHOP' ? { maskCost: parseInt(newStyleMaskCost) } : {}),
+      adultOnly: newStyleAdultOnly,
     })
     setNewStyleName('')
     setNewStyleDesc('')
     setNewStyleUnlockMode('DEFAULT')
+    setNewStyleMaskCost('')
+    setNewStyleAdultOnly(false)
     load()
   }
 
   const setStyleUnlockMode = async (styleId, unlockMode) => {
     await api.put(`/admin/styles/${styleId}`, { unlockMode })
+    load()
+  }
+
+  // SHOP 스타일 가격 저장 (0/빈값이면 서버가 null 로 정리)
+  const setStyleMaskCost = async (styleId, maskCost) => {
+    await api.put(`/admin/styles/${styleId}`, { maskCost: parseInt(maskCost) || 0 })
+    load()
+  }
+
+  // 성인 전용 여부 토글
+  const setStyleAdultOnly = async (styleId, adultOnly) => {
+    await api.put(`/admin/styles/${styleId}`, { adultOnly })
     load()
   }
 
@@ -408,7 +430,31 @@ export default function CharacterStyles() {
           >
             <option value="DEFAULT">기본 (대화 해금)</option>
             <option value="GACHA">가챠 전용</option>
+            <option value="SHOP">상점 구매</option>
           </select>
+          {newStyleUnlockMode === 'SHOP' && (
+            <input
+              type="number"
+              min="1"
+              value={newStyleMaskCost}
+              onChange={(e) => setNewStyleMaskCost(e.target.value)}
+              placeholder="마스크 가격"
+              className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            />
+          )}
+          <label
+            className="flex items-center gap-1.5 px-3 text-xs text-gray-300 whitespace-nowrap cursor-pointer select-none"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            <input
+              type="checkbox"
+              checked={newStyleAdultOnly}
+              onChange={(e) => setNewStyleAdultOnly(e.target.checked)}
+              className="accent-rose-500"
+            />
+            19+ 성인전용
+          </label>
           <button
             onClick={addStyle}
             className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-500 whitespace-nowrap"
@@ -419,6 +465,7 @@ export default function CharacterStyles() {
         </div>
         <p className="mt-2 text-[11px] text-gray-500">
           가챠 전용 스타일은 일반 대화 해금 풀에서 제외되고, 가챠 STYLE_SET 보상으로만 통째 해금됩니다.
+          상점 구매 스타일은 유저가 마스크로 통째 구매하며, 스타일 안 표정·영상이 함께 해금됩니다.
         </p>
       </div>
 
@@ -437,6 +484,16 @@ export default function CharacterStyles() {
                       GACHA 전용
                     </span>
                   )}
+                  {style.unlockMode === 'SHOP' && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-900/60 text-amber-300 border border-amber-700/50">
+                      상점 {style.maskCost ? `${style.maskCost}마스크` : '가격 미설정'}
+                    </span>
+                  )}
+                  {style.adultOnly && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-rose-900/60 text-rose-300 border border-rose-700/50">
+                      19+
+                    </span>
+                  )}
                 </h3>
                 {style.description && (
                   <p className="text-xs text-gray-400">{style.description}</p>
@@ -451,7 +508,38 @@ export default function CharacterStyles() {
                 >
                   <option value="DEFAULT">기본</option>
                   <option value="GACHA">가챠 전용</option>
+                  <option value="SHOP">상점 구매</option>
                 </select>
+                {style.unlockMode === 'SHOP' && (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="1"
+                      defaultValue={style.maskCost || ''}
+                      key={`cost-${style.id}-${style.maskCost}`}
+                      onBlur={(e) => {
+                        const v = parseInt(e.target.value) || 0
+                        if (v !== (style.maskCost || 0)) setStyleMaskCost(style.id, v)
+                      }}
+                      placeholder="가격"
+                      className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    />
+                    <span className="text-[11px] text-gray-500">마스크</span>
+                  </div>
+                )}
+                <label
+                  className="flex items-center gap-1 text-[11px] text-gray-300 cursor-pointer select-none"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!style.adultOnly}
+                    onChange={(e) => setStyleAdultOnly(style.id, e.target.checked)}
+                    className="accent-rose-500"
+                  />
+                  19+
+                </label>
                 <button
                   onClick={() => removeStyle(style.id)}
                   className="text-red-400 hover:text-red-300 text-xs"

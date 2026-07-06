@@ -29,11 +29,14 @@ export default function CharacterCollection() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState(null)
   const [viewer, setViewer] = useState(null) // { images: [{filePath, type}], index }
-  const [showGachaHint, setShowGachaHint] = useState(false) // 미보유 의상 안내 모달
+  const [showGachaHint, setShowGachaHint] = useState(false) // 미보유 가챠 의상 안내 모달
+  const [buyStyle, setBuyStyle] = useState(null) // 구매 확인 모달 대상 (SHOP 미보유 의상)
+  const [purchasing, setPurchasing] = useState(false) // 의상 구매 진행 중
   const [showProfilePicker, setShowProfilePicker] = useState(false) // 프로필 이미지 변경 시트
   const [unlockingImageId, setUnlockingImageId] = useState(null) // 영상 해금 진행 중
   const masks = useStore((s) => s.masks)
   const setMasks = useStore((s) => s.setMasks)
+  const user = useStore((s) => s.user)
 
   useEffect(() => {
     let alive = true
@@ -69,6 +72,41 @@ export default function CharacterCollection() {
       else alert(t('common.error') || '해금에 실패했어요.')
     } finally {
       setUnlockingImageId(null)
+    }
+  }
+
+  // 미보유 의상 클릭 — SHOP 이면 구매 모달, GACHA 면 가챠 유도
+  const onLockedOutfit = (o) => {
+    if (o.unlockMode === 'SHOP' && o.maskCost > 0) {
+      // 성인 전용 의상은 미인증 시 인증 페이지로
+      if (o.adultOnly && !user?.adultVerified) { navigate('/adult-verify'); return }
+      setBuyStyle(o)
+    } else setShowGachaHint(true)
+  }
+
+  // 상점 의상 구매 (마스크 차감 → StyleUnlock, 스타일 내 표정·영상 통째 해금)
+  const purchaseStyle = async () => {
+    if (!buyStyle || purchasing) return
+    if (buyStyle.adultOnly && !user?.adultVerified) {
+      navigate('/adult-verify')
+      return
+    }
+    if (masks < buyStyle.maskCost) {
+      navigate('/subscription')
+      return
+    }
+    setPurchasing(true)
+    try {
+      const res = await api.post(`/characters/${characterId}/styles/${buyStyle.styleId}/purchase`, {})
+      if (res.masks !== undefined) setMasks(res.masks)
+      const fresh = await api.get(`/collection/${characterId}`)
+      setData(fresh)
+      setBuyStyle(null)
+    } catch (err) {
+      if (err?.error === 'INSUFFICIENT_MASKS') navigate('/subscription')
+      else alert(t('common.error') || '구매에 실패했어요.')
+    } finally {
+      setPurchasing(false)
     }
   }
 
@@ -289,10 +327,12 @@ export default function CharacterCollection() {
             {tab === 'outfits' && (
               data.outfits.length === 0 ? <EmptyTab t={t} /> : (
                 <div className="grid grid-cols-3 gap-2">
-                  {data.outfits.map((o) => (
+                  {data.outfits.map((o) => {
+                    const buyable = !o.owned && o.unlockMode === 'SHOP' && o.maskCost > 0
+                    return (
                     <div
                       key={o.id}
-                      onClick={o.owned ? undefined : () => setShowGachaHint(true)}
+                      onClick={o.owned ? undefined : () => onLockedOutfit(o)}
                       className="relative rounded-lg overflow-hidden bg-gray-800 border border-gray-700"
                       style={{ aspectRatio: '9 / 16', ...(o.owned ? {} : { cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }) }}
                     >
@@ -305,11 +345,24 @@ export default function CharacterCollection() {
                           loading="lazy"
                         />
                       )}
+                      {/* 상점 구매 가능 의상: 가격 뱃지 노출 */}
+                      {buyable && (
+                        <div className="absolute top-1 right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/70 text-white text-[10px] font-semibold">
+                          <MaskIcon className="w-3 h-3" />
+                          {o.maskCost}
+                        </div>
+                      )}
+                      {!o.owned && o.adultOnly && (
+                        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-full bg-rose-600/90 text-white text-[10px] font-bold">
+                          19+
+                        </div>
+                      )}
                       <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/80 to-transparent">
                         <span className={`text-[11px] truncate block ${o.owned ? 'text-white' : 'text-gray-400'}`}>{o.name}</span>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             )}
@@ -346,6 +399,51 @@ export default function CharacterCollection() {
             >
               {t('collection.goToGacha')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 상점 의상 구매 확인 모달 */}
+      {buyStyle && (
+        <div
+          className="fixed inset-0 z-[70] max-w-[480px] mx-auto bg-black/70 flex items-center justify-center px-8"
+          onClick={() => !purchasing && setBuyStyle(null)}
+        >
+          <div
+            className="w-full rounded-2xl bg-gray-900 border border-gray-700 p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {buyStyle.thumbnailUrl && (
+              <img
+                src={buyStyle.thumbnailUrl}
+                alt={buyStyle.name || ''}
+                className="w-28 mx-auto rounded-lg mb-4 object-cover"
+                style={{ aspectRatio: '9 / 16' }}
+              />
+            )}
+            <p className="text-sm font-semibold text-white mb-1">{buyStyle.name}</p>
+            <p className="text-xs text-gray-400 mb-4">{t('collection.outfitPurchaseDesc')}</p>
+            <div className="flex items-center justify-center gap-1 text-white text-lg font-bold mb-5">
+              <MaskIcon /> {buyStyle.maskCost}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBuyStyle(null)}
+                disabled={purchasing}
+                className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 text-sm font-semibold active:bg-gray-700 transition-colors disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={purchaseStyle}
+                disabled={purchasing}
+                className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold active:bg-indigo-500 transition-colors disabled:opacity-50"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {purchasing ? t('common.loading') : (masks < buyStyle.maskCost ? t('collection.needMoreMasks') : t('collection.outfitPurchaseConfirm'))}
+              </button>
+            </div>
           </div>
         </div>
       )}
