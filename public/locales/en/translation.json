@@ -46,7 +46,9 @@
       "default": "Default",
       "popular": "Popular",
       "follow": "Following"
-    }
+    },
+    "newOutfits": "New Outfits",
+    "noOutfits": "New outfits coming soon!"
   },
   "chatList": {
     "title": "Messages - Pesona",

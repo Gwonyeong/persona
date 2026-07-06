@@ -46,7 +46,9 @@
       "default": "おすすめ",
       "popular": "人気",
       "follow": "フォロー中"
-    }
+    },
+    "newOutfits": "新しい衣装",
+    "noOutfits": "まもなく新しい衣装が登場します！"
   },
   "chatList": {
     "title": "メッセージ - Pesona",

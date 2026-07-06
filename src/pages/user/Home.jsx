@@ -8,7 +8,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
-import RecentStoriesRow from '../../components/RecentStoriesRow'
+import NewOutfitsRow from '../../components/NewOutfitsRow'
 import FollowedCharactersRow from '../../components/FollowedCharactersRow'
 import FeaturedCharacterSlider from '../../components/FeaturedCharacterSlider'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
@@ -319,8 +319,8 @@ export default function Home() {
         {/* 광고 배너 (어드민 관리) */}
         <HomeBannerSlider />
 
-        {/* 최근 공개된 스토리 */}
-        <RecentStoriesRow />
+        {/* 새로운 의상 (상점 공개 최신 의상) */}
+        <NewOutfitsRow />
 
         {/* 팔로우한 페소나 — 로그인 유저에 한해 노출 */}
         <FollowedCharactersRow characters={followedCharacters} />

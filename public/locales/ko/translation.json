@@ -46,7 +46,9 @@
       "default": "기본",
       "popular": "인기",
       "follow": "팔로우"
-    }
+    },
+    "newOutfits": "새로운 의상",
+    "noOutfits": "곧 새로운 의상이 출시돼요!"
   },
   "chatList": {
     "title": "메시지 - Pesona",
