@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import MaskIcon from '../../components/MaskIcon'
 
-const REWARD_LABEL = {
-  MASK: '마스크',
-  VOICE: '특별 보이스',
-  GALLERY: '특별 미디어',
-  PROFILE: '프로필 이미지',
+const REWARD_LABEL_KEY = {
+  MASK: 'maskPass.rewardMask',
+  VOICE: 'maskPass.rewardVoice',
+  GALLERY: 'maskPass.rewardGallery',
+  PROFILE: 'maskPass.rewardProfile',
 }
 
 function RewardPreview({ tier }) {
+  const { t } = useTranslation()
   const { rewardType, rewardPayload, claimed } = tier
   // GALLERY/PROFILE 미수령 시 미리보기용 약한 블러 (수령하면 해제)
   const visualBlur = !claimed && (rewardType === 'GALLERY' || rewardType === 'PROFILE')
@@ -22,7 +24,7 @@ function RewardPreview({ tier }) {
     return (
       <div className="flex items-center gap-2">
         <MaskIcon style={{ width: 28, height: 28 }} />
-        <span className="font-bold text-base text-gray-100">{amount}개</span>
+        <span className="font-bold text-base text-gray-100">{t('maskPass.maskAmount', { count: amount })}</span>
       </div>
     )
   }
@@ -45,7 +47,7 @@ function RewardPreview({ tier }) {
         )}
         <div className="min-w-0">
           <p className="text-xs text-gray-400">{character?.name || ''}</p>
-          <p className="text-sm text-gray-100 truncate">{rewardPayload?.title || '음성'}</p>
+          <p className="text-sm text-gray-100 truncate">{rewardPayload?.title || t('maskPass.fallbackVoice')}</p>
         </div>
       </div>
     )
@@ -78,7 +80,7 @@ function RewardPreview({ tier }) {
         <div className="min-w-0">
           <p className="text-xs text-gray-400">{preview?.character?.name || ''}</p>
           <p className="text-sm text-gray-100 truncate">
-            {preview?.title || '갤러리'}{count > 0 && <span className="text-xs text-gray-500 ml-1">({count}장)</span>}
+            {preview?.title || t('maskPass.fallbackGallery')}{count > 0 && <span className="text-xs text-gray-500 ml-1">{t('maskPass.galleryCount', { count })}</span>}
           </p>
         </div>
       </div>
@@ -100,7 +102,7 @@ function RewardPreview({ tier }) {
         </div>
         <div className="min-w-0">
           <p className="text-xs text-gray-400">{preview?.character?.name || ''}</p>
-          <p className="text-sm text-gray-100 truncate">{preview?.title || '프로필'}</p>
+          <p className="text-sm text-gray-100 truncate">{preview?.title || t('maskPass.fallbackProfile')}</p>
         </div>
       </div>
     )
@@ -109,6 +111,7 @@ function RewardPreview({ tier }) {
 }
 
 function TierCard({ tier, onClaim, claiming, onConditionClick }) {
+  const { t } = useTranslation()
   const { threshold, title, claimed, eligible, conditionsMet, claimable, unmetReasons = [] } = tier
   const stateClass = claimed
     ? 'border-emerald-600/40 bg-emerald-950/20'
@@ -134,19 +137,19 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
 
         {/* 중앙: 보상 + 조건 */}
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase text-gray-500 mb-1 tracking-wider">{REWARD_LABEL[tier.rewardType] || tier.rewardType}</p>
+          <p className="text-[10px] uppercase text-gray-500 mb-1 tracking-wider">{REWARD_LABEL_KEY[tier.rewardType] ? t(REWARD_LABEL_KEY[tier.rewardType]) : tier.rewardType}</p>
           <RewardPreview tier={tier} />
           {/* 조건 태그: 미충족인 경우에만 노출. 이미 만족한 조건은 표시 안 함 */}
           {(unmetReasons.includes('PURCHASE_REQUIRED') || unmetReasons.includes('ADULT_VERIFICATION_REQUIRED')) && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {unmetReasons.includes('PURCHASE_REQUIRED') && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded border bg-orange-900/30 text-orange-300 border-orange-700/40">
-                  🛒 마스크 1회 이상 구매 필요
+                  {t('maskPass.purchaseRequired')}
                 </span>
               )}
               {unmetReasons.includes('ADULT_VERIFICATION_REQUIRED') && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded border bg-orange-900/30 text-orange-300 border-orange-700/40">
-                  🔞 성인인증 필요
+                  {t('maskPass.adultRequired')}
                 </span>
               )}
             </div>
@@ -168,7 +171,7 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
               className="px-3 py-2 text-xs font-bold rounded-lg bg-amber-500 text-gray-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              {claiming ? '...' : '받기'}
+              {claiming ? '...' : t('maskPass.claim')}
             </button>
           ) : eligible && !conditionsMet ? (
             <button
@@ -176,7 +179,7 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
               className="px-2 py-2 text-[10px] font-bold rounded-lg bg-orange-600/30 text-orange-200 border border-orange-700/40 hover:bg-orange-600/40 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              조건<br />필요
+              {t('maskPass.conditionNeeded')}
             </button>
           ) : (
             <div className="w-9 h-9 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center">
@@ -205,10 +208,13 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
 }
 
 function ClaimResultModal({ grant, onClose }) {
+  const { t } = useTranslation()
   if (!grant) return null
   const { type, payload } = grant
   const characterName = payload?.preview?.character?.name
-  const title = characterName ? `${characterName}의 보상을 받았어요!` : '보상을 받았어요!'
+  const title = characterName
+    ? t('maskPass.claimResultTitleNamed', { name: characterName })
+    : t('maskPass.claimResultTitle')
   return (
     <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-50 px-4" onClick={onClose}>
       <div
@@ -248,7 +254,7 @@ function ClaimResultModal({ grant, onClose }) {
                 )
               })}
               {payload.preview.images.length > 4 && (
-                <div className="col-span-2 text-center text-xs text-gray-400">외 {payload.preview.images.length - 4}장 (갤러리에서 확인)</div>
+                <div className="col-span-2 text-center text-xs text-gray-400">{t('maskPass.galleryMore', { count: payload.preview.images.length - 4 })}</div>
               )}
             </div>
           )}
@@ -258,10 +264,10 @@ function ClaimResultModal({ grant, onClose }) {
         </div>
 
         {type === 'GALLERY' && (
-          <p className="text-center text-xs text-gray-400 mb-4">캐릭터 갤러리에서 확인할 수 있어요!</p>
+          <p className="text-center text-xs text-gray-400 mb-4">{t('maskPass.galleryHint')}</p>
         )}
         {type === 'PROFILE' && (
-          <p className="text-center text-xs text-gray-400 mb-4">캐릭터 페이지에서 프로필로 적용할 수 있습니다</p>
+          <p className="text-center text-xs text-gray-400 mb-4">{t('maskPass.profileHint')}</p>
         )}
 
         <button
@@ -269,7 +275,7 @@ function ClaimResultModal({ grant, onClose }) {
           className="w-full py-3 bg-amber-500 text-gray-950 font-bold rounded-xl hover:bg-amber-400 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          확인
+          {t('common.confirm')}
         </button>
       </div>
     </div>
@@ -277,6 +283,7 @@ function ClaimResultModal({ grant, onClose }) {
 }
 
 export default function MaskPass() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { setMasks } = useStore()
   const [data, setData] = useState(null)
@@ -319,11 +326,11 @@ export default function MaskPass() {
       console.error(e)
       const code = e.data?.error
       if (code === 'PURCHASE_REQUIRED') {
-        if (confirm('마스크 구매 이력이 필요해요. 상점으로 이동할까요?')) navigate('/mask-shop')
+        if (confirm(t('maskPass.purchaseConfirmClaim'))) navigate('/mask-shop')
       } else if (code === 'ADULT_VERIFICATION_REQUIRED') {
-        if (confirm('성인인증이 필요해요. 인증 페이지로 이동할까요?')) navigate('/adult-verify')
+        if (confirm(t('maskPass.adultConfirmClaim'))) navigate('/adult-verify')
       } else {
-        alert(code || '보상 수령 실패')
+        alert(code || t('maskPass.claimFailed'))
       }
     } finally {
       setClaimingId(null)
@@ -332,9 +339,9 @@ export default function MaskPass() {
 
   function handleConditionClick(reason) {
     if (reason === 'PURCHASE_REQUIRED') {
-      if (confirm('이 보상은 마스크 구매 이력이 필요해요. 상점으로 이동할까요?')) navigate('/mask-shop')
+      if (confirm(t('maskPass.purchaseConfirmCondition'))) navigate('/mask-shop')
     } else if (reason === 'ADULT_VERIFICATION_REQUIRED') {
-      if (confirm('이 보상은 성인인증이 필요해요. 인증 페이지로 이동할까요?')) navigate('/adult-verify')
+      if (confirm(t('maskPass.adultConfirmCondition'))) navigate('/adult-verify')
     }
   }
 
@@ -343,7 +350,7 @@ export default function MaskPass() {
 
   return (
     <div className="relative min-h-full bg-gray-950 text-gray-100 pb-12">
-      <Helmet><title>마스크 패스</title></Helmet>
+      <Helmet><title>{t('maskPass.title')}</title></Helmet>
 
       {/* 헤더 */}
       <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-gray-950/95 backdrop-blur border-b border-gray-800">
@@ -356,7 +363,7 @@ export default function MaskPass() {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <h1 className="text-base font-bold">마스크 패스</h1>
+        <h1 className="text-base font-bold">{t('maskPass.title')}</h1>
       </div>
 
       {/* 진행도 */}
@@ -364,7 +371,7 @@ export default function MaskPass() {
         <div className="bg-gradient-to-br from-amber-950/30 to-gray-900 border border-amber-700/30 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="text-xs text-amber-400 mb-1 tracking-wider">총 사용량</p>
+              <p className="text-xs text-amber-400 mb-1 tracking-wider">{t('maskPass.totalUsage')}</p>
               <p className="text-2xl font-bold text-gray-100">
                 {data?.lifetimeMasksSpent?.toLocaleString() || 0}
                 <span className="text-sm text-gray-400 font-normal ml-1">/ {maxThreshold.toLocaleString()}</span>
@@ -380,7 +387,7 @@ export default function MaskPass() {
           </div>
           {!!data?.unclaimedEligibleCount && (
             <p className="mt-3 text-xs text-amber-300">
-              받을 수 있는 보상이 {data.unclaimedEligibleCount}개 있어요
+              {t('maskPass.unclaimedCount', { count: data.unclaimedEligibleCount })}
             </p>
           )}
         </div>
@@ -388,9 +395,9 @@ export default function MaskPass() {
 
       {/* 티어 목록 */}
       <div className="px-4 mt-3 space-y-2">
-        {loading && <p className="text-center text-sm text-gray-500 py-8">불러오는 중...</p>}
+        {loading && <p className="text-center text-sm text-gray-500 py-8">{t('common.loading')}</p>}
         {!loading && data?.tiers?.length === 0 && (
-          <p className="text-center text-sm text-gray-500 py-8">아직 등록된 보상이 없어요</p>
+          <p className="text-center text-sm text-gray-500 py-8">{t('maskPass.noRewards')}</p>
         )}
         {!loading &&
           data?.tiers?.map((tier) => (
