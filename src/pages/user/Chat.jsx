@@ -16,6 +16,7 @@ import PersonalityModal from '../../components/PersonalityModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
+import { formatVirtualTimeParts } from '../../lib/virtualTime'
 // import AdBanner from '../../components/AdBanner'
 
 function getImageUrl(filePath) {
@@ -178,7 +179,7 @@ function getCharacterOnlineStatus(activeHours) {
   return slot?.status || 'free'
 }
 
-function getDefaultStatus(activeHours) {
+function getDefaultStatus(activeHours, t) {
   const hour = new Date().getHours()
   if (!activeHours?.schedule) {
     return { emoji: '💬', mood: '-', location: '-', activity: '-', outfit: '-' }
@@ -189,9 +190,9 @@ function getDefaultStatus(activeHours) {
   })
   const status = slot?.status || 'free'
   const label = slot?.label || null
-  if (status === 'sleep') return { emoji: '😴', mood: '수면 중', location: '-', activity: label || '잠자는 중', outfit: '잠옷' }
-  if (status === 'busy') return { emoji: '🔒', mood: '바쁨', location: '-', activity: label || '바쁜 중', outfit: '-' }
-  return { emoji: '🟢', mood: '여유', location: '-', activity: label || '자유 시간', outfit: '-' }
+  if (status === 'sleep') return { emoji: '😴', mood: t('chat.statusSleepMood'), location: '-', activity: label || t('chat.statusSleepActivity'), outfit: t('chat.statusSleepOutfit') }
+  if (status === 'busy') return { emoji: '🔒', mood: t('chat.statusBusyMood'), location: '-', activity: label || t('chat.statusBusyActivity'), outfit: '-' }
+  return { emoji: '🟢', mood: t('chat.statusFreeMood'), location: '-', activity: label || t('chat.statusFreeActivity'), outfit: '-' }
 }
 
 // 호감도 → 라벨 변환 (서버 getAffinityLabel과 일치)
@@ -708,7 +709,7 @@ export default function Chat() {
     }
     setShowCallChooser(true)
   }
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   // 캐릭터가 흥분 상태로 진입할 때 사운드 버튼 위에 툴팁 표시. 빠져나오면 자동 닫힘.
   useEffect(() => {
@@ -1650,7 +1651,7 @@ export default function Chat() {
           {showStatusPanel && (
             <div className="bg-gray-900/75 border border-gray-800/50 rounded-2xl mx-3 mt-2 px-4 pt-3 pb-3 animate-slide-down pointer-events-auto" onClick={(e) => e.stopPropagation()}>
               {(() => {
-                const status = characterStatus || getDefaultStatus(character.activeHours)
+                const status = characterStatus || getDefaultStatus(character.activeHours, t)
                 const affinity = conversation.affinity ?? 0
                 const affinityLabel = t(`chat.${getAffinityLabelKey(affinity)}`)
                 return (
@@ -1658,14 +1659,7 @@ export default function Chat() {
                     <span className="text-2xl leading-none mt-0.5 flex-shrink-0">{status.emoji}</span>
                     <div className="flex-1 min-w-0 space-y-1.5">
                       {status.virtualTime && (() => {
-                        const vt = status.virtualTime
-                        const parts = [
-                          vt.season,
-                          vt.monthDay,
-                          vt.weekday ? `${vt.weekday}요일` : null,
-                          vt.dayPart,
-                          Number.isInteger(vt.hour) ? `${vt.hour}시` : null,
-                        ].filter(Boolean)
+                        const parts = formatVirtualTimeParts(status.virtualTime, i18n.language)
                         return parts.length > 0 ? (
                           <div className="flex items-baseline gap-2">
                             <span className="text-[10px] text-gray-300 font-medium w-12 flex-shrink-0">{t('chat2.timeLabel')}</span>
