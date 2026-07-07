@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import MaskIcon from '../../components/MaskIcon'
 
 export default function Gacha() {
+  const { t } = useTranslation()
   const [boxes, setBoxes] = useState(null)
   const [error, setError] = useState(null)
   const navigate = useNavigate()
@@ -39,14 +41,14 @@ export default function Gacha() {
         }}
       >
         <div className="text-2xl mb-3">🔒</div>
-        <h2 className="text-lg font-bold mb-2">성인 인증이 필요해요</h2>
-        <p className="text-sm text-gray-400 mb-6">가챠는 성인 인증을 마친 회원만 이용할 수 있어요.</p>
+        <h2 className="text-lg font-bold mb-2">{t('gacha.adultRequired')}</h2>
+        <p className="text-sm text-gray-400 mb-6">{t('gacha.adultDesc')}</p>
         <button
           onClick={() => navigate('/adult-verify')}
           className="px-5 py-2.5 bg-indigo-600 text-white text-sm rounded-full"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
-          본인 인증하기
+          {t('gacha.verify')}
         </button>
       </div>
     )
@@ -55,24 +57,24 @@ export default function Gacha() {
   if (error === 'LOAD_FAIL') {
     return (
       <div className="p-6 text-center text-sm text-red-400">
-        가챠 목록을 불러오지 못했어요.
+        {t('gacha.loadFail')}
       </div>
     )
   }
 
-  if (!boxes) return <div className="p-6 text-center text-sm text-gray-400">로딩 중...</div>
+  if (!boxes) return <div className="p-6 text-center text-sm text-gray-400">{t('common.loading')}</div>
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <Helmet>
-        <title>가챠 — 페소나</title>
+        <title>{t('gacha.pageTitle')}</title>
       </Helmet>
 
       {boxes.length === 0 ? (
         <div className="text-center pt-32 px-6">
           <div className="text-5xl mb-3">🎁</div>
-          <p className="text-sm text-gray-400">진행 중인 가챠가 없어요.</p>
-          <p className="text-xs text-gray-600 mt-1">새 박스가 열리면 알려드릴게요.</p>
+          <p className="text-sm text-gray-400">{t('gacha.empty')}</p>
+          <p className="text-xs text-gray-600 mt-1">{t('gacha.emptyDesc')}</p>
         </div>
       ) : (
         boxes.map((box) => <GachaBoxCard key={box.id} box={box} onExit={() => navigate('/')} />)
@@ -121,6 +123,7 @@ function PreviewTile({ item }) {
 }
 
 function GachaBoxCard({ box, onExit }) {
+  const { t } = useTranslation()
   const pityPct =
     box.pity && box.pity.threshold > 0
       ? Math.min(100, (box.pity.count / box.pity.threshold) * 100)
@@ -176,7 +179,7 @@ function GachaBoxCard({ box, onExit }) {
           e.stopPropagation()
           onExit?.()
         }}
-        aria-label="가챠 나가기"
+        aria-label={t('gacha.exit')}
         className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-black/55 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/75 active:scale-95 transition-all shadow-lg"
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
       >
@@ -188,11 +191,11 @@ function GachaBoxCard({ box, onExit }) {
 
       {pityReady ? (
         <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-emerald-950 text-[10px] font-bold shadow-lg">
-          🎁 확정 보상 가능
+          {t('gacha.pityReadyBadge')}
         </div>
       ) : box.free?.remaining > 0 ? (
         <div className="absolute top-3 right-14 z-10 px-2.5 py-1 rounded-full bg-emerald-500 text-emerald-950 text-[10px] font-bold shadow-lg">
-          🎟 무료 {box.free.remaining}회
+          {t('gacha.freeBadge', { count: box.free.remaining })}
         </div>
       ) : null}
 
@@ -213,10 +216,10 @@ function GachaBoxCard({ box, onExit }) {
           <div>
             <div className="flex justify-between text-[10px] text-gray-200 mb-1 drop-shadow">
               <span className="font-semibold">
-                확정 보상 {box.pity.count}/{box.pity.threshold}
+                {t('gacha.pityCountLabel', { count: box.pity.count, threshold: box.pity.threshold })}
               </span>
               {!pityReady && (
-                <span className="opacity-80">{box.pity.threshold - box.pity.count}회 남음</span>
+                <span className="opacity-80">{t('gacha.remainingCount', { count: box.pity.threshold - box.pity.count })}</span>
               )}
             </div>
             <div className="h-1 bg-white/20 rounded-full overflow-hidden backdrop-blur-sm">
@@ -230,9 +233,9 @@ function GachaBoxCard({ box, onExit }) {
 
         <div className="flex items-center justify-between pt-1">
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-200 bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
-            <MaskIcon /> {box.cost} / 회
+            <MaskIcon /> {box.cost} {t('gacha.perDraw')}
           </span>
-          <span className="text-[11px] text-white/80 group-hover:text-white">뽑기 →</span>
+          <span className="text-[11px] text-white/80 group-hover:text-white">{t('gacha.drawCta')}</span>
         </div>
       </div>
     </Link>
