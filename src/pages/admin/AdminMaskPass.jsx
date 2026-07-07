@@ -164,6 +164,9 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
   const payload = initial?.rewardPayload || {}
   const [amount, setAmount] = useState(payload.amount || '')
   const [rewardTitle, setRewardTitle] = useState(payload.title || payload.preview?.title || '')
+  // 보상 제목 다국어 (GALLERY/PROFILE). 서버 preview.titleEn/Ja 로 프리필.
+  const [rewardTitleEn, setRewardTitleEn] = useState(payload.preview?.titleEn || '')
+  const [rewardTitleJa, setRewardTitleJa] = useState(payload.preview?.titleJa || '')
   const [rewardDescription, setRewardDescription] = useState(initial?.rewardPayload?.preview?.description || '')
   const [characterId, setCharacterId] = useState(
     payload.characterId || payload.preview?.character?.id || '',
@@ -231,6 +234,8 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
       }
       fd.append('characterId', String(characterId))
       fd.append('rewardTitle', rewardTitle || '')
+      fd.append('rewardTitleEn', rewardTitleEn || '')
+      fd.append('rewardTitleJa', rewardTitleJa || '')
       fd.append('rewardDescription', rewardDescription || '')
       if (deleteImageIds.length) fd.append('deleteImageIds', deleteImageIds.join(','))
       for (const f of galleryFiles) fd.append('files', f)
@@ -246,6 +251,8 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
       }
       fd.append('characterId', String(characterId))
       fd.append('rewardTitle', rewardTitle || '')
+      fd.append('rewardTitleEn', rewardTitleEn || '')
+      fd.append('rewardTitleJa', rewardTitleJa || '')
     }
     onSubmit(fd)
   }
@@ -474,6 +481,28 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
                 className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
               />
             </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="text-[11px] text-gray-500">제목 (EN)</span>
+                <input
+                  type="text"
+                  value={rewardTitleEn}
+                  onChange={(e) => setRewardTitleEn(e.target.value)}
+                  placeholder="English title"
+                  className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-gray-500">제목 (JA)</span>
+                <input
+                  type="text"
+                  value={rewardTitleJa}
+                  onChange={(e) => setRewardTitleJa(e.target.value)}
+                  placeholder="日本語タイトル"
+                  className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+                />
+              </label>
+            </div>
           </>
         )}
 
@@ -585,6 +614,28 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
                 className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
               />
             </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="text-[11px] text-gray-500">제목 (EN)</span>
+                <input
+                  type="text"
+                  value={rewardTitleEn}
+                  onChange={(e) => setRewardTitleEn(e.target.value)}
+                  placeholder="English title"
+                  className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-gray-500">제목 (JA)</span>
+                <input
+                  type="text"
+                  value={rewardTitleJa}
+                  onChange={(e) => setRewardTitleJa(e.target.value)}
+                  placeholder="日本語タイトル"
+                  className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+                />
+              </label>
+            </div>
             <label className="block">
               <span className="text-xs text-gray-400">설명 (선택)</span>
               <textarea

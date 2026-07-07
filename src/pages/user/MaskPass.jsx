@@ -192,14 +192,9 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
         </div>
       </div>
 
-      {/* 수령한 VOICE — 대사 + 플레이어 항상 펼침 (재청취용) */}
+      {/* 수령한 VOICE — 플레이어만 노출 (대사 텍스트는 현지화 불가라 미표시). */}
       {showVoicePlayer && (
         <div className="mt-3 pt-3 border-t border-emerald-700/30">
-          {tier.rewardPayload.text && (
-            <p className="text-sm text-gray-300 italic mb-2 leading-relaxed whitespace-pre-line">
-              “{tier.rewardPayload.text}”
-            </p>
-          )}
           <audio src={tier.rewardPayload.audioUrl} controls preload="none" className="w-full" />
         </div>
       )}
