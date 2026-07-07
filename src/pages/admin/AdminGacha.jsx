@@ -229,6 +229,18 @@ function BoxEditor({ boxId, onBack }) {
   )
 }
 
+// en/ja 입력 → { en:{name,description}, ja:{...} } (빈 값 제외). 전부 비면 null(=ko 폴백).
+function packBoxTr(tr) {
+  const out = {}
+  for (const lang of ['en', 'ja']) {
+    const o = {}
+    if (tr[lang].name?.trim()) o.name = tr[lang].name.trim()
+    if (tr[lang].description?.trim()) o.description = tr[lang].description.trim()
+    if (Object.keys(o).length) out[lang] = o
+  }
+  return Object.keys(out).length ? out : null
+}
+
 function BoxBasicForm({ box, onSaved }) {
   const [form, setForm] = useState({
     name: box.name,
@@ -245,6 +257,12 @@ function BoxBasicForm({ box, onSaved }) {
   })
   const [saving, setSaving] = useState(false)
   const [bgPickerOpen, setBgPickerOpen] = useState(false)
+  // 다국어(en/ja) — 저장 시 verbatim override. 재번역 버튼으로 자동 재생성.
+  const [tr, setTr] = useState(() => ({
+    en: { name: box.translations?.en?.name || '', description: box.translations?.en?.description || '' },
+    ja: { name: box.translations?.ja?.name || '', description: box.translations?.ja?.description || '' },
+  }))
+  const [retranslating, setRetranslating] = useState(false)
 
   const save = async () => {
     setSaving(true)
@@ -261,12 +279,33 @@ function BoxBasicForm({ box, onSaved }) {
         freeDrawCount: Number(form.freeDrawCount),
         startsAt: form.startsAt || null,
         endsAt: form.endsAt || null,
+        translations: packBoxTr(tr),
       })
       onSaved()
     } catch (err) {
       alert('저장 실패: ' + (err?.data?.error || err?.message))
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ko(name/description) 저장 + 강제 재번역 → 결과를 en/ja 필드에 반영.
+  const retranslate = async () => {
+    setRetranslating(true)
+    try {
+      const { box: updated } = await api.put(`/admin/gacha/boxes/${box.id}`, {
+        name: form.name,
+        description: form.description || null,
+        retranslate: true,
+      })
+      setTr({
+        en: { name: updated?.translations?.en?.name || '', description: updated?.translations?.en?.description || '' },
+        ja: { name: updated?.translations?.ja?.name || '', description: updated?.translations?.ja?.description || '' },
+      })
+    } catch (err) {
+      alert('재번역 실패: ' + (err?.data?.error || err?.message))
+    } finally {
+      setRetranslating(false)
     }
   }
 
@@ -339,6 +378,41 @@ function BoxBasicForm({ box, onSaved }) {
             className="mt-1 w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
           />
         </label>
+        {/* 다국어 (자동번역 + 수동 override) */}
+        <div className="col-span-2 border border-gray-800 rounded-lg p-3 bg-gray-950/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold text-gray-300">🌐 다국어 (en / ja)</span>
+            <button
+              type="button"
+              onClick={retranslate}
+              disabled={retranslating}
+              className="px-2 py-1 text-[11px] bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white rounded"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {retranslating ? '재번역 중…' : '한국어로 재번역'}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {['en', 'ja'].map((lang) => (
+              <div key={lang} className="space-y-1">
+                <div className="text-[10px] text-gray-500 uppercase">{lang}</div>
+                <input
+                  value={tr[lang].name}
+                  onChange={(e) => setTr({ ...tr, [lang]: { ...tr[lang], name: e.target.value } })}
+                  placeholder={`박스명 (${lang})`}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white"
+                />
+                <input
+                  value={tr[lang].description}
+                  onChange={(e) => setTr({ ...tr, [lang]: { ...tr[lang], description: e.target.value } })}
+                  placeholder={`설명 (${lang})`}
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-600 mt-1.5">비워두면 한국어로 표시됩니다. 저장 시 이 값이 우선 적용돼요.</p>
+        </div>
         <label className="text-xs text-gray-400">
           회당 비용 (마스크)
           <input
@@ -871,6 +945,8 @@ function AddItemForm({ box, characters, onClose, onCreated }) {
   const [specialVoiceId, setSpecialVoiceId] = useState('')
   const [stylePickId, setStylePickId] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [displayNameEn, setDisplayNameEn] = useState('')
+  const [displayNameJa, setDisplayNameJa] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
 
   // 보조 데이터
@@ -919,6 +995,11 @@ function AddItemForm({ box, characters, onClose, onCreated }) {
       displayName: displayName || null,
       previewUrl: previewUrl || null,
     }
+    // en/ja 표시명 override — 있으면 verbatim, 없으면 서버가 ko→auto 번역.
+    const itemTr = {}
+    if (displayNameEn.trim()) itemTr.en = { displayName: displayNameEn.trim() }
+    if (displayNameJa.trim()) itemTr.ja = { displayName: displayNameJa.trim() }
+    if (Object.keys(itemTr).length) payload.translations = itemTr
     if (rewardType === 'PROFILE_IMAGE') {
       if (!variantId) return alert('프로필 variant를 선택하세요.')
       payload.variantId = Number(variantId)
@@ -1088,6 +1169,21 @@ function AddItemForm({ box, characters, onClose, onCreated }) {
           onChange={(e) => setPreviewUrl(e.target.value)}
           placeholder="미리보기 이미지 URL (선택)"
           className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
+        />
+      </div>
+      {/* 표시명 다국어 — 비우면 저장 시 한국어에서 자동번역, 입력하면 그 값 우선 */}
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <input
+          value={displayNameEn}
+          onChange={(e) => setDisplayNameEn(e.target.value)}
+          placeholder="표시명 EN (비우면 자동번역)"
+          className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-[11px] text-white"
+        />
+        <input
+          value={displayNameJa}
+          onChange={(e) => setDisplayNameJa(e.target.value)}
+          placeholder="표시명 JA (비우면 자동번역)"
+          className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-[11px] text-white"
         />
       </div>
 
