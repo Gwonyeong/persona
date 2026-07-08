@@ -339,8 +339,8 @@
     "inquiry": "문의",
     "adultVerify": "성인 인증",
     "deleteAccount": "회원 탈퇴",
-    "missionAdultVerifyVerify": "성인인증하고 마스크 {{reward}}개 받기",
-    "missionAdultVerifyClaim": "성인인증 완료! 마스크 {{reward}}개 받기"
+    "missionAdultVerifyVerify": "성인인증하고 랜덤 표정영상 받기",
+    "missionAdultVerifyClaim": "성인인증 완료! 랜덤 표정영상 받기"
   },
   "adultVerify": {
     "title": "성인 인증",
@@ -986,7 +986,10 @@
     "stylePreviewLabel": "미리보기",
     "styleUnlockNote": "구매하면 이 의상의 모든 표정과 영상이 해금돼요.",
     "stylePurchaseConfirm": "구매하기",
-    "styleVideoCount": "영상 {{count}}개"
+    "styleVideoCount": "영상 {{count}}개",
+    "videoRewardTitle": "🎉 표정영상을 받았어요!",
+    "videoRewardDesc": "성인인증 보상으로 랜덤 표정영상이 해금됐어요.",
+    "videoRewardView": "보러가기"
   },
   "groupChat": {
     "title": "단체 톡방 - Pesona",

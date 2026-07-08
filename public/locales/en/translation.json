@@ -339,8 +339,8 @@
     "inquiry": "Contact Us",
     "adultVerify": "Adult Verification",
     "deleteAccount": "Delete Account",
-    "missionAdultVerifyVerify": "Verify your age & get {{reward}} masks",
-    "missionAdultVerifyClaim": "Age verified! Claim {{reward}} masks"
+    "missionAdultVerifyVerify": "Verify your age & get a random expression video",
+    "missionAdultVerifyClaim": "Age verified! Claim a random expression video"
   },
   "adultVerify": {
     "title": "Adult Verification",
@@ -986,7 +986,10 @@
     "stylePreviewLabel": "Preview",
     "styleUnlockNote": "Purchase unlocks all expressions and videos of this outfit.",
     "stylePurchaseConfirm": "Buy",
-    "styleVideoCount": "{{count}} videos"
+    "styleVideoCount": "{{count}} videos",
+    "videoRewardTitle": "🎉 You got an expression video!",
+    "videoRewardDesc": "A random expression video was unlocked as your age-verification reward.",
+    "videoRewardView": "View it"
   },
   "groupChat": {
     "title": "Group Chat - Pesona",

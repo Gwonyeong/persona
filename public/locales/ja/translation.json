@@ -339,8 +339,8 @@
     "inquiry": "お問い合わせ",
     "adultVerify": "成人認証",
     "deleteAccount": "アカウント削除",
-    "missionAdultVerifyVerify": "成人認証してマスク{{reward}}個をもらう",
-    "missionAdultVerifyClaim": "成人認証完了！マスク{{reward}}個をもらう"
+    "missionAdultVerifyVerify": "成人認証してランダム表情動画をもらう",
+    "missionAdultVerifyClaim": "成人認証完了！ランダム表情動画をもらう"
   },
   "adultVerify": {
     "title": "成人認証",
@@ -986,7 +986,10 @@
     "stylePreviewLabel": "プレビュー",
     "styleUnlockNote": "購入するとこの衣装のすべての表情と動画が解放されます。",
     "stylePurchaseConfirm": "購入する",
-    "styleVideoCount": "動画{{count}}本"
+    "styleVideoCount": "動画{{count}}本",
+    "videoRewardTitle": "🎉 表情動画をもらいました！",
+    "videoRewardDesc": "成人認証の特典としてランダム表情動画が解放されました。",
+    "videoRewardView": "見に行く"
   },
   "groupChat": {
     "title": "グループチャット - Pesona",

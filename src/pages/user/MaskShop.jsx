@@ -55,6 +55,7 @@ export default function MaskShop() {
   const [maskModalTab, setMaskModalTab] = useState('daily')
   const [missions, setMissions] = useState(null)
   const [claimingMission, setClaimingMission] = useState(null)
+  const [videoReward, setVideoReward] = useState(null)
   const [feedLikeReward, setFeedLikeReward] = useState(null)
   const [dailyChatReward, setDailyChatReward] = useState(null)
   const [checkinClaimed, setCheckinClaimed] = useState(null)
@@ -794,7 +795,11 @@ export default function MaskShop() {
                     setClaimingMission('adultVerify')
                     try {
                       const result = await api.post('/masks/adult-verify-reward')
-                      if (!result.alreadyClaimed && result.masks !== undefined) setMasks(result.masks)
+                      if (result.rewardType === 'EMOTION_VIDEO' && result.video) {
+                        setVideoReward(result.video)
+                      } else if (!result.alreadyClaimed && result.masks !== undefined) {
+                        setMasks(result.masks)
+                      }
                       setMissions((prev) => ({ ...prev, adultVerify: { ...prev.adultVerify, claimed: true } }))
                     } catch (e) {
                       console.error('Adult verify reward error:', e)
@@ -806,7 +811,7 @@ export default function MaskShop() {
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <span>🔞</span>
-                  <span>{t('myPage.missionAdultVerifyClaim', { reward: missions?.adultVerify?.reward ?? 10 })}</span>
+                  <span>{t('myPage.missionAdultVerifyClaim')}</span>
                 </button>
               ) : (
                 <button
@@ -818,7 +823,7 @@ export default function MaskShop() {
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
                   <span>🔞</span>
-                  <span>{t('myPage.missionAdultVerifyVerify', { reward: missions?.adultVerify?.reward ?? 10 })}</span>
+                  <span>{t('myPage.missionAdultVerifyVerify')}</span>
                 </button>
               )}
             </div>
@@ -1018,6 +1023,57 @@ export default function MaskShop() {
                 )}
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 성인인증 보상: 랜덤 표정영상 지급 리빌 */}
+      {videoReward && (
+        <div
+          className="fixed inset-0 z-[90] max-w-[480px] mx-auto bg-black/85 flex items-center justify-center p-6"
+          onClick={() => setVideoReward(null)}
+        >
+          <div
+            className="w-full rounded-3xl bg-gray-900 border border-gray-700 p-5 flex flex-col items-center"
+            style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-rose-300 mb-1">{t('maskShop.videoRewardTitle')}</p>
+            <p className="text-[11px] text-gray-400 mb-3 text-center">{t('maskShop.videoRewardDesc')}</p>
+
+            <div className="relative rounded-2xl overflow-hidden bg-gray-800 w-40 mb-3" style={{ aspectRatio: '9 / 16' }}>
+              <video
+                src={videoReward.videoFilePath}
+                poster={videoReward.filePath}
+                className="absolute inset-0 w-full h-full object-cover"
+                muted
+                loop
+                autoPlay
+                playsInline
+                preload="metadata"
+              />
+            </div>
+
+            <p className="text-sm font-bold text-white mb-4">{videoReward.characterName}</p>
+
+            <button
+              onClick={() => {
+                const cid = videoReward.characterId
+                setVideoReward(null)
+                navigate(`/collection/${cid}`)
+              }}
+              className="w-full py-3.5 rounded-xl bg-rose-600 text-white text-sm font-bold active:bg-rose-500 transition-colors mb-2"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {t('maskShop.videoRewardView')}
+            </button>
+            <button
+              onClick={() => setVideoReward(null)}
+              className="w-full py-2 text-xs text-gray-500"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {t('common.close')}
+            </button>
           </div>
         </div>
       )}
