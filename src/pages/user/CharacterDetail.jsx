@@ -1471,8 +1471,8 @@ export default function CharacterDetail() {
                   </div>
                 </div>
 
-                {/* 컨셉 채팅 카드 — V2 활성 캐릭터에만 노출 */}
-                {v2Presets?.v2Enabled && v2Presets?.startingPresets?.length > 0 && (
+                {/* 컨셉 채팅 카드 — V2 활성 캐릭터 + 한국어 UI일 때만 노출 (V2 화면은 아직 현지화 미완). */}
+                {(i18n.language || '').startsWith('ko') && v2Presets?.v2Enabled && v2Presets?.startingPresets?.length > 0 && (
                   <div className="rounded-2xl border border-violet-500/40 bg-violet-500/8 p-4">
                     <div className="flex items-start gap-3 mb-3">
                       <span className="text-2xl leading-none mt-0.5">🎬</span>
