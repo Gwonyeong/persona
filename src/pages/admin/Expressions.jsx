@@ -33,6 +33,57 @@ function ExpressionThumb({ src, className = '' }) {
   return <img src={src} alt="" className={className} loading="lazy" />
 }
 
+// 로컬 영상 File에서 0프레임(첫 프레임) 썸네일을 JPEG Blob으로 추출.
+// 로컬 blob URL이라 CORS 문제 없음. 서버 ffmpeg 불필요 (브라우저 canvas 사용).
+function extractFirstFrameBlob(file) {
+  const url = URL.createObjectURL(file)
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video')
+    v.muted = true
+    v.playsInline = true
+    v.preload = 'auto'
+    let settled = false
+    const finish = (fn, arg) => {
+      if (settled) return
+      settled = true
+      URL.revokeObjectURL(url)
+      fn(arg)
+    }
+    const capture = () => {
+      try {
+        const w = v.videoWidth || 720
+        const h = v.videoHeight || 1280
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d').drawImage(v, 0, 0, w, h)
+        canvas.toBlob(
+          (blob) => (blob ? finish(resolve, blob) : finish(reject, new Error('썸네일 캡처 실패'))),
+          'image/jpeg',
+          0.92,
+        )
+      } catch (err) {
+        finish(reject, err)
+      }
+    }
+    v.addEventListener('seeked', capture, { once: true })
+    v.addEventListener('error', () => finish(reject, new Error('영상 디코딩 실패')), { once: true })
+    v.addEventListener(
+      'loadeddata',
+      () => {
+        // 첫 프레임으로 seek해 seeked에서 캡처. 이미 0이라 이벤트 미발생 시 대비해 살짝 이동.
+        try {
+          v.currentTime = Math.min(0.04, Math.max(0, (v.duration || 1) - 0.01))
+        } catch {
+          capture()
+        }
+      },
+      { once: true },
+    )
+    v.src = url
+  })
+}
+
 // 서버 buildExpressionPrompt의 디폴트 구도 문구와 일치시킨다.
 const DEFAULT_COMPOSITION_KO = '정면(eye-level) 상반신 포트레이트, 인물 중앙 정렬, 레퍼런스와 동일한 크롭·조명'
 const DEFAULT_COMPOSITION_EN =
@@ -899,18 +950,54 @@ function EmotionCell({ characterId, styleId, emotion, emotionLabel, images, allS
   // 이미지 row(영상 파일 아님) 중 videoFilePath 비어있는 게 하나라도 있으면 강조
   const needsVideo = images.some((i) => !isVideoUrl(i.filePath) && !i.videoFilePath)
 
+  // 이미지 업로드 헬퍼 — Blob/File을 표정 이미지 row로 등록.
+  const uploadImageBlob = async (blob, filename) => {
+    const fd = new FormData()
+    fd.append('image', blob, filename)
+    fd.append('emotion', emotion)
+    fd.append('description', '')
+    const { image } = await api.post(`/admin/styles/${styleId}/images`, fd)
+    return image
+  }
+
   const uploadFile = async (file) => {
     if (!file) return
     // 이미지 또는 비디오만 허용 (서버 uploadSprite와 일치)
     if (!file.type?.startsWith('image/') && !file.type?.startsWith('video/')) return
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append('image', file)
-      formData.append('emotion', emotion)
-      formData.append('description', '')
-      const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, formData)
-      onAdd({ ...uploaded, emotion })
+      if (file.type?.startsWith('video/')) {
+        // 영상 업로드: 0프레임 썸네일을 이미지로 만들고 영상을 그 이미지에 자동 연결.
+        // 결과 = 이미지 row 1개 (filePath=썸네일, videoFilePath=영상).
+        let thumbImage = null
+        try {
+          const thumbBlob = await extractFirstFrameBlob(file)
+          thumbImage = await uploadImageBlob(thumbBlob, 'thumbnail.jpg')
+        } catch (thumbErr) {
+          console.error('First-frame thumbnail extraction failed, falling back to standalone video:', thumbErr)
+        }
+
+        // 영상 파일 업로드 (standalone row)
+        const videoFd = new FormData()
+        videoFd.append('image', file)
+        videoFd.append('emotion', emotion)
+        videoFd.append('description', '')
+        const { image: videoRow } = await api.post(`/admin/styles/${styleId}/images`, videoFd)
+
+        if (thumbImage) {
+          // 영상을 썸네일 이미지에 연결 — standalone videoRow는 서버에서 소모(삭제)됨.
+          const res = await api.post(`/admin/images/${thumbImage.id}/link-video`, {
+            videoUrl: videoRow.filePath,
+          })
+          onAdd({ ...thumbImage, videoFilePath: res.image.videoFilePath, emotion })
+        } else {
+          // 썸네일 추출 실패 시 기존 동작(standalone 영상 row)으로 폴백.
+          onAdd({ ...videoRow, emotion })
+        }
+      } else {
+        const uploaded = await uploadImageBlob(file, file.name || 'image')
+        onAdd({ ...uploaded, emotion })
+      }
     } catch (error) {
       console.error('Expression upload error:', error)
     } finally {
