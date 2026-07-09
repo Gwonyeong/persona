@@ -56,7 +56,6 @@ export default function MaskShop() {
   const [missions, setMissions] = useState(null)
   const [claimingMission, setClaimingMission] = useState(null)
   const [videoReward, setVideoReward] = useState(null)
-  const [feedLikeReward, setFeedLikeReward] = useState(null)
   const [dailyChatReward, setDailyChatReward] = useState(null)
   const [checkinClaimed, setCheckinClaimed] = useState(null)
   const [claimingCheckin, setClaimingCheckin] = useState(false)
@@ -186,7 +185,6 @@ export default function MaskShop() {
     api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
     api.get('/masks/ad-reward/available').then(({ available, remaining }) => { setAdRewardAvailable(available); setAdRewardRemaining(remaining) }).catch(() => {})
     api.get('/masks/missions').then(({ missions }) => setMissions(missions)).catch(() => {})
-    api.get('/masks/feed-like-reward/available').then((data) => setFeedLikeReward(data)).catch(() => {})
     api.get('/masks/daily-chat-reward/available').then((data) => setDailyChatReward(data)).catch(() => {})
     api.get('/masks/checkin/available').then(({ claimed }) => setCheckinClaimed(claimed)).catch(() => {})
     api.get('/masks/first-purchase-eligible').then(({ eligible }) => setFirstPurchaseEligible(eligible)).catch(() => {})
@@ -694,55 +692,6 @@ export default function MaskShop() {
                   </div>
                 </button>
               )}
-              {/* 피드 좋아요 3개 데일리 */}
-              <button
-                onClick={async () => {
-                  if (requireLogin()) return
-                  if (!feedLikeReward || feedLikeReward.claimed || feedLikeReward.likeCount < 3) {
-                    if (!feedLikeReward?.claimed && (!feedLikeReward || feedLikeReward.likeCount < 3)) {
-                      navigate('/feed')
-                    }
-                    return
-                  }
-                  try {
-                    const result = await api.post('/masks/feed-like-reward')
-                    if (!result.alreadyClaimed) setMasks(result.masks)
-                    setFeedLikeReward((prev) => ({ ...prev, claimed: true }))
-                  } catch (e) {
-                    console.error('Feed like reward error:', e)
-                  }
-                }}
-                disabled={feedLikeReward?.claimed}
-                className={`w-full flex items-center justify-between px-4 py-4 rounded-xl border mb-3 transition-all ${
-                  feedLikeReward?.claimed
-                    ? 'border-gray-700 bg-gray-800/50'
-                    : feedLikeReward?.likeCount >= 3
-                      ? 'border-amber-500/50 bg-amber-500/10'
-                      : 'border-gray-700 bg-gray-800/50'
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">❤️</span>
-                  <div className="text-left">
-                    <p className="text-sm font-bold text-gray-100">{t('myPage.dailyFeedLike')}</p>
-                    <p className="text-xs text-gray-400">{t('myPage.dailyFeedLikeDesc')}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {feedLikeReward?.claimed ? (
-                    <span className="text-xs text-gray-500">{t('myPage.watchAdClaimed')}</span>
-                  ) : feedLikeReward?.likeCount >= 3 ? (
-                    <>
-                      <MaskIcon className="text-lg" />
-                      <span className="text-sm font-bold text-amber-400">+3</span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-400">{t('myPage.dailyFeedLikeProgress', { count: feedLikeReward?.likeCount ?? 0 })}</span>
-                  )}
-                </div>
-              </button>
-
               <p className="text-xs text-gray-600 text-center mt-2">{t('myPage.comingSoon')}</p>
             </>
           )}
