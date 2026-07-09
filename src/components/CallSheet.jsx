@@ -19,14 +19,10 @@ function getAffinityLabelKey(affinity) {
   return 'affinityDeep'
 }
 
-function PhaseLabel({ phase, mode, t }) {
+function PhaseLabel({ phase, t }) {
   switch (phase) {
     case 'connecting':
       return <span>{t('chat.call.connecting')}</span>
-    case 'listening':
-      return <span>{mode === 'ptt' ? t('chat.call.tapToTalk') : t('chat.call.listening')}</span>
-    case 'recording':
-      return <span className="text-red-300">{mode === 'ptt' ? t('chat.call.release') : t('chat.call.listening')}</span>
     case 'sending':
       return <span>{t('chat.call.thinking')}</span>
     case 'speaking':
@@ -38,7 +34,7 @@ function PhaseLabel({ phase, mode, t }) {
 
 export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversationId, character, currentStyle, profileUrl, characterStatus, affinity = 0, safetyMode = true, callMode = 'continue' }) {
   const { t } = useTranslation()
-  const [mode, setMode] = useState('ptt') // 'ptt' | 'vad'
+  const [inputText, setInputText] = useState('')
   const [errorMsg, setErrorMsg] = useState(null)
   // 몰입 모드 — 우상단 X 클릭 시 true. 배경 sprite 만 남기고 모든 UI 숨김. 화면 탭하면 false 로 복귀.
   const [uiHidden, setUiHidden] = useState(false)
@@ -60,19 +56,14 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
     error,
     connect,
     disconnect,
-    startTalking,
-    stopTalking,
+    sendText,
   } = useCall({
     conversationId,
-    mode,
     callMode,
     onError: (err) => {
       const map = {
-        PERMISSION_DENIED: t('chat.call.permissionDenied'),
         SUBSCRIPTION_REQUIRED: t('chat.call.needLight'),
         INSUFFICIENT_MASKS: t('chat.call.errorInsufficientMasks'),
-        EMPTY_TRANSCRIPT: t('chat.call.errorEmpty'),
-        INVALID_AUDIO: t('chat.call.errorInvalidAudio'),
       }
       setErrorMsg(map[err.code] || t('chat.call.errorSend'))
     },
@@ -138,8 +129,12 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   if (!open) return null
 
   const isConnecting = phase === 'connecting'
-  const canSpeak = phase === 'listening' || phase === 'recording'
-  const isFatal = errorMsg && (phase === 'idle' || !canSpeak)
+  const handleSend = () => {
+    const text = inputText.trim()
+    if (!text || phase !== 'ready') return
+    sendText(text)
+    setInputText('')
+  }
 
   return (
     <div
@@ -226,7 +221,7 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
             </p>
           )}
           <p className="text-sm text-gray-300 mt-2">
-            <PhaseLabel phase={phase} mode={mode} t={t} />
+            <PhaseLabel phase={phase} t={t} />
           </p>
         </div>
 
@@ -327,74 +322,44 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           )
         })()}
 
-        {/* 모드 토글 */}
-        <div className="flex bg-white/10 rounded-full p-1 text-xs">
+        {/* 텍스트 입력 + 전송 + 종료 (음성 입력·STT 제거 — 유저는 타이핑, 캐릭터는 음성으로 답변) */}
+        <div className="w-full max-w-sm flex items-center gap-2">
+          <div className="relative flex-1">
+            {showFreeCallBadge && (
+              <span className="absolute -top-3 left-3 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow whitespace-nowrap pointer-events-none">
+                {t('chat.call.freeCount', { count: remainingFreeCalls })}
+              </span>
+            )}
+            <input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend() } }}
+              onClick={(e) => e.stopPropagation()}
+              disabled={isConnecting}
+              placeholder={t('chat.call.inputPlaceholder')}
+              className="w-full bg-white/15 border border-white/20 rounded-full px-4 py-3 text-sm text-white placeholder-gray-400 disabled:opacity-40"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            />
+          </div>
           <button
-            onClick={() => setMode('ptt')}
-            className={`px-4 py-1.5 rounded-full transition-colors ${mode === 'ptt' ? 'bg-white text-gray-900' : 'text-gray-300'}`}
+            onClick={(e) => { e.stopPropagation(); handleSend() }}
+            disabled={!inputText.trim() || phase !== 'ready'}
+            className="w-12 h-12 flex-shrink-0 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white flex items-center justify-center shadow-lg transition-colors"
             style={BUTTON_RESET}
+            aria-label={t('chat.call.send')}
           >
-            {t('chat.call.modePtt')}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
           </button>
-          <button
-            onClick={() => setMode('vad')}
-            className={`px-4 py-1.5 rounded-full transition-colors ${mode === 'vad' ? 'bg-white text-gray-900' : 'text-gray-300'}`}
-            style={BUTTON_RESET}
-          >
-            {t('chat.call.modeVad')}
-          </button>
-        </div>
-
-        {/* 메인 액션 */}
-        <div className="flex items-center gap-4">
-          {/* 탭 모드일 때만 마이크 버튼 표시. VAD는 자동이라 hands-free. */}
-          {/* 탭하여 시작 → 탭하여 정지로 토글. 녹음 중에는 정지(사각형) 아이콘으로 전환. */}
-          {mode === 'ptt' && (
-            <div className="relative">
-              {showFreeCallBadge && phase !== 'recording' && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow whitespace-nowrap pointer-events-none">
-                  {t('chat.call.freeCount', { count: remainingFreeCalls })}
-                </span>
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (phase === 'recording') stopTalking()
-                  else startTalking()
-                }}
-                disabled={!canSpeak || isConnecting}
-                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all select-none disabled:opacity-40 ${
-                  phase === 'recording'
-                    ? 'bg-red-500 scale-110 shadow-[0_0_40px_rgba(239,68,68,0.6)]'
-                    : showFreeCallBadge
-                      ? 'bg-emerald-300 shadow-[0_0_24px_rgba(110,231,183,0.5)]'
-                      : 'bg-white'
-                }`}
-                style={BUTTON_RESET}
-                aria-label={phase === 'recording' ? t('chat.call.release') : t('chat.call.tapToTalk')}
-              >
-                {phase === 'recording' ? (
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="white" aria-hidden="true">
-                    <rect x="6" y="6" width="12" height="12" rx="2" />
-                  </svg>
-                ) : (
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="9" y="2" width="6" height="12" rx="3" />
-                    <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="22" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          )}
-
           <button
             onClick={() => { disconnect(); onClose?.() }}
-            className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg"
+            className="w-12 h-12 flex-shrink-0 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg"
             style={BUTTON_RESET}
             aria-label={t('chat.call.end')}
           >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" transform="rotate(135 12 12)" />
             </svg>
           </button>

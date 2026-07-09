@@ -242,6 +242,8 @@
       "listening": "Listening...",
       "thinking": "Generating response...",
       "speaking": "Speaking",
+      "inputPlaceholder": "Type a message",
+      "send": "Send",
       "tapToTalk": "Tap to start",
       "release": "Tap to stop",
       "modePtt": "Tap to talk",
