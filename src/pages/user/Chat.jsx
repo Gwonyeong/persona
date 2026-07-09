@@ -951,9 +951,12 @@ export default function Chat() {
     playFromQueue()
   }, [stopAllPlayback, playFromQueue])
 
-  const send = async () => {
-    if (!input.trim() || sending) return
-    const text = input.trim()
+  // overrideText가 문자열이면 그 텍스트를 즉시 전송(추천답변 클릭 등). 아니면 입력창(input) 값 전송.
+  // (onClick={send}로 이벤트가 넘어오는 경우도 문자열이 아니므로 input 경로로 처리됨)
+  const send = async (overrideText) => {
+    if (sending) return
+    const text = (typeof overrideText === 'string' ? overrideText : input).trim()
+    if (!text) return
     const feedToSend = attachedFeed
     setInput('')
     setSuggestedReplies(null)
@@ -1340,20 +1343,6 @@ export default function Chat() {
   }, [input])
 
   // 추천답변 칩 클릭 → 입력창 채우기(편집 후 전송). 즉시 전송하지 않음.
-  const fillSuggestion = useCallback((text) => {
-    if (!text) return
-    const v = String(text).slice(0, 300)
-    setInput(v)
-    requestAnimationFrame(() => {
-      const ta = textareaRef.current
-      if (!ta) return
-      ta.focus()
-      ta.setSelectionRange(v.length, v.length)
-      ta.style.height = 'auto'
-      ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
-    })
-  }, [])
-
   // 채팅 투어 (early return 위에 hook 호출 — Rules of Hooks)
   const tourActive = !!user && !user.onboardingState?.chatTour
   const tourSteps = useMemo(() => [
@@ -1914,7 +1903,7 @@ export default function Chat() {
             {suggestedReplies.question && (
               <button
                 type="button"
-                onClick={() => fillSuggestion(suggestedReplies.question)}
+                onClick={() => send(suggestedReplies.question)}
                 className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-gray-800 border border-gray-700 text-gray-200 hover:border-indigo-500 hover:text-white transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
@@ -1924,7 +1913,7 @@ export default function Chat() {
             {suggestedReplies.normal && (
               <button
                 type="button"
-                onClick={() => fillSuggestion(suggestedReplies.normal)}
+                onClick={() => send(suggestedReplies.normal)}
                 className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-gray-800 border border-gray-700 text-gray-200 hover:border-indigo-500 hover:text-white transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
@@ -1948,7 +1937,7 @@ export default function Chat() {
               suggestedReplies.sexual && (
                 <button
                   type="button"
-                  onClick={() => fillSuggestion(suggestedReplies.sexual)}
+                  onClick={() => send(suggestedReplies.sexual)}
                   className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-rose-900/40 border border-rose-700/50 text-rose-200 hover:border-rose-400 hover:text-rose-100 transition-colors"
                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 >
