@@ -242,6 +242,8 @@
       "listening": "聞いています...",
       "thinking": "応答を作成中...",
       "speaking": "話しています",
+      "inputPlaceholder": "メッセージを入力",
+      "send": "送信",
       "tapToTalk": "タップして開始",
       "release": "タップして停止",
       "modePtt": "タップして話す",

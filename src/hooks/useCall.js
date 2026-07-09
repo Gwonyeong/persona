@@ -4,121 +4,43 @@ import i18n from '../i18n'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
-// 통화 phase
-// idle: 종료/시작 전 / connecting: 마이크 권한·세션 준비
-// listening: 마이크 입력 대기 (PTT 누르기 전 / VAD 침묵)
-// recording: 사용자가 말하는 중 (오디오 청크 누적)
-// sending: 서버 처리 중 (STT → AI → TTS)
-// speaking: 캐릭터 음성 재생 중
-export const CALL_PHASES = ['idle', 'connecting', 'listening', 'recording', 'sending', 'speaking']
-
-const VAD_OPTIONS = {
-  // 음성 임계치(RMS 0~1). 마이크/환경에 따라 조정.
-  threshold: 0.02,
-  // 말 시작으로 인정하는 누적 시간 (ms) — 잡음 무시
-  minSpeechMs: 200,
-  // 침묵 지속이 이만큼 되면 발화 종료로 판단
-  silenceMs: 700,
-  // 임계치 측정 간격
-  pollMs: 60,
-}
-
-// MediaRecorder가 지원하는 첫 mime 선택. iOS Safari/WebView 호환성.
-function pickMimeType() {
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-    'audio/ogg;codecs=opus',
-  ]
-  if (typeof MediaRecorder === 'undefined') return ''
-  for (const m of candidates) {
-    try {
-      if (MediaRecorder.isTypeSupported(m)) return m
-    } catch {}
-  }
-  return ''
-}
+// 통화 phase (텍스트 입력 버전 — STT 실패가 통화 이탈 최대 원인이라 음성 입력을 텍스트로 대체)
+// idle: 종료/시작 전 / connecting: 세션 준비
+// ready: 유저 입력(텍스트) 대기 / sending: 서버 처리 중 (AI → TTS) / speaking: 캐릭터 음성 재생 중
+export const CALL_PHASES = ['idle', 'connecting', 'ready', 'sending', 'speaking']
 
 /**
- * 음성 통화 훅.
+ * 통화 훅 (텍스트 입력 → 캐릭터 음성 응답).
+ * 유저는 텍스트로 보내고, 캐릭터는 그대로 음성(TTS)으로 답한다.
  *
  * @param {object} options
  * @param {number} options.conversationId
- * @param {'ptt'|'vad'} options.mode  - PTT / VAD 토글 (마이크 입력 방식)
- * @param {'simple'|'continue'} [options.callMode='continue']  - 서버 측 통화 모드. simple=컨텍스트 무시, continue=채팅 흐름 이어가기
+ * @param {'simple'|'continue'} [options.callMode='continue']  - simple=컨텍스트 무시, continue=채팅 흐름 이어가기
  * @param {function} [options.onTurnComplete]  - 한 턴 완료 시 ({ userText, charText, audioUrl })
  * @param {function} [options.onError]  - ({ code, message })
  */
-export default function useCall({ conversationId, mode = 'ptt', callMode = 'continue', onTurnComplete, onError } = {}) {
+export default function useCall({ conversationId, callMode = 'continue', onTurnComplete, onError } = {}) {
   const [phase, setPhase] = useState('idle')
   const [transcript, setTranscript] = useState(null)
   const [aiText, setAiText] = useState(null)
   // 서버가 LLM 응답 prefix 에서 추출한 캐릭터 감정. 표정 sprite 배경에 사용. 초기 NEUTRAL.
   const [aiEmotion, setAiEmotion] = useState('NEUTRAL')
-  // 통화 화면에서 대화 기록 노출용. sessionHistoryRef 의 reactive 미러.
-  // 형식: [{role: 'user' | 'assistant', content: string}]
+  // 통화 화면 대화 기록. [{role: 'user'|'assistant', content, audioUrl?}]
   const [sessionHistory, setSessionHistory] = useState([])
   const [error, setError] = useState(null)
 
-  const streamRef = useRef(null)
-  const recorderRef = useRef(null)
-  const chunksRef = useRef([])
-  const mimeTypeRef = useRef('')
-  const audioRef = useRef(null) // 재생용 Audio 엘리먼트 (재사용)
-  const abortRef = useRef(null) // 진행 중 fetch abort용
+  const audioRef = useRef(null)   // 재생용 Audio 엘리먼트 (재사용)
+  const abortRef = useRef(null)   // 진행 중 fetch abort용
+  const sendingRef = useRef(false) // 동시 전송 방지
   // simple 모드 전용 in-memory 통화 히스토리. connect 시 초기화, disconnect 시 휘발.
-  // continue 모드에서는 서버가 conversation.messages를 직접 보므로 사용 안 함.
   const sessionHistoryRef = useRef([])
-  // 캐릭터가 능동적으로 질문할 확률(0~100). 통화 세션 단위로 관리.
-  // 매 턴 서버로 전송 → 서버 응답의 nextQuestionChance로 업데이트.
+  // 캐릭터가 능동적으로 질문할 확률(0~100). 매 턴 서버로 전송 → 응답의 nextQuestionChance로 갱신.
   const questionChanceRef = useRef(30)
 
-  // VAD 관련
-  const audioCtxRef = useRef(null)
-  const analyserRef = useRef(null)
-  const vadIntervalRef = useRef(null)
-  const speechStartedAtRef = useRef(null)
-  const silenceStartedAtRef = useRef(null)
-
-  // 가장 최신 mode 값을 ref로 — VAD interval 안에서 클로저 stale 방지
-  const modeRef = useRef(mode)
-  useEffect(() => { modeRef.current = mode }, [mode])
-
-  // PTT는 user-driven, VAD는 자동. phase를 ref로도 추적해서 VAD interval이 phase에 따라 동작 결정.
   const phaseRef = useRef(phase)
   useEffect(() => { phaseRef.current = phase }, [phase])
 
-  const cleanupRecorder = useCallback(() => {
-    const rec = recorderRef.current
-    if (rec && rec.state !== 'inactive') {
-      try { rec.stop() } catch {}
-    }
-    recorderRef.current = null
-    chunksRef.current = []
-  }, [])
-
-  const stopVAD = useCallback(() => {
-    if (vadIntervalRef.current) {
-      clearInterval(vadIntervalRef.current)
-      vadIntervalRef.current = null
-    }
-    speechStartedAtRef.current = null
-    silenceStartedAtRef.current = null
-  }, [])
-
   const fullCleanup = useCallback(() => {
-    cleanupRecorder()
-    stopVAD()
-    if (audioCtxRef.current) {
-      try { audioCtxRef.current.close() } catch {}
-      audioCtxRef.current = null
-      analyserRef.current = null
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => { try { t.stop() } catch {} })
-      streamRef.current = null
-    }
     if (audioRef.current) {
       try { audioRef.current.pause() } catch {}
       audioRef.current.src = ''
@@ -128,35 +50,48 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       try { abortRef.current.abort() } catch {}
       abortRef.current = null
     }
-  }, [cleanupRecorder, stopVAD])
+    sendingRef.current = false
+  }, [])
 
   // 컴포넌트 언마운트 시 항상 정리
   useEffect(() => fullCleanup, [fullCleanup])
 
-  // 서버로 한 턴 전송 (SSE 응답을 직접 파싱).
-  const sendTurn = useCallback(async (audioBlob) => {
-    if (!audioBlob || audioBlob.size === 0) {
-      // 비어있는 녹음은 무시하고 listening으로 복귀
-      setPhase((p) => (p === 'idle' ? p : 'listening'))
-      return
-    }
+  const playAudio = useCallback((url) => {
+    return new Promise((resolve) => {
+      if (!audioRef.current) audioRef.current = new Audio()
+      const audio = audioRef.current
+      audio.src = url
+      const onEnd = () => { audio.removeEventListener('ended', onEnd); audio.removeEventListener('error', onEnd); resolve() }
+      audio.addEventListener('ended', onEnd)
+      audio.addEventListener('error', onEnd)
+      audio.play().catch(() => resolve())
+    })
+  }, [])
+
+  // 서버로 한 턴 전송 (텍스트 → SSE 응답 파싱 → 캐릭터 음성 재생).
+  const sendText = useCallback(async (rawText) => {
+    const text = (rawText || '').trim()
+    if (!text) return
+    if (sendingRef.current) return
+    if (phaseRef.current === 'idle' || phaseRef.current === 'connecting') return
+    sendingRef.current = true
+
+    // 이전 턴 음성이 재생 중이면 멈춘다.
+    if (audioRef.current) { try { audioRef.current.pause() } catch {} }
 
     setPhase('sending')
     setTranscript(null)
     setAiText(null)
-    // 다음 emotion 이 도착하기 전까지는 직전 표정 유지 (배경이 깜빡이지 않게).
-    // 명시적으로 reset 하지 않음 — 서버는 매 턴 emotion 이벤트를 1회 송신해 자동 overwrite.
 
     const token = useStore.getState().token
-    const fd = new FormData()
-    fd.append('audio', audioBlob, `call-${Date.now()}.${mimeTypeRef.current.includes('mp4') ? 'm4a' : 'webm'}`)
-    fd.append('mode', callMode)
-    if (callMode === 'simple' && sessionHistoryRef.current.length > 0) {
-      // 통화 세션 내부의 직전 발화들을 LLM에 함께 전달.
-      // 서버가 길이 제한·검증 후 사용하므로 클라는 raw 누적치 그대로 전송.
-      fd.append('sessionHistory', JSON.stringify(sessionHistoryRef.current))
+    const payload = {
+      text,
+      mode: callMode,
+      questionChance: questionChanceRef.current,
     }
-    fd.append('questionChance', String(questionChanceRef.current))
+    if (callMode === 'simple' && sessionHistoryRef.current.length > 0) {
+      payload.sessionHistory = sessionHistoryRef.current
+    }
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -167,31 +102,31 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         method: 'POST',
         headers: {
           Authorization: token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
           Accept: 'text/event-stream',
           'Accept-Language': i18n.language || 'en',
         },
-        body: fd,
+        body: JSON.stringify(payload),
         signal: controller.signal,
       })
     } catch (err) {
+      sendingRef.current = false
       if (err.name === 'AbortError') return
-      const payload = { code: 'NETWORK', message: err.message }
-      setError(payload)
-      onError?.(payload)
-      setPhase('listening')
+      const p = { code: 'NETWORK', message: err.message }
+      setError(p); onError?.(p)
+      setPhase((ph) => (ph === 'idle' ? ph : 'ready'))
       return
     }
 
     if (!res.ok || !res.body) {
-      const text = await res.text().catch(() => '')
+      sendingRef.current = false
+      const body = await res.text().catch(() => '')
       let code = 'CALL_FAILED'
       if (res.status === 402) code = 'INSUFFICIENT_MASKS'
       else if (res.status === 403) code = 'SUBSCRIPTION_REQUIRED'
-      else if (res.status === 413) code = 'AUDIO_TOO_LARGE'
-      const payload = { code, message: text || `HTTP ${res.status}` }
-      setError(payload)
-      onError?.(payload)
-      setPhase('listening')
+      const p = { code, message: body || `HTTP ${res.status}` }
+      setError(p); onError?.(p)
+      setPhase((ph) => (ph === 'idle' ? ph : 'ready'))
       return
     }
 
@@ -208,15 +143,12 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
 
     // === streaming audio queue (audio-chunk 이벤트용) ===
     // 서버가 문장 단위 mp3 chunk 를 base64 로 보내면 도착 즉시 큐에 넣고 순차 재생.
-    // 첫 chunk 도착 시 phase='speaking' 으로 전환 → 텍스트 도착 전이라도 UI 갱신.
-    // chunk 사이에 CHUNK_GAP_MS 만큼 짧은 호흡 — 사람이 말하는 자연스러운 띄어쓰기.
-    // 단, 마지막 chunk(stream 종료 + queue 빔) 뒤에는 지연 없이 즉시 listening 복귀.
     const CHUNK_GAP_MS = 1000
-    const chunkQueue = []        // 대기 중인 Blob URL 들 (FIFO)
+    const chunkQueue = []
     let firstAudioStarted = false
     let aborted = false
-    let streamEnded = false      // SSE 스트림이 닫혔는지 — "마지막 chunk" 판정에 사용
-    let processingPromise = null // 현재 동작 중인 큐 처리 루프 (null 이면 idle)
+    let streamEnded = false
+    let processingPromise = null
     const blobUrlsToRevoke = []
 
     const base64ToBlobUrl = (base64) => {
@@ -248,7 +180,6 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       while (true) {
         if (aborted) return
         if (chunkQueue.length === 0) {
-          // 큐가 비었는데 스트림이 끝났으면 완전 종료. 아니면 다음 chunk 를 짧게 기다림.
           if (streamEnded) return
           await new Promise((r) => setTimeout(r, 50))
           continue
@@ -260,7 +191,6 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         }
         await playOne(url)
         if (aborted) return
-        // 마지막 chunk(stream 종료 + queue 빔)면 지연 없이 종료 → listening 복귀가 빨라짐.
         if (chunkQueue.length === 0 && streamEnded) return
         await new Promise((r) => setTimeout(r, CHUNK_GAP_MS))
       }
@@ -277,51 +207,37 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       startProcessing()
     }
 
-    const handleEvent = (type, payload) => {
+    const handleEvent = (type, data) => {
       if (type === 'transcript') {
-        lastUserText = payload.text || ''
+        lastUserText = data.text || ''
         setTranscript(lastUserText)
       } else if (type === 'text-delta') {
-        // streaming 경로 — LLM 토큰 누적 표시. payload.delta 는 raw delta.
-        if (typeof payload.delta === 'string' && payload.delta) {
-          lastAiText = (lastAiText || '') + payload.delta
+        if (typeof data.delta === 'string' && data.delta) {
+          lastAiText = (lastAiText || '') + data.delta
           setAiText(lastAiText)
         }
       } else if (type === 'audio-chunk') {
-        // streaming 경로 — 도착 즉시 큐에 enqueue. 재생은 audioQueueChain 이 순차 처리.
-        enqueueAudioChunk(payload.audioBase64)
+        enqueueAudioChunk(data.audioBase64)
       } else if (type === 'text') {
-        // 비-스트리밍: 단일 전체 텍스트.
-        // 스트리밍: 마지막에 cleanCallTextForUI 가 마커 정리한 최종 텍스트로 overwrite.
-        lastAiText = payload.text || ''
+        lastAiText = data.text || ''
         setAiText(lastAiText)
-        setPhase('speaking') // 곧 오디오 도착 예정 → 미리 phase 전환해 UI 자연스럽게
+        setPhase('speaking')
       } else if (type === 'emotion') {
-        // 서버가 [EMOTION:XXX] prefix 에서 추출한 캐릭터 감정 (NEUTRAL/HAPPY/.../AROUSED_*).
-        // 화면 배경 sprite 결정에 사용. safety OFF 일 때만 AROUSED_* 가능.
-        if (typeof payload.emotion === 'string' && payload.emotion) {
-          setAiEmotion(payload.emotion)
-        }
+        if (typeof data.emotion === 'string' && data.emotion) setAiEmotion(data.emotion)
       } else if (type === 'audio') {
-        lastAudioUrl = payload.audioUrl || null
-      } else if (type === 'empty') {
-        const p = { code: 'EMPTY_TRANSCRIPT', message: 'No speech detected' }
-        setError(p)
-        onError?.(p)
+        lastAudioUrl = data.audioUrl || null
+      } else if (type === 'blocked') {
+        const p = { code: 'MINOR_CONTENT_BLOCKED', message: data.error }
+        setError(p); onError?.(p)
       } else if (type === 'error') {
-        const p = { code: payload.error || 'CALL_FAILED', message: payload.error }
-        setError(p)
-        onError?.(p)
+        const p = { code: data.error || 'CALL_FAILED', message: data.error }
+        setError(p); onError?.(p)
       } else if (type === 'done') {
-        // 다음 턴 질문 확률 업데이트 (서버에서 계산해 반환)
-        if (typeof payload.nextQuestionChance === 'number') {
-          questionChanceRef.current = payload.nextQuestionChance
+        if (typeof data.nextQuestionChance === 'number') questionChanceRef.current = data.nextQuestionChance
+        if (typeof data.freeCallUses === 'number') {
+          lastFreeCallUses = data.freeCallUses
+          consumedFreeUse = !!data.consumedFreeUse
         }
-        if (typeof payload.freeCallUses === 'number') {
-          lastFreeCallUses = payload.freeCallUses
-          consumedFreeUse = !!payload.consumedFreeUse
-        }
-        // 그 외 처리는 stream close 후 audio 재생까지 끝낸 다음
       }
     }
 
@@ -351,18 +267,15 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       if (err.name === 'AbortError') {
         aborted = true
       } else {
-        const payload = { code: 'STREAM_ERROR', message: err.message }
-        setError(payload)
-        onError?.(payload)
+        const p = { code: 'STREAM_ERROR', message: err.message }
+        setError(p); onError?.(p)
       }
     }
     abortRef.current = null
 
-    // 오디오 재생 완료까지 대기 후 listening 복귀.
-    // - streaming 경로: 큐 루프가 마지막 chunk 까지 재생 후 종료. streamEnded 신호를 켜고 await.
-    // - 비-스트리밍 폴백(흥분 모드 등): chunk 없이 단일 audio URL 만 옴 → 기존 playAudio 로 재생.
+    // 오디오 재생 완료까지 대기 후 ready 복귀.
     streamEnded = true
-    startProcessing() // 루프가 idle 이면 streamEnded 를 보고 즉시 정리되도록 1회 더 트리거
+    startProcessing()
     if (!aborted) {
       try {
         if (firstAudioStarted || chunkQueue.length > 0) {
@@ -374,15 +287,11 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
         console.warn('[Call] audio playback failed:', err)
       }
     }
-    // streaming 에서 생성한 blob URL 들 해제.
     for (const u of blobUrlsToRevoke) {
       try { URL.revokeObjectURL(u) } catch {}
     }
 
-    // 통화 세션 in-memory 히스토리 누적 (simple 모드용). 양쪽 모두 있을 때만.
-    // ref 는 sendTurn 의 동기 클로저용, state 는 UI 렌더용 — 둘 다 동기화 유지.
-    // 누적 후 transcript/aiText 는 비워서 통화 화면 미리보기 박스가 (live + history) 중복 노출되지 않도록 한다.
-    // assistant 항목에 audioUrl 도 포함 — 박스 안에서 재생 버튼으로 재생할 수 있도록.
+    // 통화 세션 in-memory 히스토리 누적. 양쪽 다 있을 때만.
     if (lastUserText && lastAiText) {
       const assistantEntry = { role: 'assistant', content: lastAiText }
       if (lastAudioUrl) assistantEntry.audioUrl = lastAudioUrl
@@ -405,106 +314,9 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       consumedFreeUse,
     })
 
-    // 다음 턴 준비
-    setPhase((p) => (p === 'idle' ? p : 'listening'))
-    // VAD 모드면 silence 카운터 리셋
-    silenceStartedAtRef.current = null
-    speechStartedAtRef.current = null
-  }, [conversationId, callMode, onError, onTurnComplete])
-
-  const playAudio = useCallback((url) => {
-    return new Promise((resolve) => {
-      if (!audioRef.current) audioRef.current = new Audio()
-      const audio = audioRef.current
-      audio.src = url
-      const onEnd = () => { audio.removeEventListener('ended', onEnd); audio.removeEventListener('error', onEnd); resolve() }
-      audio.addEventListener('ended', onEnd)
-      audio.addEventListener('error', onEnd)
-      audio.play().catch(() => resolve())
-    })
-  }, [])
-
-  // VAD 루프 — listening 상태일 때만 RMS 측정해 음성 시작/종료 판정
-  const vadTick = useCallback(() => {
-    const analyser = analyserRef.current
-    if (!analyser) return
-    // VAD는 listening 상태일 때만 동작. recording/sending/speaking에서는 패스.
-    if (phaseRef.current !== 'listening' && phaseRef.current !== 'recording') return
-    if (modeRef.current !== 'vad') return
-
-    const buf = new Float32Array(analyser.fftSize)
-    analyser.getFloatTimeDomainData(buf)
-    let sum = 0
-    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i]
-    const rms = Math.sqrt(sum / buf.length)
-
-    const now = Date.now()
-    const speaking = rms > VAD_OPTIONS.threshold
-
-    if (phaseRef.current === 'listening') {
-      if (speaking) {
-        if (!speechStartedAtRef.current) speechStartedAtRef.current = now
-        if (now - speechStartedAtRef.current >= VAD_OPTIONS.minSpeechMs) {
-          // 발화 시작 → recording 진입
-          speechStartedAtRef.current = null
-          silenceStartedAtRef.current = null
-          startRecording()
-        }
-      } else {
-        speechStartedAtRef.current = null
-      }
-    } else if (phaseRef.current === 'recording') {
-      if (speaking) {
-        silenceStartedAtRef.current = null
-      } else {
-        if (!silenceStartedAtRef.current) silenceStartedAtRef.current = now
-        if (now - silenceStartedAtRef.current >= VAD_OPTIONS.silenceMs) {
-          // 발화 종료 → stopRecording (send 트리거)
-          silenceStartedAtRef.current = null
-          stopRecording()
-        }
-      }
-    }
-  }, [])
-
-  const startRecording = useCallback(() => {
-    if (!streamRef.current) return
-    if (recorderRef.current && recorderRef.current.state === 'recording') return
-    chunksRef.current = []
-    let rec
-    try {
-      rec = mimeTypeRef.current
-        ? new MediaRecorder(streamRef.current, { mimeType: mimeTypeRef.current })
-        : new MediaRecorder(streamRef.current)
-    } catch (err) {
-      const payload = { code: 'RECORDER_INIT', message: err.message }
-      setError(payload)
-      onError?.(payload)
-      return
-    }
-    rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data) }
-    rec.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeTypeRef.current || 'audio/webm' })
-      chunksRef.current = []
-      sendTurn(blob)
-    }
-    recorderRef.current = rec
-    try {
-      rec.start()
-      setPhase('recording')
-    } catch (err) {
-      const payload = { code: 'RECORDER_START', message: err.message }
-      setError(payload)
-      onError?.(payload)
-    }
-  }, [onError, sendTurn])
-
-  const stopRecording = useCallback(() => {
-    const rec = recorderRef.current
-    if (!rec || rec.state === 'inactive') return
-    try { rec.stop() } catch {}
-    recorderRef.current = null
-  }, [])
+    sendingRef.current = false
+    setPhase((p) => (p === 'idle' ? p : 'ready'))
+  }, [conversationId, callMode, onError, onTurnComplete, playAudio])
 
   const connect = useCallback(async () => {
     if (phase !== 'idle') return
@@ -512,14 +324,11 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     setTranscript(null)
     setAiText(null)
     setPhase('connecting')
-    // 세션 시작 시 in-memory 히스토리 초기화. simple 모드는 곧 서버에서 누적분을 받아 덮어쓴다.
     sessionHistoryRef.current = []
     setSessionHistory([])
-    // 질문 확률도 매 통화 세션마다 30%로 리셋.
     questionChanceRef.current = 30
 
-    // simple 모드: 이전 통화 세션 히스토리를 서버에서 받아 LLM 컨텍스트로 사용.
-    // 실패해도 빈 세션으로 진행 (block X). 이전 표정(lastEmotion) 도 함께 받아 sprite 복구.
+    // simple 모드: 이전 통화 세션 히스토리를 서버에서 받아 LLM 컨텍스트로 사용. 실패해도 빈 세션으로 진행.
     if (callMode === 'simple' && conversationId) {
       try {
         const token = useStore.getState().token
@@ -532,7 +341,6 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
             sessionHistoryRef.current = data.sessionHistory
             setSessionHistory(data.sessionHistory)
           }
-          // 이전 통화 마지막 CHARACTER 표정 → 통화 화면 sprite 즉시 복구.
           if (typeof data?.lastEmotion === 'string' && data.lastEmotion) {
             setAiEmotion(data.lastEmotion)
           }
@@ -542,65 +350,15 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
       }
     }
 
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      const payload = { code: 'UNSUPPORTED', message: 'mediaDevices not supported' }
-      setError(payload)
-      onError?.(payload)
-      setPhase('idle')
-      return
-    }
-
-    let stream
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      })
-    } catch (err) {
-      const payload = { code: 'PERMISSION_DENIED', message: err.message }
-      setError(payload)
-      onError?.(payload)
-      setPhase('idle')
-      return
-    }
-
-    streamRef.current = stream
-    mimeTypeRef.current = pickMimeType()
-
-    // AudioContext + Analyser — VAD/시각화 둘 다에 사용
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext
-      const ctx = new AudioCtx()
-      audioCtxRef.current = ctx
-      const source = ctx.createMediaStreamSource(stream)
-      const analyser = ctx.createAnalyser()
-      analyser.fftSize = 1024
-      analyserRef.current = analyser
-      source.connect(analyser)
-      vadIntervalRef.current = setInterval(vadTick, VAD_OPTIONS.pollMs)
-    } catch (err) {
-      console.warn('[Call] AudioContext setup failed (VAD disabled):', err)
-    }
-
-    setPhase('listening')
-  }, [onError, phase, vadTick, callMode, conversationId])
+    setPhase('ready')
+  }, [phase, callMode, conversationId])
 
   const disconnect = useCallback(() => {
     setPhase('idle')
     fullCleanup()
   }, [fullCleanup])
 
-  // PTT 컨트롤 — UI 버튼에서 호출
-  const startTalking = useCallback(() => {
-    if (phaseRef.current !== 'listening') return
-    startRecording()
-  }, [startRecording])
-
-  const stopTalking = useCallback(() => {
-    if (phaseRef.current !== 'recording') return
-    stopRecording()
-  }, [stopRecording])
-
-  // 진행 중 발화 취소 (사용자가 통화 종료 누른 경우 등)
+  // 진행 중 턴 취소 (음성 재생 중단 + fetch abort)
   const cancelTurn = useCallback(() => {
     if (abortRef.current) {
       try { abortRef.current.abort() } catch {}
@@ -609,19 +367,8 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     if (audioRef.current) {
       try { audioRef.current.pause() } catch {}
     }
-    cleanupRecorder()
-    setPhase((p) => (p === 'idle' ? p : 'listening'))
-  }, [cleanupRecorder])
-
-  // 현재 마이크 입력 레벨(0~1) — UI 시각화용. 가벼운 폴링 대신 분석기 직접 노출.
-  const getInputLevel = useCallback(() => {
-    const analyser = analyserRef.current
-    if (!analyser) return 0
-    const buf = new Float32Array(analyser.fftSize)
-    analyser.getFloatTimeDomainData(buf)
-    let sum = 0
-    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i]
-    return Math.min(1, Math.sqrt(sum / buf.length) * 4) // 4배 amplify (UI 표시용)
+    sendingRef.current = false
+    setPhase((p) => (p === 'idle' ? p : 'ready'))
   }, [])
 
   return {
@@ -633,9 +380,7 @@ export default function useCall({ conversationId, mode = 'ptt', callMode = 'cont
     error,
     connect,
     disconnect,
-    startTalking,
-    stopTalking,
+    sendText,
     cancelTurn,
-    getInputLevel,
   }
 }

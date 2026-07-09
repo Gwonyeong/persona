@@ -2,7 +2,6 @@ import { Fragment, useEffect, useState, useRef, useMemo, useCallback, memo } fro
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
-import { ensureMicPermission } from '../../lib/microphone'
 import { ensureAppUpToDate } from '../../lib/appUpdate'
 import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
@@ -691,22 +690,7 @@ export default function Chat() {
       }
       // 그 외 unexpected 에러는 차단하지 않고 통과
     }
-    // 통화 시트 열기 전에 마이크 권한 확보 — user activation이 살아있는 탭 핸들러 안에서 요청해야
-    // Android WebView가 시스템 다이얼로그를 안정적으로 띄운다.
-    try {
-      await ensureMicPermission()
-    } catch (err) {
-      if (err.code === 'PERMISSION_DENIED') {
-        setErrorToast(t('chat.call.permissionHint'))
-      } else if (err.code === 'UNSUPPORTED') {
-        setErrorToast(t('chat.call.errorSend'))
-      } else {
-        setErrorToast(t('chat.call.permissionDenied'))
-      }
-      if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
-      errorTimerRef.current = setTimeout(() => setErrorToast(null), 4000)
-      return
-    }
+    // 통화는 텍스트 입력 방식이라 마이크 권한이 필요 없다 (STT 제거). 바로 통화 시트를 연다.
     setShowCallChooser(true)
   }
   const { t, i18n } = useTranslation()
