@@ -1471,8 +1471,8 @@ export default function CharacterDetail() {
                   </div>
                 </div>
 
-                {/* 컨셉 채팅 카드 — V2 활성 캐릭터 + 한국어 UI일 때만 노출 (V2 화면은 아직 현지화 미완). */}
-                {(i18n.language || '').startsWith('ko') && v2Presets?.v2Enabled && v2Presets?.startingPresets?.length > 0 && (
+                {/* 컨셉 채팅(V2) — 신규 시작 중단 (2026-07, V1 집중). 이미 진행 중인 유저만 "이어하기" 노출. */}
+                {existingV2Conv && (
                   <div className="rounded-2xl border border-violet-500/40 bg-violet-500/8 p-4">
                     <div className="flex items-start gap-3 mb-3">
                       <span className="text-2xl leading-none mt-0.5">🎬</span>
@@ -1487,67 +1487,17 @@ export default function CharacterDetail() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {existingV2Conv ? (
-                        <>
-                          <button
-                            onClick={handleConceptResume}
-                            disabled={starting}
-                            className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
-                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            {t('character.continueStory')}
-                          </button>
-                          <button
-                            onClick={() => setChatModal({ open: true, step: 'confirm-concept' })}
-                            disabled={starting}
-                            className="px-3 py-2.5 text-[11px] text-violet-200 border border-violet-400/40 hover:bg-violet-400/10 disabled:opacity-50 rounded-xl transition-colors"
-                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            {t('character.restartConfirm')}
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => setChatModal({ open: true, step: 'preset' })}
-                          disabled={starting}
-                          className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
-                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                        >
-                          {t('character.startStory')}
-                        </button>
-                      )}
+                      <button
+                        onClick={handleConceptResume}
+                        disabled={starting}
+                        className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        {t('character.continueStory')}
+                      </button>
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {chatModal.step === 'preset' && v2Presets?.startingPresets?.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => setChatModal({ open: true, step: 'mode' })}
-                  disabled={starting}
-                  className="self-start text-[11px] text-gray-400 hover:text-white mb-1 flex items-center gap-1"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {t('character.backToModeSelect')}
-                </button>
-                {v2Presets.startingPresets.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleConceptPresetPick(p.id)}
-                    disabled={starting}
-                    className="text-left p-3.5 rounded-2xl border border-violet-500/40 bg-violet-500/8 hover:bg-violet-500/15 disabled:opacity-50 transition-colors"
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    <div className="text-sm font-semibold text-violet-100">{p.label}</div>
-                    <div className="text-[11px] text-violet-200/80 mt-1">{p.description}</div>
-                    <div className="text-[10px] text-violet-300/60 mt-1.5 flex gap-2 flex-wrap">
-                      <span>{t('character.familiarity')} {p.familiarity} · {t('character.affinity')} {p.affinity}</span>
-                      {p.userNickname && <span>· {t('character.nickname')} <strong className="text-violet-200">{p.userNickname}</strong></span>}
-                    </div>
-                  </button>
-                ))}
               </div>
             )}
 
