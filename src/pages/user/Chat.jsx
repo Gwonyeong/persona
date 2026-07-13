@@ -581,6 +581,13 @@ export default function Chat() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const scrollContainerRef = useRef(null)
   const topSentinelRef = useRef(null)
+  // 서버 히스토리 페이지네이션 — 초기엔 최근 PAGE_SIZE개만 받고, 위로 스크롤 시 이전 청크를 서버에서 로드.
+  // windowStartRef = 현재 로드된 window의 raw 배열 절대 시작 인덱스(서버 before 커서로 사용).
+  const [hasMoreBefore, setHasMoreBefore] = useState(false)
+  const windowStartRef = useRef(0)
+  const loadingOlderRef = useRef(false)
+  // 채팅창에 렌더되는 메시지 role — 초기 로드/이전 청크 로드에서 동일하게 필터링.
+  const isRenderable = (m) => ['CHARACTER', 'USER', 'GENERATED_IMAGE', 'NARRATION', 'GIFT'].includes(m.role)
   const [input, setInput] = useState('')
   const textareaRef = useRef(null)
   const [sending, setSending] = useState(false)
@@ -743,20 +750,47 @@ export default function Chat() {
   const visibleMessages = useMemo(() => messages.slice(visibleStart), [messages, visibleStart])
 
   // 위로 스크롤 시 더 로드 (스크롤 위치 보존)
-  const loadMore = useCallback(() => {
+  // 1) 로드된 메시지 중 아직 안 그린 게 있으면 그것부터 노출(네트워크 X)
+  // 2) 다 그렸는데 서버에 이전 청크가 더 있으면 서버에서 fetch해 앞에 prepend
+  const loadMore = useCallback(async () => {
     const container = scrollContainerRef.current
     if (!container) return
     const prevHeight = container.scrollHeight
     const prevTop = container.scrollTop
-    setVisibleCount((c) => Math.min(messages.length, c + PAGE_SIZE))
-    requestAnimationFrame(() => {
-      const newHeight = container.scrollHeight
-      container.scrollTop = newHeight - prevHeight + prevTop
+    const restoreScroll = () => requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight - prevHeight + prevTop
     })
-  }, [messages.length])
+
+    if (visibleStart > 0) {
+      setVisibleCount((c) => Math.min(messages.length, c + PAGE_SIZE))
+      restoreScroll()
+      return
+    }
+
+    if (!hasMoreBefore || loadingOlderRef.current) return
+    loadingOlderRef.current = true
+    try {
+      const { conversation: conv } = await api.get(
+        `/conversations/${id}/messages?limit=${PAGE_SIZE}&before=${windowStartRef.current}`
+      )
+      windowStartRef.current = conv.messageWindowStart ?? 0
+      setHasMoreBefore(!!conv.hasMoreBefore)
+      const older = (conv.messages || []).filter(isRenderable)
+      if (older.length) {
+        setMessages((prev) => [...older, ...prev])
+        setVisibleCount((c) => c + older.length)
+        restoreScroll()
+      }
+    } catch {
+      // 이전 청크 로드 실패는 조용히 무시 (다음 스크롤에서 재시도)
+    } finally {
+      loadingOlderRef.current = false
+    }
+  }, [visibleStart, messages.length, hasMoreBefore, id])
 
   useEffect(() => {
-    if (visibleStart === 0) return
+    // 로컬에 안 그린 게 남았거나(visibleStart>0), 서버에 이전 청크가 더 있으면 옵저버 부착.
+    if (visibleStart === 0 && !hasMoreBefore) return
     const sentinel = topSentinelRef.current
     if (!sentinel) return
     const observer = new IntersectionObserver((entries) => {
@@ -764,7 +798,7 @@ export default function Chat() {
     }, { threshold: 0, root: scrollContainerRef.current, rootMargin: '200px 0px 0px 0px' })
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [visibleStart, loadMore])
+  }, [visibleStart, hasMoreBefore, loadMore])
 
   // 최근 응답의 마지막 CHARACTER 인덱스 + 해당 응답의 audioUrl 목록
   const { lastCharIdx, latestResponseAudios } = useMemo(() => {
@@ -828,8 +862,11 @@ export default function Chat() {
   useEffect(() => {
     initialLoadRef.current = true
     refetchCallSessionMeta()
-    api.get(`/conversations/${id}/messages`).then(({ conversation: conv, seenRecords }) => {
+    api.get(`/conversations/${id}/messages?limit=${PAGE_SIZE}`).then(({ conversation: conv, seenRecords }) => {
       setConversation(conv)
+      // 히스토리 페이지네이션 상태 초기화 — 이전 청크 로드용 커서/플래그.
+      windowStartRef.current = conv.messageWindowStart ?? 0
+      setHasMoreBefore(!!conv.hasMoreBefore)
       // 채팅 스타일 on/off 상태 — 표정 매칭 풀 + 신규 인디케이터에 사용
       if (conv?.characterId) {
         api
@@ -854,7 +891,7 @@ export default function Chat() {
       setSpriteMode(['FULL', 'BUBBLE', 'BACKGROUND', 'OFF'].includes(conv.spriteMode) ? conv.spriteMode : 'BUBBLE')
       setChatMode(conv.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
-      setMessages(conv.messages.filter((m) => m.role === 'CHARACTER' || m.role === 'USER' || m.role === 'GENERATED_IMAGE' || m.role === 'NARRATION' || m.role === 'GIFT'))
+      setMessages(conv.messages.filter(isRenderable))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       // 추천답변: 대화의 마지막 발화가 캐릭터일 때(=유저 차례)만 그 메시지의 suggestedReplies 노출
