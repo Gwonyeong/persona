@@ -85,7 +85,7 @@ export default function InsufficientMasksModal({ open, onClose, currentStyle, sp
             className="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-100 text-sm font-medium transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            무료 구독으로 바로 30개 충전하기
+            구독으로 바로 30개 충전하기
           </button>
         </div>
       </div>
