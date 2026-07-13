@@ -1479,8 +1479,13 @@ export default function Chat() {
       setVideoUnlockedImageIds((prev) => new Set([...prev, latestCharacterSprite.id]))
       if (res.masks !== undefined) setUser({ ...user, masks: res.masks })
     } catch (err) {
-      if (err?.error === 'INSUFFICIENT_MASKS') {
+      // 서버는 마스크 부족 시 402 { error: 'Insufficient masks' } 반환 → api.js가 err.message에 담는다.
+      // (다른 소비 핸들러(message/image/tts)와 동일한 판정 방식)
+      if (err.message?.includes('Insufficient masks')) {
         setInsufficientMasksFor('emotionVideo')
+      } else {
+        console.error('Unlock emotion video error:', err)
+        showError(t('chat.errorVideoUnlock', { defaultValue: '영상 해금에 실패했어요' }))
       }
     } finally {
       setUnlockingVideo(false)
