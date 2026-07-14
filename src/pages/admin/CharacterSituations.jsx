@@ -44,6 +44,11 @@ export default function CharacterSituations() {
   const [preview, setPreview] = useState(null) // 생성 결과 (배열) — 모달
   const [expanded, setExpanded] = useState({}) // cardId → bool
   const [error, setError] = useState('')
+  // 생성 옵션 모달
+  const [genOpen, setGenOpen] = useState(false)
+  const [baseCount, setBaseCount] = useState(3)
+  const [specialPerStyle, setSpecialPerStyle] = useState(1)
+  const [specialStyleIds, setSpecialStyleIds] = useState([]) // 특별 카드 만들 스타일 id
 
   const load = async () => {
     setLoading(true)
@@ -68,6 +73,7 @@ export default function CharacterSituations() {
     return m
   }, [styles])
   const defaultStyle = useMemo(() => styles.find((s) => s.unlockMode === 'DEFAULT') || styles[0], [styles])
+  const unlockableStyles = useMemo(() => styles.filter((s) => s.unlockMode === 'GACHA' || s.unlockMode === 'SHOP'), [styles])
 
   // 카드가 사용하는 스타일 + 연결된 표정 이미지 리스트
   const linkFor = (card) => {
@@ -105,11 +111,26 @@ export default function CharacterSituations() {
     }
   }
 
+  const openGenConfig = () => {
+    // 특별 카드 대상: 기본으로 모든 해금형 스타일 선택
+    setSpecialStyleIds(unlockableStyles.map((s) => s.id))
+    setError('')
+    setGenOpen(true)
+  }
+
+  const toggleStyle = (sid) =>
+    setSpecialStyleIds((prev) => (prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]))
+
   const generate = async () => {
     setGenerating(true)
     setError('')
     try {
-      const { cards: gen } = await api.post(`/admin/characters/${id}/situation-cards/generate`, {})
+      const { cards: gen } = await api.post(`/admin/characters/${id}/situation-cards/generate`, {
+        baseCount,
+        specialPerStyle,
+        specialStyleIds,
+      })
+      setGenOpen(false)
       setPreview(Array.isArray(gen) ? gen : [])
     } catch (e) {
       setError(e.message || 'Gemini 생성 실패')
@@ -141,7 +162,7 @@ export default function CharacterSituations() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={generate}
+            onClick={openGenConfig}
             disabled={generating}
             className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-50"
             style={btn}
@@ -275,6 +296,93 @@ export default function CharacterSituations() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* 생성 옵션 모달 */}
+      {genOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !generating && setGenOpen(false)}>
+          <div className="w-full max-w-md rounded-xl bg-gray-900 border border-gray-700 p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-white">Gemini 자동생성 옵션</h2>
+              <button onClick={() => !generating && setGenOpen(false)} className="text-gray-400 hover:text-white" style={btn}>✕</button>
+            </div>
+
+            {/* 개수 */}
+            <div className="flex gap-3 mb-4">
+              <label className="flex-1">
+                <div className="text-xs text-gray-400 mb-1">기본 카드 수 (DEFAULT 스타일)</div>
+                <input
+                  type="number" min={0} max={10} value={baseCount}
+                  onChange={(e) => setBaseCount(Math.max(0, Math.min(10, parseInt(e.target.value) || 0)))}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-800 text-white border border-gray-700"
+                  style={btn}
+                />
+                <div className="text-[10px] text-gray-500 mt-1">2장 이상이면 SFW 1 + 나머지 NSFW</div>
+              </label>
+              <label className="flex-1">
+                <div className="text-xs text-gray-400 mb-1">스타일당 특별 카드 수</div>
+                <input
+                  type="number" min={1} max={5} value={specialPerStyle}
+                  onChange={(e) => setSpecialPerStyle(Math.max(1, Math.min(5, parseInt(e.target.value) || 1)))}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-800 text-white border border-gray-700"
+                  style={btn}
+                />
+                <div className="text-[10px] text-gray-500 mt-1">선택한 스타일마다 NSFW 특별 카드</div>
+              </label>
+            </div>
+
+            {/* 참고 스타일(특별 카드 대상) */}
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 mb-2">특별 카드 참고 스타일 (해금형)</div>
+              {defaultStyle && (
+                <div className="text-[11px] text-gray-500 mb-2">
+                  기본 카드는 <span className="text-gray-300">{defaultStyle.name}</span>
+                  <span className="text-gray-600"> [DEFAULT]</span> 복장 기준으로 생성됩니다.
+                </div>
+              )}
+              {unlockableStyles.length === 0 ? (
+                <div className="text-[11px] text-gray-600">해금형 스타일이 없어 특별 카드는 만들 수 없습니다.</div>
+              ) : (
+                <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                  {unlockableStyles.map((s) => {
+                    const on = specialStyleIds.includes(s.id)
+                    const emos = [...new Set((s.images || []).map((i) => i.emotion))]
+                    return (
+                      <label
+                        key={s.id}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer border ${
+                          on ? 'bg-fuchsia-500/10 border-fuchsia-500/40' : 'bg-gray-800/50 border-gray-800'
+                        }`}
+                      >
+                        <input type="checkbox" checked={on} onChange={() => toggleStyle(s.id)} className="accent-fuchsia-500" />
+                        <span className="text-sm text-white">{s.name}</span>
+                        <span className="text-[10px] text-gray-500">[{s.unlockMode}]</span>
+                        <span className="text-[10px] text-gray-600 ml-auto">표정 {emos.length}종</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="text-[11px] text-gray-500 mb-4">
+              예상 생성: 기본 {baseCount}장{specialStyleIds.length > 0 ? ` + 특별 ${specialStyleIds.length * specialPerStyle}장` : ''} ={' '}
+              <b className="text-gray-300">{baseCount + specialStyleIds.length * specialPerStyle}장</b>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={() => setGenOpen(false)} disabled={generating} className="px-4 py-2 text-sm bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 disabled:opacity-50" style={btn}>취소</button>
+              <button
+                onClick={generate}
+                disabled={generating || baseCount + specialStyleIds.length * specialPerStyle === 0}
+                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-50"
+                style={btn}
+              >
+                {generating ? '생성 중…' : '생성'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
