@@ -81,7 +81,8 @@ export default function Home() {
     if (token) {
       api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
       api.get('/notifications/unread-count').then(({ count }) => setUnreadNotifCount(count)).catch(() => {})
-      api.get('/mask-pass').then(({ unclaimedEligibleCount }) => setUnclaimedPassCount(unclaimedEligibleCount || 0)).catch(() => {})
+      // 홈 뱃지엔 unclaimedEligibleCount만 필요 → minimal 모드로 무거운 tier 전체 응답 회피
+      api.get('/mask-pass?minimal=true').then(({ unclaimedEligibleCount }) => setUnclaimedPassCount(unclaimedEligibleCount || 0)).catch(() => {})
       // 가챠 박스 전체 무료 잔여 합계 + 메인 박스 ID 캐시 — 성인인증 안 된 유저는 403이라 catch로 무시
       api
         .get('/gacha/boxes')

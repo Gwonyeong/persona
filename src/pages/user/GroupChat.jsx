@@ -56,6 +56,7 @@ export default function GroupChat() {
   // 키: `${turnIdx}_${bubbleIdx}` → { turnIdx, characterId, bubbleIdx, role, content, complete }
   const [streamingBubbles, setStreamingBubbles] = useState([])
   const [presenceModeToast, setPresenceModeToast] = useState(null) // 'PHONE_AUTO' | 'PHONE' | 'IN_PERSON' | null
+  const [blockToast, setBlockToast] = useState(null) // 검열 차단 안내 메시지(문자열) | null
   const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -231,6 +232,12 @@ export default function GroupChat() {
         messages: (prev.messages || []).filter((m) => m !== userMsg),
       }) : prev)
       setStreamingBubbles([])
+      // 미성년 성적 콘텐츠 검열 차단 — 메시지 증발이 아니라 검열임을 명확히 안내(V1 채팅과 동일 토스트).
+      if (err.data?.error === 'MINOR_CONTENT_BLOCKED' || err.message === 'MINOR_CONTENT_BLOCKED') {
+        setSending(false)
+        setBlockToast(err.data?.warned ? t('chat.minorBlockedWarned') : t('chat.minorBlocked'))
+        return
+      }
       // 마스크 부족(402) → 마스크 상점으로 이동. 재시도해도 의미 없으므로 즉시 분기.
       if (err.message?.includes('Insufficient masks')) {
         setSending(false)
@@ -277,6 +284,12 @@ export default function GroupChat() {
     const t = setTimeout(() => setPresenceModeToast(null), 3000)
     return () => clearTimeout(t)
   }, [presenceModeToast])
+
+  useEffect(() => {
+    if (!blockToast) return
+    const timer = setTimeout(() => setBlockToast(null), 5000)
+    return () => clearTimeout(timer)
+  }, [blockToast])
 
   async function toggleMember(characterId, nextActive) {
     if (!groupChat) return
@@ -523,6 +536,13 @@ export default function GroupChat() {
             : presenceModeToast === 'IN_PERSON'
               ? t('groupChat.presenceMode.switchedToInPerson')
               : t('groupChat.presenceMode.switchedToPhone')}
+        </div>
+      )}
+
+      {/* 검열 차단 토스트 — 미성년 성적 콘텐츠 등으로 메시지가 차단됐을 때 (V1 채팅과 동일 안내) */}
+      {blockToast && (
+        <div className="absolute left-1/2 -translate-x-1/2 top-[120px] z-40 max-w-[85%] px-4 py-2.5 rounded-xl bg-red-900/95 border border-red-700 text-xs leading-relaxed text-white shadow-lg text-center animate-fade-in">
+          {blockToast}
         </div>
       )}
 
