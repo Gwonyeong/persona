@@ -55,7 +55,14 @@ export default function SituationCards() {
   }
 
   const onCardTap = (card) => {
-    if (card.locked) { navigate('/adult-verify'); return }
+    if (card.locked) {
+      if (card.lockReason === 'style') {
+        navigate(card.requiredStyle?.unlockMode === 'SHOP' ? '/mask-shop?tab=styles' : '/gacha')
+      } else {
+        navigate('/adult-verify')
+      }
+      return
+    }
     if (starting) return
     // 같은 카드에 진행 중 세션이 있으면 → 새로 시작 시 기존 삭제 경고 모달.
     if (sessions.some((s) => s.cardId === card.id)) { setConfirmCard(card); return }
@@ -118,27 +125,52 @@ export default function SituationCards() {
                 <p className="text-gray-400 text-[11px] font-semibold px-1 mt-3">{t('situationCards.startNew', { defaultValue: '새 상황극' })}</p>
               </>
             )}
-            {cards.map((card) => (
+            {cards.map((card) => {
+              const styleLocked = card.locked && card.lockReason === 'style'
+              const nsfwLocked = card.locked && card.lockReason === 'nsfw'
+              return (
               <button
                 key={card.id}
                 onClick={() => onCardTap(card)}
                 disabled={!!starting}
-                className={`relative w-full text-left p-4 rounded-2xl border transition-colors ${
+                className={`relative w-full flex items-center gap-3 text-left p-4 rounded-2xl border transition-colors ${
                   card.locked ? 'bg-gray-900/60 border-gray-800' : 'bg-gray-900 border-gray-800 hover:border-indigo-500/60'
                 } ${starting && starting !== card.id ? 'opacity-50' : ''}`}
                 style={NO_OUTLINE}
               >
-                <div className={card.locked ? 'blur-[3px] select-none' : ''}>
-                  <div className="flex items-center gap-2">
+                <div className={`flex-1 min-w-0 ${nsfwLocked ? 'blur-[3px] select-none' : ''}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
                     {card.emoji && <span className="text-lg">{card.emoji}</span>}
                     <span className="text-white font-medium text-sm">{card.title}</span>
                     {card.safety === 'NSFW' && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">19</span>
                     )}
+                    {card.special && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">특별</span>
+                    )}
                   </div>
                   {card.summary && <p className="text-gray-400 text-[12px] mt-1.5 leading-relaxed">{card.summary}</p>}
                 </div>
-                {card.locked && (
+
+                {/* 스타일 필요 — 우측에 이미지·이름·바로가기 (제목/설명은 블러 없이 공개) */}
+                {styleLocked && (
+                  <div className="flex-shrink-0 flex flex-col items-center gap-1.5 pl-3 border-l border-gray-700/50 self-stretch justify-center">
+                    {card.requiredStyle?.image && (
+                      <img src={card.requiredStyle.image} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-amber-400/60" />
+                    )}
+                    <p className="text-amber-200 text-[10px] font-semibold text-center leading-tight max-w-[68px] line-clamp-1">{card.requiredStyle?.name}</p>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(card.requiredStyle?.unlockMode === 'SHOP' ? '/mask-shop?tab=styles' : '/gacha') }}
+                      className="px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-amber-950 text-[10px] font-bold whitespace-nowrap"
+                      style={NO_OUTLINE}
+                    >
+                      {card.requiredStyle?.unlockMode === 'SHOP' ? '상점' : '가챠'} ▸
+                    </button>
+                  </div>
+                )}
+
+                {/* NSFW 잠금 — 블러 오버레이 */}
+                {nsfwLocked && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl bg-gray-950/40">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f9a8d4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="11" width="18" height="11" rx="2" />
@@ -147,13 +179,15 @@ export default function SituationCards() {
                     <span className="text-[11px] text-rose-200 font-medium">{t('situationCards.lockedHint', { defaultValue: '성인 인증하면 열려요' })}</span>
                   </div>
                 )}
+
                 {starting === card.id && (
                   <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-gray-950/50">
                     <span className="text-[12px] text-indigo-300">{t('situationCards.starting', { defaultValue: '시작하는 중...' })}</span>
                   </div>
                 )}
               </button>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
