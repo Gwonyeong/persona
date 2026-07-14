@@ -13,6 +13,7 @@ import CharacterStyles from './pages/admin/CharacterStyles'
 import CharacterFeeds from './pages/admin/CharacterFeeds'
 import CharacterGallery from './pages/admin/CharacterGallery'
 import CharacterGifts from './pages/admin/CharacterGifts'
+import CharacterSituations from './pages/admin/CharacterSituations'
 import AffinityImages from './pages/admin/AffinityImages'
 import BaseImages from './pages/admin/BaseImages'
 import Expressions from './pages/admin/Expressions'
@@ -199,6 +200,7 @@ function App() {
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
         <Route path="characters/:id/gallery" element={<CharacterGallery />} />
         <Route path="characters/:id/gifts" element={<CharacterGifts />} />
+        <Route path="characters/:id/situations" element={<CharacterSituations />} />
         <Route path="characters/:id/storylines" element={<CharacterStorylines />} />
         <Route path="characters/:id/profile-variants" element={<AdminCharacterProfileVariants />} />
         <Route path="mask-pass" element={<AdminMaskPass />} />
