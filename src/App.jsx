@@ -41,6 +41,8 @@ import Chat from './pages/user/Chat'
 import ChatV2 from './pages/user/ChatV2'
 import V2ChatTest from './pages/V2ChatTest'
 import ChatSettings from './pages/user/ChatSettings'
+import SituationCards from './pages/user/SituationCards'
+import VnStory from './pages/user/VnStory'
 import GroupChatNew from './pages/user/GroupChatNew'
 import GroupChat from './pages/user/GroupChat'
 import MyPage from './pages/user/MyPage'
@@ -242,6 +244,8 @@ function App() {
         <Route path="/chats/:id" element={<Chat />} />
         <Route path="/chats-v2/:id" element={<ChatV2 />} />
         <Route path="/chats/:id/settings" element={<ChatSettings />} />
+        <Route path="/chats/:id/situations" element={<SituationCards />} />
+        <Route path="/vn/:id" element={<VnStory />} />
         <Route path="/group-chats/new" element={<GroupChatNew />} />
         <Route path="/group-chats/:id" element={<GroupChat />} />
         <Route path="/about" element={<About />} />

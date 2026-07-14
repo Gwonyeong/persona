@@ -63,7 +63,8 @@ export default function UserLayout() {
     location.pathname.match(/^\/chats\/\d/) ||
     location.pathname.match(/^\/chats-v2\/\d/) ||
     location.pathname.match(/^\/group-chats\/\d/) ||
-    location.pathname === '/group-chats/new'
+    location.pathname === '/group-chats/new' ||
+    location.pathname.match(/^\/vn\/\d/)
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
   // 가챠 페이지는 박스가 화면을 풀-블리드로 채우는 디자인 — 탭바·푸터·하단 spacer 모두 숨김.
   const isGachaPage = location.pathname.startsWith('/gacha')

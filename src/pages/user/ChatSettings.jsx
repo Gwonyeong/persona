@@ -37,7 +37,8 @@ export default function ChatSettings() {
       navigate('/login')
       return
     }
-    api.get(`/conversations/${id}/messages`)
+    // 설정 플래그만 필요하고 메시지 배열은 안 쓰므로 ?limit=1로 히스토리 전송 회피 (origin transfer 절감).
+    api.get(`/conversations/${id}/messages?limit=1`)
       .then(({ conversation }) => {
         setSpriteMode(conversation?.spriteMode || 'BUBBLE')
         setChatMode(conversation?.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
