@@ -6,6 +6,7 @@ const EMPTY_FORM = {
   linkUrl: '',
   sortOrder: 0,
   isActive: true,
+  adultOnly: false,
 }
 
 export default function Banners() {
@@ -36,6 +37,7 @@ export default function Banners() {
       linkUrl: b.linkUrl || '',
       sortOrder: b.sortOrder,
       isActive: b.isActive,
+      adultOnly: !!b.adultOnly,
     })
     setImageFile(null)
     setImagePreview(null)
@@ -69,6 +71,7 @@ export default function Banners() {
         if (form.linkUrl) fd.append('linkUrl', form.linkUrl)
         fd.append('sortOrder', String(form.sortOrder))
         fd.append('isActive', String(form.isActive))
+        fd.append('adultOnly', String(form.adultOnly))
         await api.post('/admin/banners', fd)
       } else {
         await api.put(`/admin/banners/${editing.id}`, {
@@ -76,6 +79,7 @@ export default function Banners() {
           linkUrl: form.linkUrl,
           sortOrder: parseInt(form.sortOrder) || 0,
           isActive: form.isActive,
+          adultOnly: form.adultOnly,
         })
         if (imageFile) {
           const fd = new FormData()
@@ -129,13 +133,14 @@ export default function Banners() {
               <th className="text-left px-4 py-2">링크</th>
               <th className="text-left px-4 py-2 w-20">순서</th>
               <th className="text-left px-4 py-2 w-20">활성</th>
+              <th className="text-left px-4 py-2 w-20">대상</th>
               <th className="text-right px-4 py-2 w-32">작업</th>
             </tr>
           </thead>
           <tbody>
             {banners.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center text-gray-500 py-10">
+                <td colSpan={7} className="text-center text-gray-500 py-10">
                   등록된 배너가 없습니다.
                 </td>
               </tr>
@@ -166,6 +171,15 @@ export default function Banners() {
                     >
                       {b.isActive ? '활성' : '비활성'}
                     </button>
+                  </td>
+                  <td className="px-4 py-2">
+                    {b.adultOnly ? (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-600/20 text-rose-400 border border-rose-600/40">
+                        성인
+                      </span>
+                    ) : (
+                      <span className="text-gray-600 text-xs">전체</span>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-right">
                     <button
@@ -293,7 +307,27 @@ export default function Banners() {
                     {form.isActive ? '활성' : '비활성'}
                   </button>
                 </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-400 mb-1.5">대상</label>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, adultOnly: !form.adultOnly })}
+                    className={`w-full px-3 py-2 rounded text-sm font-medium border ${
+                      form.adultOnly
+                        ? 'bg-rose-600/20 text-rose-300 border-rose-600/50'
+                        : 'bg-gray-800 text-gray-400 border-gray-700'
+                    }`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {form.adultOnly ? '성인 전용' : '전체'}
+                  </button>
+                </div>
               </div>
+              {form.adultOnly && (
+                <p className="text-[11px] text-rose-400/80 -mt-2">
+                  성인인증(19+)을 완료한 유저에게만 노출됩니다.
+                </p>
+              )}
             </div>
 
             <div className="p-5 border-t border-gray-800 flex justify-end gap-2">
