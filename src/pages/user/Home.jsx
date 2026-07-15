@@ -380,6 +380,7 @@ export default function Home() {
       <RecentJoinedRow
         characters={recentJoined}
         reducedData={reducedData}
+        safetyMode={safetyMode}
       />
 
       {/* 캐릭터 그리드 — 최근 합류 4명 제외 */}
@@ -398,6 +399,7 @@ export default function Home() {
                 key={c.id}
                 character={c}
                 reducedData={reducedData}
+                safetyMode={safetyMode}
               />
             ))}
           </div>

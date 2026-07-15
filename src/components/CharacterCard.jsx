@@ -11,13 +11,14 @@ function isVideoUrl(url) {
   return !!url && /\.(mp4|webm)(\?|$)/i.test(url)
 }
 
-export default function CharacterCard({ character, reducedData }) {
+export default function CharacterCard({ character, reducedData, safetyMode }) {
   const navigate = useNavigate()
   const c = character
 
   const thumb = c.styles?.[0]?.images?.[0]
   // 2/3 그리드는 homeImage(영상 가능) 전용. homeImageSquare는 1:1 슬라이더 전용이라 여기선 안 씀.
-  const homeMedia = reducedData ? null : c.homeImage
+  // safetyMode가 켜져 있으면 영상(homeImage)은 건너뛰고 정지 이미지만 출력한다.
+  const homeMedia = reducedData || safetyMode ? null : c.homeImage
   const thumbUrl =
     getImageUrl(homeMedia) ||
     getImageUrl(c.profileImage) ||
