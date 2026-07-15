@@ -1165,6 +1165,13 @@ export default function Characters() {
                         선물
                       </button>
                       <button
+                        onClick={() => navigate(`/admin/characters/${c.id}/situations`)}
+                        className="text-emerald-400 hover:text-emerald-300 text-xs"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        상황극
+                      </button>
+                      <button
                         onClick={() => navigate(`/admin/characters/${c.id}/profile-variants`)}
                         className="text-amber-400 hover:text-amber-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
