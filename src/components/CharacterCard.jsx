@@ -16,9 +16,14 @@ export default function CharacterCard({ character, reducedData, safetyMode }) {
   const c = character
 
   const thumb = c.styles?.[0]?.images?.[0]
-  // 2/3 그리드는 homeImage(영상 가능) 전용. homeImageSquare는 1:1 슬라이더 전용이라 여기선 안 씀.
-  // safetyMode가 켜져 있으면 영상(homeImage)은 건너뛰고 정지 이미지만 출력한다.
-  const homeMedia = reducedData || safetyMode ? null : c.homeImage
+  // homeImage(영상 가능)는 SFW/NSFW 구분이 없어 safetyMode일 때 노출하지 않는다.
+  // safetyMode(비로그인·미인증 포함)에서는 서버가 SFW로 보장한 homeImageSquare를 홈 미디어로 사용하고,
+  // 그마저 없으면 profileImage로 폴백한다. safetyMode OFF(성인인증)에서는 기존대로 homeImage 사용.
+  const homeMedia = reducedData
+    ? null
+    : safetyMode
+      ? c.homeImageSquare
+      : c.homeImage
   const thumbUrl =
     getImageUrl(homeMedia) ||
     getImageUrl(c.profileImage) ||

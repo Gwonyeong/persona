@@ -7,7 +7,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
-import { requestInAppReview } from '../../lib/review'
+import { requestInAppReview, REVIEW_REWARD_UI_ENABLED } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
 import ShopPromoSection from '../../components/ShopPromoSection'
@@ -699,8 +699,8 @@ export default function MaskShop() {
           {/* 미션 탭 */}
           {maskModalTab === 'mission' && (
             <div className="flex flex-col gap-2">
-              {/* 앱 후기 작성 미션 */}
-              {missions?.review?.claimed ? (
+              {/* 앱 후기 작성 미션 — 10마스크 리뷰 보상 UI 임시 숨김 (REVIEW_REWARD_UI_ENABLED) */}
+              {REVIEW_REWARD_UI_ENABLED && (missions?.review?.claimed ? (
                 <div className="w-full flex items-center justify-center px-4 py-4 rounded-xl border border-gray-700 bg-gray-800/50">
                   <span className="text-xs text-gray-500">{t('myPage.missionClaimed')}</span>
                 </div>
@@ -729,7 +729,7 @@ export default function MaskShop() {
                   <span>⭐</span>
                   <span>{t('myPage.missionReviewButton')}</span>
                 </button>
-              )}
+              ))}
 
               {/* 성인 인증 미션 (1회성) */}
               {missions?.adultVerify?.claimed ? (
