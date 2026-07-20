@@ -7,7 +7,8 @@ import MaskIcon from '../../components/MaskIcon'
 import useStore from '../../store/useStore'
 
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
-const VN_MASK_COST = 1 // 상황극 기본 소모 마스크 (서버 situationChat CHAT_MODEL_COSTS.BASIC과 일치)
+// 모델별 기본 소모 마스크 (서버 situationChat CHAT_MODEL_COSTS와 일치)
+const MODEL_COSTS = { BASIC: 1, ADVANCED: 3 }
 
 // 스토리 모드(Storyline.jsx)와 동일한 프레젠테이션 상수 — 비주얼 일관성.
 const MESSAGE_AREA_STYLE = {
@@ -63,6 +64,9 @@ export default function VnStory() {
   const audioRef = useRef(null)
   const [voiceOn, setVoiceOn] = useState(false)
   const [isNsfw, setIsNsfw] = useState(false) // 음성 추가요금 계산용
+  // 채팅 모델 — V1 채팅과 동일하게 BASIC/ADVANCED 선택. 상황극 기본은 BASIC(1마스크).
+  const [chatModel, setChatModel] = useState('BASIC')
+  const [showModelSheet, setShowModelSheet] = useState(false)
   const [typed, setTyped] = useState('')
   const typingRef = useRef(null)
 
@@ -75,6 +79,7 @@ export default function VnStory() {
       .then(({ conversation: conv, seenRecords }) => {
         setCharacter(conv.character)
         setIsNsfw(conv.safetyMode === false)
+        setChatModel(conv.chatModel === 'ADVANCED' ? 'ADVANCED' : 'BASIC')
         if (Array.isArray(seenRecords)) {
           setVideoUnlockedImageIds(new Set(seenRecords.filter((r) => r.videoUnlockedAt).map((r) => r.characterImageId)))
         }
@@ -179,7 +184,7 @@ export default function VnStory() {
   // 클라도 그래도 실패하면 1회 추가 재시도.
   const runRound = async (msg, retriesLeft) => {
     try {
-      const res = await api.post(`/situation-conversations/${id}/messages`, { content: msg, chatModel: 'BASIC', voiceWithChat: voiceOn && !!character?.voiceId })
+      const res = await api.post(`/situation-conversations/${id}/messages`, { content: msg, chatModel, voiceWithChat: voiceOn && !!character?.voiceId })
       const received = (res.responseMessages || []).filter((m) => ['CHARACTER', 'NARRATION'].includes(m.role))
       if (res.spriteBackgroundImage !== undefined) setSpriteBg(res.spriteBackgroundImage)
       const lastChar = [...received].reverse().find((m) => m.role === 'CHARACTER')
@@ -291,6 +296,20 @@ export default function VnStory() {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
         </button>
         <span className="text-white font-semibold text-sm drop-shadow">{character?.name}</span>
+        {/* 모델 선택 토글 — V1 채팅과 동일한 바텀시트. ADVANCED면 별 강조. */}
+        <button
+          onClick={() => setShowModelSheet(true)}
+          className={`ml-auto h-7 px-2.5 rounded-full text-[10px] font-semibold flex items-center gap-1 shadow transition-colors whitespace-nowrap flex-shrink-0 ${
+            chatModel === 'ADVANCED' ? 'bg-amber-500/25 ring-1 ring-amber-400 text-amber-200' : 'bg-black/40 text-white/90'
+          }`}
+          style={NO_OUTLINE}
+          aria-label={t('chat.modelSelectorTitle', { defaultValue: '모델 선택' })}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          {chatModel === 'ADVANCED' ? t('chat.modelAdvanced', { defaultValue: '고급' }) : t('chat.modelBasic', { defaultValue: '기본' })}
+        </button>
       </header>
 
       {/* 메시지 영역 — 하단 정렬 (스토리 모드 MESSAGE_AREA_STYLE) */}
@@ -383,7 +402,7 @@ export default function VnStory() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
                 {/* 마스크 소모 배지 (V1 전송버튼처럼) */}
                 <span className="absolute -bottom-1 -right-1 flex items-center gap-px text-[9px] font-bold leading-none text-white bg-black/70 px-1 py-0.5 rounded-full pointer-events-none">
-                  -{VN_MASK_COST + (voiceOn && character?.voiceId ? 4 + (isNsfw ? 3 : 0) : 0)}<MaskIcon style={{ width: '0.8em', height: '0.8em' }} />
+                  -{(MODEL_COSTS[chatModel] ?? MODEL_COSTS.BASIC) + (voiceOn && character?.voiceId ? 4 + (isNsfw ? 3 : 0) : 0)}<MaskIcon style={{ width: '0.8em', height: '0.8em' }} />
                 </span>
               </button>
             </div>
@@ -393,6 +412,47 @@ export default function VnStory() {
         {error && <p className="text-rose-400 text-[11px] text-center pointer-events-auto">{error}</p>}
       </div>
     </div>
+
+    {/* 모델 선택 바텀시트 — V1 채팅과 동일 구성 */}
+    {showModelSheet && (
+      <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setShowModelSheet(false)}>
+        <div className="w-full max-w-lg bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5 animate-slide-up" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }} onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-center mb-3">
+            <div className="w-10 h-1 bg-gray-700 rounded-full" />
+          </div>
+          <p className="text-white font-semibold text-center mb-1">{t('chat.modelSelectorTitle', { defaultValue: '채팅 모델' })}</p>
+          <p className="text-gray-400 text-xs text-center mb-4">{t('chat.modelSelectorDesc', { defaultValue: '모델에 따라 소모 마스크가 달라져요' })}</p>
+          <div className="flex flex-col gap-2">
+            {[
+              { key: 'BASIC', label: t('chat.modelBasic', { defaultValue: '기본' }), desc: t('chat.modelBasicDesc', { defaultValue: '가볍고 빠른 응답' }), cost: MODEL_COSTS.BASIC },
+              { key: 'ADVANCED', label: t('chat.modelAdvanced', { defaultValue: '고급' }), desc: t('chat.modelAdvancedDesc', { defaultValue: '더 깊고 풍부한 응답' }), cost: MODEL_COSTS.ADVANCED },
+            ].map((opt) => {
+              const selected = chatModel === opt.key
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => { setChatModel(opt.key); setShowModelSheet(false) }}
+                  className={`text-left px-4 py-3 rounded-xl border transition-colors ${
+                    selected
+                      ? (opt.key === 'ADVANCED' ? 'bg-amber-600/20 border-amber-500' : 'bg-indigo-600/20 border-indigo-500')
+                      : 'bg-gray-800 border-gray-700 hover:border-gray-500'
+                  }`}
+                  style={NO_OUTLINE}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-sm font-semibold ${selected ? 'text-white' : 'text-gray-200'}`}>{opt.label}</span>
+                    <span className={`text-xs font-medium flex items-center gap-1 ${opt.key === 'ADVANCED' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {t('chat.maskCostLabel', { count: opt.cost, defaultValue: `${opt.cost}마스크` })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400">{opt.desc}</p>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )}
 
     <InsufficientMasksModal
       open={insufficient}
