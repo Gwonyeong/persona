@@ -7,6 +7,7 @@ import { getTagInfo } from '../../lib/tagLabel'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
+import LazyVideo from '../../components/LazyVideo'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -509,6 +510,10 @@ export default function CharacterDetail() {
   const mainStyle = character.styles?.[0]
   const mainImage = mainStyle?.images?.find((i) => i.emotion === 'NEUTRAL')
   const profileUrl = getImageUrl(character.profileImage) || getImageUrl(mainImage?.filePath)
+  // 히어로 영상: homeImage가 영상이면 재생(포스터=정지 프로필). 홈 그리드에선 영상을 끄지만
+  // 상세 페이지에선 항상 재생한다.
+  const heroMedia = getImageUrl(character.homeImage)
+  const heroVideoUrl = isVideoUrl(heroMedia) ? heroMedia : null
   const onlineStatus = getCharacterOnlineStatus(character.activeHours)
 
   const feedPosts = character.feedPosts || []
@@ -536,7 +541,9 @@ export default function CharacterDetail() {
             className="relative block w-full aspect-[4/5] overflow-hidden bg-gray-900"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {profileUrl ? (
+            {heroVideoUrl ? (
+              <LazyVideo src={heroVideoUrl} poster={profileUrl} className="w-full h-full" />
+            ) : profileUrl ? (
               <img src={profileUrl} alt={character.name} className="w-full h-full object-cover" draggable={false} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl text-gray-700">?</div>
