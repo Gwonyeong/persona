@@ -667,6 +667,7 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
   const [frameGalleryOpen, setFrameGalleryOpen] = useState(false)
   const [aiGenOpen, setAiGenOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   // 한 emotion에 여러 이미지 가능 — 배열로 그룹화.
   const imagesByEmotion = useMemo(() => {
@@ -744,6 +745,14 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
                       🤖 AI 생성
                     </button>
                     <button
+                      onClick={() => setBulkOpen(true)}
+                      className="text-[10px] text-emerald-300 hover:text-emerald-200"
+                      style={NO_OUTLINE}
+                      title="영상 여러 개를 한 번에 올려 Gemini가 감정별로 자동 분류"
+                    >
+                      🎬 영상 일괄
+                    </button>
+                    <button
                       onClick={() => setEditOpen(true)}
                       className="text-[10px] text-gray-300 hover:text-white"
                       style={NO_OUTLINE}
@@ -808,7 +817,246 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
         />,
         document.body,
       )}
+
+      {bulkOpen && style && createPortal(
+        <BulkEmotionVideoModal
+          styleId={style.id}
+          styleName={style.name}
+          characterName={character.name}
+          onClose={() => setBulkOpen(false)}
+          onDone={onStyleChanged}
+        />,
+        document.body,
+      )}
     </>
+  )
+}
+
+// 진행 상태 점 — pending(회색)/processing(주황 점멸)/done(초록)/error(빨강).
+function StatusDot({ status }) {
+  const cls = {
+    pending: 'bg-gray-600',
+    processing: 'bg-amber-400 animate-pulse',
+    done: 'bg-emerald-400',
+    error: 'bg-rose-500',
+  }[status] || 'bg-gray-600'
+  return <span className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${cls}`} />
+}
+
+// 감정 영상 일괄 업로드 모달 — 영상 여러 개를 드래그(또는 선택)해 한 번에 올리면
+// 서버가 각 영상의 0/중간/끝 프레임을 Gemini로 읽어 감정별 슬롯에 자동 배치한다.
+// 영상을 1개씩 순차 전송하며 파일별 진행 상황(대기→분류 중→완료/실패)을 실시간 표시.
+// 완전 자동 커밋: 결과가 바로 반영되며, 오분류는 표에서 개별 수정.
+function BulkEmotionVideoModal({ styleId, styleName, characterName, onClose, onDone }) {
+  const EMO_LABEL = useMemo(
+    () => Object.fromEntries([...SFW_EMOTIONS, ...NSFW_EMOTIONS].map((e) => [e.key, e.label])),
+    [],
+  )
+  const [scope, setScope] = useState('nsfw') // sfw | nsfw — Gemini 분류 후보 범위
+  const [files, setFiles] = useState([])
+  const [dragOver, setDragOver] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [started, setStarted] = useState(false)
+  const [items, setItems] = useState([]) // 진행 상황: [{name, status, emotion, confidence, error}]
+  const [error, setError] = useState('')
+  const inputRef = useRef(null)
+
+  const doneCount = items.filter((it) => it.status === 'done' || it.status === 'error').length
+
+  const addFiles = (list) => {
+    if (running) return
+    const vids = Array.from(list || []).filter((f) => (f.type || '').startsWith('video/'))
+    if (!vids.length) return
+    // 이전 배치가 끝난 상태에서 새 파일을 추가하면 새 배치로 리셋.
+    if (started) { setStarted(false); setItems([]) }
+    setFiles((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}_${f.size}`))
+      return [...prev, ...vids.filter((f) => !seen.has(`${f.name}_${f.size}`))]
+    })
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    addFiles(e.dataTransfer?.files)
+  }
+
+  const removeFile = (idx) => setFiles((prev) => prev.filter((_, i) => i !== idx))
+
+  // 영상을 1개씩 순차 전송하며 파일별 진행 상황을 실시간 갱신.
+  const submit = async () => {
+    if (!files.length || running) return
+    setRunning(true)
+    setStarted(true)
+    setError('')
+    setItems(files.map((f) => ({ name: f.name, status: 'pending', emotion: null, confidence: null, error: null })))
+
+    let anyDone = false
+    const mark = (i, patch) => setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
+
+    for (let i = 0; i < files.length; i++) {
+      mark(i, { status: 'processing' })
+      try {
+        const fd = new FormData()
+        fd.append('tab', scope)
+        fd.append('videos', files[i], files[i].name)
+        const res = await api.post(`/admin/styles/${styleId}/emotion-videos/bulk`, fd)
+        const r = res.results?.[0]
+        const er = res.errors?.[0]
+        if (r) {
+          anyDone = true
+          mark(i, { status: 'done', emotion: r.emotion, confidence: r.confidence })
+        } else {
+          mark(i, { status: 'error', error: er?.error || '분류 실패' })
+        }
+      } catch (e) {
+        mark(i, { status: 'error', error: e?.message || '업로드 실패' })
+      }
+    }
+
+    setRunning(false)
+    if (anyDone) onDone?.()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/70 flex items-center justify-center p-4" onClick={running ? undefined : onClose}>
+      <div
+        className="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-xl p-5 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-bold text-white mb-1">🎬 감정 영상 일괄 업로드</h3>
+        <p className="text-[11px] text-gray-400 mb-4">
+          {characterName} · {styleName} — 영상을 여러 개 올리면 Gemini가 0/중간/끝 프레임을 읽어 감정별로 자동 분류합니다.
+        </p>
+
+        {/* 분류 범위 */}
+        <div className="mb-3">
+          <label className="block text-[11px] text-gray-400 mb-1">분류 범위</label>
+          <div className="flex gap-2">
+            {[
+              { key: 'nsfw', label: '흥분 (NSFW 8종)' },
+              { key: 'sfw', label: '일반 (SFW 5종)' },
+            ].map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setScope(s.key)}
+                disabled={started}
+                className={`px-3 py-1.5 text-xs rounded-md ${
+                  scope === s.key ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+                style={NO_OUTLINE}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 드롭존 */}
+        <div
+          onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+          className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition ${
+            dragOver ? 'border-emerald-400 bg-emerald-500/10' : 'border-gray-700 hover:border-gray-600'
+          }`}
+        >
+          <p className="text-xs text-gray-300">영상(mp4/webm)을 여기로 드래그하거나 클릭해서 선택</p>
+          <p className="text-[10px] text-gray-500 mt-1">여러 개 한 번에 · 개당 최대 20MB</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="video/mp4,video/webm"
+            multiple
+            className="hidden"
+            onChange={(e) => { addFiles(e.target.files); e.target.value = '' }}
+          />
+        </div>
+
+        {/* 선택된 파일 목록 (시작 전) */}
+        {!started && files.length > 0 && (
+          <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+            {files.map((f, i) => (
+              <div key={`${f.name}_${i}`} className="flex items-center justify-between text-[11px] text-gray-300 bg-gray-800/60 rounded px-2 py-1">
+                <span className="truncate">{f.name}</span>
+                <button onClick={() => removeFile(i)} className="text-gray-500 hover:text-rose-300 ml-2" style={NO_OUTLINE}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && <p className="mt-3 text-xs text-rose-400">{error}</p>}
+
+        {/* 진행 상황 (시작 후) */}
+        {started && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-300">
+                {running ? '분류·업로드 중…' : '완료'}{' '}
+                <span className="text-gray-500">{doneCount} / {items.length}</span>
+              </p>
+              {running && <span className="text-[11px] text-emerald-300 animate-pulse">●</span>}
+            </div>
+            {/* 진행 바 */}
+            <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${items.length ? (doneCount / items.length) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="space-y-1 max-h-56 overflow-y-auto">
+              {items.map((it, i) => (
+                <div key={`${it.name}_${i}`} className="flex items-center justify-between text-[11px] bg-gray-800/60 rounded px-2 py-1">
+                  <span className="truncate text-gray-300 flex items-center gap-1.5 min-w-0">
+                    <StatusDot status={it.status} />
+                    <span className="truncate">{it.name}</span>
+                  </span>
+                  <span className="ml-2 flex-shrink-0">
+                    {it.status === 'done' && (
+                      <span className="text-emerald-300">
+                        {EMO_LABEL[it.emotion] || it.emotion}
+                        {typeof it.confidence === 'number' && (
+                          <span className="text-gray-500"> · {Math.round(it.confidence * 100)}%</span>
+                        )}
+                      </span>
+                    )}
+                    {it.status === 'processing' && <span className="text-amber-300">분류 중…</span>}
+                    {it.status === 'pending' && <span className="text-gray-600">대기</span>}
+                    {it.status === 'error' && <span className="text-rose-400">{it.error}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {!running && (
+              <p className="mt-2 text-[10px] text-gray-500">오분류된 항목은 표에서 해당 슬롯의 영상을 지우고 옮기면 됩니다.</p>
+            )}
+          </div>
+        )}
+
+        {/* 액션 */}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={running}
+            className="px-3 py-1.5 text-xs rounded-md bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-40"
+            style={NO_OUTLINE}
+          >
+            {started && !running ? '닫기' : '취소'}
+          </button>
+          {!started && (
+            <button
+              onClick={submit}
+              disabled={!files.length}
+              className="px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40"
+              style={NO_OUTLINE}
+            >
+              {files.length}개 업로드 & 자동 분류
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
