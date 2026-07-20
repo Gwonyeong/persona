@@ -461,6 +461,30 @@ export default function Characters() {
     return tag ? tag.split(':')[1] : null
   }
 
+  // 3-state 탭 매칭. productionStatus 없는 레거시 행은 isPublic으로 폴백.
+  const getStatus = (c) => c.productionStatus || (c.isPublic ? 'PUBLISHED' : 'HIDDEN')
+  const matchTab = (c, t) => {
+    const s = getStatus(c)
+    if (t === 'public') return s === 'PUBLISHED'
+    if (t === 'production') return s === 'IN_PRODUCTION'
+    return s === 'HIDDEN' // 'private'
+  }
+
+  // 제작중 준비도 — 이미 로드된 데이터로 계산. 기본 스타일(order 0)의 표정 커버 수 등.
+  const READINESS_EMOTIONS = ['NEUTRAL', 'HAPPY', 'ANGRY', 'SAD', 'SHY']
+  const getReadiness = (c) => {
+    const baseStyle = (c.styles || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))[0]
+    const covered = new Set((baseStyle?.images || []).map((img) => img.emotion))
+    const emotionCount = READINESS_EMOTIONS.filter((e) => covered.has(e)).length
+    return {
+      voice: !!(c.voiceId && c.voiceId.trim()),
+      emotionCount,
+      emotionTotal: READINESS_EMOTIONS.length,
+      sample: !!c.voiceSamples?.normal?.audioUrl,
+      profile: !!c.profileImage,
+    }
+  }
+
   // 같은 voiceId를 쓰는 캐릭터가 둘 이상이면 중복 표시
   const duplicateVoiceIds = (() => {
     const counts = new Map()
@@ -473,7 +497,7 @@ export default function Characters() {
   })()
 
   const filteredCharacters = characters
-    .filter((c) => (tab === 'public' ? c.isPublic : !c.isPublic))
+    .filter((c) => matchTab(c, tab))
     .filter((c) => (nationality === 'all' ? true : getNationality(c) === nationality))
     .slice()
     .sort((a, b) => {
@@ -1010,10 +1034,11 @@ export default function Characters() {
         </select>
       </div>
 
-      {/* 공개/비공개 탭 */}
+      {/* 공개/제작중/비공개 탭 */}
       <div className="flex gap-1 mb-3 border-b border-gray-800">
         {[
           { key: 'public', label: '공개' },
+          { key: 'production', label: '제작중' },
           { key: 'private', label: '비공개' },
         ].map((t) => (
           <button
@@ -1026,7 +1051,7 @@ export default function Characters() {
             }`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {t.label} ({characters.filter((c) => (t.key === 'public' ? c.isPublic : !c.isPublic)).length})
+            {t.label} ({characters.filter((c) => matchTab(c, t.key)).length})
           </button>
         ))}
       </div>
@@ -1035,7 +1060,7 @@ export default function Characters() {
       <div className="flex gap-1 mb-4">
         {NATIONALITY_TABS.map((n) => {
           const count = characters
-            .filter((c) => (tab === 'public' ? c.isPublic : !c.isPublic))
+            .filter((c) => matchTab(c, tab))
             .filter((c) => (n.key === 'all' ? true : getNationality(c) === n.key)).length
           return (
             <button
@@ -1058,7 +1083,7 @@ export default function Characters() {
       <div className="bg-gray-900 rounded-lg border border-gray-800">
         {filteredCharacters.length === 0 ? (
           <p className="p-4 text-gray-500">
-            {tab === 'public' ? '공개된 캐릭터가 없습니다.' : '비공개 캐릭터가 없습니다.'}
+            {tab === 'public' ? '공개된 캐릭터가 없습니다.' : tab === 'production' ? '제작중인 캐릭터가 없습니다.' : '비공개 캐릭터가 없습니다.'}
           </p>
         ) : (
           <table className="w-full">
@@ -1089,7 +1114,25 @@ export default function Characters() {
                           )
                         })()}
                       </div>
-                      <span className="font-medium">{c.name}</span>
+                      <div className="min-w-0">
+                        <span className="font-medium">{c.name}</span>
+                        {tab === 'production' && (() => {
+                          const r = getReadiness(c)
+                          const Badge = ({ ok, label }) => (
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded ${ok ? 'bg-green-500/15 text-green-400' : 'bg-gray-700/60 text-gray-400'}`}>
+                              {ok ? '✅' : '⏳'} {label}
+                            </span>
+                          )
+                          return (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <Badge ok={r.voice} label="보이스" />
+                              <Badge ok={r.emotionCount >= r.emotionTotal} label={`표정 ${r.emotionCount}/${r.emotionTotal}`} />
+                              <Badge ok={r.sample} label="음성샘플" />
+                              <Badge ok={r.profile} label="프로필" />
+                            </div>
+                          )
+                        })()}
+                      </div>
                     </div>
                   </td>
                   <td className="p-3">{c._count.conversations}</td>
@@ -1143,6 +1186,13 @@ export default function Characters() {
                   </td>
                   <td className="p-3">
                     <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => navigate(`/admin/characters/${c.id}/production`)}
+                        className="text-cyan-400 hover:text-cyan-300 text-xs font-semibold"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        제작
+                      </button>
                       <button
                         onClick={() => openEdit(c)}
                         className="text-indigo-400 hover:text-indigo-300 text-xs"

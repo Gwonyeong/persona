@@ -10,6 +10,7 @@ import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
 import AdminCharacters from './pages/admin/Characters'
 import CharacterStyles from './pages/admin/CharacterStyles'
+import CharacterProduction from './pages/admin/CharacterProduction'
 import CharacterFeeds from './pages/admin/CharacterFeeds'
 import CharacterGallery from './pages/admin/CharacterGallery'
 import CharacterGifts from './pages/admin/CharacterGifts'
@@ -196,6 +197,7 @@ function App() {
         <Route path="base-images" element={<BaseImages />} />
         <Route path="affinity-images" element={<AffinityImages />} />
         <Route path="expressions" element={<Expressions />} />
+        <Route path="characters/:id/production" element={<CharacterProduction />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
         <Route path="characters/:id/gallery" element={<CharacterGallery />} />
