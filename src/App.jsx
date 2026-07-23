@@ -47,6 +47,7 @@ import SituationCards from './pages/user/SituationCards'
 import VnStory from './pages/user/VnStory'
 import GroupChatNew from './pages/user/GroupChatNew'
 import GroupChat from './pages/user/GroupChat'
+import GroupChatSettings from './pages/user/GroupChatSettings'
 import MyPage from './pages/user/MyPage'
 import CharacterCollection from './pages/user/CharacterCollection'
 import AdultVerify from './pages/user/AdultVerify'
@@ -252,6 +253,7 @@ function App() {
         <Route path="/vn/:id" element={<VnStory />} />
         <Route path="/group-chats/new" element={<GroupChatNew />} />
         <Route path="/group-chats/:id" element={<GroupChat />} />
+        <Route path="/group-chats/:id/settings" element={<GroupChatSettings />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/refund" element={<Refund />} />

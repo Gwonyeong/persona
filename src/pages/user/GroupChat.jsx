@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +6,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { formatChatTime } from '../../lib/timeFormat'
 import MaskIcon from '../../components/MaskIcon'
+import { isVideoUrl, CrossfadeMedia } from '../../components/SpriteMedia'
 
 // 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js의 GROUP_CHAT_COST와 동기
 const GROUP_MESSAGE_MASK_COST = 3
@@ -26,6 +27,25 @@ function getNeutralImage(character) {
     if (img) return getImageUrl(img.filePath)
   }
   return getImageUrl(character?.profileImage)
+}
+
+// 감정에 맞는 표정 sprite URL 선택 (V1 채팅과 동일한 emotion→이미지 매칭 규칙).
+// 우선순위: 착용 스타일(currentStyleId) + 감정 → 착용 스타일 + NEUTRAL → 임의 스타일 + 감정 → NEUTRAL 기본.
+// 영상 파일(videoFilePath 대체 확장자)은 그룹에서 정적 이미지만 쓰므로 제외.
+function pickSpriteUrl(character, styleId, emotion) {
+  const styles = character?.styles || []
+  const preferred = styles.find((s) => s.id === styleId) || styles[0]
+  const tryStyle = (style, emo) => {
+    if (!style) return null
+    const img = (style.images || []).find((i) => i.emotion === emo && !isVideoUrl(i.filePath))
+    return img ? getImageUrl(img.filePath) : null
+  }
+  return (
+    tryStyle(preferred, emotion) ||
+    tryStyle(preferred, 'NEUTRAL') ||
+    styles.map((s) => tryStyle(s, emotion)).find(Boolean) ||
+    getNeutralImage(character)
+  )
 }
 
 function parseMessageSegments(content, role) {
@@ -58,8 +78,15 @@ export default function GroupChat() {
   const [presenceModeToast, setPresenceModeToast] = useState(null) // 'PHONE_AUTO' | 'PHONE' | 'IN_PERSON' | null
   const [blockToast, setBlockToast] = useState(null) // 검열 차단 안내 메시지(문자열) | null
   const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
+  const [showStatusPanel, setShowStatusPanel] = useState(true) // 상단 캐릭터 상태 패널 접기/펼치기 (1:1 채팅과 동일)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  // 상단 오버레이(헤더+캐릭터 정보+토글) 높이 — 메시지 영역이 그 아래에서 시작하도록 top 오프셋에 반영
+  const topBarRef = useRef(null)
+  const [topBarHeight, setTopBarHeight] = useState(0)
+  // 하단 오버레이(스프라이트 행 + 인풋 바) 높이 — 메시지 영역이 인풋 박스 위에서 잘리도록 bottom 오프셋에 반영
+  const bottomBarRef = useRef(null)
+  const [bottomBarHeight, setBottomBarHeight] = useState(0)
 
   // 입력창에 (행동) 형식의 괄호를 삽입. 선택된 텍스트가 있으면 감싸고, 없으면 빈 ()를 넣고 가운데로 포커스.
   function insertActionParens() {
@@ -107,6 +134,23 @@ export default function GroupChat() {
     api.get('/characters').then(({ characters }) => setAllCharacters(characters || []))
   }, [addingMember])
 
+  // 상·하단 오버레이 높이 측정 — presence 칩 개수/스프라이트 행 유무에 따라 가변이므로 ResizeObserver로 추적.
+  // 메시지 영역 top/bottom 오프셋에 반영해 상단 아래에서 시작하고 인풋 박스 위에서 잘리게 함.
+  useLayoutEffect(() => {
+    const topEl = topBarRef.current
+    const bottomEl = bottomBarRef.current
+    const update = () => {
+      if (topEl) setTopBarHeight(topEl.offsetHeight)
+      if (bottomEl) setBottomBarHeight(bottomEl.offsetHeight)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    if (topEl) ro.observe(topEl)
+    if (bottomEl) ro.observe(bottomEl)
+    return () => ro.disconnect()
+    // spriteMode(=groupChat.spriteMode 파생)·스프라이트 행 높이 변화는 groupChat 변경 + ResizeObserver로 커버됨.
+  }, [groupChat])
+
   const memberById = useMemo(() => {
     const map = new Map()
     if (groupChat?.members) {
@@ -126,6 +170,8 @@ export default function GroupChat() {
   const presenceMode = groupChat?.presenceMode || 'PHONE'
   const isInPerson = presenceMode === 'IN_PERSON'
   const safetyMode = groupChat?.safetyMode !== false // 기본 SFW
+  // 표정 이미지 출력 방식 — 서버(GroupChat.spriteMode) 값. 'BUBBLE'(기본) | 'OFF'(없음). 설정 페이지에서 변경.
+  const spriteMode = groupChat?.spriteMode === 'OFF' ? 'OFF' : 'BUBBLE'
   const toggleDisabled = withUserCount === 0 && !isInPerson // IN_PERSON으로 전환할 멤버가 없음
 
   // 채팅에 참여중인 캐릭터인지 판정 — 색상 규칙의 핵심
@@ -140,6 +186,51 @@ export default function GroupChat() {
     if (groupChat.title) return groupChat.title
     return (groupChat.members || []).map((m) => m.character?.name).filter(Boolean).join(', ')
   }, [groupChat])
+
+  // 각 캐릭터의 최신 발화 감정 — messages를 역순 스캔해 characterId별 첫(=가장 최근) emotion.
+  const latestEmotionByChar = useMemo(() => {
+    const map = new Map()
+    const msgs = groupChat?.messages || []
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i]
+      if (m.role !== 'CHARACTER' || !m.characterId) continue
+      if (!map.has(m.characterId)) map.set(m.characterId, m.emotion || 'NEUTRAL')
+    }
+    return map
+  }, [groupChat?.messages])
+
+  // 방금 말한(강조 대상) 캐릭터 — 스트리밍 중이면 마지막 스트리밍 버블, 아니면 마지막 CHARACTER 메시지.
+  const speakingCharacterId = useMemo(() => {
+    for (let i = streamingBubbles.length - 1; i >= 0; i--) {
+      const b = streamingBubbles[i]
+      if (b.role === 'CHARACTER' && b.characterId) return b.characterId
+    }
+    const msgs = groupChat?.messages || []
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i]
+      if (m.role === 'CHARACTER' && m.characterId) return m.characterId
+    }
+    return null
+  }, [groupChat?.messages, streamingBubbles])
+
+  // 인풋 위 1줄에 그릴 참여 페소나 표정 sprite (최대 4명, order순).
+  const spriteParticipants = useMemo(() => {
+    return (groupChat?.members || [])
+      .filter((m) => isParticipating(m))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .slice(0, MAX_MEMBERS)
+      .map((m) => {
+        const emotion = latestEmotionByChar.get(m.characterId) || 'NEUTRAL'
+        return {
+          characterId: m.characterId,
+          name: m.character?.name || '',
+          url: pickSpriteUrl(m.character, m.currentStyleId, emotion),
+          isExcited: !!m.characterStatus?.isExcited,
+          isSpeaking: m.characterId === speakingCharacterId,
+        }
+      })
+      .filter((p) => p.url)
+  }, [groupChat?.members, latestEmotionByChar, speakingCharacterId, isInPerson])
 
   async function handleSend() {
     if (!input.trim() || sending || !groupChat) return
@@ -346,8 +437,11 @@ export default function GroupChat() {
         <title>{headerTitle || t('groupChat.title')}</title>
       </Helmet>
 
-      {/* 헤더 */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 bg-gray-950">
+
+      {/* 상단 오버레이 — 헤더(슬림 바) + 상태 패널(보더 카드) + 모드 토글. 1:1 채팅과 동일하게 헤더/상태 패널 분리. */}
+      <div ref={topBarRef} className="absolute top-0 left-0 right-0 z-20">
+      {/* 헤더 — 슬림 글래스 바 */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800/30 bg-gray-900/30">
         <button
           onClick={() => navigate('/chats')}
           className="w-9 h-9 flex items-center justify-center rounded-full text-gray-300 hover:bg-gray-800"
@@ -380,19 +474,23 @@ export default function GroupChat() {
           </div>
         </button>
 
+        {/* 상태 패널 접기/펼치기 — 셰브론 (1:1 채팅과 동일) */}
         <button
-          onClick={() => setShowDelete(true)}
+          onClick={() => setShowStatusPanel((v) => !v)}
           className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-800"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          aria-label={showStatusPanel ? t('groupChat.collapseStatus', { defaultValue: '상태 패널 접기' }) : t('groupChat.expandStatus', { defaultValue: '상태 패널 펼치기' })}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
+            {showStatusPanel ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
           </svg>
         </button>
+
       </div>
 
-      {/* 유저 장소 + 동행/원격 그룹 (캐릭터 카드에 감정 포함) */}
-      <div className="px-3 py-2 border-b border-gray-800 bg-gray-950/80 flex-shrink-0 space-y-2">
+      {/* 상태 패널 — 유저 장소 + 동행/원격 그룹. 헤더와 분리된 보더 카드 (1:1 채팅 상태 패널과 동일 스타일). 셰브론으로 접기/펼치기. */}
+      {showStatusPanel && (
+      <div className="mx-3 mt-2 px-3 py-2 rounded-2xl border border-gray-800/50 bg-gray-900/75 flex-shrink-0 space-y-2">
         <div className="text-[11px] text-gray-400">
           {t('groupChat.yourLocation')}: <span className="text-gray-100 font-medium">{groupChat.userLocation || '집'}</span>
         </div>
@@ -459,9 +557,11 @@ export default function GroupChat() {
           </div>
         ))}
       </div>
+      )}
 
-      {/* 모드 토글 행 — presence 영역 구분선 바깥. 좌측: Safety, 우측: presence 토글 */}
+      {/* 모드 토글 행 — 좌측: Safety + 메신저 모드(대면/전화) 토글, 우측: 설정(표정 출력 방식) */}
       <div className="flex justify-between items-center px-3 py-2 flex-shrink-0 gap-2">
+        <div className="flex items-center gap-2">
         <button
           onClick={() => {
             if (!user?.adultVerified) {
@@ -526,6 +626,22 @@ export default function GroupChat() {
             </svg>
           )}
         </button>
+        </div>
+
+        {/* 설정 — 채팅 설정 페이지로 이동 (표정 이미지 출력 방식 등) */}
+        <button
+          onClick={() => navigate(`/group-chats/${id}/settings`)}
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-800/80 border border-gray-700/50 text-gray-200 hover:bg-gray-700/80 shadow-lg transition-colors"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          aria-label={t('groupChatSettings.title', { defaultValue: '채팅 설정' })}
+          title={t('groupChatSettings.title', { defaultValue: '채팅 설정' })}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+      </div>
       </div>
 
       {/* 모드 전환 토스트 — 자동 폴백/수동 전환 공통 */}
@@ -546,8 +662,15 @@ export default function GroupChat() {
         </div>
       )}
 
-      {/* 메시지 영역 */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2">
+      {/* 메시지 영역 — 전체 높이를 채우고(flex-1), 상·하단 오버레이는 반투명 absolute라 그 뒤로 메시지가 비쳐 스크롤됨.
+          패딩으로 첫/마지막 메시지가 오버레이에 가리지 않게 여백 확보 (상태바·스프라이트 뒤로 채팅 보임). */}
+      <div
+        className="relative z-10 flex-1 overflow-y-auto px-3 space-y-2"
+        style={{
+          paddingTop: `${topBarHeight + 12}px`,
+          paddingBottom: `${bottomBarHeight + 8}px`,
+        }}
+      >
         {renderableMessages.length === 0 && (
           <div className="text-center text-sm text-gray-500 py-10">{t('groupChat.emptyMessages')}</div>
         )}
@@ -711,9 +834,32 @@ export default function GroupChat() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* 하단 오버레이 — 스프라이트 행 + 인풋 바. */}
+      <div ref={bottomBarRef} className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+      {/* 참여 페소나 표정 sprite 행 — 인풋 바로 위 1줄 (최대 4명). BUBBLE(기본) 모드에서만 표시. FULL은 풀스크린 배경으로 대체. */}
+      {spriteMode === 'BUBBLE' && spriteParticipants.length > 0 && (
+        <div className="flex items-end justify-end gap-2 px-3 pt-2 pb-3 pointer-events-none">
+          {spriteParticipants.map((p) => (
+            <div
+              key={p.characterId}
+              className={`relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 ${
+                p.isExcited ? 'ring-2 ring-pink-500/70 animate-pulse' : 'ring-1 ring-gray-700/50'
+              } ${p.isSpeaking ? 'scale-105' : ''}`}
+              style={{ aspectRatio: '9 / 16' }}
+            >
+              <CrossfadeMedia
+                src={p.url}
+                variant="sprite"
+                className="absolute inset-0 w-full h-full object-cover object-bottom"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 입력 바 */}
       <div
-        className="border-t border-gray-800 bg-gray-950 p-3"
+        className="border-t border-gray-800/30 bg-gray-900/30 p-3 pointer-events-auto"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
       >
         {activeCount === 0 && (
@@ -743,20 +889,21 @@ export default function GroupChat() {
           >
             <span className="text-[15px] font-mono leading-none">( )</span>
           </button>
-          <div className="relative flex-shrink-0">
-            <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-amber-400 flex items-center gap-0.5">
-              -{GROUP_MESSAGE_MASK_COST} <MaskIcon className="text-base" />
+          <button
+            onClick={handleSend}
+            disabled={sending || !input.trim() || activeCount === 0}
+            className="relative w-10 h-10 flex-shrink-0 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+            <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-[10px] font-bold leading-none flex items-center gap-px bg-black/60 px-1 py-0.5 rounded">
+                -{GROUP_MESSAGE_MASK_COST}<MaskIcon className="text-[11px]" />
+              </span>
             </span>
-            <button
-              onClick={handleSend}
-              disabled={sending || !input.trim() || activeCount === 0}
-              className="w-10 h-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 disabled:opacity-30 transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-            </button>
-          </div>
+          </button>
         </div>
+      </div>
       </div>
 
       {/* 멤버 관리 패널 — 컨테이너 안 absolute */}
