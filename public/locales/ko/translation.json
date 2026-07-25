@@ -476,6 +476,11 @@
     "lightBenefit5": "무제한 단톡방 운영",
     "freeBoxTagline": "10명의 캐릭터와 가볍게 시작해보세요",
     "signupBonusBubble": "가입 즉시 마스크 30개를 추가 지급해드려요!",
+    "grantHistoryTitle": "마스크 지급 기록",
+    "grantHistoryDesc": "구독으로 지급받은 마스크 내역이에요",
+    "grantHistoryEmpty": "아직 지급 기록이 없어요",
+    "grantHistoryLabel": "일일 구독 지급",
+    "grantHistoryMore": "더 보기",
     "feature": {
       "chat": "채팅",
       "dailyMasks": "일일 가면 지급",

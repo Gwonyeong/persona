@@ -476,6 +476,11 @@
     "lightBenefit5": "無制限のグループチャット運営",
     "freeBoxTagline": "10人のキャラクターと気軽に始めよう",
     "signupBonusBubble": "登録後すぐにマスク30個追加プレゼント！",
+    "grantHistoryTitle": "マスク支給履歴",
+    "grantHistoryDesc": "サブスクで支給されたマスクの履歴です",
+    "grantHistoryEmpty": "まだ支給履歴がありません",
+    "grantHistoryLabel": "毎日のサブスク支給",
+    "grantHistoryMore": "もっと見る",
     "feature": {
       "chat": "チャット",
       "dailyMasks": "デイリーマスク",

@@ -476,6 +476,11 @@
     "lightBenefit5": "Unlimited group chats",
     "freeBoxTagline": "Start chatting with 10 characters for free",
     "signupBonusBubble": "Get 30 extra masks the moment you sign up!",
+    "grantHistoryTitle": "Mask grant history",
+    "grantHistoryDesc": "Masks you've received from your subscription",
+    "grantHistoryEmpty": "No grants yet",
+    "grantHistoryLabel": "Daily subscription grant",
+    "grantHistoryMore": "Load more",
     "feature": {
       "chat": "Chat",
       "dailyMasks": "Daily Masks",

@@ -47,6 +47,12 @@ export default function MaskShop() {
   const [subError, setSubError] = useState('')
   const [restoring, setRestoring] = useState(false)
 
+  // 구독 마스크 지급 기록
+  const [grants, setGrants] = useState(null)
+  const [grantsCursor, setGrantsCursor] = useState(null)
+  const [grantsLoading, setGrantsLoading] = useState(false)
+  const [grantsLoadingMore, setGrantsLoadingMore] = useState(false)
+
   // 리워드 광고
   const [adRewardAvailable, setAdRewardAvailable] = useState(false)
   const [adRewardRemaining, setAdRewardRemaining] = useState(0)
@@ -189,6 +195,30 @@ export default function MaskShop() {
     api.get('/masks/checkin/available').then(({ claimed }) => setCheckinClaimed(claimed)).catch(() => {})
     api.get('/masks/first-purchase-eligible').then(({ eligible }) => setFirstPurchaseEligible(eligible)).catch(() => {})
   }, [token])
+
+  // 구독 탭 진입 시 라이트 구독자에게 마스크 지급 기록 지연 로드
+  useEffect(() => {
+    if (activeTab !== 'subscription' || currentTier !== 'LIGHT' || !token) return
+    if (grants !== null || grantsLoading) return
+    setGrantsLoading(true)
+    api.get('/subscriptions/mask-grants')
+      .then(({ grants, nextCursor }) => { setGrants(grants || []); setGrantsCursor(nextCursor) })
+      .catch(() => setGrants([]))
+      .finally(() => setGrantsLoading(false))
+  }, [activeTab, currentTier, token, grants, grantsLoading])
+
+  const loadMoreGrants = async () => {
+    if (!grantsCursor || grantsLoadingMore) return
+    setGrantsLoadingMore(true)
+    try {
+      const { grants: more, nextCursor } = await api.get(`/subscriptions/mask-grants?cursor=${grantsCursor}`)
+      setGrants((prev) => [...(prev || []), ...(more || [])])
+      setGrantsCursor(nextCursor)
+    } catch {
+      // 무시 — 재시도 가능
+    }
+    setGrantsLoadingMore(false)
+  }
 
   // 표정 스타일 탭 진입 시 지연 로드
   useEffect(() => {
@@ -420,6 +450,49 @@ export default function MaskShop() {
               </button>
             )}
           </div>
+
+          {/* 마스크 지급 기록 — 라이트 구독자에게만 노출 */}
+          {currentTier === 'LIGHT' && (
+            <div className="mt-4 bg-gray-900 rounded-2xl border border-gray-800 p-5">
+              <p className="text-base font-bold text-gray-100">{t('subscription.grantHistoryTitle')}</p>
+              <p className="text-xs text-gray-500 mt-0.5 mb-4">{t('subscription.grantHistoryDesc')}</p>
+
+              {grantsLoading ? (
+                <p className="text-sm text-gray-500 text-center py-6">{t('common.loading')}</p>
+              ) : !grants || grants.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">{t('subscription.grantHistoryEmpty')}</p>
+              ) : (
+                <>
+                  <ul className="flex flex-col divide-y divide-gray-800">
+                    {grants.map((g) => (
+                      <li key={g.id} className="flex items-center justify-between py-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <MaskIcon className="text-base shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm text-gray-200 truncate">{t('subscription.grantHistoryLabel')}</p>
+                            <p className="text-[11px] text-gray-500">
+                              {new Date(g.createdAt).toLocaleDateString(i18n.language, { year: 'numeric', month: 'long', day: 'numeric' })}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-indigo-400 shrink-0">+{g.amount}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {grantsCursor && (
+                    <button
+                      onClick={loadMoreGrants}
+                      disabled={grantsLoadingMore}
+                      className="w-full mt-3 py-2.5 text-xs font-medium text-gray-400 bg-gray-800 rounded-lg border border-gray-700 disabled:opacity-50"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {grantsLoadingMore ? t('common.loading') : t('subscription.grantHistoryMore')}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {subError && (
             <p className="text-sm text-red-400 text-center mt-4">{subError}</p>
@@ -699,7 +772,7 @@ export default function MaskShop() {
           {/* 미션 탭 */}
           {maskModalTab === 'mission' && (
             <div className="flex flex-col gap-2">
-              {/* 앱 후기 작성 미션 — 10마스크 리뷰 보상 UI 임시 숨김 (REVIEW_REWARD_UI_ENABLED) */}
+              {/* 앱 후기 작성 미션 — 10마스크 리뷰 보상 (REVIEW_REWARD_UI_ENABLED 로 토글) */}
               {REVIEW_REWARD_UI_ENABLED && (missions?.review?.claimed ? (
                 <div className="w-full flex items-center justify-center px-4 py-4 rounded-xl border border-gray-700 bg-gray-800/50">
                   <span className="text-xs text-gray-500">{t('myPage.missionClaimed')}</span>
