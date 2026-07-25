@@ -34,6 +34,37 @@ const STATUS_LABEL = {
 
 const btnStyle = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
+// 예약 출시 기본 공개 시각 (KST). 1일 1캐릭터 출시 슬롯 계산에 사용.
+const RELEASE_HOUR_KST = 18
+
+// UTC Date → KST 달력 day key 'YYYY-MM-DD'
+function kstDayKey(date) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+// 이미 예약된 날짜(occupiedKeys: Set<'YYYY-MM-DD'>)를 피해, 내일(KST)부터 가장 빠른 빈 슬롯을 찾는다.
+// 1일 1캐릭터 원칙 — 하루 한 명만. 반환: { n, iso } (n=며칠 뒤, iso=공개 예약 UTC ISO)
+function findEarliestSlot(occupiedKeys) {
+  const kn = new Date(Date.now() + 9 * 60 * 60 * 1000) // UTC 필드 = KST 벽시계
+  const ty = kn.getUTCFullYear(), tm = kn.getUTCMonth(), td = kn.getUTCDate()
+  for (let offset = 1; offset < 3650; offset++) {
+    const candMidnight = new Date(Date.UTC(ty, tm, td + offset))
+    const key = candMidnight.toISOString().slice(0, 10)
+    if (!occupiedKeys.has(key)) {
+      const releaseMs = Date.UTC(candMidnight.getUTCFullYear(), candMidnight.getUTCMonth(), candMidnight.getUTCDate(), RELEASE_HOUR_KST - 9, 0, 0)
+      return { n: offset, iso: new Date(releaseMs).toISOString() }
+    }
+  }
+  return { n: 1, iso: null }
+}
+
+function formatKstDateFull(iso) {
+  if (!iso) return ''
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(iso))
+}
+
 export default function CharacterProduction() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -254,8 +285,40 @@ export default function CharacterProduction() {
     }
   }
 
+  // 예약 출시 — 가장 빠른 빈 슬롯(1일 1캐릭터)으로 예약. 현재 캐릭터 자신의 기존 예약은 슬롯 계산에서 제외.
+  const reserveRelease = async (iso) => {
+    setStatusBusy(true)
+    try {
+      await api.patch(`/admin/characters/${character.id}/production`, { scheduledPublishAt: iso })
+      navigate('/admin/characters')
+    } catch (e) {
+      alert(`예약 실패: ${e?.message || 'unknown'}`)
+      setStatusBusy(false)
+    }
+  }
+
+  const cancelReservation = async () => {
+    setStatusBusy(true)
+    try {
+      await api.patch(`/admin/characters/${character.id}/production`, { scheduledPublishAt: null })
+      await load()
+    } catch (e) {
+      alert(`예약 취소 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setStatusBusy(false)
+    }
+  }
+
   const status = character.productionStatus || (character.isPublic ? 'PUBLISHED' : 'HIDDEN')
   const statusMeta = STATUS_LABEL[status] || STATUS_LABEL.HIDDEN
+
+  // 다른 캐릭터의 예약 날짜(미공개 + scheduledPublishAt)를 피해 가장 빠른 출시 슬롯 계산
+  const occupiedKeys = new Set(
+    allCharacters
+      .filter((ch) => ch.id !== character.id && ch.scheduledPublishAt && !ch.isPublic)
+      .map((ch) => kstDayKey(new Date(ch.scheduledPublishAt)))
+  )
+  const earliestSlot = findEarliestSlot(occupiedKeys)
 
   const ChecklistItem = ({ ok, label }) => (
     <div className={`flex items-center gap-2 text-sm ${ok ? 'text-green-400' : 'text-gray-400'}`}>
@@ -521,7 +584,21 @@ export default function CharacterProduction() {
         {!allReady && (
           <p className="text-xs text-amber-400 mb-3">준비도 체크리스트가 완료되지 않았습니다. 공개는 가능하지만 확인 후 진행됩니다.</p>
         )}
-        <div className="flex gap-2 flex-wrap">
+        {/* 현재 예약 상태 안내 */}
+        {status !== 'PUBLISHED' && character.scheduledPublishAt && (
+          <div className="mb-3 flex items-center gap-3 flex-wrap p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+            <span className="text-sm text-purple-200">📅 <strong>{formatKstDateFull(character.scheduledPublishAt)}</strong> 공개 예약됨</span>
+            <button
+              onClick={cancelReservation}
+              disabled={statusBusy}
+              className="text-xs text-gray-400 hover:text-gray-200 disabled:opacity-50"
+              style={btnStyle}
+            >
+              예약 취소
+            </button>
+          </div>
+        )}
+        <div className="flex gap-2 flex-wrap items-end">
           {status !== 'PUBLISHED' && (
             <button
               onClick={() => setStatus('PUBLISHED')}
@@ -529,8 +606,22 @@ export default function CharacterProduction() {
               className="px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-500 text-sm font-semibold disabled:opacity-50"
               style={btnStyle}
             >
-              🚀 공개하기
+              🚀 바로 공개하기
             </button>
+          )}
+          {status !== 'PUBLISHED' && (
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[11px] font-medium text-purple-300">{earliestSlot.n}일 뒤 출시</span>
+              <button
+                onClick={() => reserveRelease(earliestSlot.iso)}
+                disabled={statusBusy || !earliestSlot.iso}
+                title={earliestSlot.iso ? `${formatKstDateFull(earliestSlot.iso)} 공개 예약` : ''}
+                className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm font-semibold disabled:opacity-50"
+                style={btnStyle}
+              >
+                🗓️ 예약하기
+              </button>
+            </div>
           )}
           {status !== 'IN_PRODUCTION' && (
             <button

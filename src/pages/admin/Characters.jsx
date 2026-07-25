@@ -108,6 +108,7 @@ const EMPTY_FORM = {
   initialAffinity: 0,
   voiceId: '',
   isPublic: false,
+  scheduledPublishAt: '', // datetime-local 값 (KST). 빈 문자열이면 예약 없음.
   proactiveEnabled: false,
   proactiveMinInterval: 60,   // 분 단위로 표시
   proactiveMaxInterval: 240,  // 분 단위로 표시
@@ -163,6 +164,144 @@ function fromDatetimeLocalKst(value) {
   const parsed = new Date(value + ':00+09:00')
   if (isNaN(parsed.getTime())) return null
   return parsed.toISOString()
+}
+
+// UTC ISO → KST 달력 필드 { y, m(0-based), d }
+function kstFields(iso) {
+  const k = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000)
+  return { y: k.getUTCFullYear(), m: k.getUTCMonth(), d: k.getUTCDate() }
+}
+
+// 출시 예약 월간 캘린더 — scheduledPublishAt 있는 캐릭터를 날짜별로 표시
+function ScheduleCalendar({ characters, month, onPrevMonth, onNextMonth, onToday, onPick }) {
+  const y = month.getFullYear()
+  const m = month.getMonth()
+  const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+  const firstWeekday = new Date(Date.UTC(y, m, 1)).getUTCDay() // 0=일
+
+  const today = kstFields(new Date().toISOString())
+
+  // 이 달의 예약 캐릭터를 일자별로 그룹핑
+  const byDay = new Map() // day(1-based) -> [character]
+  const scheduled = characters
+    .filter((c) => c.scheduledPublishAt && !c.isPublic)
+    .map((c) => ({ c, k: kstFields(c.scheduledPublishAt) }))
+  for (const { c, k } of scheduled) {
+    if (k.y === y && k.m === m) {
+      if (!byDay.has(k.d)) byDay.set(k.d, [])
+      byDay.get(k.d).push(c)
+    }
+  }
+
+  // 이 달 밖의 예약(안내용)
+  const upcomingOutside = scheduled
+    .filter(({ k }) => k.y !== y || k.m !== m)
+    .sort((a, b) => new Date(a.c.scheduledPublishAt) - new Date(b.c.scheduledPublishAt))
+
+  const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+  const cells = []
+  for (let i = 0; i < firstWeekday; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  return (
+    <div>
+      {/* 월 이동 헤더 */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onPrevMonth}
+            className="px-2.5 py-1 bg-gray-800 border border-gray-700 rounded-md text-sm hover:border-gray-600"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >‹</button>
+          <span className="text-base font-bold w-28 text-center">{y}년 {m + 1}월</span>
+          <button
+            onClick={onNextMonth}
+            className="px-2.5 py-1 bg-gray-800 border border-gray-700 rounded-md text-sm hover:border-gray-600"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >›</button>
+        </div>
+        <button
+          onClick={onToday}
+          className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-md text-xs text-gray-300 hover:border-gray-600"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >오늘</button>
+      </div>
+
+      {/* 요일 헤더 */}
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {WEEKDAYS.map((w, i) => (
+          <div key={w} className={`text-center text-xs font-medium py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-500'}`}>
+            {w}
+          </div>
+        ))}
+      </div>
+
+      {/* 날짜 그리드 */}
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, idx) => {
+          if (d === null) return <div key={`e${idx}`} className="min-h-[84px]" />
+          const isToday = today.y === y && today.m === m && today.d === d
+          const list = byDay.get(d) || []
+          const dow = idx % 7
+          return (
+            <div
+              key={d}
+              className={`min-h-[84px] rounded-lg border p-1.5 flex flex-col gap-1 ${
+                isToday ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-800 bg-gray-900'
+              }`}
+            >
+              <span className={`text-xs font-medium ${
+                isToday ? 'text-indigo-300' : dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : 'text-gray-400'
+              }`}>
+                {d}
+              </span>
+              <div className="flex flex-col gap-1 overflow-hidden">
+                {list.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => onPick(c)}
+                    title={`${c.name} · ${formatKstDateTime(c.scheduledPublishAt)} 공개 예약`}
+                    className="flex items-center gap-1 px-1.5 py-1 rounded bg-purple-500/20 border border-purple-500/40 hover:bg-purple-500/30 transition-colors min-w-0"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {c.profileImage && (
+                      <img src={c.profileImage} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+                    )}
+                    <span className="text-[11px] text-purple-100 truncate">{c.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 이 달 밖의 예약 안내 */}
+      {upcomingOutside.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs text-gray-500 mb-2">다른 달 예약 ({upcomingOutside.length})</p>
+          <div className="flex flex-wrap gap-2">
+            {upcomingOutside.map(({ c }) => (
+              <button
+                key={c.id}
+                onClick={() => onPick(c)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-800 border border-gray-700 hover:border-gray-600 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {c.profileImage && <img src={c.profileImage} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                <span className="text-xs text-gray-200">{c.name}</span>
+                <span className="text-[11px] text-gray-500">{formatKstDateTime(c.scheduledPublishAt)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {scheduled.length === 0 && (
+        <p className="text-sm text-gray-500 text-center py-8">예약된 캐릭터가 없습니다. 캐릭터 수정 화면에서 출시 예약일을 설정하세요.</p>
+      )}
+    </div>
+  )
 }
 
 function NotifyCharacterModal({ character, onClose, onSent }) {
@@ -446,6 +585,9 @@ export default function Characters() {
   const [voiceSampleBusy, setVoiceSampleBusy] = useState({ normal: null, aroused: null })
   const [nationality, setNationality] = useState('all') // 'all' | 'kr' | 'jp' | 'us'
   const [sortBy, setSortBy] = useState('conversations') // 'name' | 'conversations' | 'nationality'
+  const [search, setSearch] = useState('') // 이름 검색어
+  const [view, setView] = useState('list') // 'list' | 'schedule' (출시 예약 캘린더)
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })
   const navigate = useNavigate()
 
   const NATIONALITY_TABS = [
@@ -499,6 +641,10 @@ export default function Characters() {
   const filteredCharacters = characters
     .filter((c) => matchTab(c, tab))
     .filter((c) => (nationality === 'all' ? true : getNationality(c) === nationality))
+    .filter((c) => {
+      const q = search.trim().toLowerCase()
+      return q ? (c.name || '').toLowerCase().includes(q) : true
+    })
     .slice()
     .sort((a, b) => {
       if (sortBy === 'recentConversations') {
@@ -563,6 +709,7 @@ export default function Characters() {
       initialAffinity: c.initialAffinity || 0,
       voiceId: c.voiceId || '',
       isPublic: c.isPublic,
+      scheduledPublishAt: c.scheduledPublishAt ? toDatetimeLocalKst(c.scheduledPublishAt) : '',
       proactiveEnabled: c.proactiveEnabled || false,
       proactiveMinInterval: Math.round((c.proactiveMinInterval || 3600) / 60),
       proactiveMaxInterval: Math.round((c.proactiveMaxInterval || 14400) / 60),
@@ -642,6 +789,8 @@ export default function Characters() {
       proactiveProbability: form.proactiveProbability / 100,
       proactiveMaxCount: form.proactiveMaxCount,
       voiceId: form.voiceId.trim() || null,
+      // datetime-local(KST) → UTC ISO. 빈 값이면 null(예약 해제).
+      scheduledPublishAt: fromDatetimeLocalKst(form.scheduledPublishAt),
     }
 
     try {
@@ -1018,8 +1167,29 @@ export default function Characters() {
         </button>
       </div>
 
-      {/* 정렬 */}
-      <div className="flex items-center gap-2 mb-4">
+      {/* 목록 / 출시 예약 뷰 전환 */}
+      <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1 w-fit">
+        {[
+          { key: 'list', label: '목록' },
+          { key: 'schedule', label: '📅 출시 예약' },
+        ].map((v) => (
+          <button
+            key={v.key}
+            onClick={() => setView(v.key)}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              view === v.key ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'list' && (
+      <>
+      {/* 정렬 + 이름 검색 */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <label className="text-sm text-gray-400">정렬</label>
         <select
           value={sortBy}
@@ -1032,6 +1202,25 @@ export default function Characters() {
           <option value="recentConversations">최근 1주 대화 수</option>
           <option value="nationality">국적</option>
         </select>
+        <div className="relative ml-auto">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="이름 검색"
+            className="bg-gray-800 border border-gray-700 rounded-lg pl-3 pr-8 py-1.5 text-sm w-48"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 공개/제작중/비공개 탭 */}
@@ -1092,7 +1281,6 @@ export default function Characters() {
                 <th className="p-3">이름</th>
                 <th className="p-3">대화 수</th>
                 <th className="p-3">최근 1주</th>
-                <th className="p-3">V2 첫인사</th>
                 <th className="p-3">선제</th>
                 <th className="p-3">TTS</th>
                 <th className="p-3">푸시</th>
@@ -1144,22 +1332,6 @@ export default function Characters() {
                     )}
                   </td>
                   <td className="p-3">
-                    {(() => {
-                      const hasKo = !!c.firstMessageV2
-                      const isDraft = !!c.firstMessageV2Draft
-                      if (!hasKo) return <span className="text-gray-600 text-xs">—</span>
-                      const langs = ['ko']
-                      if (c.translations?.en?.firstMessageV2) langs.push('en')
-                      if (c.translations?.ja?.firstMessageV2) langs.push('ja')
-                      const tooltip = `언어: ${langs.join(' · ')}${isDraft ? ' (초안 — 채팅에선 V1 폴백)' : ''}`
-                      return isDraft ? (
-                        <span className="text-yellow-400 text-xs" title={tooltip}>📝 초안</span>
-                      ) : (
-                        <span className="text-green-400 text-xs" title={tooltip}>✅ {langs.join('·')}</span>
-                      )
-                    })()}
-                  </td>
-                  <td className="p-3">
                     <span className={c.proactiveEnabled ? 'text-green-400' : 'text-gray-500'}>
                       {c.proactiveEnabled ? 'ON' : 'OFF'}
                     </span>
@@ -1201,20 +1373,6 @@ export default function Characters() {
                         수정
                       </button>
                       <button
-                        onClick={() => navigate(`/admin/characters/${c.id}/feeds`)}
-                        className="text-purple-400 hover:text-purple-300 text-xs"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        피드
-                      </button>
-                      <button
-                        onClick={() => navigate(`/admin/characters/${c.id}/gifts`)}
-                        className="text-pink-400 hover:text-pink-300 text-xs"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        선물
-                      </button>
-                      <button
                         onClick={() => navigate(`/admin/characters/${c.id}/situations`)}
                         className="text-emerald-400 hover:text-emerald-300 text-xs"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -1250,6 +1408,20 @@ export default function Characters() {
           </table>
         )}
       </div>
+      </>
+      )}
+
+      {/* 출시 예약 캘린더 */}
+      {view === 'schedule' && (
+        <ScheduleCalendar
+          characters={characters}
+          month={calMonth}
+          onPrevMonth={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+          onNextMonth={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+          onToday={() => { const d = new Date(); setCalMonth(new Date(d.getFullYear(), d.getMonth(), 1)) }}
+          onPick={(c) => openEdit(c)}
+        />
+      )}
 
       {/* 푸시·인앱 알림 모달 */}
       {notifyTarget && (
@@ -1924,6 +2096,40 @@ export default function Characters() {
                   className="rounded"
                 />
                 공개<UsageTags items={[['노출 여부', 'meta']]} /></label>
+
+              {/* 출시 예약 — 미공개 상태에서만 유효. 예약 시각 도달 시 cron이 자동 공개. */}
+              {!form.isPublic && (
+                <div className="mt-1">
+                  <label className="text-sm text-gray-400 flex items-center gap-2">
+                    📅 출시 예약 (KST)
+                    <span className="text-xs text-gray-500">— 예약 시각에 자동 공개</span>
+                  </label>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <input
+                      type="datetime-local"
+                      value={form.scheduledPublishAt}
+                      onChange={(e) => setForm({ ...form, scheduledPublishAt: e.target.value })}
+                      className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    />
+                    {form.scheduledPublishAt && (
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, scheduledPublishAt: '' })}
+                        className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        예약 해제
+                      </button>
+                    )}
+                  </div>
+                  {form.scheduledPublishAt && fromDatetimeLocalKst(form.scheduledPublishAt) && (
+                    <p className="text-xs text-purple-300 mt-1">
+                      {formatKstDateTime(fromDatetimeLocalKst(form.scheduledPublishAt))} 공개 예정 · {formatRelativeKst(fromDatetimeLocalKst(form.scheduledPublishAt))}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* 선제 메시지 설정 */}
               <div className="border-t border-gray-700 pt-4 mt-2">
