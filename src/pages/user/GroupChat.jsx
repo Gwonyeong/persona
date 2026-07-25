@@ -11,7 +11,6 @@ import { isVideoUrl, CrossfadeMedia } from '../../components/SpriteMedia'
 // 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js의 GROUP_CHAT_COST와 동기
 const GROUP_MESSAGE_MASK_COST = 3
 
-const MIN_MEMBERS = 2
 const MAX_MEMBERS = 4
 
 function getImageUrl(filePath) {
@@ -67,11 +66,8 @@ export default function GroupChat() {
   const [groupChat, setGroupChat] = useState(null)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [showMembers, setShowMembers] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
-  const [addingMember, setAddingMember] = useState(false)
-  const [allCharacters, setAllCharacters] = useState([])
   // 스트리밍 중인 버블들 — 응답이 done되면 비워짐
   // 키: `${turnIdx}_${bubbleIdx}` → { turnIdx, characterId, bubbleIdx, role, content, complete }
   const [streamingBubbles, setStreamingBubbles] = useState([])
@@ -127,12 +123,6 @@ export default function GroupChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
   }, [groupChat?.messages?.length, streamingBubbles])
-
-  // 멤버 추가 모달 진입 시 캐릭터 목록 로드
-  useEffect(() => {
-    if (!addingMember || allCharacters.length > 0) return
-    api.get('/characters').then(({ characters }) => setAllCharacters(characters || []))
-  }, [addingMember])
 
   // 상·하단 오버레이 높이 측정 — presence 칩 개수/스프라이트 행 유무에 따라 가변이므로 ResizeObserver로 추적.
   // 메시지 영역 top/bottom 오프셋에 반영해 상단 아래에서 시작하고 인풋 박스 위에서 잘리게 함.
@@ -382,38 +372,6 @@ export default function GroupChat() {
     return () => clearTimeout(timer)
   }, [blockToast])
 
-  async function toggleMember(characterId, nextActive) {
-    if (!groupChat) return
-    try {
-      const { groupChat: updated } = await api.patch(`/group-chats/${id}/members/${characterId}`, {
-        isActive: nextActive,
-      })
-      setGroupChat(updated)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  async function removeMember(characterId) {
-    if (!groupChat || groupChat.members.length <= MIN_MEMBERS) return
-    try {
-      const { groupChat: updated } = await api.delete(`/group-chats/${id}/members/${characterId}`)
-      setGroupChat(updated)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  async function addMember(characterId) {
-    try {
-      const { groupChat: updated } = await api.post(`/group-chats/${id}/members`, { characterId })
-      setGroupChat(updated)
-      setAddingMember(false)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
   async function handleDelete() {
     try {
       await api.delete(`/group-chats/${id}`)
@@ -452,12 +410,8 @@ export default function GroupChat() {
           </svg>
         </button>
 
-        {/* 멤버 아바타 콜라주 */}
-        <button
-          onClick={() => setShowMembers(true)}
-          className="flex items-center gap-2 flex-1 min-w-0 text-left"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
+        {/* 멤버 아바타 콜라주 — 표시 전용 (멤버 시트는 하단 사람 아이콘 버튼으로 진입) */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 text-left">
           <div className="flex -space-x-2">
             {(groupChat.members || []).slice(0, 4).map((m) => {
               const src = getNeutralImage(m.character)
@@ -472,7 +426,7 @@ export default function GroupChat() {
             <div className="text-sm font-semibold text-white truncate">{headerTitle}</div>
             <div className="text-xs text-gray-500">{t('groupChat.members')}: {activeCount}/{(groupChat.members || []).length}</div>
           </div>
-        </button>
+        </div>
 
         {/* 상태 패널 접기/펼치기 — 셰브론 (1:1 채팅과 동일) */}
         <button
@@ -628,19 +582,37 @@ export default function GroupChat() {
         </button>
         </div>
 
-        {/* 설정 — 채팅 설정 페이지로 이동 (표정 이미지 출력 방식 등) */}
-        <button
-          onClick={() => navigate(`/group-chats/${id}/settings`)}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-800/80 border border-gray-700/50 text-gray-200 hover:bg-gray-700/80 shadow-lg transition-colors"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          aria-label={t('groupChatSettings.title', { defaultValue: '채팅 설정' })}
-          title={t('groupChatSettings.title', { defaultValue: '채팅 설정' })}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 멤버 — 멤버 관리 페이지로 이동. 1:1 채팅의 사람 아이콘 위치와 동일. */}
+          <button
+            onClick={() => navigate(`/group-chats/${id}/members`)}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-800/80 border border-gray-700/50 text-gray-200 hover:bg-gray-700/80 shadow-lg transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label={t('groupChat.members', { defaultValue: '멤버' })}
+            title={t('groupChat.members', { defaultValue: '멤버' })}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </button>
+
+          {/* 설정 — 채팅 설정 페이지로 이동 (표정 이미지 출력 방식 등) */}
+          <button
+            onClick={() => navigate(`/group-chats/${id}/settings`)}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-800/80 border border-gray-700/50 text-gray-200 hover:bg-gray-700/80 shadow-lg transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label={t('groupChatSettings.title', { defaultValue: '채팅 설정' })}
+            title={t('groupChatSettings.title', { defaultValue: '채팅 설정' })}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+        </div>
       </div>
       </div>
 
@@ -905,120 +877,6 @@ export default function GroupChat() {
         </div>
       </div>
       </div>
-
-      {/* 멤버 관리 패널 — 컨테이너 안 absolute */}
-      {showMembers && (
-        <div className="absolute inset-0 z-30 bg-black/60 flex items-end" onClick={() => setShowMembers(false)}>
-          <div
-            className="w-full max-w-[480px] mx-auto bg-gray-900 rounded-t-2xl border-t border-gray-800 p-4"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold">{t('groupChat.members')}</h3>
-              <button
-                onClick={() => setShowMembers(false)}
-                className="text-gray-400 hover:text-white text-sm"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2 mb-3">
-              {(groupChat.members || []).map((m) => {
-                const avatar = getNeutralImage(m.character)
-                return (
-                  <div key={m.characterId} className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/40">
-                    <div className="w-10 h-10 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
-                      {avatar && <img src={avatar} alt="" className={`w-full h-full object-cover ${m.isActive ? '' : 'grayscale opacity-50'}`} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-white truncate">{m.character?.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {m.isActive ? t('groupChat.toggleActive') : t('groupChat.toggleInactive')} · ♥ {m.affinity}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => toggleMember(m.characterId, !m.isActive)}
-                      className={`relative w-10 h-6 rounded-full transition-colors ${m.isActive ? 'bg-indigo-600' : 'bg-gray-700'}`}
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${m.isActive ? 'left-[18px]' : 'left-0.5'}`} />
-                    </button>
-                    {groupChat.members.length > MIN_MEMBERS && (
-                      <button
-                        onClick={() => removeMember(m.characterId)}
-                        className="text-red-400 text-xs hover:text-red-300 px-2 py-1"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        {t('groupChat.removeMember')}
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            {groupChat.members.length < MAX_MEMBERS && (
-              <button
-                onClick={() => setAddingMember(true)}
-                className="w-full py-2.5 rounded-xl bg-gray-800 text-white text-sm hover:bg-gray-700"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                + {t('groupChat.addMember')}
-              </button>
-            )}
-            {groupChat.members.length <= MIN_MEMBERS && (
-              <p className="text-xs text-gray-500 mt-2 text-center">{t('groupChat.minMembersWarning')}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 멤버 추가 모달 */}
-      {addingMember && (
-        <div className="absolute inset-0 z-40 bg-black/70 flex items-center justify-center px-4" onClick={() => setAddingMember(false)}>
-          <div
-            className="w-full max-w-[420px] bg-gray-900 rounded-2xl border border-gray-800 p-4 max-h-[70vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold">{t('groupChat.addMember')}</h3>
-              <button
-                onClick={() => setAddingMember(false)}
-                className="text-gray-400 hover:text-white text-sm"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {allCharacters
-                .filter((c) => !memberById.has(c.id))
-                .map((c) => {
-                  const thumb = c.styles?.[0]?.images?.[0]
-                  const thumbUrl = getImageUrl(c.profileImage) || getImageUrl(thumb?.filePath)
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => addMember(c.id)}
-                      className="rounded-xl overflow-hidden border border-gray-800 hover:border-indigo-500"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <div className="aspect-square bg-gray-800">
-                        {thumbUrl ? (
-                          <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-600">?</div>
-                        )}
-                      </div>
-                      <div className="px-2 py-1 text-xs text-white truncate">{c.name}</div>
-                    </button>
-                  )
-                })}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Safety OFF 확인 모달 */}
       {safetyConfirmVisible && (
