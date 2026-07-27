@@ -671,6 +671,13 @@ export default function Characters() {
       if (sortBy === 'recentConversations') {
         return (b.recentConversations7d || 0) - (a.recentConversations7d || 0)
       }
+      if (sortBy === 'recentStyle') {
+        const latestAt = (c) => {
+          const iso = (c.styles || []).reduce((m, s) => (s.createdAt && (!m || s.createdAt > m) ? s.createdAt : m), null)
+          return iso ? new Date(iso).getTime() : 0
+        }
+        return latestAt(b) - latestAt(a)
+      }
       if (sortBy === 'conversations') {
         return (b._count?.conversations || 0) - (a._count?.conversations || 0)
       }
@@ -1211,18 +1218,27 @@ export default function Characters() {
       <>
       {/* 정렬 + 이름 검색 */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <label className="text-sm text-gray-400">정렬</label>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <option value="name">이름순</option>
-          <option value="conversations">대화 수 (내림차)</option>
-          <option value="recentConversations">최근 1주 대화 수</option>
-          <option value="nationality">국적</option>
-        </select>
+        <span className="text-sm text-gray-400">정렬</span>
+        {[
+          { key: 'name', label: '이름순' },
+          { key: 'conversations', label: '대화 수 ↓' },
+          { key: 'recentConversations', label: '최근 1주 ↓' },
+          { key: 'recentStyle', label: '스타일 최근추가 ↓' },
+          { key: 'nationality', label: '국적' },
+        ].map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSortBy(s.key)}
+            className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+              sortBy === s.key
+                ? 'bg-indigo-600 border-indigo-500 text-white'
+                : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {s.label}
+          </button>
+        ))}
         <div className="relative ml-auto">
           <input
             type="text"
@@ -1369,17 +1385,32 @@ export default function Characters() {
                         return acc
                       }, {})
                       if (styles.length === 0) return <span className="text-gray-600 text-xs">-</span>
+                      // 타입 무관 가장 최근에 추가된 스타일 시각
+                      const latestStyleAt = styles.reduce((max, s) => {
+                        if (!s.createdAt) return max
+                        return !max || s.createdAt > max ? s.createdAt : max
+                      }, null)
                       return (
-                        <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                          <span className="text-gray-300 font-medium">{styles.length}</span>
-                          {counts.DEFAULT > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">기본 {counts.DEFAULT}</span>
-                          )}
-                          {counts.GACHA > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300">가챠 {counts.GACHA}</span>
-                          )}
-                          {counts.SHOP > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">상점 {counts.SHOP}</span>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="text-gray-300 font-medium">{styles.length}</span>
+                            {counts.DEFAULT > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">기본 {counts.DEFAULT}</span>
+                            )}
+                            {counts.GACHA > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300">가챠 {counts.GACHA}</span>
+                            )}
+                            {counts.SHOP > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">상점 {counts.SHOP}</span>
+                            )}
+                          </div>
+                          {latestStyleAt && (
+                            <div
+                              className={`text-[11px] mt-1 ${isRecentPublish(latestStyleAt) ? 'text-green-400' : 'text-red-400'}`}
+                              title={formatKstDateTime(latestStyleAt)}
+                            >
+                              최근 추가 {formatPublishedAgo(latestStyleAt)}
+                            </div>
                           )}
                         </div>
                       )
