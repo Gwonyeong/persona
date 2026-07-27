@@ -986,13 +986,15 @@ export default function MaskShop() {
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 mb-4">
-              {(detailStyle.previewVideos?.length ? detailStyle.previewVideos : [detailStyle.thumbnailUrl]).slice(0, 2).map((src, idx) => (
+              {(detailStyle.previewMedia?.length
+                ? detailStyle.previewMedia
+                : (detailStyle.thumbnailUrl ? [{ type: 'image', src: detailStyle.thumbnailUrl }] : [])
+              ).slice(0, 2).map((m, idx) => (
                 <div key={idx} className="relative rounded-xl overflow-hidden bg-gray-800" style={{ aspectRatio: '9 / 16' }}>
-                  {src && (detailStyle.previewVideos?.length ? (
+                  {m.type === 'video' ? (
                     <video
-                      src={src}
+                      src={m.src}
                       className="absolute inset-0 w-full h-full object-cover"
-                      style={detailStyle.owned ? undefined : { filter: 'blur(16px)', transform: 'scale(1.25)' }}
                       muted
                       loop
                       autoPlay
@@ -1001,26 +1003,47 @@ export default function MaskShop() {
                     />
                   ) : (
                     <img
-                      src={src}
+                      src={m.src}
                       alt=""
                       draggable={false}
                       className="absolute inset-0 w-full h-full object-cover"
-                      style={detailStyle.owned ? undefined : { filter: 'blur(16px)', transform: 'scale(1.25)' }}
                     />
-                  ))}
-                  {!detailStyle.owned && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-9 h-9 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                          <rect x="3" y="11" width="18" height="11" rx="2" />
-                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                      </div>
-                    </div>
                   )}
                 </div>
               ))}
             </div>
+
+            {/* 이 의상에 연결된 상황극 카드 */}
+            {detailStyle.linkedSituationCards?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] text-gray-500 mb-2">
+                  {t('maskShop.linkedSituation', { defaultValue: '이 의상으로 즐기는 상황극' })}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {detailStyle.linkedSituationCards.map((card) => (
+                    <div
+                      key={card.id}
+                      className="flex items-start gap-2.5 rounded-xl bg-gray-800/70 border border-gray-700 p-3"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-gray-900 flex items-center justify-center text-lg flex-shrink-0">
+                        {card.emoji || '🎬'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[13px] font-semibold text-white truncate">{card.title}</p>
+                          {card.safety === 'NSFW' && (
+                            <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-rose-600/90 text-white text-[9px] font-bold">19+</span>
+                          )}
+                        </div>
+                        {card.summary && (
+                          <p className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-2">{card.summary}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <p className="text-[11px] text-gray-500 text-center mb-3">{t('maskShop.styleUnlockNote')}</p>
 
