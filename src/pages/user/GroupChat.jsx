@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
@@ -58,6 +58,81 @@ function parseMessageSegments(content, role) {
   })
 }
 
+// 메시지 한 개를 렌더링하는 메모이즈된 컴포넌트.
+// 부모(GroupChat) 리렌더(특히 인풋 타이핑 시 setInput)로 인한 전체 메시지 리스트 재렌더 lag를
+// 차단하기 위해 React.memo로 감싼다. (V1 Chat.jsx의 MessageBubble과 동일한 목적)
+// props(msg / character / 그룹핑 플래그)는 부모에서 참조 안정적으로 넘겨야 memo가 실제로 동작한다.
+const GroupMessageBubble = memo(function GroupMessageBubble({ msg, character, isConsecutivePrev, isLastInGroup }) {
+  const segs = useMemo(
+    () => (msg.role === 'NARRATION' ? null : parseMessageSegments(msg.content, msg.role === 'USER' ? 'USER' : 'CHARACTER')),
+    [msg.content, msg.role]
+  )
+
+  if (msg.role === 'NARRATION') {
+    return (
+      <div className="my-3 mx-4 px-3 py-2 bg-gray-900/70 rounded-lg text-center text-xs text-gray-300 italic leading-relaxed">
+        {msg.content}
+      </div>
+    )
+  }
+  if (msg.role === 'USER') {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[75%] px-3 py-2 rounded-2xl rounded-tr-md bg-indigo-600 text-white text-sm leading-relaxed whitespace-pre-wrap">
+          {segs.map((s, i) => (
+            <span key={i}>
+              {i > 0 && '\n\n'}
+              {s.type === 'action'
+                ? <span className="italic text-indigo-200/70">{s.value}</span>
+                : s.value}
+            </span>
+          ))}
+          {isLastInGroup && (
+            <div className="text-[10px] text-indigo-200/70 mt-0.5 text-right">{formatChatTime(msg.createdAt)}</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (msg.role === 'CHARACTER') {
+    const avatar = getNeutralImage(character)
+    return (
+      <div className="flex items-start gap-2">
+        {/* 아바타 — 그룹의 첫 버블에만 표시. 연속이면 동일 너비 공백 spacer로 정렬 유지 */}
+        <div className="w-8 flex-shrink-0">
+          {!isConsecutivePrev && (
+            <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
+              {avatar && <img src={avatar} alt="" className="w-full h-full object-cover" />}
+            </div>
+          )}
+        </div>
+        <div className="max-w-[75%]">
+          {!isConsecutivePrev && (
+            <div className="text-xs text-gray-400 mb-0.5">{character?.name || '...'}</div>
+          )}
+          <div className="px-3 py-2 rounded-2xl rounded-tl-md bg-gray-800 text-white text-sm leading-relaxed whitespace-pre-wrap">
+            {segs.map((s, i) => (
+              <span key={i}>
+                {i > 0 && '\n\n'}
+                {s.type === 'action'
+                  ? <span className="italic text-gray-400/80">{s.value}</span>
+                  : s.value}
+              </span>
+            ))}
+            {msg.audioUrl && (
+              <audio controls src={msg.audioUrl} className="block mt-1 w-full h-8" />
+            )}
+          </div>
+          {isLastInGroup && (
+            <div className="text-[10px] text-gray-500 mt-0.5">{formatChatTime(msg.createdAt)}</div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  return null
+})
+
 export default function GroupChat() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -77,6 +152,16 @@ export default function GroupChat() {
   const [showStatusPanel, setShowStatusPanel] = useState(true) // 상단 캐릭터 상태 패널 접기/펼치기 (1:1 채팅과 동일)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  // 페이지네이션 — 초기엔 최근 PAGE_SIZE개만 서버에서 받고(전송량 절감), 위로 스크롤 시
+  // IntersectionObserver가 top sentinel을 감지해 이전 청크를 서버에서 fetch·prepend한다.
+  const PAGE_SIZE = 50
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const scrollContainerRef = useRef(null)
+  const topSentinelRef = useRef(null)
+  // 서버에 아직 안 받은 이전 메시지가 남았는지. windowStartRef = 현재 보유한 첫 메시지의 전체 배열 내 절대 인덱스.
+  const [hasMoreBefore, setHasMoreBefore] = useState(false)
+  const windowStartRef = useRef(0)
+  const loadingOlderRef = useRef(false)
   // 상단 오버레이(헤더+캐릭터 정보+토글) 높이 — 메시지 영역이 그 아래에서 시작하도록 top 오프셋에 반영
   const topBarRef = useRef(null)
   const [topBarHeight, setTopBarHeight] = useState(0)
@@ -108,9 +193,12 @@ export default function GroupChat() {
 
   useEffect(() => {
     if (!token) return
-    api.get(`/group-chats/${id}`).then(({ groupChat }) => {
+    // 초기엔 최근 PAGE_SIZE개만 요청 — 히스토리 많은 방의 초기 전송량/파싱 비용 절감.
+    api.get(`/group-chats/${id}?limit=${PAGE_SIZE}`).then(({ groupChat }) => {
       setGroupChat(groupChat)
       setVoiceMode(!!groupChat.voiceMode)
+      windowStartRef.current = groupChat.messageWindowStart ?? 0
+      setHasMoreBefore(!!groupChat.hasMoreBefore)
     }).catch((err) => {
       console.error(err)
       if (err.status === 404) navigate('/chats', { replace: true })
@@ -119,10 +207,14 @@ export default function GroupChat() {
 
   // 스크롤은 항상 즉시 바닥으로 — 페이지 진입·새 메시지·스트리밍 delta 모두 동일.
   // 'smooth' 애니메이션을 쓰면 진입 시 상→하 스크롤이 보이고 스트리밍 중 따라가지 못함.
-  // streamingBubbles 전체 ref 변화를 dep에 포함해 delta마다 즉시 재스크롤.
+  // dep는 "마지막 메시지 시각" — 위로 스크롤해 이전 청크를 prepend할 땐 마지막 메시지가 안 바뀌므로
+  // 바닥으로 튕기지 않는다(개수 dep면 prepend 때도 발동함). streamingBubbles는 delta마다 재스크롤용.
+  const lastMessageAt = groupChat?.messages?.length
+    ? groupChat.messages[groupChat.messages.length - 1].createdAt
+    : null
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
-  }, [groupChat?.messages?.length, streamingBubbles])
+  }, [lastMessageAt, streamingBubbles])
 
   // 상·하단 오버레이 높이 측정 — presence 칩 개수/스프라이트 행 유무에 따라 가변이므로 ResizeObserver로 추적.
   // 메시지 영역 top/bottom 오프셋에 반영해 상단 아래에서 시작하고 인풋 박스 위에서 잘리게 함.
@@ -372,6 +464,71 @@ export default function GroupChat() {
     return () => clearTimeout(timer)
   }, [blockToast])
 
+  // 렌더 가능한 메시지 전체 목록 (memoize — 인풋 타이핑 리렌더마다 filter 재계산 방지).
+  const renderableMessages = useMemo(
+    () => (groupChat?.messages || []).filter((m) => m.content || m.role === 'GENERATED_IMAGE'),
+    [groupChat?.messages]
+  )
+
+  // 렌더 페이지네이션 — 최근 visibleCount개만 DOM에 그림. slice는 뒤(최신)에서 잘라 항상 최신이 보이게.
+  const visibleStart = Math.max(0, renderableMessages.length - visibleCount)
+  const visibleMessages = useMemo(
+    () => renderableMessages.slice(visibleStart),
+    [renderableMessages, visibleStart]
+  )
+
+  // 위로 스크롤 시 이전 메시지 로드 (스크롤 위치 보존). V1 Chat.jsx의 loadMore와 동일 전략:
+  //  1) 로컬에 아직 안 그린 메시지가 있으면 그것부터 노출(네트워크 X)
+  //  2) 다 그렸는데 서버에 이전 청크가 더 있으면(hasMoreBefore) 서버에서 fetch해 앞에 prepend
+  const loadMore = useCallback(async () => {
+    const container = scrollContainerRef.current
+    const prevHeight = container?.scrollHeight ?? 0
+    const prevTop = container?.scrollTop ?? 0
+    const restoreScroll = () => requestAnimationFrame(() => {
+      if (container) container.scrollTop = container.scrollHeight - prevHeight + prevTop
+    })
+
+    if (visibleStart > 0) {
+      setVisibleCount((c) => Math.min(renderableMessages.length, c + PAGE_SIZE))
+      restoreScroll()
+      return
+    }
+
+    if (!hasMoreBefore || loadingOlderRef.current) return
+    loadingOlderRef.current = true
+    try {
+      const resp = await api.get(
+        `/group-chats/${id}/messages?limit=${PAGE_SIZE}&before=${windowStartRef.current}`
+      )
+      windowStartRef.current = resp.messageWindowStart ?? 0
+      setHasMoreBefore(!!resp.hasMoreBefore)
+      const older = Array.isArray(resp.messages) ? resp.messages : []
+      if (older.length) {
+        const olderRenderable = older.filter((m) => m.content || m.role === 'GENERATED_IMAGE').length
+        setGroupChat((prev) => prev ? { ...prev, messages: [...older, ...(prev.messages || [])] } : prev)
+        // prepend한 렌더 가능한 개수만큼 window를 넓혀 새로 붙은 이전 메시지를 노출.
+        setVisibleCount((c) => c + olderRenderable)
+        restoreScroll()
+      }
+    } catch {
+      // 이전 청크 로드 실패는 조용히 무시 (다음 스크롤에서 재시도)
+    } finally {
+      loadingOlderRef.current = false
+    }
+  }, [visibleStart, renderableMessages.length, hasMoreBefore, id])
+
+  useEffect(() => {
+    // 로컬에 안 그린 게 남았거나(visibleStart>0) 서버에 이전 청크가 더 있으면 옵저버 부착.
+    if (visibleStart <= 0 && !hasMoreBefore) return
+    const sentinel = topSentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) loadMore()
+    }, { threshold: 0, root: scrollContainerRef.current, rootMargin: '200px 0px 0px 0px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleStart, hasMoreBefore, loadMore])
+
   async function handleDelete() {
     try {
       await api.delete(`/group-chats/${id}`)
@@ -386,8 +543,6 @@ export default function GroupChat() {
       <div className="pt-10 text-center text-gray-500 text-sm">{t('common.loading', { defaultValue: '...' })}</div>
     )
   }
-
-  const renderableMessages = (groupChat.messages || []).filter((m) => m.content || m.role === 'GENERATED_IMAGE')
 
   return (
     <div className="flex flex-col h-full relative">
@@ -637,18 +792,23 @@ export default function GroupChat() {
       {/* 메시지 영역 — 전체 높이를 채우고(flex-1), 상·하단 오버레이는 반투명 absolute라 그 뒤로 메시지가 비쳐 스크롤됨.
           패딩으로 첫/마지막 메시지가 오버레이에 가리지 않게 여백 확보 (상태바·스프라이트 뒤로 채팅 보임). */}
       <div
+        ref={scrollContainerRef}
         className="relative z-10 flex-1 overflow-y-auto px-3 space-y-2"
         style={{
           paddingTop: `${topBarHeight + 12}px`,
           paddingBottom: `${bottomBarHeight + 8}px`,
         }}
       >
+        {/* 위로 스크롤 시 이전 메시지를 더 노출시키는 sentinel — 아직 안 그린 메시지가 있을 때만 존재 */}
+        {(visibleStart > 0 || hasMoreBefore) && <div ref={topSentinelRef} className="h-px" aria-hidden />}
         {renderableMessages.length === 0 && (
           <div className="text-center text-sm text-gray-500 py-10">{t('groupChat.emptyMessages')}</div>
         )}
-        {renderableMessages.map((msg, idx) => {
+        {visibleMessages.map((msg, i) => {
           // 연속 버블 그룹핑: 같은 작가(USER끼리 또는 같은 characterId)에 같은 분이면 한 그룹.
           // 그룹 내 첫 버블만 아바타/이름 표시, 마지막 버블만 시간 표시.
+          // 그룹핑 판정은 잘리지 않은 전체 목록(renderableMessages) 기준으로 해야 윈도우 경계에서도 정확.
+          const idx = visibleStart + i
           const prevMsg = renderableMessages[idx - 1]
           const nextMsg = renderableMessages[idx + 1]
           const sameAuthor = (a, b) => {
@@ -663,74 +823,17 @@ export default function GroupChat() {
           }
           const isConsecutivePrev = sameAuthor(prevMsg, msg) && sameMinute(prevMsg, msg)
           const isLastInGroup = !sameAuthor(msg, nextMsg) || !sameMinute(msg, nextMsg)
+          const character = msg.role === 'CHARACTER' ? memberById.get(msg.characterId)?.character : undefined
 
-          if (msg.role === 'NARRATION') {
-            return (
-              <div key={idx} className="my-3 mx-4 px-3 py-2 bg-gray-900/70 rounded-lg text-center text-xs text-gray-300 italic leading-relaxed">
-                {msg.content}
-              </div>
-            )
-          }
-          if (msg.role === 'USER') {
-            const segs = parseMessageSegments(msg.content, 'USER')
-            return (
-              <div key={idx} className="flex justify-end">
-                <div className="max-w-[75%] px-3 py-2 rounded-2xl rounded-tr-md bg-indigo-600 text-white text-sm leading-relaxed whitespace-pre-wrap">
-                  {segs.map((s, i) => (
-                    <span key={i}>
-                      {i > 0 && '\n\n'}
-                      {s.type === 'action'
-                        ? <span className="italic text-indigo-200/70">{s.value}</span>
-                        : s.value}
-                    </span>
-                  ))}
-                  {isLastInGroup && (
-                    <div className="text-[10px] text-indigo-200/70 mt-0.5 text-right">{formatChatTime(msg.createdAt)}</div>
-                  )}
-                </div>
-              </div>
-            )
-          }
-          if (msg.role === 'CHARACTER') {
-            const member = memberById.get(msg.characterId)
-            const character = member?.character
-            const avatar = getNeutralImage(character)
-            const segs = parseMessageSegments(msg.content, 'CHARACTER')
-            return (
-              <div key={idx} className="flex items-start gap-2">
-                {/* 아바타 — 그룹의 첫 버블에만 표시. 연속이면 동일 너비 공백 spacer로 정렬 유지 */}
-                <div className="w-8 flex-shrink-0">
-                  {!isConsecutivePrev && (
-                    <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden">
-                      {avatar && <img src={avatar} alt="" className="w-full h-full object-cover" />}
-                    </div>
-                  )}
-                </div>
-                <div className="max-w-[75%]">
-                  {!isConsecutivePrev && (
-                    <div className="text-xs text-gray-400 mb-0.5">{character?.name || '...'}</div>
-                  )}
-                  <div className="px-3 py-2 rounded-2xl rounded-tl-md bg-gray-800 text-white text-sm leading-relaxed whitespace-pre-wrap">
-                    {segs.map((s, i) => (
-                      <span key={i}>
-                        {i > 0 && '\n\n'}
-                        {s.type === 'action'
-                          ? <span className="italic text-gray-400/80">{s.value}</span>
-                          : s.value}
-                      </span>
-                    ))}
-                    {msg.audioUrl && (
-                      <audio controls src={msg.audioUrl} className="block mt-1 w-full h-8" />
-                    )}
-                  </div>
-                  {isLastInGroup && (
-                    <div className="text-[10px] text-gray-500 mt-0.5">{formatChatTime(msg.createdAt)}</div>
-                  )}
-                </div>
-              </div>
-            )
-          }
-          return null
+          return (
+            <GroupMessageBubble
+              key={idx}
+              msg={msg}
+              character={character}
+              isConsecutivePrev={isConsecutivePrev}
+              isLastInGroup={isLastInGroup}
+            />
+          )
         })}
 
         {/* 대기 버블 — 메시지 전송 직후 첫 delta가 오기 전까지의 빈 구간 */}
