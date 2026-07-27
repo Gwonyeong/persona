@@ -10,8 +10,8 @@ const NAV_ITEMS = [
     label: '캐릭터',
     children: [
       { to: '/admin/characters', label: '캐릭터 관리' },
-      { to: '/admin/storylines', label: '스토리' },
       { to: '/admin/expressions', label: '표정 이미지' },
+      { to: '/admin/storylines', label: '스토리', deprecated: true },
       { to: '/admin/base-images', label: '베이스 이미지', deprecated: true },
       { to: '/admin/affinity-images', label: '호감도 이미지', deprecated: true },
     ],

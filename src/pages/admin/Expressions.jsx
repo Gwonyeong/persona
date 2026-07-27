@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import JSZip from 'jszip'
@@ -6,8 +6,21 @@ import { api } from '../../lib/api'
 import { removeChromaBackground } from '../../lib/removeChromaBackground'
 import useVideoJobs from '../../store/useVideoJobs'
 
-const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
-const PAGE_SIZE = 10
+export const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
+
+// 최근 스타일 추가 시각 → 경과 일수. 없거나 잘못된 값이면 null.
+function daysSince(dateStr) {
+  if (!dateStr) return null
+  const then = new Date(dateStr)
+  if (Number.isNaN(then.getTime())) return null
+  return Math.floor((Date.now() - then.getTime()) / 86400000)
+}
+
+// 경과 일수 → "오늘 / n일 전" 라벨.
+function relativeDaysLabel(days) {
+  if (days == null) return null
+  return days <= 0 ? '오늘' : `${days}일 전`
+}
 
 // 표정 sprite 미디어 — 비디오(mp4/webm/...)는 자동재생/루프/음소거로 미리보기.
 // 채팅 출력 시에도 동일하게 음소거로 재생됨.
@@ -86,36 +99,6 @@ function extractFirstFrameBlob(file) {
 
 // 서버 buildExpressionPrompt의 디폴트 구도 문구와 일치시킨다.
 const DEFAULT_COMPOSITION_KO = '정면(eye-level) 상반신 포트레이트, 인물 중앙 정렬, 레퍼런스와 동일한 크롭·조명'
-const DEFAULT_COMPOSITION_EN =
-  'eye-level head-and-shoulders portrait, character centered, identical framing and crop to the reference, same lighting style as the reference'
-
-// 배경 옵션 — server/src/lib/expressionPrompt.js와 동기화.
-const BACKGROUND_LINES = {
-  black:
-    'Background: a perfectly flat, solid, pure black (#000000, rgb(0,0,0)) background. No gradients, no shadows on the background, no patterns, no objects, no scenery, no environmental details. Pure flat black only, edge to edge.',
-  cyan:
-    'Background: a perfectly flat, solid, pure cyan (#00FFFF, rgb(0,255,255)) chroma-key background. No gradients, no shadows on the background, no patterns, no objects, no scenery, no environmental details. Pure flat cyan only, edge to edge. The character itself must NOT contain any cyan/turquoise/aqua color — only the background is cyan.',
-}
-
-// 서버 buildExpressionPrompt와 동일한 조립 순서로 전문(全文)을 만든다.
-// posePrompt는 운영자가 모달에서 추가 입력하는 값이라 기본 미리보기에서는 비움.
-function buildExpressionPromptPreview(emotion, { background = 'black', posePrompt = '' } = {}) {
-  const expr = EXPRESSION_PROMPTS[emotion] || 'a clear, distinct emotional expression matching the emotion label'
-  const trimmedPose = (posePrompt || '').trim()
-  const lines = [
-    'Strictly preserve the art style, character design, face shape, hair color, hairstyle, outfit, and body type of the provided reference image. Recreate the exact same character.',
-    `Change the facial expression to: ${expr}.`,
-    `Default composition: ${DEFAULT_COMPOSITION_EN}.`,
-  ]
-  if (trimmedPose) {
-    lines.push(
-      `Additional composition / pose guidance (this overrides the default above when it specifies a different framing, angle, or pose): ${trimmedPose}.`,
-    )
-  }
-  lines.push(BACKGROUND_LINES[background] || BACKGROUND_LINES.black)
-  lines.push('No text, no watermarks, no logos anywhere.')
-  return lines.join(' ')
-}
 
 // 일반 표정 (Safety Mode ON에서도 노출)
 const SFW_EMOTIONS = [
@@ -125,28 +108,6 @@ const SFW_EMOTIONS = [
   { key: 'SAD', label: '슬픔' },
   { key: 'SHY', label: '설렘' },
 ]
-
-// server/src/lib/expressionPrompt.js#EXPRESSION_DESCRIPTORS와 동기화. 서버 변경 시 같이 수정.
-const EXPRESSION_PROMPTS = {
-  NEUTRAL: 'calm, relaxed neutral expression, soft closed mouth, eyes looking forward, no strong emotion',
-  HAPPY: 'bright joyful smile with mouth slightly open, eyes warmly squinted from genuine happiness, cheeks lifted',
-  ANGRY: 'furrowed angry brow, narrowed glaring eyes, tightly pressed lips or a sharp scowl, intense irritation',
-  SAD: 'downturned mouth, glossy slightly tearful eyes, drooped eyelids, head tilted very slightly downward, sorrowful',
-  SURPRISED: 'eyes wide open, eyebrows raised high, mouth slightly opened in a small "oh" of surprise',
-  SHY: 'flustered, heart-fluttering expression of someone smitten with the person in front of them — clearly visible warm blush across the cheeks and nose bridge, eyes shyly glancing to the side or downward as if unable to hold the gaze, a soft bashful smile gently curling the lips, slightly tilted head, subtle look of infatuation and quiet excitement',
-  ANNOYED: 'slightly furrowed brow, sideways sulky glance, mouth set in a small displeased line, mildly annoyed',
-  WORRIED: 'softly furrowed concerned brow, slightly downturned mouth, anxious wide eyes, gentle worry',
-  PLAYFUL: 'mischievous closed-mouth smile or smirk, eyes glinting with playful intent, head tilted slightly',
-  EXCITED: 'wide bright open smile with eyes lit up, eager animated expression, joyful energy',
-  AROUSED_TEASE: 'flirty teasing smirk, half-lidded suggestive eyes, subtle blush, playful expression',
-  AROUSED_TOPLESS: 'soft heated expression, parted lips, half-lidded eyes, subtle blush',
-  AROUSED_NUDE: 'soft anticipatory expression, slightly parted lips, half-lidded eyes, light blush',
-  AROUSED_FOREPLAY: 'lost in sensation, eyes half-closed, mouth slightly open, deep blush',
-  AROUSED_INSERT: 'eyes squeezed shut or unfocused, mouth open in a quiet gasp, deep blush, intense expression',
-  AROUSED_INSERT_ALT: 'eyes half-closed, mouth open in a heated gasp, flushed cheeks, intense expression',
-  AROUSED_CLIMAX: 'eyes welling with tears or rolled slightly up, mouth open in a quiet cry, deep blush, defenseless expression at the peak',
-  AROUSED_AFTERGLOW: 'soft dazed expression, half-lidded peaceful eyes, faint smile, languid afterglow',
-}
 
 // 흥분 표정 (NSFW) — 성인 인증 + Safety Mode OFF 유저에게만 출력
 // desc는 운영자가 어떤 컨셉의 이미지를 업로드해야 하는지 안내.
@@ -161,13 +122,13 @@ const NSFW_EMOTIONS = [
   { key: 'AROUSED_AFTERGLOW', label: '여운', desc: '마무리 · 나른함 · 풀린 표정 · 절정 후 정적' },
 ]
 
-const EMOTION_TABS = {
+export const EMOTION_TABS = {
   sfw: { label: '일반', emotions: SFW_EMOTIONS },
   nsfw: { label: '흥분 (NSFW)', emotions: NSFW_EMOTIONS },
 }
 
 // 'bg'는 emotions를 안 쓰고 별도 컴포넌트로 렌더링.
-const TABS = [
+export const TABS = [
   { id: 'sfw', label: '일반' },
   { id: 'nsfw', label: '흥분 (NSFW)' },
   { id: 'bg', label: '배경' },
@@ -175,153 +136,46 @@ const TABS = [
 
 export default function Expressions() {
   const [characters, setCharacters] = useState(null)
-  const [filter, setFilter] = useState('ALL') // ALL | INCOMPLETE | NO_STYLE
-  const [page, setPage] = useState(1)
-  const [tab, setTab] = useState('sfw') // sfw | nsfw | bg
   const [visibility, setVisibility] = useState('public') // public | private
-  const currentEmotions = tab === 'bg' ? [] : EMOTION_TABS[tab].emotions
+  const [query, setQuery] = useState('')
+  const [sortBy, setSortBy] = useState('name') // name | recent
 
   useEffect(() => {
-    api.get('/admin/expressions-overview').then(({ characters }) => setCharacters(characters || []))
+    api.get('/admin/expressions-characters').then(({ characters }) => setCharacters(characters || []))
   }, [])
 
-  // 같은 (styleId, emotion)에 여러 이미지 허용 — 추가/삭제/업데이트 별도 핸들러.
-  // 이제 스타일 단위로 동작 — characterId + styleId 인자.
-  const patchStyle = (characterId, styleId, mapImages) => {
-    setCharacters((prev) =>
-      prev.map((c) => {
-        if (c.id !== characterId) return c
-        const nextStyles = (c.styles || []).map((s) =>
-          s.id === styleId ? { ...s, images: mapImages(s.images) } : s,
-        )
-        const nextDefault =
-          c.defaultStyle && c.defaultStyle.id === styleId
-            ? { ...c.defaultStyle, images: mapImages(c.defaultStyle.images) }
-            : c.defaultStyle
-        return { ...c, styles: nextStyles, defaultStyle: nextDefault }
-      }),
-    )
-  }
-  const addImage = (characterId, styleId, image) => {
-    patchStyle(characterId, styleId, (imgs) => [
-      ...imgs,
-      {
-        id: image.id,
-        emotion: image.emotion,
-        filePath: image.filePath,
-        videoFilePath: image.videoFilePath ?? null,
-      },
-    ])
-  }
-  const removeImage = (characterId, styleId, imageId) => {
-    patchStyle(characterId, styleId, (imgs) => imgs.filter((i) => i.id !== imageId))
-  }
-  const updateImage = (characterId, styleId, imageId, patch) => {
-    patchStyle(characterId, styleId, (imgs) =>
-      imgs.map((i) => (i.id === imageId ? { ...i, ...patch } : i)),
-    )
-  }
-
-  const reloadOverview = () => {
-    api.get('/admin/expressions-overview').then(({ characters }) => setCharacters(characters || []))
-  }
-
-  // 공개/비공개로 먼저 분할 → 필터·페이징은 분할된 집합 안에서 동작.
-  // 비공개는 채팅 수 기준이 무의미하므로 최신 생성순으로 재정렬.
-  const visibilityScoped = useMemo(() => {
+  // 공개/비공개 분할 → 이름 검색 → 정렬(이름순 / 최근 스타일 출시일순).
+  const scoped = useMemo(() => {
     if (!characters) return []
-    const scoped = characters.filter((c) => (visibility === 'public' ? c.isPublic : !c.isPublic))
-    if (visibility === 'private') {
-      return [...scoped].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    }
-    return scoped
-  }, [characters, visibility])
-
-  const filtered = useMemo(() => {
-    if (filter === 'INCOMPLETE') {
-      // 현재 탭의 emotion 중 1장도 없는 게 있으면 미완성 (다중 이미지 모드)
-      const tabKeys = new Set(currentEmotions.map((e) => e.key))
-      return visibilityScoped.filter((c) => {
-        if (!c.defaultStyle) return false
-        const filledEmotions = new Set(
-          c.defaultStyle.images.filter((i) => tabKeys.has(i.emotion)).map((i) => i.emotion),
-        )
-        return filledEmotions.size < currentEmotions.length
+    const q = query.trim().toLowerCase()
+    const list = characters
+      .filter((c) => (visibility === 'public' ? c.isPublic : !c.isPublic))
+      .filter((c) => !q || (c.name || '').toLowerCase().includes(q))
+    if (sortBy === 'recent') {
+      // 최근 출시(스타일 추가)가 위로. latestStyleAt 없는 캐릭터는 맨 아래.
+      return [...list].sort((a, b) => {
+        const ta = a.latestStyleAt ? new Date(a.latestStyleAt).getTime() : -Infinity
+        const tb = b.latestStyleAt ? new Date(b.latestStyleAt).getTime() : -Infinity
+        if (tb !== ta) return tb - ta
+        return (a.name || '').localeCompare(b.name || '', 'ko')
       })
     }
-    if (filter === 'NO_STYLE') return visibilityScoped.filter((c) => !c.defaultStyle)
-    return visibilityScoped
-  }, [visibilityScoped, filter, currentEmotions])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+    return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ko'))
+  }, [characters, visibility, query, sortBy])
 
   if (!characters) return <div className="p-6 text-gray-400">로딩 중...</div>
 
   return (
     <div className="p-6">
-      <div className="flex items-end justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold">표정 이미지</h2>
-          <p className="text-sm text-gray-400 mt-1">
-            기본 스타일(첫 번째 스타일) 기준 · 캐릭터 {characters.length}명
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* 탭: 일반 / NSFW / 배경 */}
-          <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
-            {TABS.map((def) => (
-              <button
-                key={def.id}
-                onClick={() => {
-                  setTab(def.id)
-                  setPage(1)
-                }}
-                className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                  tab === def.id
-                    ? def.id === 'nsfw'
-                      ? 'bg-pink-600 text-white'
-                      : def.id === 'bg'
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-indigo-600 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                style={NO_OUTLINE}
-              >
-                {def.label}
-              </button>
-            ))}
-          </div>
-          {/* 필터 (표정 탭에서만) */}
-          {tab !== 'bg' && (
-            <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
-              {[
-                { id: 'ALL', label: '전체' },
-                { id: 'INCOMPLETE', label: '미완성' },
-                { id: 'NO_STYLE', label: '스타일 없음' },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => {
-                    setFilter(f.id)
-                    setPage(1)
-                  }}
-                  className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                    filter === f.id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                  style={NO_OUTLINE}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="mb-4">
+        <h2 className="text-xl font-bold">표정 이미지</h2>
+        <p className="text-sm text-gray-400 mt-1">
+          캐릭터를 선택해 표정 이미지를 관리하세요 · 총 {characters.length}명
+        </p>
       </div>
 
       {/* 공개/비공개 탭 */}
-      <div className="flex gap-1 mb-4 border-b border-gray-800">
+      <div className="flex gap-1 mb-5 border-b border-gray-800">
         {[
           { key: 'public', label: '공개' },
           { key: 'private', label: '비공개' },
@@ -330,10 +184,7 @@ export default function Expressions() {
           return (
             <button
               key={v.key}
-              onClick={() => {
-                setVisibility(v.key)
-                setPage(1)
-              }}
+              onClick={() => setVisibility(v.key)}
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 visibility === v.key
                   ? 'border-indigo-500 text-white'
@@ -347,207 +198,93 @@ export default function Expressions() {
         })}
       </div>
 
-      {tab === 'nsfw' && (
-        <div className="mb-4 bg-pink-950/30 border border-pink-800/40 rounded-xl px-4 py-3">
-          <p className="text-xs text-pink-200 leading-relaxed">
-            <span className="font-semibold">흥분 단계 가이드</span> — 서사 진행 순서로 배치되어 있습니다.
-            도발 → 노출 → 행위 → 절정 → 여운. 각 열의 안내를 보고 캐릭터별로 적합한 이미지를 업로드하세요.
-            모든 슬롯을 채울 필요는 없습니다 — 캐릭터 컨셉에 맞는 단계만 채우면 AI가 자동으로 매칭합니다.
-          </p>
+      {/* 검색 + 정렬 */}
+      <div className="flex items-center gap-2 mb-4">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="이름으로 검색"
+          className="flex-1 min-w-0 bg-gray-800 text-sm text-white placeholder-gray-500 rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500"
+          style={NO_OUTLINE}
+        />
+        <div className="flex gap-1 bg-gray-800 rounded-lg p-1 shrink-0">
+          {[
+            { key: 'name', label: '이름순' },
+            { key: 'recent', label: '최근 출시순' },
+          ].map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSortBy(s.key)}
+              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                sortBy === s.key ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+              style={NO_OUTLINE}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {scoped.length === 0 ? (
+        <div className="text-center text-gray-500 py-16">
+          {query.trim() ? '검색 결과가 없습니다.' : '표시할 캐릭터가 없습니다.'}
+        </div>
+      ) : (
+        <div
+          className="grid gap-x-3 gap-y-4"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))' }}
+        >
+          {scoped.map((c) => (
+            <Link
+              key={c.id}
+              to={`/admin/expressions/${c.id}`}
+              className="group flex flex-col items-center gap-1.5"
+              style={NO_OUTLINE}
+              title={c.styleCount === 0 ? `${c.name} · 스타일 없음` : c.name}
+            >
+              <div
+                className={`w-14 h-14 rounded-full overflow-hidden bg-gray-800 transition-transform group-hover:scale-105 ${
+                  c.styleCount === 0 ? 'ring-2 ring-rose-500/70' : ''
+                }`}
+              >
+                {c.profileImage ? (
+                  <img src={c.profileImage} alt="" className="w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-[9px]">없음</div>
+                )}
+              </div>
+              <div className="w-full">
+                <p className="text-[11px] text-gray-300 group-hover:text-white text-center truncate leading-tight">
+                  {c.name}
+                </p>
+                {(() => {
+                  const days = daysSince(c.latestStyleAt)
+                  const label = relativeDaysLabel(days)
+                  if (!label) return null
+                  // 출시(최근 스타일 추가)된 지 20일 초과면 빨간색으로 강조.
+                  const stale = days != null && days > 20
+                  return (
+                    <p
+                      className={`text-[9px] text-center truncate leading-tight mt-0.5 ${
+                        stale ? 'text-red-500' : 'text-gray-500'
+                      }`}
+                    >
+                      {label}
+                    </p>
+                  )
+                })()}
+              </div>
+            </Link>
+          ))}
         </div>
       )}
-
-      {tab !== 'bg' && (
-        <ExpressionPromptReference emotions={currentEmotions} />
-      )}
-
-      {tab === 'bg' ? (
-        <BackgroundsTab />
-      ) : filtered.length === 0 ? (
-        <div className="text-center text-gray-500 py-16">표시할 캐릭터가 없습니다.</div>
-      ) : (
-        <>
-          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-800">
-                  <th className="sticky left-0 z-10 bg-gray-900 text-left text-xs font-medium text-gray-400 px-4 py-3 min-w-[180px]">
-                    캐릭터
-                  </th>
-                  {currentEmotions.map((e) => (
-                    <th
-                      key={e.key}
-                      className={`text-center text-xs font-medium text-gray-400 px-2 py-3 align-top ${e.desc ? 'min-w-[140px]' : 'min-w-[88px]'}`}
-                      title={e.desc || undefined}
-                    >
-                      <div className="text-gray-200">{e.label}</div>
-                      {e.desc && (
-                        <p className="mt-1 text-[10px] text-gray-500 font-normal leading-snug whitespace-normal">{e.desc}</p>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((c) => {
-                  const styles = c.styles || (c.defaultStyle ? [c.defaultStyle] : [])
-                  return (
-                    <Fragment key={c.id}>
-                      {styles.length === 0 ? (
-                        <CharacterRow
-                          character={c}
-                          style={null}
-                          isFirstStyle
-                          emotions={currentEmotions}
-                          onAddImage={() => {}}
-                          onRemoveImage={() => {}}
-                          onUpdateImage={() => {}}
-                        />
-                      ) : (
-                        styles.map((s, i) => (
-                          <CharacterRow
-                            key={s.id}
-                            character={c}
-                            style={s}
-                            isFirstStyle={i === 0}
-                            emotions={currentEmotions}
-                            onAddImage={(img) => addImage(c.id, s.id, img)}
-                            onRemoveImage={(imageId) => removeImage(c.id, s.id, imageId)}
-                            onUpdateImage={(imageId, patch) => updateImage(c.id, s.id, imageId, patch)}
-                            onStyleChanged={reloadOverview}
-                          />
-                        ))
-                      )}
-                      <AddStyleRow
-                        character={c}
-                        colSpan={currentEmotions.length + 1}
-                        onAdded={reloadOverview}
-                      />
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex items-center justify-between mt-4">
-            <p className="text-xs text-gray-500">
-              {filtered.length}명 중 {(safePage - 1) * PAGE_SIZE + 1}–
-              {Math.min(safePage * PAGE_SIZE, filtered.length)}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                className="px-3 py-1.5 text-xs rounded-md bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={NO_OUTLINE}
-              >
-                이전
-              </button>
-              <span className="text-xs text-gray-400">
-                {safePage} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-                className="px-3 py-1.5 text-xs rounded-md bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={NO_OUTLINE}
-              >
-                다음
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      <VideoJobsPanel characters={characters} onAddImage={addImage} />
     </div>
   )
 }
 
-// 표정별 AI 생성에 실제로 사용되는 전문 프롬프트(영문)를 그대로 노출.
-// 일괄 생성 기준(배경 검정)으로 조립한다. 단일 생성 모달은 시안 배경을 쓰지만,
-// 표정 묘사·구도·금지사항 등 다른 라인은 동일하므로 운영자가 참고 가능.
-function ExpressionPromptReference({ emotions }) {
-  const [copiedKey, setCopiedKey] = useState(null)
-  const copyTimerRef = useRef(null)
-
-  useEffect(() => () => clearTimeout(copyTimerRef.current), [])
-
-  const copyPrompt = async (key, text) => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        // 구형 브라우저 / insecure context fallback.
-        const ta = document.createElement('textarea')
-        ta.value = text
-        ta.style.position = 'fixed'
-        ta.style.opacity = '0'
-        document.body.appendChild(ta)
-        ta.select()
-        document.execCommand('copy')
-        document.body.removeChild(ta)
-      }
-      setCopiedKey(key)
-      clearTimeout(copyTimerRef.current)
-      copyTimerRef.current = setTimeout(() => setCopiedKey(null), 1500)
-    } catch (err) {
-      console.error('프롬프트 복사 실패:', err)
-    }
-  }
-
-  if (!emotions || emotions.length === 0) return null
-  return (
-    <details className="mb-4 bg-gray-900/60 border border-gray-800 rounded-xl overflow-hidden group">
-      <summary
-        className="cursor-pointer select-none px-4 py-3 text-sm text-gray-200 hover:bg-gray-800/40 flex items-center justify-between gap-2"
-        style={NO_OUTLINE}
-      >
-        <span>
-          <span className="font-semibold">🧠 AI 생성 프롬프트 전문</span>
-          <span className="text-[11px] text-gray-500 ml-2">
-            ({emotions.length}개 표정 · 일괄 생성 기준 — 검정 배경 · 클릭하면 복사)
-          </span>
-        </span>
-        <span className="text-[11px] text-gray-500 group-open:hidden">펼치기</span>
-        <span className="text-[11px] text-gray-500 hidden group-open:inline">접기</span>
-      </summary>
-      <div className="border-t border-gray-800 divide-y divide-gray-800/70">
-        {emotions.map((e) => {
-          const promptText = buildExpressionPromptPreview(e.key, { background: 'black' })
-          const isCopied = copiedKey === e.key
-          return (
-            <div key={e.key} className="px-4 py-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-xs font-semibold text-white">{e.label}</span>
-                <span className="text-[10px] text-gray-500">{e.key}</span>
-                {isCopied && (
-                  <span className="text-[10px] text-emerald-400 ml-auto">✓ 복사됨</span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => copyPrompt(e.key, promptText)}
-                title="클릭하여 클립보드로 복사"
-                className={`w-full text-left text-[11px] leading-relaxed whitespace-pre-wrap break-words rounded-md px-2 py-1.5 -mx-2 cursor-pointer transition-colors ${
-                  isCopied
-                    ? 'bg-emerald-500/10 text-emerald-100'
-                    : 'text-gray-300 hover:bg-gray-800/60 hover:text-white'
-                }`}
-                style={NO_OUTLINE}
-              >
-                {promptText}
-              </button>
-            </div>
-          )
-        })}
-      </div>
-    </details>
-  )
-}
-
-function AddStyleRow({ character, colSpan, onAdded }) {
+export function AddStyleRow({ character, colSpan, onAdded }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [unlockMode, setUnlockMode] = useState('DEFAULT')
@@ -663,9 +400,7 @@ function AddStyleRow({ character, colSpan, onAdded }) {
   )
 }
 
-function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddImage, onRemoveImage, onUpdateImage, onStyleChanged }) {
-  const [frameGalleryOpen, setFrameGalleryOpen] = useState(false)
-  const [aiGenOpen, setAiGenOpen] = useState(false)
+export function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddImage, onRemoveImage, onUpdateImage, onStyleChanged }) {
   const [editOpen, setEditOpen] = useState(false)
   const [bulkOpen, setBulkOpen] = useState(false)
 
@@ -729,22 +464,6 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
                   </div>
                   <div className="mt-1 flex items-center gap-2">
                     <button
-                      onClick={() => setFrameGalleryOpen(true)}
-                      className="text-[10px] text-indigo-300 hover:text-indigo-200"
-                      style={NO_OUTLINE}
-                      title="Seedance로 추출한 프레임 이미지 보기"
-                    >
-                      🎞 추출 이미지
-                    </button>
-                    <button
-                      onClick={() => setAiGenOpen(true)}
-                      className="text-[10px] text-amber-300 hover:text-amber-200"
-                      style={NO_OUTLINE}
-                      title="이미지 선택 → 분석 → 변형 or 영상 생성"
-                    >
-                      🤖 AI 생성
-                    </button>
-                    <button
                       onClick={() => setBulkOpen(true)}
                       className="text-[10px] text-emerald-300 hover:text-emerald-200"
                       style={NO_OUTLINE}
@@ -789,25 +508,6 @@ function CharacterRow({ character, style, isFirstStyle = true, emotions, onAddIm
           </td>
         ))}
       </tr>
-
-      {frameGalleryOpen && createPortal(
-        <VideoFrameGalleryModal
-          characterId={character.id}
-          characterName={character.name}
-          onClose={() => setFrameGalleryOpen(false)}
-        />,
-        document.body,
-      )}
-
-      {aiGenOpen && style && createPortal(
-        <AiGenerationModal
-          styleId={style.id}
-          allImages={style.images || []}
-          onClose={() => setAiGenOpen(false)}
-          onUploaded={() => {}}
-        />,
-        document.body,
-      )}
 
       {editOpen && style && createPortal(
         <StyleEditModal
@@ -2960,349 +2660,6 @@ const EMOTION_LABEL_MAP = {
   AROUSED_CLIMAX: '절정', AROUSED_AFTERGLOW: '여운',
 }
 
-function AiGenerationModal({ styleId, allImages, onClose, onUploaded }) {
-  const [selectedImage, setSelectedImage] = useState(null)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [analysis, setAnalysis] = useState(null)
-  const [mode, setMode] = useState('image') // 'image' | 'video'
-  const [prompt, setPrompt] = useState('')
-  const [generating, setGenerating] = useState(false)
-  const [result, setResult] = useState(null) // { type, url }
-  const [targetEmotion, setTargetEmotion] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [uploadDone, setUploadDone] = useState(false)
-  const [error, setError] = useState('')
-
-  const grouped = useMemo(() => {
-    const map = {}
-    for (const img of allImages) {
-      if (!map[img.emotion]) map[img.emotion] = []
-      map[img.emotion].push(img)
-    }
-    return map
-  }, [allImages])
-
-  const emotionOrder = Object.keys(EMOTION_LABEL_MAP)
-
-  const selectImage = async (img) => {
-    if (analyzing) return
-    setSelectedImage(img)
-    setAnalysis(null)
-    setResult(null)
-    setPrompt('')
-    setError('')
-    setTargetEmotion(img.emotion)
-    setUploadDone(false)
-    setAnalyzing(true)
-    try {
-      const data = await api.post(`/admin/images/${img.id}/analyze-variation`)
-      setAnalysis(data)
-      setPrompt(mode === 'image' ? data.imageVariationPrompt : data.videoPrompt)
-    } catch (e) {
-      setError(e.message || '분석 실패')
-    } finally {
-      setAnalyzing(false)
-    }
-  }
-
-  useEffect(() => {
-    if (analysis) setPrompt(mode === 'image' ? analysis.imageVariationPrompt : analysis.videoPrompt)
-  }, [mode]) // eslint-disable-line
-
-  const handleGenerate = async () => {
-    if (!selectedImage || !prompt.trim()) return
-    setGenerating(true)
-    setResult(null)
-    setError('')
-    setUploadDone(false)
-    try {
-      if (mode === 'image') {
-        const data = await api.post(`/admin/images/${selectedImage.id}/generate-image-wan`, { prompt })
-        setResult({ type: 'image', url: data.imageUrl })
-      } else {
-        const data = await api.post(`/admin/images/${selectedImage.id}/generate-video-seedance`, { prompt })
-        setResult({ type: 'video', url: data.videoUrl })
-      }
-    } catch (e) {
-      setError(e.message || '생성 실패')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!result || !targetEmotion) return
-    setUploading(true)
-    setError('')
-    try {
-      if (result.type === 'image') {
-        const blob = await fetch(result.url).then(r => r.blob())
-        const fd = new FormData()
-        fd.append('image', blob, 'ai_generated.jpg')
-        fd.append('emotion', targetEmotion)
-        await api.post(`/admin/styles/${styleId}/images`, fd)
-      } else {
-        await api.post(`/admin/styles/${styleId}/upload-video-to-emotion`, { videoUrl: result.url, emotion: targetEmotion })
-      }
-      setUploadDone(true)
-      onUploaded?.()
-    } catch (e) {
-      setError(e.message || '업로드 실패')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70" onClick={onClose}>
-      <div
-        className="w-full bg-gray-900 border border-gray-700 rounded-t-2xl p-4 overflow-y-auto"
-        style={{ maxWidth: 480, maxHeight: '92vh' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-white">🤖 AI 이미지/영상 생성</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-lg leading-none" style={NO_OUTLINE}>✕</button>
-        </div>
-
-        {/* 이미지 선택 그리드 */}
-        <p className="text-[11px] text-gray-400 mb-2">생성에 사용할 이미지를 선택하세요</p>
-        <div className="space-y-2 mb-4 max-h-48 overflow-y-auto pr-1">
-          {emotionOrder.filter(e => grouped[e]?.length > 0).map(emotionKey => (
-            <div key={emotionKey}>
-              <p className="text-[10px] text-gray-500 mb-1">{EMOTION_LABEL_MAP[emotionKey]}</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {grouped[emotionKey].map(img => (
-                  <div
-                    key={img.id}
-                    onClick={() => selectImage(img)}
-                    className={`relative flex-shrink-0 cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${selectedImage?.id === img.id ? 'border-amber-500' : 'border-gray-700 hover:border-gray-500'}`}
-                    style={{ width: 52 }}
-                  >
-                    <img src={img.filePath} alt="" className="w-full object-cover" style={{ aspectRatio: '3/4' }} />
-                    {selectedImage?.id === img.id && (
-                      <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
-                        <span className="text-white text-[10px] font-bold">✓</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-          {allImages.length === 0 && (
-            <p className="text-xs text-gray-500">이 캐릭터에 등록된 이미지가 없습니다.</p>
-          )}
-        </div>
-
-        {/* 선택된 이미지 + 분석 결과 */}
-        {selectedImage && (
-          <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-3 mb-3">
-            <div className="flex gap-3 items-start">
-              <img src={selectedImage.filePath} alt="" className="w-16 rounded-lg object-cover flex-shrink-0 border border-gray-600" style={{ aspectRatio: '3/4' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-amber-400 mb-1">{EMOTION_LABEL_MAP[selectedImage.emotion] || selectedImage.emotion}</p>
-                {analyzing && <p className="text-[11px] text-blue-400">이미지 분석 중...</p>}
-                {analysis && !analyzing && (
-                  <p className="text-[11px] text-gray-300 leading-relaxed">{analysis.description}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 분석 완료 후 생성 패널 */}
-        {analysis && !analyzing && (
-          <>
-            {/* 모드 선택 */}
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setMode('image')}
-                className={`flex-1 py-1.5 text-xs rounded-xl font-semibold transition-all ${mode === 'image' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                style={NO_OUTLINE}
-              >
-                🖼 이미지 변형
-              </button>
-              <button
-                onClick={() => setMode('video')}
-                className={`flex-1 py-1.5 text-xs rounded-xl font-semibold transition-all ${mode === 'video' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                style={NO_OUTLINE}
-              >
-                🎬 영상 생성
-              </button>
-            </div>
-
-            <textarea
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              rows={3}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 resize-none mb-3"
-              placeholder="프롬프트 편집 가능"
-            />
-
-            {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
-
-            <button
-              onClick={handleGenerate}
-              disabled={generating || !prompt.trim()}
-              className="w-full py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-xl disabled:opacity-50 mb-3"
-              style={NO_OUTLINE}
-            >
-              {generating
-                ? (mode === 'video' ? '영상 생성 중... (최대 5분)' : '이미지 생성 중...')
-                : (mode === 'image' ? '🖼 이미지 변형 생성' : '🎬 영상 생성')}
-            </button>
-          </>
-        )}
-
-        {/* 생성 결과 */}
-        {result && (
-          <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-3 mb-3">
-            <p className="text-[11px] text-gray-400 mb-2">생성 결과</p>
-            {result.type === 'image' ? (
-              <img src={result.url} alt="generated" className="w-full rounded-lg object-cover mb-3" style={{ maxHeight: 240 }} />
-            ) : (
-              <video src={result.url} autoPlay loop muted playsInline className="w-full rounded-lg mb-3" style={{ maxHeight: 240 }} />
-            )}
-
-            {/* 업로드 감정 선택 + 업로드 버튼 */}
-            <div className="flex gap-2 items-center">
-              <select
-                value={targetEmotion}
-                onChange={e => setTargetEmotion(e.target.value)}
-                className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none"
-              >
-                {Object.entries(EMOTION_LABEL_MAP).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-              <button
-                onClick={handleUpload}
-                disabled={uploading || uploadDone}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-xl ${uploadDone ? 'bg-green-700 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50'}`}
-                style={NO_OUTLINE}
-              >
-                {uploadDone ? '✓ 업로드됨' : uploading ? '업로드 중...' : '슬롯에 업로드'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        <button onClick={onClose} className="w-full py-2 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-xl" style={NO_OUTLINE}>닫기</button>
-      </div>
-    </div>
-  )
-}
-
-function VideoFrameGalleryModal({ characterId, characterName, onClose }) {
-  const [frames, setFrames] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [deletingId, setDeletingId] = useState(null)
-
-  useEffect(() => {
-    api.get(`/admin/characters/${characterId}/video-frames`)
-      .then(({ frames }) => setFrames(frames))
-      .catch((err) => setError(err.message || '불러오기 실패'))
-      .finally(() => setLoading(false))
-  }, [characterId])
-
-  const handleDelete = async (id) => {
-    if (deletingId) return
-    setDeletingId(id)
-    try {
-      await api.delete(`/admin/video-frames/${id}`)
-      setFrames(prev => prev.filter(f => f.id !== id))
-    } catch (err) {
-      alert('삭제 실패: ' + (err.message || ''))
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  // Group by emotion
-  const grouped = useMemo(() => {
-    const map = {}
-    for (const f of frames) {
-      if (!map[f.emotion]) map[f.emotion] = []
-      map[f.emotion].push(f)
-    }
-    return map
-  }, [frames])
-
-  const emotionKeys = Object.keys(grouped)
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 overflow-y-auto py-6" onClick={onClose}>
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-5 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-sm font-semibold text-white">🎞 추출 프레임 — {characterName}</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">Seedance 비디오에서 추출한 프레임 이미지</p>
-          </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none" style={NO_OUTLINE}>✕</button>
-        </div>
-
-        {loading && <p className="text-gray-400 text-sm text-center py-8">불러오는 중...</p>}
-        {error && <p className="text-red-400 text-sm text-center py-8">{error}</p>}
-
-        {!loading && !error && emotionKeys.length === 0 && (
-          <p className="text-gray-500 text-sm text-center py-8">추출된 프레임이 없습니다.</p>
-        )}
-
-        {!loading && emotionKeys.map((emotion) => (
-          <div key={emotion} className="mb-5">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-semibold text-white">{EMOTION_LABEL_MAP[emotion] || emotion}</span>
-              <span className="text-[10px] text-gray-500">{grouped[emotion].length}장</span>
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {grouped[emotion].map((frame) => (
-                <div key={frame.id} className="relative flex-shrink-0 group" style={{ width: 80 }}>
-                  <img
-                    src={frame.filePath}
-                    alt={`${frame.timestampMs}ms`}
-                    className="w-full rounded-lg object-cover border border-gray-700"
-                    style={{ aspectRatio: '9/16' }}
-                  />
-                  <span className="absolute bottom-0 left-0 right-0 text-center text-[9px] text-white bg-black/60 rounded-b-lg py-0.5">
-                    {(frame.timestampMs / 1000).toFixed(1)}s
-                  </span>
-                  {/* 호버 오버레이: description + tags */}
-                  <div className="absolute inset-0 bg-black/85 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity overflow-y-auto p-1.5 flex flex-col gap-1">
-                    {frame.description && (
-                      <p className="text-[9px] text-gray-200 leading-tight">{frame.description}</p>
-                    )}
-                    {frame.tags?.length > 0 && (
-                      <div className="flex flex-wrap gap-0.5 mt-auto">
-                        {frame.tags.map((tag) => (
-                          <span key={tag} className="text-[8px] bg-indigo-900/70 text-indigo-300 px-1 rounded">{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => handleDelete(frame.id)}
-                      disabled={deletingId === frame.id}
-                      className="mt-1 w-full text-[9px] text-red-400 bg-red-900/40 hover:bg-red-900/70 rounded py-0.5 disabled:opacity-50"
-                      style={NO_OUTLINE}
-                    >
-                      삭제
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        <div className="flex justify-end mt-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-xl" style={NO_OUTLINE}>닫기</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ============================================
 // 기존 저장된 표정 이미지의 chroma key 배경 제거 모달 (시안 #00FFFF)
 // 원본 + 처리 결과를 나란히 보여주고, 슬라이더로 임계값 조정 후 "교체"로 새 이미지로 업로드.
@@ -4142,7 +3499,7 @@ function BatchExpressionGenerator({ characterId, styleId, characterName, onClose
 const isAutoGenerated = (bg) => typeof bg?.description === 'string' && bg.description.startsWith('[auto]')
 const stripAutoPrefix = (desc) => (desc || '').replace(/^\[auto\]\s*/, '')
 
-function BackgroundsTab() {
+export function BackgroundsTab({ characterId = null } = {}) {
   const [library, setLibrary] = useState(null)
   const [assignments, setAssignments] = useState(null) // [{id, name, profileImage, backgrounds: [{id, order, background:{id,filePath,tags}}]}]
   const [pickerForCharacter, setPickerForCharacter] = useState(null)
@@ -4309,11 +3666,11 @@ function BackgroundsTab() {
         )}
       </section>
 
-      {/* 캐릭터별 할당 */}
+      {/* 캐릭터별 할당 — 상세 화면(characterId 지정)에서는 해당 캐릭터만 노출 */}
       <section>
         <h3 className="text-sm font-semibold text-white mb-3">캐릭터별 배경 할당</h3>
         <div className="bg-gray-900 rounded-xl border border-gray-800 divide-y divide-gray-800">
-          {assignments.map((c) => (
+          {(characterId ? assignments.filter((c) => c.id === characterId) : assignments).map((c) => (
             <CharacterBackgroundRow
               key={c.id}
               character={c}
@@ -4601,7 +3958,7 @@ function LibraryPickerModal({ library, alreadyAssigned, onClose, onConfirm }) {
 // - 진행/완료/실패 잡을 카드로 표시
 // - 완료 잡 클릭 → JobResultModal에서 미리보기 + 감정 슬롯 업로드 결정
 // ============================================
-function VideoJobsPanel({ characters, onAddImage }) {
+export function VideoJobsPanel({ characters, onAddImage }) {
   const jobs = useVideoJobs((s) => s.jobs)
   const dismissJob = useVideoJobs((s) => s.dismissJob)
   const clearFinished = useVideoJobs((s) => s.clearFinished)

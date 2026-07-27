@@ -134,6 +134,38 @@ function formatRelativeKst(iso) {
   return `${Math.floor(diffMin / 60 / 24)}일 전`
 }
 
+// 공개 날짜용 상대 표기: n일 전 → (1달 이상) n달 전 → (12개월 초과) n년 m개월 전
+function formatPublishedAgo(iso) {
+  if (!iso) return '-'
+  const then = new Date(iso)
+  if (isNaN(then.getTime())) return '-'
+  const now = new Date()
+  const diffMs = now.getTime() - then.getTime()
+  if (diffMs < 0) return '예정'
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  if (days <= 0) return '오늘'
+  // 달·년은 달력 기준으로 계산 (날짜가 아직 안 지났으면 한 달 덜 침)
+  let months = (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth())
+  if (now.getDate() < then.getDate()) months -= 1
+  if (months < 1) return `${days}일 전`
+  if (months < 12) return `${months}달 전`
+  const years = Math.floor(months / 12)
+  const remMonths = months % 12
+  return remMonths > 0 ? `${years}년 ${remMonths}개월 전` : `${years}년 전`
+}
+
+// 공개한 지 1달(달력 기준) 미만이면 true — 최근 제작 캐릭터 하이라이트용
+function isRecentPublish(iso) {
+  if (!iso) return false
+  const then = new Date(iso)
+  if (isNaN(then.getTime())) return false
+  const now = new Date()
+  if (now.getTime() < then.getTime()) return false
+  let months = (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth())
+  if (now.getDate() < then.getDate()) months -= 1
+  return months < 1
+}
+
 function formatKstDateTime(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -627,17 +659,6 @@ export default function Characters() {
     }
   }
 
-  // 같은 voiceId를 쓰는 캐릭터가 둘 이상이면 중복 표시
-  const duplicateVoiceIds = (() => {
-    const counts = new Map()
-    for (const c of characters) {
-      const v = (c.voiceId || '').trim()
-      if (!v) continue
-      counts.set(v, (counts.get(v) || 0) + 1)
-    }
-    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([v]) => v))
-  })()
-
   const filteredCharacters = characters
     .filter((c) => matchTab(c, tab))
     .filter((c) => (nationality === 'all' ? true : getNationality(c) === nationality))
@@ -649,6 +670,13 @@ export default function Characters() {
     .sort((a, b) => {
       if (sortBy === 'recentConversations') {
         return (b.recentConversations7d || 0) - (a.recentConversations7d || 0)
+      }
+      if (sortBy === 'recentStyle') {
+        const latestAt = (c) => {
+          const iso = (c.styles || []).reduce((m, s) => (s.createdAt && (!m || s.createdAt > m) ? s.createdAt : m), null)
+          return iso ? new Date(iso).getTime() : 0
+        }
+        return latestAt(b) - latestAt(a)
       }
       if (sortBy === 'conversations') {
         return (b._count?.conversations || 0) - (a._count?.conversations || 0)
@@ -1190,18 +1218,27 @@ export default function Characters() {
       <>
       {/* 정렬 + 이름 검색 */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <label className="text-sm text-gray-400">정렬</label>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          <option value="name">이름순</option>
-          <option value="conversations">대화 수 (내림차)</option>
-          <option value="recentConversations">최근 1주 대화 수</option>
-          <option value="nationality">국적</option>
-        </select>
+        <span className="text-sm text-gray-400">정렬</span>
+        {[
+          { key: 'name', label: '이름순' },
+          { key: 'conversations', label: '대화 수 ↓' },
+          { key: 'recentConversations', label: '최근 1주 ↓' },
+          { key: 'recentStyle', label: '스타일 최근추가 ↓' },
+          { key: 'nationality', label: '국적' },
+        ].map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSortBy(s.key)}
+            className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+              sortBy === s.key
+                ? 'bg-indigo-600 border-indigo-500 text-white'
+                : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {s.label}
+          </button>
+        ))}
         <div className="relative ml-auto">
           <input
             type="text"
@@ -1281,8 +1318,8 @@ export default function Characters() {
                 <th className="p-3">이름</th>
                 <th className="p-3">대화 수</th>
                 <th className="p-3">최근 1주</th>
-                <th className="p-3">선제</th>
-                <th className="p-3">TTS</th>
+                <th className="p-3">공개일</th>
+                <th className="p-3">스타일</th>
                 <th className="p-3">푸시</th>
                 <th className="p-3">관리</th>
               </tr>
@@ -1332,17 +1369,52 @@ export default function Characters() {
                     )}
                   </td>
                   <td className="p-3">
-                    <span className={c.proactiveEnabled ? 'text-green-400' : 'text-gray-500'}>
-                      {c.proactiveEnabled ? 'ON' : 'OFF'}
+                    <span
+                      className={isRecentPublish(c.createdAt) ? 'text-green-400 font-medium' : 'text-gray-300'}
+                      title={c.createdAt ? formatKstDateTime(c.createdAt) : ''}
+                    >
+                      {formatPublishedAgo(c.createdAt)}
                     </span>
                   </td>
                   <td className="p-3">
-                    <span className={c.voiceId ? 'text-green-400' : 'text-gray-500'}>
-                      {c.voiceId ? 'ON' : 'OFF'}
-                    </span>
-                    {c.voiceId && duplicateVoiceIds.has(c.voiceId.trim()) && (
-                      <span className="ml-1.5 text-red-400 font-semibold">(중복)</span>
-                    )}
+                    {(() => {
+                      const styles = c.styles || []
+                      const counts = styles.reduce((acc, s) => {
+                        const k = s.unlockMode || 'DEFAULT'
+                        acc[k] = (acc[k] || 0) + 1
+                        return acc
+                      }, {})
+                      if (styles.length === 0) return <span className="text-gray-600 text-xs">-</span>
+                      // 타입 무관 가장 최근에 추가된 스타일 시각
+                      const latestStyleAt = styles.reduce((max, s) => {
+                        if (!s.createdAt) return max
+                        return !max || s.createdAt > max ? s.createdAt : max
+                      }, null)
+                      return (
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                            <span className="text-gray-300 font-medium">{styles.length}</span>
+                            {counts.DEFAULT > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">기본 {counts.DEFAULT}</span>
+                            )}
+                            {counts.GACHA > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300">가챠 {counts.GACHA}</span>
+                            )}
+                            {counts.SHOP > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">상점 {counts.SHOP}</span>
+                            )}
+                          </div>
+                          {latestStyleAt && (
+                            <div
+                              className={`text-[11px] mt-1 ${isRecentPublish(latestStyleAt) ? 'text-green-400' : 'text-red-400'}`}
+                              title={formatKstDateTime(latestStyleAt)}
+                            >
+                              최근 추가 {formatPublishedAgo(latestStyleAt)}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td className="p-3">
                     {c._count?.broadcastNotifications > 0 ? (
