@@ -18,6 +18,7 @@ import CharacterSituations from './pages/admin/CharacterSituations'
 import AffinityImages from './pages/admin/AffinityImages'
 import BaseImages from './pages/admin/BaseImages'
 import Expressions from './pages/admin/Expressions'
+import ExpressionDetail from './pages/admin/ExpressionDetail'
 import CharacterStorylines from './pages/admin/CharacterStorylines'
 import StorylinesOverview from './pages/admin/StorylinesOverview'
 import StorylineEdit from './pages/admin/StorylineEdit'
@@ -199,6 +200,7 @@ function App() {
         <Route path="base-images" element={<BaseImages />} />
         <Route path="affinity-images" element={<AffinityImages />} />
         <Route path="expressions" element={<Expressions />} />
+        <Route path="expressions/:characterId" element={<ExpressionDetail />} />
         <Route path="characters/:id/production" element={<CharacterProduction />} />
         <Route path="characters/:id/styles" element={<CharacterStyles />} />
         <Route path="characters/:id/feeds" element={<CharacterFeeds />} />
