@@ -134,6 +134,38 @@ function formatRelativeKst(iso) {
   return `${Math.floor(diffMin / 60 / 24)}일 전`
 }
 
+// 공개 날짜용 상대 표기: n일 전 → (1달 이상) n달 전 → (12개월 초과) n년 m개월 전
+function formatPublishedAgo(iso) {
+  if (!iso) return '-'
+  const then = new Date(iso)
+  if (isNaN(then.getTime())) return '-'
+  const now = new Date()
+  const diffMs = now.getTime() - then.getTime()
+  if (diffMs < 0) return '예정'
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  if (days <= 0) return '오늘'
+  // 달·년은 달력 기준으로 계산 (날짜가 아직 안 지났으면 한 달 덜 침)
+  let months = (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth())
+  if (now.getDate() < then.getDate()) months -= 1
+  if (months < 1) return `${days}일 전`
+  if (months < 12) return `${months}달 전`
+  const years = Math.floor(months / 12)
+  const remMonths = months % 12
+  return remMonths > 0 ? `${years}년 ${remMonths}개월 전` : `${years}년 전`
+}
+
+// 공개한 지 1달(달력 기준) 미만이면 true — 최근 제작 캐릭터 하이라이트용
+function isRecentPublish(iso) {
+  if (!iso) return false
+  const then = new Date(iso)
+  if (isNaN(then.getTime())) return false
+  const now = new Date()
+  if (now.getTime() < then.getTime()) return false
+  let months = (now.getFullYear() - then.getFullYear()) * 12 + (now.getMonth() - then.getMonth())
+  if (now.getDate() < then.getDate()) months -= 1
+  return months < 1
+}
+
 function formatKstDateTime(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -626,17 +658,6 @@ export default function Characters() {
       profile: !!c.profileImage,
     }
   }
-
-  // 같은 voiceId를 쓰는 캐릭터가 둘 이상이면 중복 표시
-  const duplicateVoiceIds = (() => {
-    const counts = new Map()
-    for (const c of characters) {
-      const v = (c.voiceId || '').trim()
-      if (!v) continue
-      counts.set(v, (counts.get(v) || 0) + 1)
-    }
-    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([v]) => v))
-  })()
 
   const filteredCharacters = characters
     .filter((c) => matchTab(c, tab))
@@ -1281,8 +1302,8 @@ export default function Characters() {
                 <th className="p-3">이름</th>
                 <th className="p-3">대화 수</th>
                 <th className="p-3">최근 1주</th>
-                <th className="p-3">선제</th>
-                <th className="p-3">TTS</th>
+                <th className="p-3">공개일</th>
+                <th className="p-3">스타일</th>
                 <th className="p-3">푸시</th>
                 <th className="p-3">관리</th>
               </tr>
@@ -1332,17 +1353,37 @@ export default function Characters() {
                     )}
                   </td>
                   <td className="p-3">
-                    <span className={c.proactiveEnabled ? 'text-green-400' : 'text-gray-500'}>
-                      {c.proactiveEnabled ? 'ON' : 'OFF'}
+                    <span
+                      className={isRecentPublish(c.createdAt) ? 'text-green-400 font-medium' : 'text-gray-300'}
+                      title={c.createdAt ? formatKstDateTime(c.createdAt) : ''}
+                    >
+                      {formatPublishedAgo(c.createdAt)}
                     </span>
                   </td>
                   <td className="p-3">
-                    <span className={c.voiceId ? 'text-green-400' : 'text-gray-500'}>
-                      {c.voiceId ? 'ON' : 'OFF'}
-                    </span>
-                    {c.voiceId && duplicateVoiceIds.has(c.voiceId.trim()) && (
-                      <span className="ml-1.5 text-red-400 font-semibold">(중복)</span>
-                    )}
+                    {(() => {
+                      const styles = c.styles || []
+                      const counts = styles.reduce((acc, s) => {
+                        const k = s.unlockMode || 'DEFAULT'
+                        acc[k] = (acc[k] || 0) + 1
+                        return acc
+                      }, {})
+                      if (styles.length === 0) return <span className="text-gray-600 text-xs">-</span>
+                      return (
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                          <span className="text-gray-300 font-medium">{styles.length}</span>
+                          {counts.DEFAULT > 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">기본 {counts.DEFAULT}</span>
+                          )}
+                          {counts.GACHA > 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300">가챠 {counts.GACHA}</span>
+                          )}
+                          {counts.SHOP > 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">상점 {counts.SHOP}</span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td className="p-3">
                     {c._count?.broadcastNotifications > 0 ? (
