@@ -5,6 +5,7 @@ import JSZip from 'jszip'
 import { api } from '../../lib/api'
 import { removeChromaBackground } from '../../lib/removeChromaBackground'
 import useVideoJobs from '../../store/useVideoJobs'
+import StyleAcquisitionStats from './StyleAcquisitionStats'
 
 export const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
@@ -136,6 +137,7 @@ export const TABS = [
 
 export default function Expressions() {
   const [characters, setCharacters] = useState(null)
+  const [tab, setTab] = useState('manage') // manage(이미지 관리) | stats(획득 통계)
   const [visibility, setVisibility] = useState('public') // public | private
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState('name') // name | recent
@@ -174,6 +176,31 @@ export default function Expressions() {
         </p>
       </div>
 
+      {/* 최상위 탭: 이미지 관리 / 획득 통계 */}
+      <div className="flex gap-1 mb-5 border-b border-gray-800">
+        {[
+          { key: 'manage', label: '이미지 관리' },
+          { key: 'stats', label: '획득 통계' },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === t.key
+                ? 'border-indigo-500 text-white'
+                : 'border-transparent text-gray-500 hover:text-gray-300'
+            }`}
+            style={NO_OUTLINE}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'stats' ? (
+        <StyleAcquisitionStats embedded />
+      ) : (
+      <>
       {/* 공개/비공개 탭 */}
       <div className="flex gap-1 mb-5 border-b border-gray-800">
         {[
@@ -279,6 +306,8 @@ export default function Expressions() {
             </Link>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   )
