@@ -768,6 +768,7 @@ function AutoTextarea({ className = '', value, onChange, ...props }) {
 }
 
 function ChipInput({ label, values, onChange, placeholder, maxLen = MAX_PREF_LEN, maxItems = MAX_PREF_ITEMS }) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState('')
   const handleAdd = () => {
     const v = draft.trim().slice(0, maxLen)
@@ -806,22 +807,41 @@ function ChipInput({ label, values, onChange, placeholder, maxLen = MAX_PREF_LEN
           ))}
         </div>
       )}
-      <input
-        type="text"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value.slice(0, maxLen))}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            handleAdd()
-          }
-        }}
-        placeholder={placeholder}
-        disabled={values.length >= maxItems}
-        className="w-full px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500 disabled:opacity-50"
-        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        maxLength={maxLen}
-      />
+      <div className="flex items-stretch gap-1.5">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.slice(0, maxLen))}
+          onKeyDown={(e) => {
+            // 한글(IME) 조합 중 Enter는 무시 — 조합 확정용이므로 중복/유실 방지
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
+              e.preventDefault()
+              handleAdd()
+            }
+          }}
+          // 모바일에서 확정 텍스트가 chip으로 추가되기 전에 유실되지 않도록 blur 시에도 추가
+          onBlur={handleAdd}
+          enterKeyHint="done"
+          placeholder={placeholder}
+          disabled={values.length >= maxItems}
+          className="flex-1 min-w-0 px-3 py-2 rounded-md bg-gray-800/70 border border-gray-700/60 text-sm text-gray-100 placeholder:text-gray-500 disabled:opacity-50"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          maxLength={maxLen}
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!draft.trim() || values.length >= maxItems}
+          aria-label={t('personality.edit.addItem')}
+          className="shrink-0 px-3 rounded-md bg-purple-500/80 hover:bg-purple-500 text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }
