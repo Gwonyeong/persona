@@ -85,19 +85,20 @@ export default function CharacterCollection() {
   }
 
   // 상점 의상 구매 (마스크 차감 → StyleUnlock, 스타일 내 표정·영상 통째 해금)
-  const purchaseStyle = async () => {
+  const purchaseStyle = async (variant = 'set') => {
     if (!buyStyle || purchasing) return
     if (buyStyle.adultOnly && !user?.adultVerified) {
       navigate('/adult-verify')
       return
     }
-    if (masks < buyStyle.maskCost) {
+    const cost = variant === 'single' ? (buyStyle.singleMaskCost ?? 10) : buyStyle.maskCost
+    if (masks < cost) {
       navigate('/mask-shop?tab=subscription')
       return
     }
     setPurchasing(true)
     try {
-      const res = await api.post(`/characters/${characterId}/styles/${buyStyle.styleId}/purchase`, {})
+      const res = await api.post(`/characters/${characterId}/styles/${buyStyle.styleId}/purchase`, { variant })
       if (res.masks !== undefined) setMasks(res.masks)
       const fresh = await api.get(`/collection/${characterId}`)
       setData(fresh)
@@ -349,7 +350,7 @@ export default function CharacterCollection() {
                       {buyable && (
                         <div className="absolute top-1 right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/70 text-white text-[10px] font-semibold">
                           <MaskIcon className="w-3 h-3" />
-                          {o.maskCost}
+                          {o.videoCount > 0 ? `${o.singleMaskCost ?? 10}~` : o.maskCost}
                         </div>
                       )}
                       {!o.owned && o.adultOnly && (
@@ -422,28 +423,64 @@ export default function CharacterCollection() {
               />
             )}
             <p className="text-sm font-semibold text-white mb-1">{buyStyle.name}</p>
-            <p className="text-xs text-gray-400 mb-4">{t('collection.outfitPurchaseDesc')}</p>
-            <div className="flex items-center justify-center gap-1 text-white text-lg font-bold mb-5">
-              <MaskIcon /> {buyStyle.maskCost}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setBuyStyle(null)}
-                disabled={purchasing}
-                className="flex-1 py-3 rounded-xl bg-gray-800 text-gray-300 text-sm font-semibold active:bg-gray-700 transition-colors disabled:opacity-50"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={purchaseStyle}
-                disabled={purchasing}
-                className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold active:bg-indigo-500 transition-colors disabled:opacity-50"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {purchasing ? t('common.loading') : (masks < buyStyle.maskCost ? t('collection.needMoreMasks') : t('collection.outfitPurchaseConfirm'))}
-              </button>
-            </div>
+            <p className="text-[11px] text-gray-400 mb-4 leading-relaxed">{t('maskShop.styleUnlockNote')}</p>
+            {buyStyle.adultOnly && !user?.adultVerified ? (
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => purchaseStyle('set')}
+                  className="w-full py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold active:bg-indigo-500 transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('maskShop.styleAdultVerify')}
+                </button>
+                <button
+                  onClick={() => setBuyStyle(null)}
+                  className="w-full py-2.5 rounded-xl bg-gray-800 text-gray-300 text-sm font-semibold active:bg-gray-700 transition-colors"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {/* 세트 — 이미지 + 영상 전체 */}
+                <button
+                  onClick={() => purchaseStyle('set')}
+                  disabled={purchasing}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 text-white active:bg-indigo-500 transition-colors disabled:opacity-50 flex flex-col items-center gap-0.5"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {purchasing ? (
+                    <span className="text-sm font-semibold py-0.5">{t('common.loading')}</span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold inline-flex items-center gap-1.5"><MaskIcon /> {buyStyle.maskCost} · {t('maskShop.stylePurchaseSet')}</span>
+                      <span className="text-[10px] text-indigo-200/90">{t('maskShop.styleSetDesc')}</span>
+                    </>
+                  )}
+                </button>
+                {/* 단일 — 이미지만 (영상 있는 스타일에서만) */}
+                {buyStyle.videoCount > 0 && (
+                  <button
+                    onClick={() => purchaseStyle('single')}
+                    disabled={purchasing}
+                    className="w-full py-2.5 rounded-xl bg-gray-800 border border-gray-700 text-gray-100 active:bg-gray-750 transition-colors disabled:opacity-50 flex flex-col items-center gap-0.5"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <span className="text-sm font-semibold inline-flex items-center gap-1.5"><MaskIcon /> {buyStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}</span>
+                    <span className="text-[10px] text-gray-400">{t('maskShop.styleSingleDesc')}</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setBuyStyle(null)}
+                  disabled={purchasing}
+                  className="w-full py-2 rounded-xl bg-transparent text-gray-400 text-xs font-medium active:text-gray-200 transition-colors disabled:opacity-50"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

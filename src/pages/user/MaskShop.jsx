@@ -230,8 +230,8 @@ export default function MaskShop() {
       .finally(() => setStylesLoading(false))
   }, [activeTab, shopStyles, stylesLoading])
 
-  // 상점 표정 스타일 구매 — 마스크 차감 후 통째 해금
-  const purchaseStyle = async (item) => {
+  // 상점 표정 스타일 구매 — variant: 'set'(이미지+영상, maskCost) | 'single'(이미지만, singleMaskCost)
+  const purchaseStyle = async (item, variant = 'set') => {
     if (requireLogin()) return
     if (purchasingStyleId) return
     // 성인 전용 의상은 성인 인증 완료 유저만 구매 가능
@@ -239,16 +239,17 @@ export default function MaskShop() {
       navigate('/adult-verify')
       return
     }
-    if (masks < item.maskCost) {
+    const cost = variant === 'single' ? (item.singleMaskCost ?? 10) : item.maskCost
+    if (masks < cost) {
       setDetailStyle(null)
       setActiveTab('shop')
       return
     }
     setPurchasingStyleId(item.styleId)
     try {
-      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, {})
+      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, { variant })
       if (res.masks !== undefined) setMasks(res.masks)
-      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true } : s)))
+      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: variant } : s)))
       setDetailStyle(null)
       setToast({ kind: 'success', text: t('maskShop.stylePurchased') })
     } catch (err) {
@@ -934,7 +935,8 @@ export default function MaskShop() {
                         <span className="text-rose-300 font-semibold">{t('maskShop.styleAdultVerify')}</span>
                       ) : (
                         <span className="inline-flex items-center gap-0.5 text-indigo-300 font-bold">
-                          <MaskIcon /> {item.maskCost}
+                          {/* 영상 있는 스타일은 단일가(최저가)부터 노출 */}
+                          <MaskIcon /> {item.videoCount > 0 ? `${item.singleMaskCost ?? 10}~` : item.maskCost}
                         </span>
                       )}
                     </span>
@@ -1049,24 +1051,58 @@ export default function MaskShop() {
 
             {/* 구매 버튼 */}
             {detailStyle.owned ? (
-              <div className="w-full py-3.5 rounded-xl bg-gray-800 text-gray-500 text-sm font-bold text-center">
-                {t('maskShop.styleOwned')}
-              </div>
-            ) : (
+              detailStyle.ownedVariant === 'single' && detailStyle.videoCount > 0 ? (
+                <div className="w-full py-3 rounded-xl bg-gray-800 text-gray-400 text-[12px] font-medium text-center leading-relaxed px-3">
+                  {t('maskShop.styleOwnedSingle')}
+                </div>
+              ) : (
+                <div className="w-full py-3.5 rounded-xl bg-gray-800 text-gray-500 text-sm font-bold text-center">
+                  {t('maskShop.styleOwned')}
+                </div>
+              )
+            ) : detailStyle.adultOnly && !user?.adultVerified ? (
               <button
-                onClick={() => purchaseStyle(detailStyle)}
-                disabled={purchasingStyleId === detailStyle.styleId}
-                className="w-full py-3.5 rounded-xl bg-indigo-600 text-white text-sm font-bold active:bg-indigo-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                onClick={() => purchaseStyle(detailStyle, 'set')}
+                className="w-full py-3.5 rounded-xl bg-indigo-600 text-white text-sm font-bold active:bg-indigo-500 transition-colors flex items-center justify-center gap-1.5"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {purchasingStyleId === detailStyle.styleId ? (
-                  t('common.loading')
-                ) : detailStyle.adultOnly && !user?.adultVerified ? (
-                  t('maskShop.styleAdultVerify')
-                ) : (
-                  <><MaskIcon /> {detailStyle.maskCost} · {t('maskShop.stylePurchaseConfirm')}</>
-                )}
+                {t('maskShop.styleAdultVerify')}
               </button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {/* 세트 — 이미지 + 연계 영상 전체 */}
+                <button
+                  onClick={() => purchaseStyle(detailStyle, 'set')}
+                  disabled={purchasingStyleId === detailStyle.styleId}
+                  className="w-full py-3 rounded-xl bg-indigo-600 text-white active:bg-indigo-500 transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-0.5"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {purchasingStyleId === detailStyle.styleId ? (
+                    <span className="text-sm font-bold py-0.5">{t('common.loading')}</span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-bold inline-flex items-center gap-1.5">
+                        <MaskIcon /> {detailStyle.maskCost} · {t('maskShop.stylePurchaseSet')}
+                      </span>
+                      <span className="text-[10px] text-indigo-200/90">{t('maskShop.styleSetDesc')}</span>
+                    </>
+                  )}
+                </button>
+                {/* 단일 — 표정 이미지만 (영상 개별 해금). 영상이 있는 스타일에서만 노출 */}
+                {detailStyle.videoCount > 0 && (
+                  <button
+                    onClick={() => purchaseStyle(detailStyle, 'single')}
+                    disabled={purchasingStyleId === detailStyle.styleId}
+                    className="w-full py-3 rounded-xl bg-gray-800 text-gray-100 border border-gray-700 active:bg-gray-750 transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-0.5"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <span className="text-sm font-bold inline-flex items-center gap-1.5">
+                      <MaskIcon /> {detailStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}
+                    </span>
+                    <span className="text-[10px] text-gray-400">{t('maskShop.styleSingleDesc')}</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>

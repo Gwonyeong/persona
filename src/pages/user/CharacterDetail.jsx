@@ -463,7 +463,7 @@ export default function CharacterDetail() {
 
   // 상점 의상(SHOP 스타일) 구매 — 마스크 차감 후 통째 해금
   const [purchasingStyleId, setPurchasingStyleId] = useState(null)
-  const handlePurchaseStyle = async (style) => {
+  const handlePurchaseStyle = async (style, variant = 'set') => {
     if (!user) return goToLogin()
     if (!style?.maskCost || style.maskCost <= 0 || purchasingStyleId) return
     // 성인 전용 의상은 성인 인증 완료 유저만 구매 가능
@@ -471,21 +471,31 @@ export default function CharacterDetail() {
       navigate('/adult-verify')
       return
     }
-    if ((user.masks ?? 0) < style.maskCost) {
+    const cost = variant === 'single' ? (style.singleMaskCost ?? 10) : style.maskCost
+    if ((user.masks ?? 0) < cost) {
       alert(t('character.insufficientMasks'))
       navigate('/mask-shop?tab=subscription')
       return
     }
     setPurchasingStyleId(style.id)
     try {
-      const res = await api.post(`/characters/${id}/styles/${style.id}/purchase`, {})
+      const res = await api.post(`/characters/${id}/styles/${style.id}/purchase`, { variant })
       setCharacter((prev) => {
         if (!prev) return prev
         return {
           ...prev,
           styles: prev.styles.map((s) =>
             s.id === style.id
-              ? { ...s, unlocked: true, images: s.images.map((i) => ({ ...i, seen: true, videoUnlocked: i.videoFilePath ? true : i.videoUnlocked })) }
+              ? {
+                  ...s,
+                  unlocked: true,
+                  // set 은 영상까지 해금, single 은 이미지만 (영상 잠금 유지)
+                  images: s.images.map((i) => ({
+                    ...i,
+                    seen: true,
+                    videoUnlocked: variant === 'set' && i.videoFilePath ? true : i.videoUnlocked,
+                  })),
+                }
               : s,
           ),
         }
@@ -659,25 +669,55 @@ export default function CharacterDetail() {
             />
           )}
 
-          {/* 선택된 스타일이 해금 안 된 SHOP 이면 마스크 구매 배너 */}
+          {/* 선택된 스타일이 해금 안 된 SHOP 이면 마스크 구매 배너 (세트/단일) */}
           {selectedStyle && !selectedStyle.unlocked && selectedStyle.unlockMode === 'SHOP' && selectedStyle.maskCost > 0 && (
-            <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60 flex items-center gap-3">
-              <span className="text-lg">🛍️</span>
-              <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">
-                {t('character.styleShopBanner')}
+            <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="text-lg">🛍️</span>
+                <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">
+                  {t('character.styleShopBanner')}
+                </div>
               </div>
-              <button
-                onClick={() => handlePurchaseStyle(selectedStyle)}
-                disabled={purchasingStyleId === selectedStyle.id}
-                className="flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold disabled:opacity-50"
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                {purchasingStyleId === selectedStyle.id
-                  ? t('common.loading')
-                  : selectedStyle.adultOnly && !user?.adultVerified
-                    ? t('maskShop.styleAdultVerify')
-                    : (<><MaskIcon size={12} /> {selectedStyle.maskCost}</>)}
-              </button>
+              {selectedStyle.adultOnly && !user?.adultVerified ? (
+                <button
+                  onClick={() => handlePurchaseStyle(selectedStyle, 'set')}
+                  className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {t('maskShop.styleAdultVerify')}
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  {/* 세트 */}
+                  <button
+                    onClick={() => handlePurchaseStyle(selectedStyle, 'set')}
+                    disabled={purchasingStyleId === selectedStyle.id}
+                    className="flex-1 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold disabled:opacity-50 flex flex-col items-center gap-0.5"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {purchasingStyleId === selectedStyle.id ? (
+                      t('common.loading')
+                    ) : (
+                      <>
+                        <span className="inline-flex items-center gap-1"><MaskIcon size={12} /> {selectedStyle.maskCost} · {t('maskShop.stylePurchaseSet')}</span>
+                        <span className="text-[9px] text-indigo-200/90 font-normal">{t('maskShop.styleSetDesc')}</span>
+                      </>
+                    )}
+                  </button>
+                  {/* 단일 — 영상 있는 스타일에서만 */}
+                  {selectedStyle.images?.some((i) => i.videoFilePath) && (
+                    <button
+                      onClick={() => handlePurchaseStyle(selectedStyle, 'single')}
+                      disabled={purchasingStyleId === selectedStyle.id}
+                      className="flex-1 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 text-xs font-bold disabled:opacity-50 flex flex-col items-center gap-0.5"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <span className="inline-flex items-center gap-1"><MaskIcon size={12} /> {selectedStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}</span>
+                      <span className="text-[9px] text-gray-400 font-normal">{t('maskShop.styleSingleDesc')}</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

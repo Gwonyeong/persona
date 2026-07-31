@@ -311,6 +311,7 @@ export default function CharacterStyles() {
   const [newStyleDesc, setNewStyleDesc] = useState('')
   const [newStyleUnlockMode, setNewStyleUnlockMode] = useState('DEFAULT')
   const [newStyleMaskCost, setNewStyleMaskCost] = useState('')
+  const [newStyleSingleMaskCost, setNewStyleSingleMaskCost] = useState('')
   const [newStyleAdultOnly, setNewStyleAdultOnly] = useState(false)
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(null) // "styleId-emotion"
@@ -334,13 +335,20 @@ export default function CharacterStyles() {
       name: newStyleName,
       description: newStyleDesc,
       unlockMode: newStyleUnlockMode,
-      ...(newStyleUnlockMode === 'SHOP' ? { maskCost: parseInt(newStyleMaskCost) } : {}),
+      ...(newStyleUnlockMode === 'SHOP'
+        ? {
+            maskCost: parseInt(newStyleMaskCost),
+            // 단일가 미입력 시 서버 기본 10
+            ...(parseInt(newStyleSingleMaskCost) > 0 ? { singleMaskCost: parseInt(newStyleSingleMaskCost) } : {}),
+          }
+        : {}),
       adultOnly: newStyleAdultOnly,
     })
     setNewStyleName('')
     setNewStyleDesc('')
     setNewStyleUnlockMode('DEFAULT')
     setNewStyleMaskCost('')
+    setNewStyleSingleMaskCost('')
     setNewStyleAdultOnly(false)
     load()
   }
@@ -350,9 +358,15 @@ export default function CharacterStyles() {
     load()
   }
 
-  // SHOP 스타일 가격 저장 (0/빈값이면 서버가 null 로 정리)
+  // SHOP 스타일 세트 가격 저장 (0/빈값이면 서버가 null 로 정리)
   const setStyleMaskCost = async (styleId, maskCost) => {
     await api.put(`/admin/styles/${styleId}`, { maskCost: parseInt(maskCost) || 0 })
+    load()
+  }
+
+  // SHOP 스타일 단일(이미지만) 가격 저장 (0/빈값이면 서버가 기본 10 으로 정리)
+  const setStyleSingleMaskCost = async (styleId, singleMaskCost) => {
+    await api.put(`/admin/styles/${styleId}`, { singleMaskCost: parseInt(singleMaskCost) || 0 })
     load()
   }
 
@@ -433,15 +447,26 @@ export default function CharacterStyles() {
             <option value="SHOP">상점 구매</option>
           </select>
           {newStyleUnlockMode === 'SHOP' && (
-            <input
-              type="number"
-              min="1"
-              value={newStyleMaskCost}
-              onChange={(e) => setNewStyleMaskCost(e.target.value)}
-              placeholder="마스크 가격"
-              className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            />
+            <>
+              <input
+                type="number"
+                min="1"
+                value={newStyleMaskCost}
+                onChange={(e) => setNewStyleMaskCost(e.target.value)}
+                placeholder="세트 가격(이미지+영상)"
+                className="w-40 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              />
+              <input
+                type="number"
+                min="1"
+                value={newStyleSingleMaskCost}
+                onChange={(e) => setNewStyleSingleMaskCost(e.target.value)}
+                placeholder="단일 가격(기본 10)"
+                className="w-36 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              />
+            </>
           )}
           <label
             className="flex items-center gap-1.5 px-3 text-xs text-gray-300 whitespace-nowrap cursor-pointer select-none"
@@ -486,7 +511,7 @@ export default function CharacterStyles() {
                   )}
                   {style.unlockMode === 'SHOP' && (
                     <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-amber-900/60 text-amber-300 border border-amber-700/50">
-                      상점 {style.maskCost ? `${style.maskCost}마스크` : '가격 미설정'}
+                      상점 세트 {style.maskCost ? `${style.maskCost}` : '?'} · 단일 {style.singleMaskCost ?? 10}
                     </span>
                   )}
                   {style.adultOnly && (
@@ -521,8 +546,24 @@ export default function CharacterStyles() {
                         const v = parseInt(e.target.value) || 0
                         if (v !== (style.maskCost || 0)) setStyleMaskCost(style.id, v)
                       }}
-                      placeholder="가격"
-                      className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
+                      placeholder="세트"
+                      title="세트 가격 (이미지+영상)"
+                      className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    />
+                    <span className="text-[11px] text-gray-600">/</span>
+                    <input
+                      type="number"
+                      min="1"
+                      defaultValue={style.singleMaskCost ?? 10}
+                      key={`single-${style.id}-${style.singleMaskCost}`}
+                      onBlur={(e) => {
+                        const v = parseInt(e.target.value) || 0
+                        if (v !== (style.singleMaskCost ?? 10)) setStyleSingleMaskCost(style.id, v)
+                      }}
+                      placeholder="단일"
+                      title="단일 가격 (이미지만)"
+                      className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs"
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     />
                     <span className="text-[11px] text-gray-500">마스크</span>
