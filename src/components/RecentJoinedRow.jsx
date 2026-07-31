@@ -8,12 +8,12 @@ export default function RecentJoinedRow({ characters, reducedData, safetyMode })
 
   return (
     <div className="mb-4">
-      <h2 className="text-sm font-medium text-gray-400 mb-2">
+      <h2 className="text-lg font-bold text-white mb-2">
         {t('home.recentJoined')}
       </h2>
       <div className="grid grid-cols-2 gap-3">
         {characters.map((c) => (
-          <CharacterCard key={c.id} character={c} reducedData={reducedData} safetyMode={safetyMode} />
+          <CharacterCard key={c.id} character={c} reducedData={reducedData} safetyMode={safetyMode} compact />
         ))}
       </div>
     </div>

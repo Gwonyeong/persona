@@ -9,9 +9,8 @@ import useStore from '../../store/useStore'
 import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import NewOutfitsRow from '../../components/NewOutfitsRow'
-import FollowedCharactersRow from '../../components/FollowedCharactersRow'
-import FeaturedCharacterSlider from '../../components/FeaturedCharacterSlider'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
+import RelationSections from '../../components/RelationSections'
 import CharacterCard from '../../components/CharacterCard'
 import MaskIcon from '../../components/MaskIcon'
 // import AdBanner from '../../components/AdBanner'
@@ -76,7 +75,6 @@ export default function Home() {
   const [unclaimedPassCount, setUnclaimedPassCount] = useState(0)
   const [gachaFreeRemaining, setGachaFreeRemaining] = useState(0)
   const [primaryGachaBoxId, setPrimaryGachaBoxId] = useState(null)
-  const [followedIds, setFollowedIds] = useState(null)
   useEffect(() => {
     if (token) {
       api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
@@ -96,9 +94,6 @@ export default function Home() {
           setGachaFreeRemaining(0)
           setPrimaryGachaBoxId(null)
         })
-      api.get('/follows').then(({ characterIds }) => setFollowedIds(characterIds || [])).catch(() => setFollowedIds([]))
-    } else {
-      setFollowedIds(null)
     }
   }, [token])
 
@@ -124,12 +119,12 @@ export default function Home() {
   // 가장 최근 흥분 이미지 업로드 시점 기준 최신순으로 로드.
   useEffect(() => {
     api
-      .get('/characters/featured?limit=5')
+      .get('/characters/featured?limit=3')
       .then(({ characters }) => setFeaturedCharacters(characters || []))
       .catch(() => setFeaturedCharacters([]))
   }, [i18nInstance.language, safetyMode])
 
-  // 최근 합류 4명 — 가로 슬라이드에서만 노출, 하단 그리드에서는 제외
+  // 최근 합류 4명 — 상단 2열 그리드(2×2)에서만 노출, 하단 그리드에서는 제외
   const recentJoined = useMemo(() => {
     return [...characters]
       .filter((c) => c.createdAt)
@@ -147,12 +142,6 @@ export default function Home() {
     [characters, recentJoinedIds]
   )
 
-  const followedCharacters = useMemo(() => {
-    if (!followedIds) return null
-    if (followedIds.length === 0) return []
-    const idSet = new Set(followedIds)
-    return characters.filter((c) => idSet.has(c.id))
-  }, [characters, followedIds])
 
   return (
     <div className="relative px-4 pb-2">
@@ -323,9 +312,6 @@ export default function Home() {
         {/* 새로운 의상 (상점 공개 최신 의상) */}
         <NewOutfitsRow />
 
-        {/* 팔로우한 페소나 — 로그인 유저에 한해 노출 */}
-        <FollowedCharactersRow characters={followedCharacters} />
-
         {/* 안전모드 토글 — NSFW 게이트 */}
         <div className="flex items-center pb-2">
           <button
@@ -370,40 +356,39 @@ export default function Home() {
         />
       )}
 
-      {/* 추천 캐릭터 슬라이더 — AROUSED 표정 이미지 보유 캐릭터, 최신 업로드순 */}
-      <FeaturedCharacterSlider
-        characters={featuredCharacters}
-        reducedData={reducedData}
-      />
-
-      {/* 최근에 합류한 페소나들 — 최근 생성된 4명 가로 슬라이드 */}
+      {/* 최근에 합류한 페소나들 — 최근 생성된 3명, 3열 그리드 */}
       <RecentJoinedRow
         characters={recentJoined}
         reducedData={reducedData}
         safetyMode={safetyMode}
       />
 
-      {/* 캐릭터 그리드 — 최근 합류 4명 제외 */}
+      {/* 추천 페소나 — 3열 카드. 일단 UI에서 숨김(false). 되살리려면 false 제거. */}
+      {false && featuredCharacters.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {featuredCharacters.slice(0, 3).map((c) => (
+            <CharacterCard
+              key={c.id}
+              character={c}
+              reducedData={reducedData}
+              safetyMode={safetyMode}
+              compact
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 관계 태그별 섹션 — 제목 + 3열(최대 6개). 관계 없는 캐릭터는 '기타'로 */}
       {gridCharacters.length === 0 ? (
         <div className="text-center text-gray-500 py-20">
           <p>{t('home.emptyCharacters')}</p>
         </div>
       ) : (
-        <>
-          <h2 className="text-sm font-medium text-gray-400 mb-2">
-            {t('home.otherCharacters')}
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {gridCharacters.map((c) => (
-              <CharacterCard
-                key={c.id}
-                character={c}
-                reducedData={reducedData}
-                safetyMode={safetyMode}
-              />
-            ))}
-          </div>
-        </>
+        <RelationSections
+          characters={gridCharacters}
+          reducedData={reducedData}
+          safetyMode={safetyMode}
+        />
       )}
 
       {/* 사업자 정보 푸터 */}
