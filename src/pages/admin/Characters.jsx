@@ -2,13 +2,15 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 
-function TagSelector({ tags, onChange }) {
-  const [categories, setCategories] = useState([])
+function TagSelector({ tags, onChange, categories: categoriesProp }) {
+  const [fetched, setFetched] = useState([])
+  const categories = categoriesProp ?? fetched
   const selectedTags = new Set(tags)
 
   useEffect(() => {
-    api.get('/characters/tags').then(({ categories }) => setCategories(categories)).catch(() => {})
-  }, [])
+    if (categoriesProp) return // 상위에서 주면 자체 fetch 생략
+    api.get('/characters/tags').then(({ categories }) => setFetched(categories)).catch(() => {})
+  }, [categoriesProp])
 
   const toggle = useCallback((value) => {
     const next = new Set(selectedTags)
@@ -53,6 +55,122 @@ function TagSelector({ tags, onChange }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// 캐릭터 관리 '태그' 탭 — 전체 캐릭터를 카드로 펼쳐 태그를 토글·저장한다.
+function TagsManager({ characters, onSaved }) {
+  const [categories, setCategories] = useState([])
+  const [drafts, setDrafts] = useState({}) // id -> tags[]
+  const [saving, setSaving] = useState({}) // id -> bool
+  const [search, setSearch] = useState('')
+  const [needsRelationOnly, setNeedsRelationOnly] = useState(false)
+
+  useEffect(() => {
+    api.get('/characters/tags').then(({ categories }) => setCategories(categories)).catch(() => {})
+  }, [])
+
+  const draftOf = (c) => drafts[c.id] ?? c.tags ?? []
+  const norm = (arr) => JSON.stringify([...(arr || [])].sort())
+  const isDirty = (c) => c.id in drafts && norm(drafts[c.id]) !== norm(c.tags)
+  const hasRelation = (c) => draftOf(c).some((t) => t.startsWith('relation:'))
+  const setTags = (id, tags) => setDrafts((d) => ({ ...d, [id]: tags }))
+
+  const save = async (c) => {
+    setSaving((s) => ({ ...s, [c.id]: true }))
+    try {
+      const tags = draftOf(c)
+      await api.put(`/admin/characters/${c.id}`, { tags })
+      onSaved(c.id, tags)
+      setDrafts((d) => { const n = { ...d }; delete n[c.id]; return n })
+    } catch (e) {
+      alert('태그 저장 실패: ' + (e.message || e))
+    } finally {
+      setSaving((s) => ({ ...s, [c.id]: false }))
+    }
+  }
+
+  const list = characters
+    .filter((c) => (search ? c.name.toLowerCase().includes(search.toLowerCase()) : true))
+    .filter((c) => (needsRelationOnly ? !hasRelation(c) : true))
+
+  const relationCount = characters.filter((c) => c.tags?.some((t) => t.startsWith('relation:'))).length
+
+  return (
+    <div>
+      {/* 상단: 커버리지 + 검색 + 필터 */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <span className="text-sm text-gray-400">
+          관계 태그 지정 <span className="text-white font-medium">{relationCount}</span> / {characters.length}
+        </span>
+        <button
+          onClick={() => setNeedsRelationOnly((v) => !v)}
+          className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+            needsRelationOnly ? 'bg-amber-600 border-amber-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600'
+          }`}
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          관계 미지정만
+        </button>
+        <div className="relative ml-auto">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="이름 검색"
+            className="bg-gray-800 border border-gray-700 rounded-lg pl-3 pr-8 py-1.5 text-sm w-48"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-sm"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {list.map((c) => {
+          const src = c.profileImage || c.styles?.[0]?.images?.find((i) => i.emotion === 'NEUTRAL')?.filePath
+          const dirty = isDirty(c)
+          return (
+            <div key={c.id} className="bg-gray-900 rounded-lg border border-gray-800 p-3">
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-9 h-9 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
+                  {src ? (
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">?</div>
+                  )}
+                </div>
+                <span className="font-medium text-sm">{c.name}</span>
+                {!hasRelation(c) && (
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">관계 없음</span>
+                )}
+                <button
+                  onClick={() => save(c)}
+                  disabled={!dirty || saving[c.id]}
+                  className={`ml-auto px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    dirty && !saving[c.id]
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-500'
+                      : 'bg-gray-800 text-gray-600 cursor-default'
+                  }`}
+                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                >
+                  {saving[c.id] ? '저장 중…' : dirty ? '저장' : '저장됨'}
+                </button>
+              </div>
+              <TagSelector tags={draftOf(c)} onChange={(t) => setTags(c.id, t)} categories={categories} />
+            </div>
+          )
+        })}
+      </div>
+      {list.length === 0 && <p className="p-4 text-gray-500 text-sm">해당하는 캐릭터가 없습니다.</p>}
     </div>
   )
 }
@@ -627,12 +745,20 @@ export default function Characters() {
     { key: 'kr', label: '🇰🇷' },
     { key: 'jp', label: '🇯🇵' },
     { key: 'us', label: '🇺🇸' },
+    { key: 'unknown', label: '❓' },
   ]
   const NATIONALITY_ORDER = ['kr', 'jp', 'us']
 
   const getNationality = (c) => {
     const tag = (c.tags || []).find((t) => t.startsWith('nationality:'))
     return tag ? tag.split(':')[1] : null
+  }
+  // 국적 탭 매칭. '미정'(unknown)은 nationality:unknown 또는 국적 태그 없음을 포함.
+  const matchNationality = (c, key) => {
+    if (key === 'all') return true
+    const n = getNationality(c)
+    if (key === 'unknown') return !n || n === 'unknown'
+    return n === key
   }
 
   // 3-state 탭 매칭. productionStatus 없는 레거시 행은 isPublic으로 폴백.
@@ -661,7 +787,7 @@ export default function Characters() {
 
   const filteredCharacters = characters
     .filter((c) => matchTab(c, tab))
-    .filter((c) => (nationality === 'all' ? true : getNationality(c) === nationality))
+    .filter((c) => matchNationality(c, nationality))
     .filter((c) => {
       const q = search.trim().toLowerCase()
       return q ? (c.name || '').toLowerCase().includes(q) : true
@@ -1199,6 +1325,7 @@ export default function Characters() {
       <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1 w-fit">
         {[
           { key: 'list', label: '목록' },
+          { key: 'tags', label: '🏷 태그' },
           { key: 'schedule', label: '📅 출시 예약' },
         ].map((v) => (
           <button
@@ -1287,7 +1414,7 @@ export default function Characters() {
         {NATIONALITY_TABS.map((n) => {
           const count = characters
             .filter((c) => matchTab(c, tab))
-            .filter((c) => (n.key === 'all' ? true : getNationality(c) === n.key)).length
+            .filter((c) => matchNationality(c, n.key)).length
           return (
             <button
               key={n.key}
@@ -1481,6 +1608,14 @@ export default function Characters() {
         )}
       </div>
       </>
+      )}
+
+      {/* 태그 관리 */}
+      {view === 'tags' && (
+        <TagsManager
+          characters={characters.filter((c) => matchTab(c, 'public'))}
+          onSaved={(id, tags) => setCharacters((cs) => cs.map((x) => (x.id === id ? { ...x, tags } : x)))}
+        />
       )}
 
       {/* 출시 예약 캘린더 */}
