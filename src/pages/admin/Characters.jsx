@@ -1478,7 +1478,6 @@ export default function Characters() {
                           return (
                             <div className="flex flex-wrap gap-1 mt-1">
                               <Badge ok={r.voice} label="보이스" />
-                              <Badge ok={r.emotionCount >= r.emotionTotal} label={`표정 ${r.emotionCount}/${r.emotionTotal}`} />
                               <Badge ok={r.sample} label="음성샘플" />
                               <Badge ok={r.profile} label="프로필" />
                             </div>
@@ -1496,12 +1495,48 @@ export default function Characters() {
                     )}
                   </td>
                   <td className="p-3">
-                    <span
-                      className={isRecentPublish(c.createdAt) ? 'text-green-400 font-medium' : 'text-gray-300'}
-                      title={c.createdAt ? formatKstDateTime(c.createdAt) : ''}
-                    >
-                      {formatPublishedAgo(c.createdAt)}
-                    </span>
+                    {(() => {
+                      // 공개된 캐릭터: 실제 출시 시각(publishedAt) 우선, 없으면 createdAt 폴백
+                      if (c.isPublic) {
+                        const publishIso = c.publishedAt || c.createdAt
+                        return (
+                          <span
+                            className={isRecentPublish(publishIso) ? 'text-green-400 font-medium' : 'text-gray-300'}
+                            title={publishIso ? formatKstDateTime(publishIso) : ''}
+                          >
+                            {formatPublishedAgo(publishIso)}
+                            {c.publishedAt && (
+                              <span className="block text-[11px] text-gray-500">
+                                ({formatKstDateTime(c.publishedAt)})
+                              </span>
+                            )}
+                          </span>
+                        )
+                      }
+                      // 미공개 + 출시 예약 있음
+                      if (c.scheduledPublishAt) {
+                        const now = kstFields(new Date().toISOString())
+                        const sch = kstFields(c.scheduledPublishAt)
+                        const isToday = now.y === sch.y && now.m === sch.m && now.d === sch.d
+                        if (isToday) {
+                          return (
+                            <span className="text-green-400 font-medium" title={formatKstDateTime(c.scheduledPublishAt)}>
+                              오늘 출시
+                            </span>
+                          )
+                        }
+                        return (
+                          <span className="text-indigo-300" title={formatKstDateTime(c.scheduledPublishAt)}>
+                            출시 예정
+                            <span className="block text-[11px] text-gray-500">
+                              {formatRelativeKst(c.scheduledPublishAt)}
+                            </span>
+                          </span>
+                        )
+                      }
+                      // 미공개 + 예약 없음 (아직 출시 미확정)
+                      return <span className="text-gray-500">제작 중</span>
+                    })()}
                   </td>
                   <td className="p-3">
                     {(() => {
