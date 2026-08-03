@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 
-// 제작중 캐릭터 완성 워크스페이스 — voiceId · 표정 일괄 등록 · 음성 샘플 · 프로필/홈 이미지 · 공개 전환을
+// 제작중 캐릭터 완성 워크스페이스 — voiceId · 표정 일괄 등록 · 음성 샘플 · 프로필 이미지 · 공개 전환을
 // 한 화면에서 처리. 기존 어드민 API를 그대로 재사용한다(신규 API는 PATCH /production 하나뿐).
 
 // 준비도/표정 등록 기준 감정 (Expressions.jsx SFW_EMOTIONS와 동일)
@@ -25,6 +25,8 @@ const NSFW_EMOTIONS = [
 ]
 
 const isVideoUrl = (url) => /\.(mp4|webm)(\?|$)/i.test(url || '')
+
+const truncate = (s, n) => (!s ? '' : s.length > n ? s.slice(0, n) + '…' : s)
 
 const STATUS_LABEL = {
   IN_PRODUCTION: { label: '제작중', cls: 'bg-cyan-500/15 text-cyan-300' },
@@ -74,6 +76,13 @@ export default function CharacterProduction() {
   const [voiceIdInput, setVoiceIdInput] = useState('')
   const [savingVoice, setSavingVoice] = useState(false)
   const [copied, setCopied] = useState(null) // 'desc' | 'sample'
+
+  // ElevenLabs Voice Design — 미리듣기 3개 생성 → 하나 골라 캐릭터 이름으로 확정
+  const [designBusy, setDesignBusy] = useState(false)
+  const [designError, setDesignError] = useState(null)
+  const [previews, setPreviews] = useState([]) // [{ generatedVoiceId, audioBase64, mediaType, ... }]
+  const [designText, setDesignText] = useState('') // 미리듣기가 실제 낭독한 대사
+  const [creatingId, setCreatingId] = useState(null) // 확정 중인 generatedVoiceId
 
   // 표정 영상 일괄 업로드 (Gemini 자동 분류)
   const [bulkScope, setBulkScope] = useState('sfw') // 'sfw' | 'nsfw'
@@ -145,6 +154,46 @@ export default function CharacterProduction() {
     }
   }
 
+  // ── Voice Design (미리듣기 생성 → 확정) ──────────────────
+  const runVoiceDesign = async () => {
+    setDesignBusy(true)
+    setDesignError(null)
+    setPreviews([])
+    try {
+      const { previews: p, text } = await api.post(`/admin/characters/${character.id}/voice-design`, {})
+      setPreviews(p || [])
+      setDesignText(text || '')
+      if (!p || p.length === 0) setDesignError('미리듣기가 생성되지 않았습니다.')
+    } catch (e) {
+      setDesignError(e?.data?.error || e?.message || '생성 실패')
+    } finally {
+      setDesignBusy(false)
+    }
+  }
+
+  // 고른 미리듣기를 캐릭터 이름으로 확정 → voiceId 저장. 나머지는 학습용(played_not_selected)으로 전달.
+  const confirmVoice = async (chosen) => {
+    setCreatingId(chosen.generatedVoiceId)
+    setDesignError(null)
+    try {
+      const playedNotSelected = previews
+        .filter((p) => p.generatedVoiceId !== chosen.generatedVoiceId)
+        .map((p) => p.generatedVoiceId)
+      const { voiceId } = await api.post(`/admin/characters/${character.id}/voice-design/create`, {
+        generatedVoiceId: chosen.generatedVoiceId,
+        playedNotSelected,
+      })
+      setVoiceIdInput(voiceId || '')
+      setPreviews([])
+      setDesignText('')
+      await load()
+    } catch (e) {
+      setDesignError(e?.data?.error || e?.message || '확정 실패')
+    } finally {
+      setCreatingId(null)
+    }
+  }
+
   const copyText = async (which, text) => {
     try {
       await navigator.clipboard.writeText(text || '')
@@ -175,7 +224,8 @@ export default function CharacterProduction() {
     if (!bulkFiles.length || bulkRunning) return
     setBulkRunning(true)
     setBulkStarted(true)
-    setBulkItems(bulkFiles.map((f) => ({ name: f.name, status: 'pending', emotion: null, confidence: null, error: null })))
+    // file/scope를 항목에 보관 → 실패 시 원본 파일로 개별 재시도 가능 (submit 후 bulkFiles는 비워짐).
+    setBulkItems(bulkFiles.map((f) => ({ name: f.name, file: f, scope: bulkScope, status: 'pending', emotion: null, confidence: null, error: null })))
     const mark = (i, patch) => setBulkItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)))
     let anyDone = false
     for (let i = 0; i < bulkFiles.length; i++) {
@@ -196,6 +246,28 @@ export default function CharacterProduction() {
     setBulkRunning(false)
     setBulkFiles([])
     if (anyDone) await load()
+  }
+
+  // 실패한 개별 항목 재시도 — 보관해둔 원본 파일을 원래 scope로 다시 업로드·분류.
+  const retryBulkItem = async (idx) => {
+    if (bulkRunning) return
+    const item = bulkItems[idx]
+    if (!item || !item.file || item.status === 'processing') return
+    if (!baseStyle) { alert('기본 스타일이 없습니다.'); return }
+    const mark = (patch) => setBulkItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
+    mark({ status: 'processing', error: null })
+    try {
+      const fd = new FormData()
+      fd.append('tab', item.scope || bulkScope)
+      fd.append('videos', item.file, item.name)
+      const res = await api.post(`/admin/styles/${baseStyle.id}/emotion-videos/bulk`, fd)
+      const r = res.results?.[0]
+      const er = res.errors?.[0]
+      if (r) { mark({ status: 'done', emotion: r.emotion, confidence: r.confidence, error: null }); await load() }
+      else mark({ status: 'error', error: er?.error || '분류 실패' })
+    } catch (e) {
+      mark({ status: 'error', error: e?.message || '업로드 실패' })
+    }
   }
 
   const removeImage = async (imageId) => {
@@ -369,7 +441,50 @@ export default function CharacterProduction() {
                 onCopy={() => copyText('sample', character.voicePrompt.sampleText)}
               />
             )}
-            <p className="text-[11px] text-gray-500 mt-1">이 둘을 ElevenLabs Voice Design에 붙여넣어 보이스를 만들고, 생성된 voiceId를 아래에 입력하세요.</p>
+            <p className="text-[11px] text-gray-500 mt-1">아래 버튼으로 미리듣기 3개를 만든 뒤, 마음에 드는 목소리를 고르면 <b className="text-gray-300">{character.name}</b> 이름으로 확정·저장됩니다.</p>
+
+            {/* 미리듣기 생성 버튼 */}
+            <button
+              onClick={runVoiceDesign}
+              disabled={designBusy || !!creatingId}
+              className="mt-3 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium disabled:opacity-50 w-full"
+              style={btnStyle}
+            >
+              {designBusy ? '미리듣기 생성 중...' : previews.length > 0 ? '🔄 미리듣기 다시 생성' : '🎙 보이스 미리듣기 생성 (3개)'}
+            </button>
+
+            {designError && <p className="text-[11px] text-red-400 mt-2 break-words">⚠ {designError}</p>}
+
+            {/* 미리듣기 3개 — 재생 후 하나 선택 */}
+            {previews.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {designText && (
+                  <p className="text-[11px] text-gray-500">낭독 대사: "{truncate(designText, 80)}"</p>
+                )}
+                {previews.map((p, i) => {
+                  const busy = creatingId === p.generatedVoiceId
+                  const otherBusy = !!creatingId && !busy
+                  return (
+                    <div key={p.generatedVoiceId} className="flex items-center gap-2 bg-gray-800/60 rounded-lg p-2">
+                      <span className="text-[11px] text-gray-400 font-mono flex-shrink-0 w-10">#{i + 1}</span>
+                      <audio
+                        src={`data:${p.mediaType};base64,${p.audioBase64}`}
+                        controls
+                        className="h-8 flex-1 min-w-0"
+                      />
+                      <button
+                        onClick={() => confirmVoice(p)}
+                        disabled={otherBusy}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-medium disabled:opacity-50 flex-shrink-0"
+                        style={btnStyle}
+                      >
+                        {busy ? '확정 중...' : '이 목소리로 확정'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
         <p className="text-xs text-gray-500 mb-2">일레븐랩스에서 제작한 보이스 ID를 붙여넣으세요.</p>
@@ -457,23 +572,58 @@ export default function CharacterProduction() {
 
         {/* 진행 상황 */}
         {bulkStarted && bulkItems.length > 0 && (
-          <div className="mt-4 space-y-1 max-h-56 overflow-y-auto">
-            {bulkItems.map((it, i) => (
-              <div key={`${it.name}_${i}`} className="flex items-center justify-between text-[11px] bg-gray-800/60 rounded px-2 py-1">
-                <span className="truncate text-gray-300 min-w-0">{it.name}</span>
-                <span className="ml-2 flex-shrink-0">
-                  {it.status === 'done' && (
-                    <span className="text-emerald-300">
-                      {emotionLabel(it.emotion)}
-                      {typeof it.confidence === 'number' && <span className="text-gray-500"> · {Math.round(it.confidence * 100)}%</span>}
-                    </span>
-                  )}
-                  {it.status === 'processing' && <span className="text-amber-300">분류 중…</span>}
-                  {it.status === 'pending' && <span className="text-gray-600">대기</span>}
-                  {it.status === 'error' && <span className="text-rose-400">{it.error}</span>}
-                </span>
-              </div>
-            ))}
+          <div className="mt-4">
+            {/* 실패 항목 일괄 재시도 */}
+            {(() => {
+              const failed = bulkItems.filter((it) => it.status === 'error' && it.file)
+              if (failed.length === 0) return null
+              return (
+                <button
+                  onClick={async () => {
+                    for (let i = 0; i < bulkItems.length; i++) {
+                      if (bulkItems[i]?.status === 'error' && bulkItems[i]?.file) await retryBulkItem(i)
+                    }
+                  }}
+                  disabled={bulkRunning}
+                  className="mb-2 px-3 py-1.5 rounded-md bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-medium disabled:opacity-50"
+                  style={btnStyle}
+                >
+                  🔄 실패 {failed.length}개 모두 재시도
+                </button>
+              )
+            })()}
+            <div className="space-y-1 max-h-56 overflow-y-auto">
+              {bulkItems.map((it, i) => (
+                <div key={`${it.name}_${i}`} className="flex items-center justify-between text-[11px] bg-gray-800/60 rounded px-2 py-1">
+                  <span className="truncate text-gray-300 min-w-0">{it.name}</span>
+                  <span className="ml-2 flex-shrink-0 flex items-center gap-2">
+                    {it.status === 'done' && (
+                      <span className="text-emerald-300">
+                        {emotionLabel(it.emotion)}
+                        {typeof it.confidence === 'number' && <span className="text-gray-500"> · {Math.round(it.confidence * 100)}%</span>}
+                      </span>
+                    )}
+                    {it.status === 'processing' && <span className="text-amber-300">분류 중…</span>}
+                    {it.status === 'pending' && <span className="text-gray-600">대기</span>}
+                    {it.status === 'error' && (
+                      <>
+                        <span className="text-rose-400 truncate max-w-[140px]">{it.error}</span>
+                        {it.file && (
+                          <button
+                            onClick={() => retryBulkItem(i)}
+                            disabled={bulkRunning}
+                            className="px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 disabled:opacity-50 flex-shrink-0"
+                            style={btnStyle}
+                          >
+                            재시도
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -551,12 +701,13 @@ export default function CharacterProduction() {
         </div>
       </Section>
 
-      {/* 4. 프로필 / 홈 이미지 */}
-      <Section title="4. 프로필 / 홈 이미지">
-        <div className="grid grid-cols-2 gap-4">
+      {/* 4. 프로필 이미지 */}
+      <Section title="4. 프로필 이미지">
+        <div className="max-w-[220px]">
           <CharImageCell
-            label="프로필 이미지"
+            label="프로필 이미지 (9:16)"
             url={character.profileImage}
+            aspectClass="aspect-[9/16]"
             uploading={uploadingImage === 'profile'}
             dragOver={dragImage === 'profile'}
             onDragOver={() => setDragImage('profile')}
@@ -564,17 +715,6 @@ export default function CharacterProduction() {
             onDrop={(file) => { setDragImage(null); uploadCharImage('profile', file) }}
             onPick={() => triggerCharImageUpload('profile')}
             onRemove={character.profileImage ? () => removeCharImage('profile') : null}
-          />
-          <CharImageCell
-            label="홈 이미지 (선택)"
-            url={character.homeImage}
-            uploading={uploadingImage === 'home'}
-            dragOver={dragImage === 'home'}
-            onDragOver={() => setDragImage('home')}
-            onDragLeave={() => setDragImage(null)}
-            onDrop={(file) => { setDragImage(null); uploadCharImage('home', file) }}
-            onPick={() => triggerCharImageUpload('home')}
-            onRemove={character.homeImage ? () => removeCharImage('home') : null}
           />
         </div>
       </Section>
@@ -717,7 +857,7 @@ function EmotionCell({ emo, images, onRemove }) {
   )
 }
 
-function CharImageCell({ label, url, uploading, dragOver, onDragOver, onDragLeave, onDrop, onPick, onRemove }) {
+function CharImageCell({ label, url, uploading, dragOver, onDragOver, onDragLeave, onDrop, onPick, onRemove, aspectClass = 'aspect-square' }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -731,7 +871,7 @@ function CharImageCell({ label, url, uploading, dragOver, onDragOver, onDragLeav
         onDragLeave={onDragLeave}
         onDrop={(e) => { e.preventDefault(); onDrop(e.dataTransfer.files[0]) }}
         onClick={onPick}
-        className={`aspect-square rounded-lg border-2 border-dashed cursor-pointer flex items-center justify-center overflow-hidden transition-colors ${dragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'}`}
+        className={`${aspectClass} rounded-lg border-2 border-dashed cursor-pointer flex items-center justify-center overflow-hidden transition-colors ${dragOver ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'}`}
       >
         {uploading ? (
           <span className="text-xs text-gray-400">업로드 중...</span>
