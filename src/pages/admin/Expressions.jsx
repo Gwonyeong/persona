@@ -6,8 +6,57 @@ import { api } from '../../lib/api'
 import { removeChromaBackground } from '../../lib/removeChromaBackground'
 import useVideoJobs from '../../store/useVideoJobs'
 import StyleAcquisitionStats from './StyleAcquisitionStats'
+import StyleReleaseCalendar from './StyleReleaseCalendar'
 
 export const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
+
+// ISO 문자열 → <input type="datetime-local"> 로컬 값(YYYY-MM-DDTHH:mm)
+export function toLocalInput(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+// 예약 배지에 쓰는 짧은 날짜 표기 (예: 8/10 21:00)
+export function formatScheduleShort(iso) {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// ── 스타일 출시 예약 슬롯 (1일 1스타일, 캐릭터 관리의 출시 예약과 동일한 규약) ──
+// 기본 공개 시각 18:00 KST. 이미 예약된 날짜를 피해 내일(KST)부터 가장 빠른 빈 슬롯을 찾는다.
+const STYLE_RELEASE_HOUR_KST = 18
+
+// UTC Date → KST 달력 day key 'YYYY-MM-DD'
+function kstDayKey(date) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+// occupiedKeys(Set<'YYYY-MM-DD'>)를 피해 가장 빠른 빈 슬롯. 반환 { n(며칠 뒤), iso(공개 예약 UTC ISO) }
+function findEarliestStyleSlot(occupiedKeys) {
+  const kn = new Date(Date.now() + 9 * 60 * 60 * 1000) // UTC 필드 = KST 벽시계
+  const ty = kn.getUTCFullYear(), tm = kn.getUTCMonth(), td = kn.getUTCDate()
+  for (let offset = 1; offset < 3650; offset++) {
+    const cand = new Date(Date.UTC(ty, tm, td + offset))
+    const key = cand.toISOString().slice(0, 10)
+    if (!occupiedKeys.has(key)) {
+      const releaseMs = Date.UTC(cand.getUTCFullYear(), cand.getUTCMonth(), cand.getUTCDate(), STYLE_RELEASE_HOUR_KST - 9, 0, 0)
+      return { n: offset, iso: new Date(releaseMs).toISOString() }
+    }
+  }
+  return { n: 1, iso: null }
+}
+
+// 예약 버튼 툴팁용 — KST 전체 표기
+export function formatKstDateFull(iso) {
+  if (!iso) return ''
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(iso))
+}
 
 // 최근 스타일 추가 시각 → 경과 일수. 없거나 잘못된 값이면 null.
 function daysSince(dateStr) {
@@ -21,6 +70,23 @@ function daysSince(dateStr) {
 function relativeDaysLabel(days) {
   if (days == null) return null
   return days <= 0 ? '오늘' : `${days}일 전`
+}
+
+// KST 달력일 인덱스 (자정 경계). 예약 출시까지 남은 "n일 후" 계산용.
+function kstDayIndex(dateLike) {
+  const t = new Date(dateLike).getTime()
+  if (Number.isNaN(t)) return null
+  return Math.floor((t + 9 * 60 * 60 * 1000) / 86400000)
+}
+
+// 예약 출시 시각 → "오늘 출시 / n일 후 출시" 라벨. 없으면 null.
+function scheduledLabel(iso) {
+  if (!iso) return null
+  const a = kstDayIndex(iso)
+  const b = kstDayIndex(Date.now())
+  if (a == null || b == null) return null
+  const diff = a - b
+  return diff <= 0 ? '오늘 출시' : `${diff}일 후 출시`
 }
 
 // 표정 sprite 미디어 — 비디오(mp4/webm/...)는 자동재생/루프/음소거로 미리보기.
@@ -137,7 +203,7 @@ export const TABS = [
 
 export default function Expressions() {
   const [characters, setCharacters] = useState(null)
-  const [tab, setTab] = useState('manage') // manage(이미지 관리) | stats(획득 통계)
+  const [tab, setTab] = useState('manage') // manage(이미지 관리) | calendar(출시 캘린더) | stats(획득 통계)
   const [visibility, setVisibility] = useState('public') // public | private
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState('name') // name | recent
@@ -180,6 +246,7 @@ export default function Expressions() {
       <div className="flex gap-1 mb-5 border-b border-gray-800">
         {[
           { key: 'manage', label: '이미지 관리' },
+          { key: 'calendar', label: '출시 캘린더' },
           { key: 'stats', label: '획득 통계' },
         ].map((t) => (
           <button
@@ -199,6 +266,8 @@ export default function Expressions() {
 
       {tab === 'stats' ? (
         <StyleAcquisitionStats embedded />
+      ) : tab === 'calendar' ? (
+        <StyleReleaseCalendar />
       ) : (
       <>
       {/* 공개/비공개 탭 */}
@@ -269,11 +338,21 @@ export default function Expressions() {
               to={`/admin/expressions/${c.id}`}
               className="group flex flex-col items-center gap-1.5"
               style={NO_OUTLINE}
-              title={c.styleCount === 0 ? `${c.name} · 스타일 없음` : c.name}
+              title={
+                c.nextScheduledAt
+                  ? `${c.name} · ${scheduledLabel(c.nextScheduledAt)} (${formatKstDateFull(c.nextScheduledAt)})`
+                  : c.styleCount === 0
+                    ? `${c.name} · 스타일 없음`
+                    : c.name
+              }
             >
               <div
                 className={`w-14 h-14 rounded-full overflow-hidden bg-gray-800 transition-transform group-hover:scale-105 ${
-                  c.styleCount === 0 ? 'ring-2 ring-rose-500/70' : ''
+                  c.nextScheduledAt
+                    ? 'ring-2 ring-emerald-500'
+                    : c.styleCount === 0
+                      ? 'ring-2 ring-rose-500/70'
+                      : ''
                 }`}
               >
                 {c.profileImage ? (
@@ -287,6 +366,15 @@ export default function Expressions() {
                   {c.name}
                 </p>
                 {(() => {
+                  // 출시 예약 스타일이 있으면 "n일 후 출시"(초록)를 우선 표시.
+                  const schedLabel = scheduledLabel(c.nextScheduledAt)
+                  if (schedLabel) {
+                    return (
+                      <p className="text-[9px] text-center truncate leading-tight mt-0.5 text-emerald-400 font-medium">
+                        {schedLabel}
+                      </p>
+                    )
+                  }
                   const days = daysSince(c.latestStyleAt)
                   const label = relativeDaysLabel(days)
                   if (!label) return null
@@ -319,9 +407,35 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
   const [unlockMode, setUnlockMode] = useState('DEFAULT')
   const [maskCost, setMaskCost] = useState('')
   const [adultOnly, setAdultOnly] = useState(false)
+  // 출시 예약 슬롯 — 다른 예약 대기 스타일이 점유한 KST 날짜 집합. null=로딩 전.
+  // 캐릭터 관리의 '1일 1캐릭터'와 동일하게, 스타일도 1일 1개만 예약(가장 빠른 빈 날짜 18시 KST).
+  const [occupiedKeys, setOccupiedKeys] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  const submit = async () => {
+  const loadSlots = () => {
+    api
+      .get('/admin/scheduled-styles')
+      .then(({ items }) => {
+        setOccupiedKeys(
+          new Set(
+            (items || [])
+              .filter((it) => it.status === 'scheduled' && it.scheduledPublishAt)
+              .map((it) => kstDayKey(new Date(it.scheduledPublishAt))),
+          ),
+        )
+      })
+      .catch(() => setOccupiedKeys(new Set()))
+  }
+
+  useEffect(() => {
+    if (open && occupiedKeys === null) loadSlots()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const earliestSlot = occupiedKeys ? findEarliestStyleSlot(occupiedKeys) : null
+
+  // scheduledIso=null → 즉시 공개, 값 있으면 그 시각에 예약(숨김 등록)
+  const submit = async (scheduledIso = null) => {
     if (!name.trim()) return
     if (unlockMode === 'SHOP' && !(parseInt(maskCost) > 0)) {
       alert('상점 구매 스타일은 마스크 가격(1 이상)을 입력해주세요.')
@@ -335,12 +449,18 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
         unlockMode,
         ...(unlockMode === 'SHOP' ? { maskCost: parseInt(maskCost) } : {}),
         adultOnly,
+        ...(scheduledIso ? { scheduledPublishAt: scheduledIso } : {}),
       })
       setName('')
       setUnlockMode('DEFAULT')
       setMaskCost('')
       setAdultOnly(false)
-      setOpen(false)
+      if (scheduledIso) {
+        // 방금 예약한 날짜를 점유 처리 → 다음 슬롯이 자동으로 하루 밀림 (연속 예약 편의)
+        setOccupiedKeys((prev) => new Set(prev || []).add(kstDayKey(new Date(scheduledIso))))
+      } else {
+        setOpen(false)
+      }
       onAdded?.()
     } catch (err) {
       alert('스타일 추가 실패: ' + (err?.data?.error || err?.message))
@@ -359,7 +479,7 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submit()
+                if (e.key === 'Enter') submit(null)
                 if (e.key === 'Escape') setOpen(false)
               }}
               placeholder="새 스타일명 (예: 교복, 비키니)"
@@ -381,7 +501,7 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
                 min="1"
                 value={maskCost}
                 onChange={(e) => setMaskCost(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') submit() }}
+                onKeyDown={(e) => { if (e.key === 'Enter') submit(null) }}
                 placeholder="마스크 가격"
                 className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white w-24"
                 style={NO_OUTLINE}
@@ -397,12 +517,22 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
               19+
             </label>
             <button
-              onClick={submit}
+              onClick={() => submit(null)}
               disabled={saving || !name.trim()}
               className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded disabled:opacity-50"
               style={NO_OUTLINE}
+              title="즉시 공개로 추가"
             >
               추가
+            </button>
+            <button
+              onClick={() => earliestSlot?.iso && submit(earliestSlot.iso)}
+              disabled={saving || !name.trim() || !earliestSlot?.iso}
+              className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded disabled:opacity-50 whitespace-nowrap"
+              style={NO_OUTLINE}
+              title={earliestSlot?.iso ? `${formatKstDateFull(earliestSlot.iso)} 공개 예약 (1일 1스타일)` : '예약 슬롯 계산 중...'}
+            >
+              🗓️ {occupiedKeys === null ? '예약 추가' : `${earliestSlot.n}일 뒤 예약`}
             </button>
             <button
               onClick={() => {
@@ -415,7 +545,14 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
               취소
             </button>
           </div>
-        ) : (
+        ) : null}
+        {open && (
+          <p className="pl-11 mt-1.5 text-[10px] text-gray-500">
+            <span className="text-gray-400">추가</span> = 즉시 공개 · <span className="text-purple-300">🗓️ 예약</span> = 1일 1스타일, 예약 가능한 가장 빠른 날(18시 KST)에 자동 공개
+            {earliestSlot?.iso && <> · 다음 슬롯 <span className="text-purple-300">{formatKstDateFull(earliestSlot.iso)}</span></>}
+          </p>
+        )}
+        {!open && (
           <button
             onClick={() => setOpen(true)}
             className="pl-11 text-[11px] text-gray-500 hover:text-indigo-300"
@@ -488,6 +625,16 @@ export function CharacterRow({ character, style, isFirstStyle = true, emotions, 
                     {style.adultOnly && (
                       <span className="text-[9px] bg-rose-900/60 text-rose-300 px-1 py-0.5 rounded font-semibold">
                         19+
+                      </span>
+                    )}
+                    {style.isPublic === false && style.scheduledPublishAt && (
+                      <span className="text-[9px] bg-sky-900/60 text-sky-300 px-1 py-0.5 rounded font-semibold whitespace-nowrap" title={`출시 예약: ${new Date(style.scheduledPublishAt).toLocaleString('ko-KR')}`}>
+                        ⏳ {formatScheduleShort(style.scheduledPublishAt)}
+                      </span>
+                    )}
+                    {style.isPublic === false && !style.scheduledPublishAt && (
+                      <span className="text-[9px] bg-gray-700 text-gray-300 px-1 py-0.5 rounded font-semibold" title="숨김 — 예약 미설정. 편집에서 공개하거나 예약하세요.">
+                        숨김
                       </span>
                     )}
                   </div>
@@ -796,7 +943,10 @@ function StyleEditModal({ style, onClose, onChanged }) {
   const [maskCost, setMaskCost] = useState(style.maskCost ? String(style.maskCost) : '')
   const [adultOnly, setAdultOnly] = useState(!!style.adultOnly)
   const [shopActive, setShopActive] = useState(style.shopActive !== false)
+  // 출시 예약 — 숨김(미공개) 스타일에서만 편집. 공개된 스타일은 이미 라이브.
+  const [scheduledAt, setScheduledAt] = useState(toLocalInput(style.scheduledPublishAt))
   const [saving, setSaving] = useState(false)
+  const hidden = style.isPublic === false
 
   const save = async () => {
     if (!name.trim()) return
@@ -811,10 +961,25 @@ function StyleEditModal({ style, onClose, onChanged }) {
         unlockMode,
         ...(unlockMode === 'SHOP' ? { maskCost: parseInt(maskCost), shopActive } : {}),
         adultOnly,
+        // 숨김 스타일일 때만 예약 시각을 갱신 (빈값이면 예약 해제, 숨김 유지)
+        ...(hidden ? { scheduledPublishAt: scheduledAt ? new Date(scheduledAt).toISOString() : null } : {}),
       })
       onChanged?.()
     } catch (err) {
       alert('저장 실패: ' + (err?.data?.error || err?.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 예약을 기다리지 않고 즉시 공개
+  const publishNow = async () => {
+    setSaving(true)
+    try {
+      await api.put(`/admin/styles/${style.id}`, { isPublic: true })
+      onChanged?.()
+    } catch (err) {
+      alert('공개 실패: ' + (err?.data?.error || err?.message))
     } finally {
       setSaving(false)
     }
@@ -879,10 +1044,56 @@ function StyleEditModal({ style, onClose, onChanged }) {
           </>
         )}
 
-        <label className="flex items-center gap-2 text-xs text-gray-200 mb-5 cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-xs text-gray-200 mb-4 cursor-pointer select-none">
           <input type="checkbox" checked={adultOnly} onChange={(e) => setAdultOnly(e.target.checked)} className="accent-rose-500" />
           19+ 성인전용 (미인증 유저 구매 불가)
         </label>
+
+        {/* 출시 예약 — 숨김 스타일에만 노출 */}
+        {hidden ? (
+          <div className="mb-5 rounded-lg border border-sky-800/50 bg-sky-950/30 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold text-sky-200">출시 예약</span>
+              <span className="text-[10px] text-sky-300/80">
+                {scheduledAt ? '예약 시각에 자동 공개' : '숨김 (예약 없음)'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200"
+                style={{ ...NO_OUTLINE, colorScheme: 'dark' }}
+              />
+              {scheduledAt && (
+                <button
+                  onClick={() => setScheduledAt('')}
+                  className="text-[11px] text-gray-400 hover:text-white whitespace-nowrap"
+                  style={NO_OUTLINE}
+                >
+                  예약 해제
+                </button>
+              )}
+            </div>
+            <button
+              onClick={publishNow}
+              disabled={saving}
+              className="mt-2 w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs rounded disabled:opacity-50"
+              style={NO_OUTLINE}
+            >
+              지금 바로 공개
+            </button>
+            <p className="mt-2 text-[10px] text-gray-500 leading-snug">
+              예약 시각을 저장하려면 아래 <span className="text-gray-300">저장</span>을 누르세요. 예약 시각까지 이 스타일은 유저에게 노출되지 않습니다.
+            </p>
+          </div>
+        ) : (
+          <div className="mb-5 flex items-center gap-1.5 text-[11px] text-emerald-300">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            공개됨 (유저에게 노출 중)
+          </div>
+        )}
 
         <div className="flex items-center justify-between gap-2">
           <button
