@@ -706,7 +706,7 @@
   },
   "nav": {
     "home": "홈",
-    "feed": "피드",
+    "groupChats": "단톡방",
     "chats": "대화",
     "my": "마이"
   },
@@ -1003,6 +1003,39 @@
     "videoRewardTitle": "🎉 표정영상을 받았어요!",
     "videoRewardDesc": "성인인증 보상으로 랜덤 표정영상이 해금됐어요.",
     "videoRewardView": "보러가기"
+  },
+  "groupChatList": {
+    "title": "단톡방 - Pesona",
+    "heading": "단톡방",
+    "metaDescription": "여러 페소나와 함께하는 단체 톡방",
+    "searchPlaceholder": "단톡방 검색",
+    "noSearchResults": "검색 결과가 없어요",
+    "empty": "아직 단톡방이 없어요",
+    "emptyHint": "아래 추천 조합으로 바로 시작해보세요",
+    "loginPrompt": "로그인하고 단톡방을 시작하세요",
+    "myRooms": "내 단톡방",
+    "recommended": "이런 조합은 어때요?",
+    "recommendedHint": "탭하면 바로 단톡방이 만들어져요",
+    "concepts": "상황극 시작하기",
+    "conceptsHint": "상황을 고르고 원하는 캐릭터를 배역에 캐스팅하세요",
+    "freeCombo": "캐릭터 직접 고르기",
+    "createRoom": "새 단톡방",
+    "starting": "만드는 중..."
+  },
+  "groupChatCast": {
+    "title": "배역 캐스팅",
+    "metaDescription": "상황극 배역에 캐릭터를 캐스팅하세요",
+    "roles": "배역",
+    "pickForRole": "이 배역에 넣을 캐릭터를 골라주세요",
+    "tapToAssign": "탭해서 캐스팅",
+    "free": "자유",
+    "empty": "비어 있음",
+    "characters": "캐릭터",
+    "start": "이 배역으로 시작",
+    "starting": "만드는 중...",
+    "needMore": "배역을 {{count}}개 이상 채워주세요",
+    "adultRequired": "이 상황극은 성인 인증이 필요해요",
+    "loadFailed": "불러오지 못했어요"
   },
   "groupChat": {
     "title": "단체 톡방 - Pesona",

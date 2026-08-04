@@ -19,14 +19,15 @@ const TABS = [
     ),
   },
   {
-    to: '/feed',
-    labelKey: 'nav.feed',
+    to: '/group-chats',
+    labelKey: 'nav.groupChats',
     requireAuth: false,
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
   },
@@ -64,6 +65,7 @@ export default function UserLayout() {
     location.pathname.match(/^\/chats-v2\/\d/) ||
     location.pathname.match(/^\/group-chats\/\d/) ||
     location.pathname === '/group-chats/new' ||
+    location.pathname.startsWith('/group-chats/cast/') ||
     location.pathname.match(/^\/vn\/\d/)
   const isFullscreenPage = isChatPage || location.pathname.startsWith('/characters/')
   // 가챠 페이지는 박스가 화면을 풀-블리드로 채우는 디자인 — 탭바·푸터·하단 spacer 모두 숨김.

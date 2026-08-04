@@ -706,7 +706,7 @@
   },
   "nav": {
     "home": "Home",
-    "feed": "Feed",
+    "groupChats": "Groups",
     "chats": "Chats",
     "my": "My"
   },
@@ -1003,6 +1003,39 @@
     "videoRewardTitle": "🎉 You got an expression video!",
     "videoRewardDesc": "A random expression video was unlocked as your age-verification reward.",
     "videoRewardView": "View it"
+  },
+  "groupChatList": {
+    "title": "Group Chats - Pesona",
+    "heading": "Group Chats",
+    "metaDescription": "Group chats with multiple personas",
+    "searchPlaceholder": "Search group chats",
+    "noSearchResults": "No results",
+    "empty": "No group chats yet",
+    "emptyHint": "Start instantly with a suggested combo below",
+    "loginPrompt": "Log in to start a group chat",
+    "myRooms": "My rooms",
+    "recommended": "Try these combos",
+    "recommendedHint": "Tap to create a group chat instantly",
+    "concepts": "Start a roleplay",
+    "conceptsHint": "Pick a situation and cast characters into roles",
+    "freeCombo": "Pick characters yourself",
+    "createRoom": "New group",
+    "starting": "Creating..."
+  },
+  "groupChatCast": {
+    "title": "Cast roles",
+    "metaDescription": "Cast characters into roleplay roles",
+    "roles": "Roles",
+    "pickForRole": "Pick a character for this role",
+    "tapToAssign": "Tap to cast",
+    "free": "Free",
+    "empty": "Empty",
+    "characters": "Characters",
+    "start": "Start with this cast",
+    "starting": "Creating...",
+    "needMore": "Fill at least {{count}} roles",
+    "adultRequired": "This roleplay requires adult verification",
+    "loadFailed": "Failed to load"
   },
   "groupChat": {
     "title": "Group Chat - Pesona",

@@ -251,6 +251,9 @@ export default function GroupChat() {
 
   const presenceMode = groupChat?.presenceMode || 'PHONE'
   const isInPerson = presenceMode === 'IN_PERSON'
+  // 상황극(컨셉) 방 — 캐스팅이 고정이라 진행 중 멤버 변경 불가. 멤버 관리 버튼 숨김.
+  const isConcept = groupChat?.conceptData != null
+
   const safetyMode = groupChat?.safetyMode !== false // 기본 SFW
   // 표정 이미지 출력 방식 — 서버(GroupChat.spriteMode) 값. 'BUBBLE'(기본) | 'OFF'(없음). 설정 페이지에서 변경.
   const spriteMode = groupChat?.spriteMode === 'OFF' ? 'OFF' : 'BUBBLE'
@@ -738,7 +741,9 @@ export default function GroupChat() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* 멤버 — 멤버 관리 페이지로 이동. 1:1 채팅의 사람 아이콘 위치와 동일. */}
+          {/* 멤버 — 멤버 관리 페이지로 이동. 1:1 채팅의 사람 아이콘 위치와 동일.
+              상황극(컨셉) 방은 캐스팅 고정이라 멤버 변경 불가 → 버튼 숨김. */}
+          {!isConcept && (
           <button
             onClick={() => navigate(`/group-chats/${id}/members`)}
             className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-800/80 border border-gray-700/50 text-gray-200 hover:bg-gray-700/80 shadow-lg transition-colors"
@@ -753,6 +758,7 @@ export default function GroupChat() {
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           </button>
+          )}
 
           {/* 설정 — 채팅 설정 페이지로 이동 (표정 이미지 출력 방식 등) */}
           <button

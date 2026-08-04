@@ -706,7 +706,7 @@
   },
   "nav": {
     "home": "ホーム",
-    "feed": "フィード",
+    "groupChats": "グループ",
     "chats": "チャット",
     "my": "マイ"
   },
@@ -1003,6 +1003,39 @@
     "videoRewardTitle": "🎉 表情動画をもらいました！",
     "videoRewardDesc": "成人認証の特典としてランダム表情動画が解放されました。",
     "videoRewardView": "見に行く"
+  },
+  "groupChatList": {
+    "title": "グループチャット - Pesona",
+    "heading": "グループチャット",
+    "metaDescription": "複数のペルソナとのグループチャット",
+    "searchPlaceholder": "グループチャットを検索",
+    "noSearchResults": "結果がありません",
+    "empty": "まだグループチャットがありません",
+    "emptyHint": "下のおすすめの組み合わせから始めましょう",
+    "loginPrompt": "ログインしてグループチャットを始めましょう",
+    "myRooms": "マイルーム",
+    "recommended": "こんな組み合わせはいかが？",
+    "recommendedHint": "タップするとすぐに作成できます",
+    "concepts": "ロールプレイを始める",
+    "conceptsHint": "シチュエーションを選び、キャラを配役にキャスティング",
+    "freeCombo": "キャラを自分で選ぶ",
+    "createRoom": "新規グループ",
+    "starting": "作成中..."
+  },
+  "groupChatCast": {
+    "title": "配役キャスティング",
+    "metaDescription": "ロールプレイの配役にキャラをキャスティング",
+    "roles": "配役",
+    "pickForRole": "この配役に入れるキャラを選んでください",
+    "tapToAssign": "タップしてキャスティング",
+    "free": "自由",
+    "empty": "空き",
+    "characters": "キャラクター",
+    "start": "この配役で始める",
+    "starting": "作成中...",
+    "needMore": "配役を{{count}}つ以上埋めてください",
+    "adultRequired": "このロールプレイは成人認証が必要です",
+    "loadFailed": "読み込めませんでした"
   },
   "groupChat": {
     "title": "グループチャット - Pesona",

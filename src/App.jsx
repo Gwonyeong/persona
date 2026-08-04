@@ -25,6 +25,7 @@ import StorylineEdit from './pages/admin/StorylineEdit'
 import StoryAnalyticsPremium from './pages/admin/StoryAnalyticsPremium'
 import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
+import AdminGroupConcepts from './pages/admin/GroupConcepts'
 import AdminBroadcasts from './pages/admin/Broadcasts'
 import FinanceSubscriptions from './pages/admin/FinanceSubscriptions'
 import FinanceMaskPurchases from './pages/admin/FinanceMaskPurchases'
@@ -46,6 +47,8 @@ import V2ChatTest from './pages/V2ChatTest'
 import ChatSettings from './pages/user/ChatSettings'
 import SituationCards from './pages/user/SituationCards'
 import VnStory from './pages/user/VnStory'
+import GroupChatList from './pages/user/GroupChatList'
+import GroupChatCast from './pages/user/GroupChatCast'
 import GroupChatNew from './pages/user/GroupChatNew'
 import GroupChat from './pages/user/GroupChat'
 import GroupChatSettings from './pages/user/GroupChatSettings'
@@ -54,7 +57,6 @@ import MyPage from './pages/user/MyPage'
 import CharacterCollection from './pages/user/CharacterCollection'
 import AdultVerify from './pages/user/AdultVerify'
 import Login from './pages/user/Login'
-import Feed from './pages/user/Feed'
 import About from './pages/user/About'
 import Terms from './pages/user/Terms'
 import Refund from './pages/user/Refund'
@@ -217,6 +219,7 @@ function App() {
         <Route path="storylines/:id" element={<StorylineEdit />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="banners" element={<AdminBanners />} />
+        <Route path="group-concepts" element={<AdminGroupConcepts />} />
         <Route path="broadcasts" element={<AdminBroadcasts />} />
         <Route path="finance/subscriptions" element={<FinanceSubscriptions />} />
         <Route path="finance/mask-purchases" element={<FinanceMaskPurchases />} />
@@ -241,7 +244,9 @@ function App() {
       {/* 유저 - 탭바 레이아웃 */}
       <Route element={<UserLayout />}>
         <Route path="/" element={<Home />} />
-        <Route path="/feed" element={<Feed />} />
+        <Route path="/feed" element={<Navigate to="/group-chats" replace />} />
+        <Route path="/group-chats" element={<GroupChatList />} />
+        <Route path="/group-chats/cast/:conceptId" element={<GroupChatCast />} />
         <Route path="/chats" element={<ChatList />} />
         <Route path="/my" element={<MyPage />} />
         <Route path="/collection/:characterId" element={<CharacterCollection />} />

@@ -4,7 +4,7 @@ import { api } from '../../lib/api'
 const LINK_OPTIONS = [
   { value: '', label: '이동 없음' },
   { value: '/', label: '홈' },
-  { value: '/feed', label: '피드' },
+  { value: '/group-chats', label: '단톡방' },
   { value: '/chats', label: '채팅 목록' },
   { value: '/my', label: '마이페이지' },
   { value: '/mask-shop?tab=subscription', label: '구독' },

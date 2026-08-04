@@ -16,6 +16,7 @@ const NAV_ITEMS = [
       { to: '/admin/affinity-images', label: '호감도 이미지', deprecated: true },
     ],
   },
+  { to: '/admin/group-concepts', label: '단톡방 상황극' },
   { to: '/admin/banners', label: '광고 배너' },
   { to: '/admin/mask-pass', label: '마스크 패스' },
   {
