@@ -304,6 +304,15 @@ function VideoPanel({ img, styleId, onDone }) {
   )
 }
 
+// ISO 문자열 → <input type="datetime-local"> 로컬 값(YYYY-MM-DDTHH:mm)
+function toLocalInput(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
 export default function CharacterStyles() {
   const { id } = useParams()
   const [character, setCharacter] = useState(null)
@@ -313,6 +322,8 @@ export default function CharacterStyles() {
   const [newStyleMaskCost, setNewStyleMaskCost] = useState('')
   const [newStyleSingleMaskCost, setNewStyleSingleMaskCost] = useState('')
   const [newStyleAdultOnly, setNewStyleAdultOnly] = useState(false)
+  // 출시 예약(선택) — 값이 있으면 숨김 상태로 생성되고 예약 시각에 cron이 자동 공개.
+  const [newStyleScheduledAt, setNewStyleScheduledAt] = useState('')
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(null) // "styleId-emotion"
 
@@ -343,6 +354,7 @@ export default function CharacterStyles() {
           }
         : {}),
       adultOnly: newStyleAdultOnly,
+      ...(newStyleScheduledAt ? { scheduledPublishAt: new Date(newStyleScheduledAt).toISOString() } : {}),
     })
     setNewStyleName('')
     setNewStyleDesc('')
@@ -350,6 +362,21 @@ export default function CharacterStyles() {
     setNewStyleMaskCost('')
     setNewStyleSingleMaskCost('')
     setNewStyleAdultOnly(false)
+    setNewStyleScheduledAt('')
+    load()
+  }
+
+  // 즉시 공개 (예약 클리어 + 최초 공개시각 기록은 서버가 처리)
+  const publishStyleNow = async (styleId) => {
+    await api.put(`/admin/styles/${styleId}`, { isPublic: true })
+    load()
+  }
+
+  // 출시 예약 설정/변경/해제 (빈값 → 예약 해제, 숨김 유지)
+  const setStyleSchedule = async (styleId, localValue) => {
+    await api.put(`/admin/styles/${styleId}`, {
+      scheduledPublishAt: localValue ? new Date(localValue).toISOString() : null,
+    })
     load()
   }
 
@@ -488,6 +515,29 @@ export default function CharacterStyles() {
             추가
           </button>
         </div>
+        {/* 출시 예약 (선택) — 대량 사전 등록용. 값이 있으면 숨김 상태로 만들어지고 예약 시각에 자동 공개 */}
+        <div className="flex items-center gap-2 mt-2">
+          <label className="text-xs text-gray-400 whitespace-nowrap">출시 예약 (선택)</label>
+          <input
+            type="datetime-local"
+            value={newStyleScheduledAt}
+            onChange={(e) => setNewStyleScheduledAt(e.target.value)}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', colorScheme: 'dark' }}
+          />
+          {newStyleScheduledAt && (
+            <button
+              onClick={() => setNewStyleScheduledAt('')}
+              className="text-xs text-gray-400 hover:text-white"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              지우기
+            </button>
+          )}
+          <span className="text-[11px] text-gray-500">
+            {newStyleScheduledAt ? '숨김 상태로 등록 → 예약 시각에 자동 공개' : '비우면 즉시 공개'}
+          </span>
+        </div>
         <p className="mt-2 text-[11px] text-gray-500">
           가챠 전용 스타일은 일반 대화 해금 풀에서 제외되고, 가챠 STYLE_SET 보상으로만 통째 해금됩니다.
           상점 구매 스타일은 유저가 마스크로 통째 구매하며, 스타일 안 표정·영상이 함께 해금됩니다.
@@ -519,6 +569,16 @@ export default function CharacterStyles() {
                       19+
                     </span>
                   )}
+                  {style.isPublic === false && style.scheduledPublishAt && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-sky-900/60 text-sky-300 border border-sky-700/50">
+                      예약 {new Date(style.scheduledPublishAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {style.isPublic === false && !style.scheduledPublishAt && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-700/60 text-gray-300 border border-gray-600/50">
+                      숨김
+                    </span>
+                  )}
                 </h3>
                 {style.description && (
                   <p className="text-xs text-gray-400">{style.description}</p>
@@ -535,6 +595,29 @@ export default function CharacterStyles() {
                   <option value="GACHA">가챠 전용</option>
                   <option value="SHOP">상점 구매</option>
                 </select>
+                {/* 출시 예약 컨트롤 — 숨김(미공개) 스타일에만 노출. 공개 스타일은 이미 라이브. */}
+                {style.isPublic === false && (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="datetime-local"
+                      defaultValue={toLocalInput(style.scheduledPublishAt)}
+                      key={`sched-${style.id}-${style.scheduledPublishAt || 'none'}`}
+                      onBlur={(e) => {
+                        const cur = toLocalInput(style.scheduledPublishAt)
+                        if (e.target.value !== cur) setStyleSchedule(style.id, e.target.value)
+                      }}
+                      className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', colorScheme: 'dark' }}
+                    />
+                    <button
+                      onClick={() => publishStyleNow(style.id)}
+                      className="px-2 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-500 whitespace-nowrap"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      지금 공개
+                    </button>
+                  </div>
+                )}
                 {style.unlockMode === 'SHOP' && (
                   <div className="flex items-center gap-1">
                     <input
