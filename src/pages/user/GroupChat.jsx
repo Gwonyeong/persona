@@ -8,8 +8,10 @@ import { formatChatTime } from '../../lib/timeFormat'
 import MaskIcon from '../../components/MaskIcon'
 import { isVideoUrl, CrossfadeMedia } from '../../components/SpriteMedia'
 
-// 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js의 GROUP_CHAT_COST와 동기
-const GROUP_MESSAGE_MASK_COST = 3
+// 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js와 동기. 모델별(기본1/고급3) + 음성 추가요금.
+const GROUP_MODEL_COSTS = { BASIC: 1, ADVANCED: 3 }
+const GROUP_VOICE_SURCHARGE = 4
+const GROUP_NSFW_VOICE_EXTRA = 3
 
 const MAX_MEMBERS = 4
 
@@ -142,7 +144,10 @@ export default function GroupChat() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false)
+  const [chatModel, setChatModel] = useState('BASIC') // 'BASIC'(기본) | 'ADVANCED'(고급)
+  const [showModelSheet, setShowModelSheet] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [enlargedSprite, setEnlargedSprite] = useState(null) // 표정 스프라이트 확대 뷰 { url, name } | null
   // 스트리밍 중인 버블들 — 응답이 done되면 비워짐
   // 키: `${turnIdx}_${bubbleIdx}` → { turnIdx, characterId, bubbleIdx, role, content, complete }
   const [streamingBubbles, setStreamingBubbles] = useState([])
@@ -197,6 +202,7 @@ export default function GroupChat() {
     api.get(`/group-chats/${id}?limit=${PAGE_SIZE}`).then(({ groupChat }) => {
       setGroupChat(groupChat)
       setVoiceMode(!!groupChat.voiceMode)
+      setChatModel(groupChat.chatModel === 'ADVANCED' ? 'ADVANCED' : 'BASIC')
       windowStartRef.current = groupChat.messageWindowStart ?? 0
       setHasMoreBefore(!!groupChat.hasMoreBefore)
     }).catch((err) => {
@@ -255,6 +261,8 @@ export default function GroupChat() {
   const isConcept = groupChat?.conceptData != null
 
   const safetyMode = groupChat?.safetyMode !== false // 기본 SFW
+  // 이번 메시지 마스크 비용 — 모델(기본1/고급3) + 음성 추가요금(+4, NSFW 음성 +3).
+  const msgCost = GROUP_MODEL_COSTS[chatModel] + (voiceMode ? GROUP_VOICE_SURCHARGE + (safetyMode ? 0 : GROUP_NSFW_VOICE_EXTRA) : 0)
   // 표정 이미지 출력 방식 — 서버(GroupChat.spriteMode) 값. 'BUBBLE'(기본) | 'OFF'(없음). 설정 페이지에서 변경.
   const spriteMode = groupChat?.spriteMode === 'OFF' ? 'OFF' : 'BUBBLE'
   const toggleDisabled = withUserCount === 0 && !isInPerson // IN_PERSON으로 전환할 멤버가 없음
@@ -347,6 +355,7 @@ export default function GroupChat() {
       await api.stream(`/group-chats/${id}/messages`, {
         content: userMsg.content,
         voiceWithChat: voiceMode,
+        chatModel,
       }, (eventType, data) => {
         if (eventType === 'delta') {
           // delta: { turnIdx, characterId, bubbleIdx, role, content, complete }
@@ -466,6 +475,7 @@ export default function GroupChat() {
     const timer = setTimeout(() => setBlockToast(null), 5000)
     return () => clearTimeout(timer)
   }, [blockToast])
+
 
   // 렌더 가능한 메시지 전체 목록 (memoize — 인풋 타이핑 리렌더마다 filter 재계산 방지).
   const renderableMessages = useMemo(
@@ -760,6 +770,20 @@ export default function GroupChat() {
           </button>
           )}
 
+          {/* 기억 — 톡방 장기 기억 페이지로 이동 (1:1 채팅의 '기억' 버튼과 동일 위치·아이콘) */}
+          <button
+            onClick={() => navigate(`/group-chats/${id}/memory`)}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-800/80 border border-gray-700/50 text-gray-200 hover:bg-gray-700/80 shadow-lg transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label={t('memory.button', { defaultValue: '기억' })}
+            title={t('memory.button', { defaultValue: '기억' })}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+          </button>
+
           {/* 설정 — 채팅 설정 페이지로 이동 (표정 이미지 출력 방식 등) */}
           <button
             onClick={() => navigate(`/group-chats/${id}/settings`)}
@@ -921,19 +945,22 @@ export default function GroupChat() {
       {spriteMode === 'BUBBLE' && spriteParticipants.length > 0 && (
         <div className="flex items-end justify-end gap-2 px-3 pt-2 pb-3 pointer-events-none">
           {spriteParticipants.map((p) => (
-            <div
+            <button
               key={p.characterId}
-              className={`relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 ${
+              type="button"
+              onClick={() => setEnlargedSprite({ url: p.url, name: p.name })}
+              className={`relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 pointer-events-auto ${
                 p.isExcited ? 'ring-2 ring-pink-500/70 animate-pulse' : 'ring-1 ring-gray-700/50'
               } ${p.isSpeaking ? 'scale-105' : ''}`}
-              style={{ aspectRatio: '9 / 16' }}
+              style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              aria-label={t('groupChat.enlargeSprite', { defaultValue: '{{name}} 크게 보기', name: p.name })}
             >
               <CrossfadeMedia
                 src={p.url}
                 variant="sprite"
                 className="absolute inset-0 w-full h-full object-cover object-bottom"
               />
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -946,6 +973,22 @@ export default function GroupChat() {
         {activeCount === 0 && (
           <div className="mb-2 text-xs text-amber-400">{t('groupChat.noActiveMembers')}</div>
         )}
+        {/* 모델 선택 — 1:1 채팅과 동일. 기본(BASIC) / 고급(ADVANCED) */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <button
+            onClick={() => setShowModelSheet(true)}
+            className={`h-7 px-2.5 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-colors bg-gray-800/80 hover:bg-gray-700/80 ${
+              chatModel === 'ADVANCED' ? 'ring-1 ring-amber-400 text-amber-300' : 'text-gray-200'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label={t('chat.modelSelectorTitle', { defaultValue: '채팅 모델' })}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            {chatModel === 'ADVANCED' ? t('chat.modelAdvanced', { defaultValue: '고급' }) : t('chat.modelBasic', { defaultValue: '기본' })}
+          </button>
+        </div>
         <div className="flex gap-2 items-end">
           <textarea
             ref={inputRef}
@@ -979,13 +1022,86 @@ export default function GroupChat() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
             <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-[10px] font-bold leading-none flex items-center gap-px bg-black/60 px-1 py-0.5 rounded">
-                -{GROUP_MESSAGE_MASK_COST}<MaskIcon className="text-[11px]" />
+                -{msgCost}<MaskIcon className="text-[11px]" />
               </span>
             </span>
           </button>
         </div>
       </div>
       </div>
+
+      {/* 표정 스프라이트 확대 뷰 — 하단 스프라이트 클릭 시 */}
+      {enlargedSprite && (
+        <div
+          className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center px-6"
+          onClick={() => setEnlargedSprite(null)}
+        >
+          <button
+            onClick={() => setEnlargedSprite(null)}
+            className="absolute top-4 right-4 text-white/70 hover:text-white"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            aria-label={t('common.close', { defaultValue: '닫기' })}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <img
+            src={enlargedSprite.url}
+            alt={enlargedSprite.name || ''}
+            className="max-w-full max-h-[80vh] object-contain rounded-xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          {enlargedSprite.name && (
+            <div className="mt-3 text-white text-sm font-medium">{enlargedSprite.name}</div>
+          )}
+        </div>
+      )}
+
+      {/* 채팅 모델 선택 시트 — 1:1 채팅과 동일 UX */}
+      {showModelSheet && (
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowModelSheet(false)}>
+          <div
+            className="w-full bg-gray-900 border-t border-gray-700 rounded-t-2xl p-5"
+            style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 bg-gray-700 rounded-full" />
+            </div>
+            <p className="text-white font-semibold text-center mb-1">{t('chat.modelSelectorTitle', { defaultValue: '채팅 모델 선택' })}</p>
+            <p className="text-gray-400 text-xs text-center mb-4">{t('chat.modelSelectorDesc', { defaultValue: '고급 모델은 더 풍부한 응답을 제공해요' })}</p>
+            <div className="flex flex-col gap-2">
+              {[
+                { key: 'BASIC', label: t('chat.modelBasic', { defaultValue: '기본' }), desc: t('chat.modelBasicDesc', { defaultValue: '빠르고 가벼운 응답' }), cost: GROUP_MODEL_COSTS.BASIC },
+                { key: 'ADVANCED', label: t('chat.modelAdvanced', { defaultValue: '고급' }), desc: t('chat.modelAdvancedDesc', { defaultValue: '더 풍부하고 몰입감 있는 응답' }), cost: GROUP_MODEL_COSTS.ADVANCED },
+              ].map((opt) => {
+                const selected = chatModel === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => { setChatModel(opt.key); setShowModelSheet(false) }}
+                    className={`text-left px-4 py-3 rounded-xl border transition-colors ${
+                      selected
+                        ? (opt.key === 'ADVANCED' ? 'bg-amber-600/20 border-amber-500' : 'bg-indigo-600/20 border-indigo-500')
+                        : 'bg-gray-800 border-gray-700 hover:border-gray-500'
+                    }`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-sm font-semibold ${selected ? 'text-white' : 'text-gray-200'}`}>{opt.label}</span>
+                      <span className={`text-xs font-medium flex items-center gap-0.5 ${opt.key === 'ADVANCED' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        {t('chat.maskCostLabel', { count: opt.cost, defaultValue: `마스크 ${opt.cost}개` })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">{opt.desc}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Safety OFF 확인 모달 */}
       {safetyConfirmVisible && (

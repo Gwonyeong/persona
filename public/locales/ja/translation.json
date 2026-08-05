@@ -1069,6 +1069,9 @@
     "actionButton": "行動描写 (括弧)",
     "excitedHint": "興奮状態",
     "finalizing": "応答を仕上げ中...",
+    "memoryTitle": "このトークルームが覚えている内容",
+    "memoryEmpty": "まだトークルームが覚えている内容はありません",
+    "memoryHint": "会話が積み重なると、ユーザーや関係についての情報を自動で記憶します",
     "presenceMode": {
       "disabledHint": "一緒にいるキャラクターがいません",
       "switchToInPersonHint": "一緒にいるキャラクターとだけ会話する",
@@ -1076,7 +1079,8 @@
       "switchedToInPerson": "🧑 一緒にいる友達とだけ話します",
       "switchedToPhone": "📱 メッセンジャーモードに切り替えました",
       "autoFallbackToast": "📱 一緒にいる友達がいないのでメッセンジャーモードに切り替えました"
-    }
+    },
+    "memoryNoneForChar": "まだ覚えていることはありません"
   },
   "memory": {
     "button": "記憶",

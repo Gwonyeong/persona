@@ -24,8 +24,8 @@ function emptyForm() {
     summary: '',
     relationFraming: '',
     roles: [
-      { name: '', description: '', free: false, userAddress: '' },
-      { name: '', description: '', free: false, userAddress: '' },
+      { name: '', description: '', free: false, userAddress: '', memorySlots: 10 },
+      { name: '', description: '', free: false, userAddress: '', memorySlots: 10 },
     ],
     // 번역
     tr: {
@@ -60,7 +60,7 @@ function hydrateForm(c) {
     title: c.title || '',
     summary: c.summary || '',
     relationFraming: c.relationFraming || '',
-    roles: roles.map((r) => ({ name: r.name || '', description: r.description || '', free: !!r.free, userAddress: r.userAddress || '' })),
+    roles: roles.map((r) => ({ name: r.name || '', description: r.description || '', free: !!r.free, userAddress: r.userAddress || '', memorySlots: r.memorySlots || 10 })),
     tr: { en: trOf('en'), ja: trOf('ja') },
   }
 }
@@ -93,7 +93,7 @@ export default function AdminGroupConcepts() {
     if (f.roles.length >= MAX_ROLES) return f
     return {
       ...f,
-      roles: [...f.roles, { name: '', description: '', free: false, userAddress: '' }],
+      roles: [...f.roles, { name: '', description: '', free: false, userAddress: '', memorySlots: 10 }],
       tr: {
         en: { ...f.tr.en, roles: [...f.tr.en.roles, { name: '', description: '', userAddress: '' }] },
         ja: { ...f.tr.ja, roles: [...f.tr.ja.roles, { name: '', description: '', userAddress: '' }] },
@@ -133,6 +133,7 @@ export default function AdminGroupConcepts() {
       name: r.name.trim(),
       description: r.description.trim(),
       userAddress: (r.userAddress || '').trim(),
+      memorySlots: Number(r.memorySlots) || 10,
       free: !!r.free,
     }))
     const trLang = (lang) => {
@@ -350,6 +351,11 @@ export default function AdminGroupConcepts() {
                     <>
                       <textarea value={r.description} onChange={(e) => setRole(i, { description: e.target.value })} rows={2} placeholder="이 배역의 LLM 연기 지침 (예: 그룹의 리더, 유저의 매니저를 챙긴다)" className={inputCls + ' resize-none'} />
                       <input value={r.userAddress || ''} onChange={(e) => setRole(i, { userAddress: e.target.value })} placeholder="이 배역이 유저를 부르는 호칭 (예: 여보 / 아빠 — 비우면 컨셉 기본 호칭)" className={inputCls} />
+                      <label className="flex items-center gap-2 text-[11px] text-gray-400">
+                        <span className="whitespace-nowrap">장기기억 슬롯</span>
+                        <input type="number" min={1} max={100} value={r.memorySlots} onChange={(e) => setRole(i, { memorySlots: e.target.value })} className={inputCls + ' w-24'} />
+                        <span className="text-gray-500">개 (기본 10 — 이 배역 캐릭터가 기억하는 최대 개수)</span>
+                      </label>
                     </>
                   ) : (
                     <>

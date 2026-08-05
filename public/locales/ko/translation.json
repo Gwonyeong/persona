@@ -1069,6 +1069,9 @@
     "actionButton": "행동 묘사 (괄호)",
     "excitedHint": "흥분 상태",
     "finalizing": "응답 마무리 중...",
+    "memoryTitle": "이 톡방이 기억하는 내용",
+    "memoryEmpty": "아직 톡방이 기억하는 내용이 없어요",
+    "memoryHint": "대화가 쌓이면 유저·관계에 대한 정보를 자동으로 기억해요",
     "presenceMode": {
       "disabledHint": "함께 있는 캐릭터가 없어요",
       "switchToInPersonHint": "함께 있는 캐릭터끼리만 대화하기",
@@ -1076,7 +1079,8 @@
       "switchedToInPerson": "🧑 같이 있는 친구들과만 대화해요",
       "switchedToPhone": "📱 메신저 모드로 전환했어요",
       "autoFallbackToast": "📱 함께 있는 친구가 없어서 메신저 모드로 전환했어요"
-    }
+    },
+    "memoryNoneForChar": "아직 기억하는 게 없어요"
   },
   "memory": {
     "button": "기억",
