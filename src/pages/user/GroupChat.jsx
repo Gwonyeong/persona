@@ -6,12 +6,14 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { formatChatTime } from '../../lib/timeFormat'
 import MaskIcon from '../../components/MaskIcon'
-import { isVideoUrl, CrossfadeMedia } from '../../components/SpriteMedia'
+import { isVideoUrl, CrossfadeMedia, SpriteMedia } from '../../components/SpriteMedia'
 
 // 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js와 동기. 모델별(기본1/고급3) + 음성 추가요금.
 const GROUP_MODEL_COSTS = { BASIC: 1, ADVANCED: 3 }
 const GROUP_VOICE_SURCHARGE = 4
 const GROUP_NSFW_VOICE_EXTRA = 3
+// 표정영상 해금 비용 — 서버 routes/groupChats.js의 EMOTION_VIDEO_MASK_COST와 동기.
+const EMOTION_VIDEO_MASK_COST = 10
 
 const MAX_MEMBERS = 4
 
@@ -30,22 +32,18 @@ function getNeutralImage(character) {
   return getImageUrl(character?.profileImage)
 }
 
-// 감정에 맞는 표정 sprite URL 선택 (V1 채팅과 동일한 emotion→이미지 매칭 규칙).
+// 감정에 맞는 표정 sprite 이미지 객체 선택 (V1 채팅과 동일한 emotion→이미지 매칭 규칙).
+// 반환: { url, id, videoFilePath } — id/videoFilePath는 표정영상(해금) 렌더에 사용. 매칭 실패 시 null.
 // 우선순위: 착용 스타일(currentStyleId) + 감정 → 착용 스타일 + NEUTRAL → 임의 스타일 + 감정 → NEUTRAL 기본.
-// 영상 파일(videoFilePath 대체 확장자)은 그룹에서 정적 이미지만 쓰므로 제외.
-// seed: 같은 감정에 이미지가 여러 장이면 seed로 변형을 로테이션(발화할 때마다 다른 컷) — 감정이 안 바뀌어도 정적이지 않게.
-function pickSpriteUrl(character, styleId, emotion, seed = 0) {
+// seed: 같은 감정에 이미지가 여러 장이면 seed로 변형을 로테이션(발화할 때마다 다른 컷).
+function pickSpriteImage(character, styleId, emotion, seed = 0) {
   const styles = character?.styles || []
   const preferred = styles.find((s) => s.id === styleId) || styles[0]
-  // 해당 스타일+감정의 정적 이미지 URL 목록(여러 변형 가능).
+  // 해당 스타일+감정의 정적 이미지 객체 목록(영상 파일 자체는 제외 — videoFilePath로 따라옴).
   const poolOf = (style, emo) => {
     if (!style) return []
-    return (style.images || [])
-      .filter((i) => i.emotion === emo && !isVideoUrl(i.filePath))
-      .map((i) => getImageUrl(i.filePath))
-      .filter(Boolean)
+    return (style.images || []).filter((i) => i.emotion === emo && !isVideoUrl(i.filePath))
   }
-  // 우선순위대로 첫 번째로 비지 않은 풀을 사용.
   let pool = poolOf(preferred, emotion)
   if (!pool.length) pool = poolOf(preferred, 'NEUTRAL')
   if (!pool.length) {
@@ -54,10 +52,13 @@ function pickSpriteUrl(character, styleId, emotion, seed = 0) {
       if (p.length) { pool = p; break }
     }
   }
-  if (!pool.length) return getNeutralImage(character)
-  // seed로 변형 선택 (음수 방어).
+  if (!pool.length) {
+    const url = getNeutralImage(character)
+    return url ? { url, id: null, videoFilePath: null } : null
+  }
   const idx = (((seed % pool.length) + pool.length) % pool.length)
-  return pool[idx]
+  const img = pool[idx]
+  return { url: getImageUrl(img.filePath), id: img.id ?? null, videoFilePath: img.videoFilePath || null }
 }
 
 function parseMessageSegments(content, role) {
@@ -157,6 +158,8 @@ export default function GroupChat() {
   const [voiceMode, setVoiceMode] = useState(false)
   const [chatModel, setChatModel] = useState('BASIC') // 'BASIC'(기본) | 'ADVANCED'(고급)
   const [showModelSheet, setShowModelSheet] = useState(false)
+  const [videoUnlockedImageIds, setVideoUnlockedImageIds] = useState(new Set()) // 해금된 characterImageId 집합
+  const [unlockingVideoId, setUnlockingVideoId] = useState(null) // 해금 처리 중인 imageId
   const [showDelete, setShowDelete] = useState(false)
   const [enlargedSprite, setEnlargedSprite] = useState(null) // 표정 스프라이트 확대 뷰 { url, name } | null
   // 스트리밍 중인 버블들 — 응답이 done되면 비워짐
@@ -212,12 +215,13 @@ export default function GroupChat() {
   useEffect(() => {
     if (!token) return
     // 초기엔 최근 PAGE_SIZE개만 요청 — 히스토리 많은 방의 초기 전송량/파싱 비용 절감.
-    api.get(`/group-chats/${id}?limit=${PAGE_SIZE}`).then(({ groupChat }) => {
+    api.get(`/group-chats/${id}?limit=${PAGE_SIZE}`).then(({ groupChat, videoUnlockedImageIds }) => {
       setGroupChat(groupChat)
       setVoiceMode(!!groupChat.voiceMode)
       setChatModel(groupChat.chatModel === 'ADVANCED' ? 'ADVANCED' : 'BASIC')
       windowStartRef.current = groupChat.messageWindowStart ?? 0
       setHasMoreBefore(!!groupChat.hasMoreBefore)
+      setVideoUnlockedImageIds(new Set(Array.isArray(videoUnlockedImageIds) ? videoUnlockedImageIds : []))
     }).catch((err) => {
       console.error(err)
       if (err.status === 404) navigate('/chats', { replace: true })
@@ -350,16 +354,44 @@ export default function GroupChat() {
         const emotion = latestEmotionByChar.get(m.characterId) || 'NEUTRAL'
         // 발화 횟수를 seed로 — 같은 감정에 이미지가 여러 장이면 발화마다 다른 컷으로.
         const seed = speakCountByChar.get(m.characterId) || 0
+        const img = pickSpriteImage(m.character, m.currentStyleId, emotion, seed)
+        if (!img) return null
+        // 이 이미지에 표정영상이 있고 해금됐는지 — 해금 시 영상 재생, 미해금 시 블러+CTA.
+        const hasVideo = !!img.videoFilePath
+        const unlocked = hasVideo && img.id != null && videoUnlockedImageIds.has(img.id)
+        const activeUrl = hasVideo && unlocked ? img.videoFilePath : img.url
         return {
           characterId: m.characterId,
           name: m.character?.name || '',
-          url: pickSpriteUrl(m.character, m.currentStyleId, emotion, seed),
+          imageId: img.id,
+          videoFilePath: img.videoFilePath,
+          activeUrl,
+          needsUnlock: hasVideo && !unlocked,
           isExcited: !!m.characterStatus?.isExcited,
           isSpeaking: m.characterId === speakingCharacterId,
         }
       })
-      .filter((p) => p.url)
-  }, [groupChat?.members, latestEmotionByChar, speakCountByChar, speakingCharacterId, isInPerson])
+      .filter((p) => p && p.activeUrl)
+  }, [groupChat?.members, latestEmotionByChar, speakCountByChar, speakingCharacterId, isInPerson, videoUnlockedImageIds])
+
+  // 표정영상 해금 — 마스크 10 소모 후 해당 이미지 영상을 재생.
+  async function handleUnlockGroupVideo(imageId) {
+    if (!imageId || unlockingVideoId) return
+    setUnlockingVideoId(imageId)
+    try {
+      const res = await api.post(`/group-chats/${id}/unlock-image-video`, { characterImageId: imageId })
+      setVideoUnlockedImageIds((prev) => new Set([...prev, imageId]))
+      if (typeof res.masks === 'number') setMasks(res.masks)
+    } catch (err) {
+      if (err.status === 402 || err.data?.error === 'INSUFFICIENT_MASKS' || err.message?.includes('INSUFFICIENT')) {
+        navigate('/mask-shop')
+        return
+      }
+      console.error('group video unlock failed:', err)
+    } finally {
+      setUnlockingVideoId(null)
+    }
+  }
 
   async function handleSend() {
     if (!input.trim() || sending || !groupChat) return
@@ -663,7 +695,8 @@ export default function GroupChat() {
               <span className={`w-1.5 h-1.5 rounded-full ${section.dotClass}`} />
               {section.label}
             </div>
-            <div className="flex gap-2 overflow-x-auto">
+            {/* overflow-x-auto는 overflow-y도 auto가 되어 세로 클립됨 → 칩의 ring-2(바깥 2px)/좌측이 잘리지 않게 padding 확보 */}
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1 px-0.5">
               {section.members.length === 0 ? (
                 <span className="text-[10px] text-gray-600">-</span>
               ) : (
@@ -698,12 +731,13 @@ export default function GroupChat() {
                       <div className="w-7 h-7 rounded-full bg-gray-800 overflow-hidden flex-shrink-0">
                         {avatar && <img src={avatar} alt="" className={`w-full h-full object-cover ${participating && m.isActive ? '' : 'grayscale'}`} />}
                       </div>
-                      <div className="min-w-0 max-w-[110px]">
+                      <div className="min-w-0 max-w-[140px]">
                         <div className={`text-[11px] leading-tight truncate flex items-center gap-0.5 ${nameClass}`}>
                           {m.character?.name}
                           {excited && <span className="text-pink-400">♥</span>}
                         </div>
-                        <div className={`text-[10px] leading-tight truncate ${moodClass}`}>
+                        {/* mood — 자르지 않고 전부 출력 (LLM에 10자 이내 지시). 길면 줄바꿈. */}
+                        <div className={`text-[10px] leading-tight break-words ${moodClass}`}>
                           {emoji ? <span className="mr-0.5">{emoji}</span> : null}
                           {mood || '-'}
                         </div>
@@ -863,7 +897,7 @@ export default function GroupChat() {
         className="relative z-10 flex-1 overflow-y-auto px-3 space-y-2"
         style={{
           paddingTop: `${topBarHeight + 12}px`,
-          paddingBottom: `${bottomBarHeight + 8}px`,
+          paddingBottom: `${bottomBarHeight + 28}px`,
         }}
       >
         {/* 위로 스크롤 시 이전 메시지를 더 노출시키는 sentinel — 아직 안 그린 메시지가 있을 때만 존재 */}
@@ -982,22 +1016,52 @@ export default function GroupChat() {
       {spriteMode === 'BUBBLE' && spriteParticipants.length > 0 && (
         <div className="flex items-end justify-end gap-2 px-3 pt-2 pb-3 pointer-events-none">
           {spriteParticipants.map((p) => (
-            <button
-              key={p.characterId}
-              type="button"
-              onClick={() => setEnlargedSprite({ url: p.url, name: p.name })}
-              className={`relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 pointer-events-auto ${
-                p.isExcited ? 'ring-2 ring-pink-500/70 animate-pulse' : 'ring-1 ring-gray-700/50'
-              } ${p.isSpeaking ? 'scale-105' : ''}`}
-              style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={t('groupChat.enlargeSprite', { defaultValue: '{{name}} 크게 보기', name: p.name })}
-            >
-              <CrossfadeMedia
-                src={p.url}
-                variant="sprite"
-                className="absolute inset-0 w-full h-full object-cover object-bottom"
-              />
-            </button>
+            <div key={p.characterId} className="flex flex-col items-center gap-1.5 pointer-events-auto">
+              {/* 미해금 표정영상 카드 — 표정 이미지 카드 "위"에 별도 표시 (1:1 채팅과 동일 UI). 블러 재생 + 해금 CTA */}
+              {p.needsUnlock && (
+                <button
+                  type="button"
+                  onClick={() => { if (unlockingVideoId !== p.imageId) handleUnlockGroupVideo(p.imageId) }}
+                  className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+                  style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  aria-label={t('groupChat.unlockVideo', { defaultValue: '표정 영상 해금' })}
+                >
+                  <CrossfadeMedia
+                    src={p.videoFilePath}
+                    variant="sprite"
+                    className="absolute inset-0 w-full h-full object-cover object-bottom blur"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-1.5 py-1 flex flex-col items-center shadow-lg">
+                      <div className="flex items-center gap-0.5 text-white text-[10px] font-bold leading-none">
+                        <MaskIcon style={{ width: '0.9em', height: '0.9em' }} />
+                        <span>{EMOTION_VIDEO_MASK_COST}</span>
+                      </div>
+                      <span className="text-white/90 text-[8px] font-medium mt-0.5 leading-none">
+                        {unlockingVideoId === p.imageId ? t('common.processing', { defaultValue: '처리중' }) : t('groupChat.unlock', { defaultValue: '해금' })}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* 표정 sprite 카드 — 해금 시 영상, 미해금/영상없음 시 이미지 */}
+              <button
+                type="button"
+                onClick={() => setEnlargedSprite({ url: p.activeUrl, name: p.name })}
+                className={`relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 ${
+                  p.isExcited ? 'ring-2 ring-pink-500/70' : 'ring-1 ring-gray-700/50'
+                } ${p.isSpeaking ? 'scale-105' : ''}`}
+                style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                aria-label={t('groupChat.enlargeSprite', { defaultValue: '{{name}} 크게 보기', name: p.name })}
+              >
+                <CrossfadeMedia
+                  src={p.activeUrl}
+                  variant="sprite"
+                  className="absolute inset-0 w-full h-full object-cover object-bottom"
+                />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -1081,12 +1145,12 @@ export default function GroupChat() {
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-          <img
-            src={enlargedSprite.url}
-            alt={enlargedSprite.name || ''}
-            className="max-w-full max-h-[80vh] object-contain rounded-xl"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div onClick={(e) => e.stopPropagation()} className="max-w-full max-h-[80vh] flex items-center justify-center">
+            <SpriteMedia
+              src={enlargedSprite.url}
+              className="max-w-full max-h-[80vh] object-contain rounded-xl"
+            />
+          </div>
           {enlargedSprite.name && (
             <div className="mt-3 text-white text-sm font-medium">{enlargedSprite.name}</div>
           )}
