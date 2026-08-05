@@ -193,6 +193,8 @@ export default function GroupChat() {
       const caret = selected ? before.length + inserted.length : before.length + 1
       ta2.focus()
       ta2.setSelectionRange(caret, caret)
+      ta2.style.height = 'auto'
+      ta2.style.height = Math.min(ta2.scrollHeight, 116) + 'px'
     })
   }
 
@@ -219,8 +221,20 @@ export default function GroupChat() {
     ? groupChat.messages[groupChat.messages.length - 1].createdAt
     : null
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' })
-  }, [lastMessageAt, streamingBubbles])
+    // scrollIntoView(block:'end')는 마지막 요소를 "보이는 하단 가장자리"에 맞춰, 하단 스프라이트+인풋
+    // 오버레이 뒤로 새 버블이 가려진다. 컨테이너를 scrollHeight까지 밀면 확보해둔 paddingBottom
+    // (=bottomBarHeight+8, 스프라이트 행 포함)만큼 아래로 스크롤돼 새 버블이 오버레이 위로 온전히 보인다.
+    // ResizeObserver로 bottomBarHeight(=paddingBottom)가 갱신된 다음 프레임에 한 번 더 맞춰 스프라이트가
+    // 방금 늘어난 경우까지 커버.
+    const el = scrollContainerRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    const raf = requestAnimationFrame(() => {
+      const el2 = scrollContainerRef.current
+      if (el2) el2.scrollTop = el2.scrollHeight
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [lastMessageAt, streamingBubbles, bottomBarHeight])
 
   // 상·하단 오버레이 높이 측정 — presence 칩 개수/스프라이트 행 유무에 따라 가변이므로 ResizeObserver로 추적.
   // 메시지 영역 top/bottom 오프셋에 반영해 상단 아래에서 시작하고 인풋 박스 위에서 잘리게 함.
@@ -341,6 +355,7 @@ export default function GroupChat() {
       messages: [...(prev.messages || []), userMsg],
     }) : prev)
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = ''
     setSending(true)
 
     try {
@@ -993,12 +1008,10 @@ export default function GroupChat() {
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                handleSend()
-              }
+            onChange={(e) => {
+              setInput(e.target.value)
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 116) + 'px'
             }}
             placeholder=""
             rows={1}
