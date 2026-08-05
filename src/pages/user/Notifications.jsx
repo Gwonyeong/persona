@@ -9,7 +9,6 @@ export default function Notifications() {
   const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expandedId, setExpandedId] = useState(null)
 
   useEffect(() => {
     api
@@ -31,22 +30,17 @@ export default function Notifications() {
     return d.toLocaleDateString()
   }
 
-  const handleToggle = async (n) => {
-    const isExpanding = expandedId !== n.id
-    setExpandedId(isExpanding ? n.id : null)
-    if (isExpanding && !n.isRead) {
-      try {
-        await api.post(`/notifications/${n.id}/read`, {})
-      } catch {}
+  // 알림 클릭 → 읽음 처리 후 상세 페이지로 이동. 본문은 상세에서 출력.
+  const handleOpen = async (n) => {
+    if (!n.isRead) {
       setNotifications((prev) =>
         prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
       )
+      try {
+        await api.post(`/notifications/${n.id}/read`, {})
+      } catch {}
     }
-  }
-
-  const handleNavigate = (e, n) => {
-    e.stopPropagation()
-    if (n.linkPath) navigate(n.linkPath)
+    navigate(`/notifications/${n.id}`)
   }
 
   const handleReadAll = async () => {
@@ -92,77 +86,32 @@ export default function Notifications() {
         <div className="text-center text-gray-500 py-20">{t('notifications.empty')}</div>
       ) : (
         <div className="flex flex-col gap-2">
-          {notifications.map((n) => {
-            const isExpanded = expandedId === n.id
-            return (
-              <div
-                key={n.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleToggle(n)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    handleToggle(n)
-                  }
-                }}
-                className={`text-left p-4 rounded-xl border transition-colors cursor-pointer ${
-                  n.isRead
-                    ? 'bg-gray-900 border-gray-800'
-                    : 'bg-indigo-600/10 border-indigo-500/30'
-                }`}
-                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              >
-                <div className="flex items-start gap-3">
-                  {n.imageUrl && !isExpanded && (
-                    <img
-                      src={n.imageUrl}
-                      alt=""
-                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      {!n.isRead && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
-                      )}
-                      <p
-                        className={`font-semibold text-sm ${
-                          isExpanded ? '' : 'truncate'
-                        } ${n.isRead ? 'text-gray-200' : 'text-white'}`}
-                      >
-                        {n.title}
-                      </p>
-                    </div>
-                    {isExpanded && n.imageUrl && (
-                      <img
-                        src={n.imageUrl}
-                        alt=""
-                        className="w-full max-h-64 rounded-lg object-cover my-2"
-                      />
-                    )}
-                    <p
-                      className={`text-xs text-gray-300 whitespace-pre-line ${
-                        isExpanded ? '' : 'line-clamp-3 text-gray-400'
-                      }`}
-                    >
-                      {n.body}
-                    </p>
-                    <p className="text-[11px] text-gray-500 mt-2">{formatDate(n.createdAt)}</p>
-                    {isExpanded && n.linkPath && (
-                      <button
-                        onClick={(e) => handleNavigate(e, n)}
-                        className="mt-3 w-full py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-colors"
-                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        {t('notifications.goToPage')}
-                      </button>
-                    )}
-                  </div>
-                </div>
+          {notifications.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => handleOpen(n)}
+              className={`w-full text-left flex items-center gap-3 p-4 rounded-xl border transition-colors ${
+                n.isRead
+                  ? 'bg-gray-900 border-gray-800'
+                  : 'bg-indigo-600/10 border-indigo-500/30'
+              }`}
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {!n.isRead && (
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className={`font-semibold text-sm truncate ${n.isRead ? 'text-gray-200' : 'text-white'}`}>
+                  {n.title}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-1">{formatDate(n.createdAt)}</p>
               </div>
-            )
-          })}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 flex-shrink-0">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          ))}
         </div>
       )}
     </div>

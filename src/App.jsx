@@ -72,6 +72,7 @@ import InquiryList from './pages/user/InquiryList'
 import InquiryDetail from './pages/user/InquiryDetail'
 import InquiryWrite from './pages/user/InquiryWrite'
 import UserNotifications from './pages/user/Notifications'
+import UserNotificationDetail from './pages/user/NotificationDetail'
 import Survey from './pages/user/Survey'
 import AdminSurveys from './pages/admin/AdminSurveys'
 import AdminMaskPass from './pages/admin/AdminMaskPass'
@@ -285,6 +286,7 @@ function App() {
         <Route path="/inquiry/:id" element={<InquiryDetail />} />
         <Route path="/inquiry/write" element={<InquiryWrite />} />
         <Route path="/notifications" element={<UserNotifications />} />
+        <Route path="/notifications/:id" element={<UserNotificationDetail />} />
         <Route path="/survey/:id" element={<Survey />} />
       </Route>
     </Routes>
