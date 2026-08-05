@@ -224,7 +224,7 @@ export default function GroupChat() {
       setVideoUnlockedImageIds(new Set(Array.isArray(videoUnlockedImageIds) ? videoUnlockedImageIds : []))
     }).catch((err) => {
       console.error(err)
-      if (err.status === 404) navigate('/chats', { replace: true })
+      if (err.status === 404) navigate('/group-chats', { replace: true })
     })
   }, [id, token])
 
@@ -393,13 +393,25 @@ export default function GroupChat() {
     }
   }
 
-  async function handleSend() {
-    if (!input.trim() || sending || !groupChat) return
+  // 추천 답변 — 마지막 CHARACTER 메시지에 부착된 suggestedReplies. 유저 차례(마지막이 유저 아님)에만 노출.
+  const activeSuggestedReplies = useMemo(() => {
+    const msgs = groupChat?.messages || []
+    const last = msgs[msgs.length - 1]
+    if (!last || last.role === 'USER') return null
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'CHARACTER') return msgs[i].suggestedReplies || null
+    }
+    return null
+  }, [groupChat?.messages])
+
+  async function handleSend(overrideText) {
+    const text = typeof overrideText === 'string' && overrideText.trim() ? overrideText.trim() : input.trim()
+    if (!text || sending || !groupChat) return
     if (activeCount === 0) return
 
     const userMsg = {
       role: 'USER',
-      content: input.trim(),
+      content: text,
       createdAt: new Date().toISOString(),
     }
 
@@ -614,7 +626,7 @@ export default function GroupChat() {
   async function handleDelete() {
     try {
       await api.delete(`/group-chats/${id}`)
-      navigate('/chats', { replace: true })
+      navigate('/group-chats', { replace: true })
     } catch (err) {
       console.error(err)
     }
@@ -638,7 +650,7 @@ export default function GroupChat() {
       {/* 헤더 — 슬림 글래스 바 */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800/30 bg-gray-900/30">
         <button
-          onClick={() => navigate('/chats')}
+          onClick={() => navigate('/group-chats')}
           className="w-9 h-9 flex items-center justify-center rounded-full text-gray-300 hover:bg-gray-800"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
@@ -1063,6 +1075,42 @@ export default function GroupChat() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 추천 답변 — 유저 차례에 입력바 위 노출. 탭하면 그대로 전송 (1:1 채팅과 동일). */}
+      {activeSuggestedReplies && !sending && streamingBubbles.length === 0 && (
+        <div className="flex flex-col items-center gap-1.5 px-3 pb-2 pointer-events-auto">
+          {activeSuggestedReplies.question && (
+            <button
+              type="button"
+              onClick={() => handleSend(activeSuggestedReplies.question)}
+              className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-gray-800/95 border border-gray-700 text-gray-200 hover:border-indigo-500 hover:text-white transition-colors shadow"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              💬 {activeSuggestedReplies.question}
+            </button>
+          )}
+          {activeSuggestedReplies.normal && (
+            <button
+              type="button"
+              onClick={() => handleSend(activeSuggestedReplies.normal)}
+              className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-gray-800/95 border border-gray-700 text-gray-200 hover:border-indigo-500 hover:text-white transition-colors shadow"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {activeSuggestedReplies.normal}
+            </button>
+          )}
+          {activeSuggestedReplies.sexual && (
+            <button
+              type="button"
+              onClick={() => handleSend(activeSuggestedReplies.sexual)}
+              className="max-w-[90%] truncate px-4 py-2 rounded-full text-xs bg-rose-900/50 border border-rose-700/50 text-rose-200 hover:border-rose-400 hover:text-rose-100 transition-colors shadow"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {activeSuggestedReplies.sexual}
+            </button>
+          )}
         </div>
       )}
 

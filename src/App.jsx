@@ -133,6 +133,8 @@ function App() {
           window.history.back()
         } else if (/^\/chats\/[^/]+$/.test(window.location.pathname)) {
           navigateRef.current('/chats', { replace: true })
+        } else if (/^\/group-chats\/.+/.test(window.location.pathname)) {
+          navigateRef.current('/group-chats', { replace: true })
         } else {
           App.minimizeApp()
         }
