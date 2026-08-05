@@ -114,7 +114,7 @@ export default function GroupChatSettings() {
         <h1 className="font-semibold text-sm text-white">{t('groupChatSettings.title', { defaultValue: '채팅 설정' })}</h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
+      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">
             {t('groupChatSettings.spriteMode.heading', { defaultValue: '표정 이미지 표시' })}
