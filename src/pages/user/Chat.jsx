@@ -19,6 +19,10 @@ import { formatVirtualTimeParts } from '../../lib/virtualTime'
 import { isVideoUrl, SpriteMedia, CrossfadeMedia } from '../../components/SpriteMedia'
 // import AdBanner from '../../components/AdBanner'
 
+// 이미지 생성 기능 임시 비활성화 (현재 SFW 이미지만 생성되어 UI에서 잠시 내림).
+// 되돌리려면 true 로만 변경하면 버튼·투어 스텝이 다시 노출된다.
+const IMAGE_GEN_ENABLED = false
+
 function getImageUrl(filePath) {
   if (!filePath) return null
   if (filePath.startsWith('http')) return filePath
@@ -1302,7 +1306,7 @@ export default function Chat() {
   const tourSteps = useMemo(() => [
     { page: 'chatTour', key: 'affinity', target: '[data-onboarding-target="affinity"]', caption: t('chatTour.affinity', { name: user?.name || '' }) },
     { page: 'chatTour', key: 'voice', target: '[data-onboarding-target="voice-btn"]', caption: t('chatTour.voice') },
-    { page: 'chatTour', key: 'imageGen', target: '[data-onboarding-target="image-gen-btn"]', caption: t('chatTour.imageGen') },
+    ...(IMAGE_GEN_ENABLED ? [{ page: 'chatTour', key: 'imageGen', target: '[data-onboarding-target="image-gen-btn"]', caption: t('chatTour.imageGen') }] : []),
     { page: 'chatTour', key: 'gallery', target: '[data-onboarding-target="gallery-btn"]', caption: t('chatTour.gallery') },
     {
       page: 'chatTour', key: 'galleryTabs',
@@ -2058,6 +2062,7 @@ export default function Chat() {
                 </button>
               </div>
             )}
+            {IMAGE_GEN_ENABLED && (
             <button
               onClick={() => {
                 setShowImageGenModal(true)
@@ -2082,6 +2087,7 @@ export default function Chat() {
                 </svg>
               )}
             </button>
+            )}
             <button
               onClick={() => setShowModelSheet(true)}
               disabled={!token}
