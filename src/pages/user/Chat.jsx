@@ -19,6 +19,10 @@ import { formatVirtualTimeParts } from '../../lib/virtualTime'
 import { isVideoUrl, SpriteMedia, CrossfadeMedia } from '../../components/SpriteMedia'
 // import AdBanner from '../../components/AdBanner'
 
+// 이미지 생성 기능 임시 비활성화 (현재 SFW 이미지만 생성되어 UI에서 잠시 내림).
+// 되돌리려면 true 로만 변경하면 버튼·투어 스텝이 다시 노출된다.
+const IMAGE_GEN_ENABLED = false
+
 function getImageUrl(filePath) {
   if (!filePath) return null
   if (filePath.startsWith('http')) return filePath
@@ -912,6 +916,7 @@ export default function Chat() {
     if (!text) return
     const feedToSend = attachedFeed
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = ''
     setSuggestedReplies(null)
     setSending(true)
     // read polling burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
@@ -1291,7 +1296,7 @@ export default function Chat() {
       const cursorPos = end === start ? start + 1 : end + 1
       textarea.setSelectionRange(cursorPos, cursorPos)
       textarea.style.height = 'auto'
-      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+      textarea.style.height = Math.min(textarea.scrollHeight, 116) + 'px'
     })
   }, [input])
 
@@ -1301,7 +1306,7 @@ export default function Chat() {
   const tourSteps = useMemo(() => [
     { page: 'chatTour', key: 'affinity', target: '[data-onboarding-target="affinity"]', caption: t('chatTour.affinity', { name: user?.name || '' }) },
     { page: 'chatTour', key: 'voice', target: '[data-onboarding-target="voice-btn"]', caption: t('chatTour.voice') },
-    { page: 'chatTour', key: 'imageGen', target: '[data-onboarding-target="image-gen-btn"]', caption: t('chatTour.imageGen') },
+    ...(IMAGE_GEN_ENABLED ? [{ page: 'chatTour', key: 'imageGen', target: '[data-onboarding-target="image-gen-btn"]', caption: t('chatTour.imageGen') }] : []),
     { page: 'chatTour', key: 'gallery', target: '[data-onboarding-target="gallery-btn"]', caption: t('chatTour.gallery') },
     {
       page: 'chatTour', key: 'galleryTabs',
@@ -2057,6 +2062,7 @@ export default function Chat() {
                 </button>
               </div>
             )}
+            {IMAGE_GEN_ENABLED && (
             <button
               onClick={() => {
                 setShowImageGenModal(true)
@@ -2081,6 +2087,7 @@ export default function Chat() {
                 </svg>
               )}
             </button>
+            )}
             <button
               onClick={() => setShowModelSheet(true)}
               disabled={!token}
@@ -2135,7 +2142,7 @@ export default function Chat() {
             </div>
           )}
           <div className="flex gap-2 items-end">
-            <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+            <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 116) + 'px' }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
             <button
               onClick={handleInsertParens}
               type="button"

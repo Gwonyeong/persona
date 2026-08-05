@@ -989,6 +989,7 @@ export default function ChatV2() {
     const text = input.trim()
     const feedToSend = attachedFeed
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = ''
     setSending(true)
     setAttachedFeed(null)
     setShowGalleryTooltip(false)
@@ -1397,7 +1398,7 @@ export default function ChatV2() {
       const cursorPos = end === start ? start + 1 : end + 1
       textarea.setSelectionRange(cursorPos, cursorPos)
       textarea.style.height = 'auto'
-      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+      textarea.style.height = Math.min(textarea.scrollHeight, 116) + 'px'
     })
   }, [input])
 
@@ -1956,7 +1957,7 @@ export default function ChatV2() {
             </div>
           )}
           <div className="flex gap-2 items-end">
-            <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px' }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+            <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 116) + 'px' }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
             <button
               onClick={handleInsertParens}
               type="button"
