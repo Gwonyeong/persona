@@ -33,20 +33,31 @@ function getNeutralImage(character) {
 // 감정에 맞는 표정 sprite URL 선택 (V1 채팅과 동일한 emotion→이미지 매칭 규칙).
 // 우선순위: 착용 스타일(currentStyleId) + 감정 → 착용 스타일 + NEUTRAL → 임의 스타일 + 감정 → NEUTRAL 기본.
 // 영상 파일(videoFilePath 대체 확장자)은 그룹에서 정적 이미지만 쓰므로 제외.
-function pickSpriteUrl(character, styleId, emotion) {
+// seed: 같은 감정에 이미지가 여러 장이면 seed로 변형을 로테이션(발화할 때마다 다른 컷) — 감정이 안 바뀌어도 정적이지 않게.
+function pickSpriteUrl(character, styleId, emotion, seed = 0) {
   const styles = character?.styles || []
   const preferred = styles.find((s) => s.id === styleId) || styles[0]
-  const tryStyle = (style, emo) => {
-    if (!style) return null
-    const img = (style.images || []).find((i) => i.emotion === emo && !isVideoUrl(i.filePath))
-    return img ? getImageUrl(img.filePath) : null
+  // 해당 스타일+감정의 정적 이미지 URL 목록(여러 변형 가능).
+  const poolOf = (style, emo) => {
+    if (!style) return []
+    return (style.images || [])
+      .filter((i) => i.emotion === emo && !isVideoUrl(i.filePath))
+      .map((i) => getImageUrl(i.filePath))
+      .filter(Boolean)
   }
-  return (
-    tryStyle(preferred, emotion) ||
-    tryStyle(preferred, 'NEUTRAL') ||
-    styles.map((s) => tryStyle(s, emotion)).find(Boolean) ||
-    getNeutralImage(character)
-  )
+  // 우선순위대로 첫 번째로 비지 않은 풀을 사용.
+  let pool = poolOf(preferred, emotion)
+  if (!pool.length) pool = poolOf(preferred, 'NEUTRAL')
+  if (!pool.length) {
+    for (const s of styles) {
+      const p = poolOf(s, emotion)
+      if (p.length) { pool = p; break }
+    }
+  }
+  if (!pool.length) return getNeutralImage(character)
+  // seed로 변형 선택 (음수 방어).
+  const idx = (((seed % pool.length) + pool.length) % pool.length)
+  return pool[idx]
 }
 
 function parseMessageSegments(content, role) {
@@ -306,6 +317,15 @@ export default function GroupChat() {
     return map
   }, [groupChat?.messages])
 
+  // 캐릭터별 발화 횟수 — 표정 이미지 변형(seed)용. 발화가 늘 때마다 같은 감정이라도 다른 컷으로 로테이션.
+  const speakCountByChar = useMemo(() => {
+    const map = new Map()
+    for (const m of groupChat?.messages || []) {
+      if (m.role === 'CHARACTER' && m.characterId) map.set(m.characterId, (map.get(m.characterId) || 0) + 1)
+    }
+    return map
+  }, [groupChat?.messages])
+
   // 방금 말한(강조 대상) 캐릭터 — 스트리밍 중이면 마지막 스트리밍 버블, 아니면 마지막 CHARACTER 메시지.
   const speakingCharacterId = useMemo(() => {
     for (let i = streamingBubbles.length - 1; i >= 0; i--) {
@@ -328,16 +348,18 @@ export default function GroupChat() {
       .slice(0, MAX_MEMBERS)
       .map((m) => {
         const emotion = latestEmotionByChar.get(m.characterId) || 'NEUTRAL'
+        // 발화 횟수를 seed로 — 같은 감정에 이미지가 여러 장이면 발화마다 다른 컷으로.
+        const seed = speakCountByChar.get(m.characterId) || 0
         return {
           characterId: m.characterId,
           name: m.character?.name || '',
-          url: pickSpriteUrl(m.character, m.currentStyleId, emotion),
+          url: pickSpriteUrl(m.character, m.currentStyleId, emotion, seed),
           isExcited: !!m.characterStatus?.isExcited,
           isSpeaking: m.characterId === speakingCharacterId,
         }
       })
       .filter((p) => p.url)
-  }, [groupChat?.members, latestEmotionByChar, speakingCharacterId, isInPerson])
+  }, [groupChat?.members, latestEmotionByChar, speakCountByChar, speakingCharacterId, isInPerson])
 
   async function handleSend() {
     if (!input.trim() || sending || !groupChat) return
