@@ -198,7 +198,7 @@ export default function GroupChatCast() {
               <span className="text-xs font-semibold text-gray-300">{t('groupChatCast.roles')}</span>
               <span className="text-[11px] text-gray-500">{assignedCount}/{concept.roles.length}</span>
             </div>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pt-2 pb-1">
               {concept.roles.map((role, i) => {
                 const cid = assignments[i]
                 const c = cid ? charById.get(cid) : null
