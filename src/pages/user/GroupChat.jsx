@@ -1080,7 +1080,7 @@ export default function GroupChat() {
                 <button
                   type="button"
                   onClick={() => { if (unlockingVideoId !== p.imageId) handleUnlockGroupVideo(p.imageId) }}
-                  className="relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
+                  className="relative w-12 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer"
                   style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   aria-label={t('groupChat.unlockVideo', { defaultValue: '표정 영상 해금' })}
                 >
@@ -1107,7 +1107,7 @@ export default function GroupChat() {
               <button
                 type="button"
                 onClick={() => setEnlargedSprite({ url: p.activeUrl, name: p.name })}
-                className={`relative w-16 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 ${
+                className={`relative w-12 rounded-2xl overflow-hidden bg-gray-800/80 shadow-lg transition-all duration-300 ${
                   p.isExcited ? 'ring-2 ring-pink-500/70' : 'ring-1 ring-gray-700/50'
                 } ${p.isSpeaking ? 'scale-105' : ''}`}
                 style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
