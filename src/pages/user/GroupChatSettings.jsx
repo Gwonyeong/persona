@@ -8,6 +8,8 @@ const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
 // 그룹 채팅 표정 이미지 출력 방식 — 서버(GroupChat.spriteMode)에서 관리.
 const SPRITE_MODES = ['BUBBLE', 'OFF']
+// 텍스트 스트리밍(타자기) 속도 — 서버(GroupChat.streamSpeed)에서 관리.
+const STREAM_SPEEDS = ['SLOW', 'DEFAULT', 'FAST']
 
 export default function GroupChatSettings() {
   const { id } = useParams()
@@ -16,6 +18,7 @@ export default function GroupChatSettings() {
   const { t } = useTranslation()
 
   const [spriteMode, setSpriteMode] = useState('BUBBLE')
+  const [streamSpeed, setStreamSpeed] = useState('DEFAULT')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -27,6 +30,7 @@ export default function GroupChatSettings() {
     api.get(`/group-chats/${id}`)
       .then(({ groupChat }) => {
         setSpriteMode(groupChat?.spriteMode || 'BUBBLE')
+        setStreamSpeed(groupChat?.streamSpeed || 'DEFAULT')
       })
       .catch((err) => {
         if (err.status === 404) navigate(`/group-chats/${id}`, { replace: true })
@@ -44,6 +48,21 @@ export default function GroupChatSettings() {
     } catch (err) {
       console.error('Update group sprite mode error:', err)
       setSpriteMode(prev) // 롤백
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSelectSpeed = async (speed) => {
+    if (saving || speed === streamSpeed) return
+    const prev = streamSpeed
+    setStreamSpeed(speed)
+    setSaving(true)
+    try {
+      await api.patch(`/group-chats/${id}/stream-speed`, { speed })
+    } catch (err) {
+      console.error('Update group stream speed error:', err)
+      setStreamSpeed(prev) // 롤백
     } finally {
       setSaving(false)
     }
@@ -120,6 +139,55 @@ export default function GroupChatSettings() {
                             ? '입력창 위에 표정을 작은 카드로 표시합니다.'
                             : '표정 이미지를 표시하지 않습니다.',
                       })}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-sm font-semibold text-white mb-1">
+            {t('groupChatSettings.streamSpeed.heading', { defaultValue: '텍스트 출력 속도' })}
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">
+            {t('groupChatSettings.streamSpeed.description', { defaultValue: '메시지가 화면에 타이핑되는 속도를 선택합니다.' })}
+          </p>
+
+          <div className="space-y-2">
+            {STREAM_SPEEDS.map((speed) => {
+              const selected = streamSpeed === speed
+              const defTitle = speed === 'SLOW' ? '느림' : speed === 'FAST' ? '빠름' : '기본'
+              const defDesc =
+                speed === 'SLOW'
+                  ? '천천히 한 글자씩 출력됩니다.'
+                  : speed === 'FAST'
+                    ? '속도 제한 없이 가장 빠르게 출력됩니다.'
+                    : '적당한 속도로 출력됩니다.'
+              return (
+                <button
+                  key={speed}
+                  onClick={() => handleSelectSpeed(speed)}
+                  disabled={saving}
+                  className={`w-full flex items-start gap-3 text-left p-4 rounded-xl border transition-colors ${
+                    selected
+                      ? 'bg-indigo-600/15 border-indigo-500/60'
+                      : 'bg-gray-900 border-gray-800 hover:border-gray-700'
+                  } ${saving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  style={NO_OUTLINE}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                    selected ? 'border-indigo-400' : 'border-gray-600'
+                  }`}>
+                    {selected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-400" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">
+                      {t(`groupChatSettings.streamSpeed.options.${speed}.title`, { defaultValue: defTitle })}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                      {t(`groupChatSettings.streamSpeed.options.${speed}.desc`, { defaultValue: defDesc })}
                     </p>
                   </div>
                 </button>
