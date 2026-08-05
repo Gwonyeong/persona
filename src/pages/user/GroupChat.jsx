@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -8,8 +8,8 @@ import { formatChatTime } from '../../lib/timeFormat'
 import MaskIcon from '../../components/MaskIcon'
 import { isVideoUrl, CrossfadeMedia, SpriteMedia } from '../../components/SpriteMedia'
 
-// 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js와 동기. 모델별(기본1/고급3) + 음성 추가요금.
-const GROUP_MODEL_COSTS = { BASIC: 1, ADVANCED: 3 }
+// 단톡방 메시지당 마스크 비용 — 서버 routes/groupChats.js와 동기. 모델별(기본1/고급4) + 음성 추가요금.
+const GROUP_MODEL_COSTS = { BASIC: 1, ADVANCED: 4 }
 const GROUP_VOICE_SURCHARGE = 4
 const GROUP_NSFW_VOICE_EXTRA = 3
 // 표정영상 해금 비용 — 서버 routes/groupChats.js의 EMOTION_VIDEO_MASK_COST와 동기.
@@ -150,6 +150,9 @@ const GroupMessageBubble = memo(function GroupMessageBubble({ msg, character, is
 export default function GroupChat() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  // 방을 방금 생성한 경우(캐스팅/신규) — 초기 스크롤을 바닥이 아닌 맨 위로 두어 오프닝을 처음부터 읽게 한다.
+  const justCreatedRef = useRef(location.state?.justCreated === true)
   const { t } = useTranslation()
   const { token, user, setMasks } = useStore()
   const [groupChat, setGroupChat] = useState(null)
@@ -243,6 +246,12 @@ export default function GroupChat() {
     // 방금 늘어난 경우까지 커버.
     const el = scrollContainerRef.current
     if (!el) return
+    // 방 생성 직후 첫 렌더: 오프닝을 처음부터 읽도록 맨 위 고정(바닥으로 튕기지 않음). 이후 턴부터는 정상 바닥 스크롤.
+    if (justCreatedRef.current) {
+      el.scrollTop = 0
+      justCreatedRef.current = false
+      return
+    }
     el.scrollTop = el.scrollHeight
     const raf = requestAnimationFrame(() => {
       const el2 = scrollContainerRef.current
@@ -290,7 +299,7 @@ export default function GroupChat() {
   const isConcept = groupChat?.conceptData != null
 
   const safetyMode = groupChat?.safetyMode !== false // 기본 SFW
-  // 이번 메시지 마스크 비용 — 모델(기본1/고급3) + 음성 추가요금(+4, NSFW 음성 +3).
+  // 이번 메시지 마스크 비용 — 모델(기본1/고급4) + 음성 추가요금(+4, NSFW 음성 +3).
   const msgCost = GROUP_MODEL_COSTS[chatModel] + (voiceMode ? GROUP_VOICE_SURCHARGE + (safetyMode ? 0 : GROUP_NSFW_VOICE_EXTRA) : 0)
   // 표정 이미지 출력 방식 — 서버(GroupChat.spriteMode) 값. 'BUBBLE'(기본) | 'OFF'(없음). 설정 페이지에서 변경.
   const spriteMode = groupChat?.spriteMode === 'OFF' ? 'OFF' : 'BUBBLE'
@@ -395,6 +404,7 @@ export default function GroupChat() {
 
   // 추천 답변 — 마지막 CHARACTER 메시지에 부착된 suggestedReplies. 유저 차례(마지막이 유저 아님)에만 노출.
   const activeSuggestedReplies = useMemo(() => {
+    if (groupChat?.suggestedRepliesEnabled === false) return null // 방 설정에서 끔
     const msgs = groupChat?.messages || []
     const last = msgs[msgs.length - 1]
     if (!last || last.role === 'USER') return null
@@ -402,7 +412,7 @@ export default function GroupChat() {
       if (msgs[i].role === 'CHARACTER') return msgs[i].suggestedReplies || null
     }
     return null
-  }, [groupChat?.messages])
+  }, [groupChat?.messages, groupChat?.suggestedRepliesEnabled])
 
   async function handleSend(overrideText) {
     const text = typeof overrideText === 'string' && overrideText.trim() ? overrideText.trim() : input.trim()

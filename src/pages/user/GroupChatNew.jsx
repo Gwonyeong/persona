@@ -70,7 +70,7 @@ export default function GroupChatNew() {
         characterIds: selectedIds,
         title: title.trim() || null,
       })
-      navigate(`/group-chats/${groupChat.id}`, { replace: true })
+      navigate(`/group-chats/${groupChat.id}`, { replace: true, state: { justCreated: true } })
     } catch (err) {
       console.error(err)
       if (err.data?.error === 'GROUP_CHAT_LIMIT_REACHED') {

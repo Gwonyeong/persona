@@ -19,6 +19,7 @@ export default function GroupChatSettings() {
 
   const [spriteMode, setSpriteMode] = useState('BUBBLE')
   const [streamSpeed, setStreamSpeed] = useState('DEFAULT')
+  const [suggestEnabled, setSuggestEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -31,12 +32,28 @@ export default function GroupChatSettings() {
       .then(({ groupChat }) => {
         setSpriteMode(groupChat?.spriteMode || 'BUBBLE')
         setStreamSpeed(groupChat?.streamSpeed || 'DEFAULT')
+        setSuggestEnabled(groupChat?.suggestedRepliesEnabled !== false)
       })
       .catch((err) => {
         if (err.status === 404) navigate(`/group-chats/${id}`, { replace: true })
       })
       .finally(() => setLoading(false))
   }, [id, token, navigate])
+
+  const handleToggleSuggest = async () => {
+    if (saving) return
+    const next = !suggestEnabled
+    setSuggestEnabled(next)
+    setSaving(true)
+    try {
+      await api.patch(`/group-chats/${id}/suggested-replies`, { enabled: next })
+    } catch (err) {
+      console.error('Update group suggested replies error:', err)
+      setSuggestEnabled(!next) // 롤백
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleSelect = async (mode) => {
     if (saving || mode === spriteMode) return
@@ -194,6 +211,36 @@ export default function GroupChatSettings() {
               )
             })}
           </div>
+        </section>
+
+        <section>
+          <h2 className="text-sm font-semibold text-white mb-1">
+            {t('groupChatSettings.suggestedReplies.heading', { defaultValue: '추천 답변' })}
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">
+            {t('groupChatSettings.suggestedReplies.description', { defaultValue: '내 차례에 보낼 만한 답변 후보를 버블 아래에 보여줍니다.' })}
+          </p>
+
+          <button
+            onClick={handleToggleSuggest}
+            disabled={saving}
+            className={`w-full flex items-center justify-between gap-3 text-left p-4 rounded-xl border transition-colors bg-gray-900 border-gray-800 ${saving ? 'opacity-60 cursor-not-allowed' : 'hover:border-gray-700'}`}
+            style={NO_OUTLINE}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white">
+                {t('groupChatSettings.suggestedReplies.toggleLabel', { defaultValue: '추천 답변 표시' })}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                {suggestEnabled
+                  ? t('groupChatSettings.suggestedReplies.on', { defaultValue: '켜짐 — 답변 후보를 보여줍니다.' })
+                  : t('groupChatSettings.suggestedReplies.off', { defaultValue: '꺼짐 — 답변 후보를 숨깁니다.' })}
+              </p>
+            </div>
+            <div className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors ${suggestEnabled ? 'bg-indigo-500' : 'bg-gray-700'}`}>
+              <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${suggestEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
         </section>
       </div>
     </div>

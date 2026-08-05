@@ -134,7 +134,7 @@ export default function GroupChatCast() {
         const me = await api.get('/auth/me')
         if (typeof me.masks === 'number') setMasks(me.masks)
       } catch {}
-      navigate(`/group-chats/${groupChat.id}`, { replace: true })
+      navigate(`/group-chats/${groupChat.id}`, { replace: true, state: { justCreated: true } })
     } catch (err) {
       console.error(err)
       if (err.data?.error === 'ADULT_VERIFICATION_REQUIRED') {
