@@ -45,6 +45,7 @@ function SubscriptionTable({ rows }) {
           <th className="p-3">유저</th>
           <th className="p-3">상태</th>
           <th className="p-3">결제</th>
+          <th className="p-3">요금</th>
           <th className="p-3">자동갱신</th>
           <th className="p-3">시작일</th>
           <th className="p-3">만료일</th>
@@ -82,6 +83,18 @@ function SubscriptionTable({ rows }) {
               ) : (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-emerald-900/40 text-emerald-300 border border-emerald-800">
                   유료
+                </span>
+              )}
+            </td>
+            <td className="p-3">
+              {sub.isNewPrice ? (
+                <span className="text-indigo-300">₩12,900</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-gray-300">
+                  ₩9,900
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400 border border-gray-700">
+                    인상 전
+                  </span>
                 </span>
               )}
             </td>
@@ -210,6 +223,12 @@ export default function FinanceSubscriptions() {
             유료 {summary.payingCount.toLocaleString('ko-KR')} · 체험{' '}
             {summary.trialCount.toLocaleString('ko-KR')}
           </div>
+          <div className="mt-1 text-xs text-gray-500">
+            <span className="text-gray-400">9,900원</span>{' '}
+            {(summary.payingOldCount ?? 0).toLocaleString('ko-KR')} ·{' '}
+            <span className="text-indigo-300">12,900원</span>{' '}
+            {(summary.payingNewCount ?? 0).toLocaleString('ko-KR')}
+          </div>
         </div>
         <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
           <div className="text-xs text-gray-400">취소 (만료 대기)</div>
@@ -237,9 +256,13 @@ export default function FinanceSubscriptions() {
           <div className="mt-1 text-2xl font-bold text-indigo-300">
             {fmtKrw(summary.monthlyRevenueNetKrw)}
           </div>
-          <div className="mt-1 text-xs text-gray-500">
-            총액 {fmtKrw(summary.monthlyRevenueKrw)} · 유료 {summary.payingCount}건 ×{' '}
-            {fmtKrw(summary.lightPlanPriceKrw)}
+          <div className="mt-1 text-xs text-gray-500">총액 {fmtKrw(summary.monthlyRevenueKrw)}</div>
+          <div className="mt-1 text-xs text-gray-500 leading-relaxed">
+            9,900원 {(summary.payingOldCount ?? 0).toLocaleString('ko-KR')}건 ×{' '}
+            {fmtKrw(summary.netOldKrw)}
+            <br />
+            12,900원 {(summary.payingNewCount ?? 0).toLocaleString('ko-KR')}건 ×{' '}
+            {fmtKrw(summary.netNewKrw)}
           </div>
         </div>
       </div>
