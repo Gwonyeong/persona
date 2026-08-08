@@ -95,6 +95,8 @@ export default function CharacterProduction() {
   // 음성 샘플
   const [voiceSamples, setVoiceSamples] = useState({ normal: { text: '', audioUrl: '' }, aroused: { text: '', audioUrl: '' } })
   const [voiceSampleBusy, setVoiceSampleBusy] = useState({ normal: null, aroused: null })
+  // 원클릭 자동 생성 (일반·흥분 대사 생성 → TTS → 저장)
+  const [autoSample, setAutoSample] = useState({ running: false, step: '', error: null })
 
   // 프로필/홈 이미지
   const [uploadingImage, setUploadingImage] = useState(null) // 'profile' | 'home'
@@ -307,6 +309,39 @@ export default function CharacterProduction() {
     }
   }
 
+  // 버튼 하나로 일반·흥분 대사를 각각 LLM 생성 → 곧바로 TTS까지 만들어 저장.
+  // 기존 generate-text / save 엔드포인트를 순차 호출 (한 요청에 몰면 LLM 2회 + TTS 2회라 타임아웃 위험).
+  const autoGenerateSamples = async () => {
+    if (!hasVoiceId) { alert('보이스 ID를 먼저 확정/저장하세요.'); return }
+    if (autoSample.running) return
+    if ((voiceSamples.normal?.audioUrl || voiceSamples.aroused?.audioUrl) &&
+        !confirm('기존 음성 샘플을 새로 생성한 대사·음성으로 덮어씁니다. 진행할까요?')) return
+
+    setAutoSample({ running: true, step: '', error: null })
+    let updatedAll = null
+    try {
+      for (const { kind, label } of [{ kind: 'normal', label: '기본' }, { kind: 'aroused', label: '흥분' }]) {
+        setAutoSample((p) => ({ ...p, step: `${label} 대사 생성 중...` }))
+        const { text } = await api.post(`/admin/characters/${character.id}/voice-sample/generate-text`, { kind })
+        setVoiceSamples((prev) => ({ ...prev, [kind]: { ...prev[kind], text } }))
+
+        setAutoSample((p) => ({ ...p, step: `${label} 음성 생성 중...` }))
+        const { voiceSamples: updated } = await api.post(`/admin/characters/${character.id}/voice-sample/save`, { kind, text, generateTts: true })
+        updatedAll = updated
+        setVoiceSamples({
+          normal: { text: updated?.normal?.text || '', audioUrl: updated?.normal?.audioUrl || '' },
+          aroused: { text: updated?.aroused?.text || '', audioUrl: updated?.aroused?.audioUrl || '' },
+        })
+      }
+      setAutoSample({ running: false, step: '', error: null })
+    } catch (e) {
+      // 중간 실패 시에도 앞 단계(기본)는 이미 저장됨 — 아래 개별 편집에서 이어서 처리 가능.
+      setAutoSample({ running: false, step: '', error: e?.data?.error || e?.message || '자동 생성 실패' })
+    } finally {
+      if (updatedAll) await load()
+    }
+  }
+
   // ── 프로필 / 홈 이미지 ────────────────────────────────────
   const uploadCharImage = async (which, file) => {
     if (!file) return
@@ -419,8 +454,8 @@ export default function CharacterProduction() {
         </div>
       </div>
 
-      {/* 1. voiceId */}
-      <Section title="1. 보이스 ID (ElevenLabs)">
+      {/* 1. voiceId + 음성 샘플 */}
+      <Section title="1. 보이스 (ElevenLabs) · 음성 샘플">
         {/* 보이스 생성 프롬프트 — ElevenLabs Voice Design에 복사해 사용 */}
         {character.voicePrompt && (character.voicePrompt.description || character.voicePrompt.sampleText) && (
           <div className="mb-4 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3">
@@ -508,6 +543,97 @@ export default function CharacterProduction() {
         {voiceDupNames.length > 0 && (
           <p className="text-xs text-red-400 mt-2">⚠ 이 보이스 ID는 다른 캐릭터와 중복됩니다: {voiceDupNames.join(', ')}</p>
         )}
+
+        {/* 음성 샘플 — 보이스 확정 후 버튼 하나로 일반·흥분 대사 생성 + TTS까지 */}
+        <div className="mt-5 pt-4 border-t border-gray-800">
+          <p className="text-xs font-semibold text-gray-300 mb-1">🔊 음성 샘플 (캐릭터 상세 버블)</p>
+          <p className="text-[11px] text-gray-500 mb-3">
+            버튼 하나로 <b className="text-gray-400">기본 / 흥분</b> 대사를 각각 생성하고, 위 보이스로 음성까지 만들어 저장합니다.
+          </p>
+          {!hasVoiceId && (
+            <p className="text-xs text-amber-400 mb-2">⚠ 보이스 ID를 먼저 확정/저장해야 음성 생성이 가능합니다.</p>
+          )}
+
+          <button
+            onClick={autoGenerateSamples}
+            disabled={!hasVoiceId || autoSample.running || !!voiceSampleBusy.normal || !!voiceSampleBusy.aroused}
+            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm font-medium disabled:opacity-50 w-full"
+            style={btnStyle}
+          >
+            {autoSample.running ? `⏳ ${autoSample.step || '생성 중...'}` : '✨ 대사 생성 + 음성 생성 (기본·흥분 한 번에)'}
+          </button>
+          {autoSample.error && <p className="text-[11px] text-red-400 mt-2 break-words">⚠ {autoSample.error}</p>}
+
+          {/* 결과 요약 */}
+          <div className="mt-3 space-y-2">
+            {[{ kind: 'normal', label: '기본' }, { kind: 'aroused', label: '흥분 (NSFW)' }].map(({ kind, label }) => {
+              const sample = voiceSamples[kind]
+              return (
+                <div key={kind} className="bg-gray-800/50 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-400 flex-shrink-0 w-16">{label}</span>
+                    {sample.audioUrl
+                      ? <audio src={sample.audioUrl} controls className="h-8 flex-1 min-w-0" />
+                      : <span className="text-[11px] text-gray-600">아직 음성 없음</span>}
+                  </div>
+                  {sample.text && <p className="text-[11px] text-gray-500 mt-1 break-words">{sample.text}</p>}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 직접 수정 — 자동 생성 결과가 마음에 안 들 때만 펼쳐서 개별 처리 */}
+          <details className="mt-3">
+            <summary className="text-xs text-gray-400 cursor-pointer select-none">대사 직접 수정 · 개별 재생성</summary>
+            <div className="space-y-4 mt-3">
+              {[{ kind: 'normal', label: '기본' }, { kind: 'aroused', label: '흥분 (NSFW)' }].map(({ kind, label }) => {
+                const busy = voiceSampleBusy[kind]
+                const sample = voiceSamples[kind]
+                return (
+                  <div key={kind} className="border border-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{label}</span>
+                      <button
+                        onClick={() => generateSampleText(kind)}
+                        disabled={!!busy || autoSample.running}
+                        className="text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
+                        style={btnStyle}
+                      >
+                        {busy === 'text' ? '생성 중...' : '✨ 대사 자동 생성'}
+                      </button>
+                    </div>
+                    <textarea
+                      value={sample.text}
+                      onChange={(e) => setVoiceSamples((prev) => ({ ...prev, [kind]: { ...prev[kind], text: e.target.value } }))}
+                      placeholder="샘플 대사"
+                      rows={2}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm mb-2"
+                      style={btnStyle}
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => saveSample(kind, false)}
+                        disabled={!!busy || autoSample.running}
+                        className="text-xs px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+                        style={btnStyle}
+                      >
+                        {busy === 'save' ? '저장 중...' : '텍스트만 저장'}
+                      </button>
+                      <button
+                        onClick={() => saveSample(kind, true)}
+                        disabled={!!busy || autoSample.running || !hasVoiceId}
+                        className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
+                        style={btnStyle}
+                      >
+                        {busy === 'tts' ? 'TTS 생성 중...' : '🔊 저장 + 음성 생성'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </details>
+        </div>
       </Section>
 
       {/* 2. 표정 영상 일괄 등록 (Gemini 자동 분류) */}
@@ -646,63 +772,8 @@ export default function CharacterProduction() {
         </div>
       </Section>
 
-      {/* 3. 음성 샘플 */}
-      <Section title="3. 음성 샘플">
-        {!hasVoiceId && (
-          <p className="text-xs text-amber-400 mb-3">⚠ 보이스 ID를 먼저 등록해야 TTS 생성이 가능합니다.</p>
-        )}
-        <div className="space-y-4">
-          {[{ kind: 'normal', label: '기본' }, { kind: 'aroused', label: '흥분 (NSFW)' }].map(({ kind, label }) => {
-            const busy = voiceSampleBusy[kind]
-            const sample = voiceSamples[kind]
-            return (
-              <div key={kind} className="border border-gray-800 rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">{label}</span>
-                  <button
-                    onClick={() => generateSampleText(kind)}
-                    disabled={!!busy}
-                    className="text-xs text-purple-400 hover:text-purple-300 disabled:opacity-50"
-                    style={btnStyle}
-                  >
-                    {busy === 'text' ? '생성 중...' : '✨ 대사 자동 생성'}
-                  </button>
-                </div>
-                <textarea
-                  value={sample.text}
-                  onChange={(e) => setVoiceSamples((prev) => ({ ...prev, [kind]: { ...prev[kind], text: e.target.value } }))}
-                  placeholder="샘플 대사"
-                  rows={2}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm mb-2"
-                  style={btnStyle}
-                />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => saveSample(kind, false)}
-                    disabled={!!busy}
-                    className="text-xs px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
-                    style={btnStyle}
-                  >
-                    {busy === 'save' ? '저장 중...' : '텍스트만 저장'}
-                  </button>
-                  <button
-                    onClick={() => saveSample(kind, true)}
-                    disabled={!!busy || !hasVoiceId}
-                    className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
-                    style={btnStyle}
-                  >
-                    {busy === 'tts' ? 'TTS 생성 중...' : '🔊 저장 + 음성 생성'}
-                  </button>
-                  {sample.audioUrl && <audio src={sample.audioUrl} controls className="h-8" />}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </Section>
-
-      {/* 4. 프로필 이미지 */}
-      <Section title="4. 프로필 이미지">
+      {/* 3. 프로필 이미지 */}
+      <Section title="3. 프로필 이미지">
         <div className="max-w-[220px]">
           <CharImageCell
             label="프로필 이미지 (9:16)"
@@ -719,8 +790,8 @@ export default function CharacterProduction() {
         </div>
       </Section>
 
-      {/* 5. 공개 전환 */}
-      <Section title="5. 공개 전환">
+      {/* 4. 공개 전환 */}
+      <Section title="4. 공개 전환">
         {!allReady && (
           <p className="text-xs text-amber-400 mb-3">준비도 체크리스트가 완료되지 않았습니다. 공개는 가능하지만 확인 후 진행됩니다.</p>
         )}
