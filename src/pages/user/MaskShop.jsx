@@ -50,6 +50,8 @@ export default function MaskShop() {
   const [isNative, setIsNative] = useState(false)
   // 웹 전용 PG 상품 가격표 (서버가 신뢰하는 값). 앱에서는 조회하지 않는다.
   const [pgProducts, setPgProducts] = useState([])
+  // 서버가 판단한 웹 결제 허용 여부. 계약 전에는 심사·테스트 계정에만 열린다.
+  const [pgAllowed, setPgAllowed] = useState(false)
 
   // 구독
   const [subLoading, setSubLoading] = useState(false)
@@ -110,7 +112,10 @@ export default function MaskShop() {
 
     api
       .get('/payments/products')
-      .then((res) => setPgProducts(res.products || []))
+      .then((res) => {
+        setPgProducts(res.products || [])
+        setPgAllowed(Boolean(res.allowed))
+      })
       .catch(() => {})
 
     const impUid = searchParams.get('imp_uid')
@@ -352,7 +357,8 @@ export default function MaskShop() {
       api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
 
       // 웹에서는 PG 결제로 분기한다. 앱(WebView 포함)에서는 이 분기를 절대 타지 않는다.
-      if (!isNativeApp() && isPortOneConfigured()) {
+      // pgAllowed 는 서버가 이메일 허용목록으로 판단한 값 — 계약 전에는 테스트 계정만 true.
+      if (!isNativeApp() && isPortOneConfigured() && pgAllowed) {
         await handleWebPgPurchase(pkg)
         return
       }

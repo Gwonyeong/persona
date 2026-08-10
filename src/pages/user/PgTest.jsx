@@ -37,6 +37,7 @@ export default function PgTest() {
   const [searchParams] = useSearchParams()
   const { user, token } = useStore()
   const [catalog, setCatalog] = useState({ products: [], plans: [] })
+  const [allowed, setAllowed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [log, setLog] = useState([])
 
@@ -66,7 +67,10 @@ export default function PgTest() {
     if (native || !token) return
     api
       .get('/payments/products')
-      .then(setCatalog)
+      .then((res) => {
+        setCatalog(res)
+        setAllowed(Boolean(res.allowed))
+      })
       .catch((err) => pushLog('error', '상품 목록을 불러오지 못했습니다', err.message))
   }, [native, token])
 
@@ -240,6 +244,22 @@ export default function PgTest() {
         </div>
       )}
 
+      {token && configured && !allowed && (
+        <div
+          style={{
+            background: '#3a2a1a',
+            border: '1px solid #6b4a1f',
+            borderRadius: 12,
+            padding: 14,
+            fontSize: 13,
+            color: '#f0c992',
+            marginBottom: 20,
+          }}
+        >
+          이 계정은 웹 결제 허용 대상이 아닙니다. 서버의 PAYMENT_ALLOWED_EMAILS 를 확인해 주세요.
+        </div>
+      )}
+
       {!configured && (
         <div
           style={{
@@ -291,14 +311,14 @@ export default function PgTest() {
               </div>
               <button
                 type="button"
-                disabled={busy || !configured || !token}
+                disabled={busy || !configured || !token || !allowed}
                 onClick={() => handlePayment(product)}
                 style={{
                   ...btnBase,
                   padding: '10px 18px',
-                  background: busy || !configured || !token ? '#33333d' : '#6c5ce7',
+                  background: busy || !configured || !token || !allowed ? '#33333d' : '#6c5ce7',
                   color: '#fff',
-                  opacity: busy || !configured || !token ? 0.6 : 1,
+                  opacity: busy || !configured || !token || !allowed ? 0.6 : 1,
                 }}
               >
                 결제하기
@@ -332,14 +352,14 @@ export default function PgTest() {
               </div>
               <button
                 type="button"
-                disabled={busy || !configured || !token}
+                disabled={busy || !configured || !token || !allowed}
                 onClick={() => handleBilling(plan)}
                 style={{
                   ...btnBase,
                   padding: '10px 18px',
-                  background: busy || !configured || !token ? '#33333d' : '#00b894',
+                  background: busy || !configured || !token || !allowed ? '#33333d' : '#00b894',
                   color: '#fff',
-                  opacity: busy || !configured || !token ? 0.6 : 1,
+                  opacity: busy || !configured || !token || !allowed ? 0.6 : 1,
                 }}
               >
                 구독하기
