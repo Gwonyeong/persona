@@ -11,6 +11,13 @@ import { requestInAppReview, REVIEW_REWARD_UI_ENABLED } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
 import ShopPromoSection from '../../components/ShopPromoSection'
+import {
+  isNativeApp,
+  isPortOneConfigured,
+  loadPortOne,
+  createMerchantUid,
+  PORTONE_CHANNEL_KEY,
+} from '../../lib/webPayment'
 
 const YOONHARIN_IMAGE_URL = 'https://zstwgwszakivdnhwbuei.supabase.co/storage/v1/object/public/pesona/dev/sprites/25/NEUTRAL.png'
 
@@ -41,6 +48,8 @@ export default function MaskShop() {
   const [purchaseError, setPurchaseError] = useState('')
   const [billingReady, setBillingReady] = useState(false)
   const [isNative, setIsNative] = useState(false)
+  // 웹 전용 PG 상품 가격표 (서버가 신뢰하는 값). 앱에서는 조회하지 않는다.
+  const [pgProducts, setPgProducts] = useState([])
 
   // 구독
   const [subLoading, setSubLoading] = useState(false)
@@ -93,6 +102,29 @@ export default function MaskShop() {
     }
     return false
   }
+
+  // 웹 전용: PG 가격표 조회 + 모바일 결제창 리다이렉트 복귀 처리.
+  // 앱에서는 아무것도 하지 않는다 (구글 인앱결제 경로만 사용).
+  useEffect(() => {
+    if (isNativeApp() || !isPortOneConfigured() || !token) return
+
+    api
+      .get('/payments/products')
+      .then((res) => setPgProducts(res.products || []))
+      .catch(() => {})
+
+    const impUid = searchParams.get('imp_uid')
+    const merchantUid = searchParams.get('merchant_uid')
+    const productId = searchParams.get('productId')
+    if (!impUid || !merchantUid || !productId) return
+
+    api
+      .post('/payments/complete', { impUid, merchantUid, productId })
+      .then((result) => {
+        if (typeof result.masks === 'number') setMasks(result.masks)
+      })
+      .catch((err) => setPurchaseError(err?.data?.error || t('myPage.purchaseFailed')))
+  }, [token, searchParams])
 
   useEffect(() => {
     const native = isNativeBillingAvailable()
@@ -262,6 +294,55 @@ export default function MaskShop() {
     }
   }
 
+  // 웹 전용 PG(포트원·다날) 결제. 앱에서는 절대 호출되지 않는다.
+  const handleWebPgPurchase = async (pkg) => {
+    const product = pgProducts.find((p) => p.id === pkg.productId)
+    if (!product) {
+      setPurchaseError(t('myPage.purchaseEnvError'))
+      setPurchasing(false)
+      return
+    }
+
+    const IMP = await loadPortOne()
+    const merchantUid = createMerchantUid()
+
+    IMP.request_pay(
+      {
+        channelKey: PORTONE_CHANNEL_KEY,
+        pay_method: 'card',
+        merchant_uid: merchantUid,
+        name: product.name,
+        amount: product.amount,
+        m_redirect_url: `${window.location.origin}/mask-shop?productId=${product.id}`,
+        buyer_name: user?.name || '구매자',
+        buyer_email: user?.email || undefined,
+        // 다날은 buyer_tel 미설정 시 결제창에서 오류가 날 수 있어 항상 채운다.
+        buyer_tel: '010-0000-0000',
+      },
+      async (rsp) => {
+        if (!rsp.imp_uid) {
+          const msg = rsp.error_msg || ''
+          // 사용자가 결제창을 닫은 경우는 오류로 표시하지 않는다.
+          if (msg && !msg.includes('취소')) setPurchaseError(msg)
+          setPurchasing(false)
+          return
+        }
+        try {
+          const result = await api.post('/payments/complete', {
+            impUid: rsp.imp_uid,
+            merchantUid: rsp.merchant_uid,
+            productId: product.id,
+          })
+          if (typeof result.masks === 'number') setMasks(result.masks)
+        } catch (err) {
+          setPurchaseError(err?.data?.error || t('myPage.purchaseFailed'))
+        } finally {
+          setPurchasing(false)
+        }
+      }
+    )
+  }
+
   const handlePurchase = async () => {
     if (requireLogin()) return
     setPurchasing(true)
@@ -269,6 +350,12 @@ export default function MaskShop() {
     try {
       const pkg = PACKAGES[selectedPkg]
       api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
+
+      // 웹에서는 PG 결제로 분기한다. 앱(WebView 포함)에서는 이 분기를 절대 타지 않는다.
+      if (!isNativeApp() && isPortOneConfigured()) {
+        await handleWebPgPurchase(pkg)
+        return
+      }
 
       if (!isNative || !billingReady) {
         setPurchaseError(t('myPage.purchaseEnvError'))

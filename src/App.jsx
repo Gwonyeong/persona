@@ -65,6 +65,7 @@ import DeleteAccount from './pages/user/DeleteAccount'
 import DeleteAccountInfo from './pages/user/DeleteAccountInfo'
 import PrivacyPolicy from './pages/user/PrivacyPolicy'
 import MaskShop from './pages/user/MaskShop'
+import PgTest from './pages/user/PgTest'
 import FeedbackList from './pages/user/FeedbackList'
 import FeedbackDetail from './pages/user/FeedbackDetail'
 import FeedbackWrite from './pages/user/FeedbackWrite'
@@ -244,6 +245,9 @@ function App() {
 
       {/* V2 채팅 테스트 (풀스크린, 탭바 없음, 임시) */}
       <Route path="/v2-test/:id" element={<V2ChatTest />} />
+
+      {/* PG 검수용 웹 전용 테스트 결제 (앱에서는 차단됨, 네비게이션 미노출) */}
+      <Route path="/pg-test" element={<PgTest />} />
 
       {/* 유저 - 탭바 레이아웃 */}
       <Route element={<UserLayout />}>
