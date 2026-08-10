@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import i18n from '../../i18n'
+import { isNativeApp } from '../../lib/webPayment'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
@@ -22,6 +23,13 @@ export default function Login() {
   const inWebView = isWebView()
   const hadTokenRef = useRef(!!token)
   const [errorMessage, setErrorMessage] = useState('')
+
+  // PG 검수용 테스트 계정 로그인. 웹에서만 노출한다 (앱에는 존재하지 않는 것처럼).
+  const showTestLogin = !isNativeApp()
+  const [testOpen, setTestOpen] = useState(false)
+  const [testId, setTestId] = useState('')
+  const [testPw, setTestPw] = useState('')
+  const [testBusy, setTestBusy] = useState(false)
 
   const returnTo = searchParams.get('returnTo') || '/'
 
@@ -93,6 +101,26 @@ export default function Login() {
       } else {
         setErrorMessage(error?.data?.error || error?.message || '')
       }
+    }
+  }
+
+  const handleTestLogin = async (e) => {
+    e.preventDefault()
+    if (testBusy) return
+    setTestBusy(true)
+    setErrorMessage('')
+    try {
+      const { token: newToken, user } = await api.post('/auth/test-login', {
+        username: testId,
+        password: testPw,
+      })
+      setToken(newToken)
+      setUser(user)
+      goBack()
+    } catch (error) {
+      setErrorMessage(error?.data?.error || '아이디 또는 비밀번호가 올바르지 않습니다.')
+    } finally {
+      setTestBusy(false)
     }
   }
 
@@ -209,6 +237,73 @@ export default function Login() {
             />
           )}
         </div>
+
+        {showTestLogin && (
+          <div className="w-full flex flex-col items-center" style={{ maxWidth: 360 }}>
+            {!testOpen ? (
+              <button
+                type="button"
+                onClick={() => setTestOpen(true)}
+                className="mt-4 text-xs text-white/50 hover:text-white/75 transition-colors"
+                style={{
+                  outline: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  background: 'transparent',
+                }}
+              >
+                관리자 로그인
+              </button>
+            ) : (
+              <form onSubmit={handleTestLogin} className="mt-4 w-full flex flex-col gap-2">
+                <input
+                  type="text"
+                  value={testId}
+                  onChange={(e) => setTestId(e.target.value)}
+                  placeholder="아이디"
+                  autoComplete="username"
+                  className="w-full text-sm text-white rounded-xl px-4"
+                  style={{
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    height: 48,
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                  }}
+                />
+                <input
+                  type="password"
+                  value={testPw}
+                  onChange={(e) => setTestPw(e.target.value)}
+                  placeholder="비밀번호"
+                  autoComplete="current-password"
+                  className="w-full text-sm text-white rounded-xl px-4"
+                  style={{
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    height: 48,
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={testBusy || !testId || !testPw}
+                  className="w-full text-sm font-semibold text-white rounded-xl transition-colors"
+                  style={{
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    height: 48,
+                    border: 'none',
+                    background: testBusy || !testId || !testPw ? 'rgba(255,255,255,0.15)' : '#6c5ce7',
+                    opacity: testBusy ? 0.7 : 1,
+                  }}
+                >
+                  {testBusy ? '로그인 중...' : '로그인'}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
         <button
           onClick={goBack}
