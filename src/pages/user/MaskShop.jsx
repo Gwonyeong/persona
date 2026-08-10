@@ -125,9 +125,7 @@ export default function MaskShop() {
 
     api
       .post('/payments/complete', { impUid, merchantUid, productId })
-      .then((result) => {
-        if (typeof result.masks === 'number') setMasks(result.masks)
-      })
+      .then(applyPgPurchaseResult)
       .catch((err) => setPurchaseError(err?.data?.error || t('myPage.purchaseFailed')))
   }, [token, searchParams])
 
@@ -299,6 +297,15 @@ export default function MaskShop() {
     }
   }
 
+  // 웹 PG 결제 성공 후 처리. 구글 인앱결제 경로와 동일하게 첫 구매 보너스를 반영한다.
+  const applyPgPurchaseResult = (result) => {
+    if (typeof result.masks === 'number') setMasks(result.masks)
+    if (result.firstPurchaseBonus) {
+      setFirstPurchaseEligible(false)
+      window.gtag?.('event', 'first_purchase_bonus', { bonus: result.firstPurchaseBonus })
+    }
+  }
+
   // 웹 전용 PG(포트원·다날) 결제. 앱에서는 절대 호출되지 않는다.
   const handleWebPgPurchase = async (pkg) => {
     const product = pgProducts.find((p) => p.id === pkg.productId)
@@ -338,7 +345,7 @@ export default function MaskShop() {
             merchantUid: rsp.merchant_uid,
             productId: product.id,
           })
-          if (typeof result.masks === 'number') setMasks(result.masks)
+          applyPgPurchaseResult(result)
         } catch (err) {
           setPurchaseError(err?.data?.error || t('myPage.purchaseFailed'))
         } finally {
