@@ -50,6 +50,7 @@ export default function MaskShop() {
   const [isNative, setIsNative] = useState(false)
   // 웹 전용 PG 상품 가격표 (서버가 신뢰하는 값). 앱에서는 조회하지 않는다.
   const [pgProducts, setPgProducts] = useState([])
+  const [pgPlans, setPgPlans] = useState([])
   // 서버가 판단한 웹 결제 허용 여부. 계약 전에는 심사·테스트 계정에만 열린다.
   const [pgAllowed, setPgAllowed] = useState(false)
 
@@ -114,6 +115,7 @@ export default function MaskShop() {
       .get('/payments/products')
       .then((res) => {
         setPgProducts(res.products || [])
+        setPgPlans(res.plans || [])
         setPgAllowed(Boolean(res.allowed))
       })
       .catch(() => {})
@@ -155,12 +157,67 @@ export default function MaskShop() {
     }
   }, [])
 
+  // 웹 전용 PG 정기결제. 빌링키(customer_uid)를 발급받고 서버가 첫 회를 승인한다.
+  // 앱에서는 절대 호출되지 않는다 — 구글 구독을 그대로 쓴다.
+  const handleWebPgSubscribe = async () => {
+    const plan = pgPlans.find((p) => p.id === 'light')
+    if (!plan) {
+      setSubError(t('subscription.googlePlayError'))
+      setSubLoading(false)
+      return
+    }
+
+    const IMP = await loadPortOne()
+    const customerUid = `pesona-customer-${user?.id}`
+
+    IMP.request_pay(
+      {
+        channelKey: PORTONE_CHANNEL_KEY,
+        pay_method: 'card', // 다날 비인증(빌링) 결제는 card 만 지원
+        merchant_uid: createMerchantUid('pesona-sub'),
+        name: plan.name,
+        // amount 0 = 빌링키 발급만 하고 승인은 서버에서 따로 일으킨다.
+        amount: 0,
+        customer_uid: customerUid,
+        m_redirect_url: `${window.location.origin}/mask-shop?tab=subscription`,
+        buyer_name: user?.name || '구매자',
+        buyer_email: user?.email || undefined,
+        buyer_tel: '010-0000-0000',
+      },
+      async (rsp) => {
+        if (!rsp.success && !rsp.imp_uid) {
+          const msg = rsp.error_msg || ''
+          if (msg && !msg.includes('취소')) setSubError(msg)
+          setSubLoading(false)
+          return
+        }
+        try {
+          const result = await api.post('/payments/billing/pay', { customerUid, planId: plan.id })
+          if (result.subscription) useStore.getState().setSubscription(result.subscription)
+          window.gtag?.('event', 'subscription_purchase', { plan: 'light_plan' })
+          const meRes = await api.get('/auth/me')
+          if (meRes.user) useStore.getState().setUser(meRes.user)
+        } catch (err) {
+          setSubError(err?.data?.error || t('subscription.subscribeError'))
+        } finally {
+          setSubLoading(false)
+        }
+      }
+    )
+  }
+
   const handleSubscribe = async () => {
     if (requireLogin()) return
     if (currentTier === 'LIGHT') return
     setSubLoading(true)
     setSubError('')
     try {
+      // 웹에서는 PG 정기결제로 분기. 허용 계정에만 열린다.
+      if (!isNativeApp() && isPortOneConfigured() && pgAllowed) {
+        await handleWebPgSubscribe()
+        return
+      }
+
       if (!isNative || !billingReady) {
         setSubError(t('subscription.googlePlayError'))
         setSubLoading(false)
