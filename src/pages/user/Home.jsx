@@ -124,11 +124,14 @@ export default function Home() {
       .catch(() => setFeaturedCharacters([]))
   }, [i18nInstance.language, safetyMode])
 
-  // 최근 합류 4명 — 상단 2열 그리드(2×2)에서만 노출, 하단 그리드에서는 제외
+  // 최근 합류 4명 — 상단 2열 그리드(2×2)에서만 노출, 하단 그리드에서는 제외.
+  // 정렬 기준은 실제 출시 시각(publishedAt). createdAt(=어드민이 row를 처음 만든 시각)을 쓰면
+  // 미리 만들어두고 나중에 공개한 캐릭터가 오래된 것으로 밀려 신규 출시가 묻힌다.
+  // publishedAt이 없는 레거시 캐릭터(컬럼 도입 이전 공개분)는 이 섹션에서 아예 제외한다.
   const recentJoined = useMemo(() => {
     return [...characters]
-      .filter((c) => c.createdAt)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .filter((c) => c.publishedAt)
+      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
       .slice(0, 4)
   }, [characters])
 
