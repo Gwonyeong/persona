@@ -364,7 +364,16 @@
       "portone": "Verification service error occurred.",
       "notFound": "Verification record not found.",
       "cancelled": "Verification was cancelled.",
-      "unknown": "An unknown error occurred."
+      "unknown": "An unknown error occurred.",
+      "selfDeclareNotAllowed": "This account requires identity verification.",
+      "birthInvalid": "Invalid date of birth."
+    },
+    "selfDeclare": {
+      "heading": "Date of Birth",
+      "description": "Please enter your date of birth to access adult content.\nYou must be {{minAge}} or older.",
+      "birthLabel": "Enter your date of birth",
+      "notice": "Your date of birth is used only to confirm your age. Users under {{minAge}} cannot access this content.",
+      "submit": "Confirm"
     }
   },
   "chatSettings": {
