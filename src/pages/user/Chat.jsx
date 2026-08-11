@@ -1406,7 +1406,7 @@ export default function Chat() {
         setInsufficientMasksFor('emotionVideo')
       } else {
         console.error('Unlock emotion video error:', err)
-        showError(t('chat.errorVideoUnlock', { defaultValue: '영상 해금에 실패했어요' }))
+        showError(t('chat.errorVideoUnlock', { defaultValue: t('chat.videoUnlockFailed') }))
       }
     } finally {
       setUnlockingVideo(false)
@@ -1512,7 +1512,7 @@ export default function Chat() {
           onClick={() => setShowStatusPanel(v => !v)}
           className="text-gray-400 hover:text-white transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          aria-label={showStatusPanel ? '패널 접기' : '패널 펼치기'}
+          aria-label={showStatusPanel ? t('chat.panelCollapse') : t('chat.panelExpand')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {showStatusPanel ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
@@ -1574,7 +1574,7 @@ export default function Chat() {
                       <span>10</span>
                     </div>
                     <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
-                      {unlockingVideo ? '처리중' : '해금하기'}
+                      {unlockingVideo ? t('chat.processing') : t('chat.unlockAction')}
                     </span>
                   </div>
                 </div>
@@ -1905,7 +1905,7 @@ export default function Chat() {
                 className="relative px-4 py-2 rounded-full text-xs bg-rose-900/30 border border-rose-700/40 overflow-hidden"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                <span className="blur-[3px] select-none text-rose-200/80">두근거리는 한마디…</span>
+                <span className="blur-[3px] select-none text-rose-200/80">{t('chat.blurredHint')}</span>
                 <span className="absolute inset-0 flex items-center justify-center text-rose-200">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 </span>
@@ -1955,7 +1955,7 @@ export default function Chat() {
                         <span>10</span>
                       </div>
                       <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
-                        {unlockingVideo ? '처리중' : '해금하기'}
+                        {unlockingVideo ? t('chat.processing') : t('chat.unlockAction')}
                       </span>
                     </div>
                   </div>

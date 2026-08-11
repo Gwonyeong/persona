@@ -59,7 +59,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-gray-100">프로필 이미지 변경</h3>
+          <h3 className="text-base font-bold text-gray-100">{t('profileVariant.title')}</h3>
           <button
             onClick={onClose}
             className="p-1 text-gray-400"
@@ -69,7 +69,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
           </button>
         </div>
 
-        {loading && <p className="text-center text-sm text-gray-500 py-6">불러오는 중...</p>}
+        {loading && <p className="text-center text-sm text-gray-500 py-6">{t('common.loading2')}</p>}
 
         {!loading && character && (
           <>
@@ -88,7 +88,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
                 ) : (
                   <div className="w-full h-full bg-gray-800" />
                 )}
-                <span className="absolute bottom-1 left-1 right-1 text-[10px] text-center bg-black/60 text-gray-200 rounded px-1 py-0.5">기본</span>
+                <span className="absolute bottom-1 left-1 right-1 text-[10px] text-center bg-black/60 text-gray-200 rounded px-1 py-0.5">{t('common.default')}</span>
               </button>
 
               {variants.map((v) => (

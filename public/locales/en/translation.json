@@ -107,7 +107,15 @@
     "edit": "Edit",
     "user": "User",
     "generate": "Generate",
-    "error": "Something went wrong."
+    "error": "Something went wrong.",
+    "collapse": "Collapse",
+    "stop": "Stop",
+    "playAll": "Play all",
+    "cancel2": "Cancel",
+    "loading2": "Loading...",
+    "default": "Default",
+    "back": "Back",
+    "seeMore": "See more"
   },
   "home": {
     "title": "Pesona - AI Character Chat",
@@ -262,7 +270,25 @@
       "modeContinueDesc": "Carry over your chat history and character state. Call turns are appended to chat",
       "modeSimple": "Quick call",
       "modeSimpleDesc": "One-off call with no context. Nothing is added to chat history or summary"
-    }
+    },
+    "videoUnlockFailed": "Failed to unlock the video",
+    "panelCollapse": "Collapse panel",
+    "panelExpand": "Expand panel",
+    "processing": "Processing",
+    "unlockAction": "Unlock",
+    "situationPlay": "Roleplay",
+    "loadingHistory": "Loading previous messages...",
+    "finishingReply": "Finishing reply...",
+    "unlockInAdultMode": "Unlock in adult mode",
+    "blurredHint": "A heart-fluttering line…",
+    "addActionMarkup": "Add action description ( )",
+    "openTools": "Open tools",
+    "closeTools": "Close tools",
+    "finalizing": "Finishing reply...",
+    "playAll": "Play all",
+    "playAllStop": "Stop",
+    "suggestedSexualLocked": "Unlock in adult mode",
+    "errorVideoUnlock": "Failed to unlock the video"
   },
   "collection": {
     "title": "Collection",
@@ -433,6 +459,13 @@
           "desc": "Enter any name you'd like to be called."
         }
       }
+    },
+    "suggestedReplies": {
+      "description": "Suggests replies you could send above the input box. Turn off to hide them.",
+      "heading": "Suggested replies",
+      "off": "Off — suggestions hidden",
+      "on": "On — suggestions on every turn",
+      "toggleLabel": "Show suggested replies"
     }
   },
   "emotions": {
@@ -542,7 +575,11 @@
     "googleLogin": "Sign in with Google",
     "heroSubtitle": "Your AI girlfriend who truly understands you",
     "termsAgreement": "By continuing, you agree to the Terms of Service and Privacy Policy.",
-    "resignupBlocked": "This account has been deleted and cannot be re-registered. Please use a different Google account."
+    "resignupBlocked": "This account has been deleted and cannot be re-registered. Please use a different Google account.",
+    "adminId": "ID",
+    "adminPw": "Password",
+    "adminSigningIn": "Signing in...",
+    "adminSignIn": "Sign in"
   },
   "welcome": {
     "title": "Hi there~ So nice to meet you!",
@@ -606,7 +643,12 @@
     "resetBg": "Reset",
     "bgPickHint": "Select an image to use as background",
     "bgPickImage": "Choose an image",
-    "confirmBg": "Set as background"
+    "confirmBg": "Set as background",
+    "videoPlay": "Play video",
+    "videoUnlock": "Unlock video",
+    "loadMoreCount": "Show more (+{{count}})",
+    "tabExpression": "Expressions",
+    "tabGift": "Gifts"
   },
   "comment": {
     "title": "Comments",
@@ -967,7 +1009,8 @@
     "empty": "No notifications yet.",
     "markAllRead": "Mark all read",
     "justNow": "Just now",
-    "goToPage": "Go"
+    "goToPage": "Go",
+    "detailNotFound": "Could not load the notification"
   },
   "maskShop": {
     "title": "Mask Shop",
@@ -1089,7 +1132,12 @@
       "switchedToPhone": "📱 Switched to messenger mode",
       "autoFallbackToast": "📱 No one is with you — switched to messenger mode"
     },
-    "memoryNoneForChar": "Nothing remembered yet"
+    "memoryNoneForChar": "Nothing remembered yet",
+    "collapseStatus": "Collapse status panel",
+    "enlargeSprite": "View {{name}} larger",
+    "expandStatus": "Expand status panel",
+    "unlock": "Unlock",
+    "unlockVideo": "Unlock expression video"
   },
   "memory": {
     "button": "Memory",
@@ -1218,7 +1266,9 @@
     "send": "Send gift",
     "completed": "🎁 Gift sent",
     "noUnlockedContent": "No unlocked content.",
-    "rewatchHint": "You can view unlocked content again in the character detail's gallery tab."
+    "rewatchHint": "You can view unlocked content again in the character detail's gallery tab.",
+    "emptyBoughtHint": "You can send gifts from the Unpurchased tab.",
+    "rewatchHintGift": "Unlocked content can be viewed again in the purchased list on the Gift tab."
   },
   "accountDelete": {
     "metaTitle": "Account Deletion Guide - Pesona",
@@ -1286,7 +1336,19 @@
     "giftSent": "was gifted",
     "timeLabel": "Time",
     "actionMenuOpen": "Open action menu",
-    "actionMenuClose": "Close action menu"
+    "actionMenuClose": "Close action menu",
+    "stateSleeping": "Sleeping",
+    "statePajama": "Pajamas",
+    "stateBusy": "Busy",
+    "stateFree": "Free",
+    "together": "Together",
+    "messenger": "Messenger chat",
+    "episodeLabel": "Episode",
+    "gifted": "was gifted",
+    "episodeSuccess": "Episode cleared",
+    "episodeEnd": "Episode ended",
+    "eventLabel": "Event",
+    "episodeStart": "🎬 Episode start:"
   },
   "story": {
     "badge": "Story"
@@ -1341,5 +1403,49 @@
     "bizInfo4": "Phone: +82-70-8094-0654",
     "bizInfo5": "Mail-order business no.: 2025-Seoul Mapo-2857",
     "bizInfo6": "Email: busGwonyeong@gmail.com"
+  },
+  "profileVariant": {
+    "title": "Change profile image"
+  },
+  "groupChatSettings": {
+    "spriteMode": {
+      "description": "Choose how participating characters’ expression images appear above the input box.",
+      "heading": "Expression images"
+    },
+    "streamSpeed": {
+      "description": "Choose how fast messages are typed out on screen.",
+      "heading": "Text speed"
+    },
+    "suggestedReplies": {
+      "description": "Shows reply candidates under the bubble when it is your turn.",
+      "heading": "Suggested replies",
+      "off": "Off — hide reply candidates.",
+      "on": "On — show reply candidates.",
+      "toggleLabel": "Show suggested replies"
+    },
+    "title": "Chat settings"
+  },
+  "situationCards": {
+    "button": "Roleplay",
+    "continue": "Continue",
+    "empty": "No roleplays yet",
+    "loadFailed": "Could not load",
+    "lockedHint": "Unlocked after age verification",
+    "restartConfirm": "Start over",
+    "restartDesc": "Your existing progress for this roleplay will be deleted and it will start from the beginning.",
+    "restartTitle": "Start over?",
+    "startFailed": "Could not start the roleplay",
+    "startNew": "New roleplay",
+    "starting": "Starting...",
+    "title": "Roleplay"
+  },
+  "vn": {
+    "inputPlaceholder": "Type your own...",
+    "loadFailed": "Could not load",
+    "send": "Send",
+    "sendFailed": "Could not send",
+    "videoUnlockFailed": "Failed to unlock the video",
+    "voiceToggle": "Voice",
+    "you": "You"
   }
 }

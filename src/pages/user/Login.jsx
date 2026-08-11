@@ -259,7 +259,7 @@ export default function Login() {
                   type="text"
                   value={testId}
                   onChange={(e) => setTestId(e.target.value)}
-                  placeholder="아이디"
+                  placeholder={t('login.adminId')}
                   autoComplete="username"
                   className="w-full text-sm text-white rounded-xl px-4"
                   style={{
@@ -274,7 +274,7 @@ export default function Login() {
                   type="password"
                   value={testPw}
                   onChange={(e) => setTestPw(e.target.value)}
-                  placeholder="비밀번호"
+                  placeholder={t('login.adminPw')}
                   autoComplete="current-password"
                   className="w-full text-sm text-white rounded-xl px-4"
                   style={{
@@ -298,7 +298,7 @@ export default function Login() {
                     opacity: testBusy ? 0.7 : 1,
                   }}
                 >
-                  {testBusy ? '로그인 중...' : '로그인'}
+                  {testBusy ? t('login.adminSigningIn') : t('login.adminSignIn')}
                 </button>
               </form>
             )}

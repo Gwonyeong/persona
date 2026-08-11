@@ -188,9 +188,9 @@ function getDefaultStatus(activeHours) {
   })
   const status = slot?.status || 'free'
   const label = slot?.label || null
-  if (status === 'sleep') return { emoji: '😴', mood: '수면 중', location: '-', activity: label || '잠자는 중', outfit: '잠옷' }
-  if (status === 'busy') return { emoji: '🔒', mood: '바쁨', location: '-', activity: label || '바쁜 중', outfit: '-' }
-  return { emoji: '🟢', mood: '여유', location: '-', activity: label || '자유 시간', outfit: '-' }
+  if (status === 'sleep') return { emoji: '😴', mood: t('chat2.stateSleeping'), location: '-', activity: label || '잠자는 중', outfit: t('chat2.statePajama') }
+  if (status === 'busy') return { emoji: '🔒', mood: t('chat2.stateBusy'), location: '-', activity: label || '바쁜 중', outfit: '-' }
+  return { emoji: '🟢', mood: t('chat2.stateFree'), location: '-', activity: label || '자유 시간', outfit: '-' }
 }
 
 // 호감도 → 라벨 변환 (서버 getAffinityLabel과 일치)
@@ -280,7 +280,7 @@ function ModeChangeDivider({ to }) {
         <span className={`text-[11px] font-semibold tracking-wide ${
           isMeeting ? 'text-amber-200' : 'text-indigo-200'
         }`}>
-          {isMeeting ? '함께 있음' : '메신저 대화'}
+          {isMeeting ? t('chat2.together') : t('chat2.messenger')}
         </span>
       </div>
       <div className="flex-1 h-px bg-gradient-to-l from-transparent to-gray-600/50" />
@@ -309,13 +309,13 @@ function StatusPanel({ status, currentTimeLabel, activeEpisode, affinity, affini
       <div className="flex-1 min-w-0 space-y-1.5">
         {currentTimeLabel && (
           <div className="flex items-baseline gap-2">
-            <span className={`${labelBase} ${timeH ? labelOn : labelOff}`}>시간</span>
+            <span className={`${labelBase} ${timeH ? labelOn : labelOff}`}>{t('chat2.timeLabel')}</span>
             <span className="text-xs text-amber-200">⏰ <TypingText value={currentTimeLabel} /></span>
           </div>
         )}
         {activeEpisode && activeEpisode.snapshot && (
           <div className="flex items-baseline gap-2">
-            <span className={`${labelBase} ${episodeH ? labelOn : labelOff}`}>에피소드</span>
+            <span className={`${labelBase} ${episodeH ? labelOn : labelOff}`}>{t('chat2.episodeLabel')}</span>
             <span className="text-xs text-violet-200">
               🎬 <TypingText value={activeEpisode.snapshot.title} />
               <span className="text-gray-400 ml-1">({(activeEpisode.turnsElapsed ?? 0) + 1}/{activeEpisode.snapshot.duration})</span>
@@ -1550,7 +1550,7 @@ export default function ChatV2() {
           onClick={() => setShowStatusPanel(v => !v)}
           className="text-gray-400 hover:text-white transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          aria-label={showStatusPanel ? '패널 접기' : '패널 펼치기'}
+          aria-label={showStatusPanel ? t('chat.panelCollapse') : t('chat.panelExpand')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {showStatusPanel ? <polyline points="18 15 12 9 6 15" /> : <polyline points="6 9 12 15 18 9" />}
@@ -1833,7 +1833,7 @@ export default function ChatV2() {
                 showInputButtons ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="기능 버튼 열기"
+              aria-label={t('chat.openTools')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" />
@@ -1924,7 +1924,7 @@ export default function ChatV2() {
               onClick={() => setShowInputButtons(false)}
               className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="기능 버튼 닫기"
+              aria-label={t('chat.closeTools')}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />

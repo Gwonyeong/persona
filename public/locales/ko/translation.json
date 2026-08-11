@@ -107,7 +107,15 @@
     "edit": "수정",
     "user": "사용자",
     "generate": "생성하기",
-    "error": "오류가 발생했어요."
+    "error": "오류가 발생했어요.",
+    "collapse": "접기",
+    "stop": "중지",
+    "playAll": "전체 재생",
+    "cancel2": "취소",
+    "loading2": "불러오는 중...",
+    "default": "기본",
+    "back": "뒤로",
+    "seeMore": "더 보기"
   },
   "home": {
     "title": "Pesona - AI 캐릭터 채팅 플랫폼",
@@ -262,7 +270,25 @@
       "modeContinueDesc": "지금까지의 채팅과 캐릭터 상태를 이어받아 통화. 통화 내용은 채팅에도 누적돼요",
       "modeSimple": "단순 통화",
       "modeSimpleDesc": "이전 대화·상태와 상관없이 일회성으로 통화만. 채팅 기록·요약에 반영되지 않아요"
-    }
+    },
+    "videoUnlockFailed": "영상 해금에 실패했어요",
+    "panelCollapse": "패널 접기",
+    "panelExpand": "패널 펼치기",
+    "processing": "처리중",
+    "unlockAction": "해금하기",
+    "situationPlay": "상황극",
+    "loadingHistory": "이전 대화 불러오는 중...",
+    "finishingReply": "응답 마무리 중...",
+    "unlockInAdultMode": "성인 모드에서 잠금 해제",
+    "blurredHint": "두근거리는 한마디…",
+    "addActionMarkup": "행동 묘사 ( ) 추가",
+    "openTools": "기능 버튼 열기",
+    "closeTools": "기능 버튼 닫기",
+    "finalizing": "응답 마무리 중...",
+    "playAll": "전체 재생",
+    "playAllStop": "중지",
+    "suggestedSexualLocked": "성인 모드에서 잠금 해제",
+    "errorVideoUnlock": "영상 해금에 실패했어요"
   },
   "collection": {
     "title": "보관함",
@@ -433,6 +459,13 @@
           "desc": "원하는 호칭을 직접 입력하세요."
         }
       }
+    },
+    "suggestedReplies": {
+      "description": "대화마다 보낼 만한 답변을 입력창 위에 추천해줍니다. 끄면 추천이 표시되지 않습니다.",
+      "heading": "추천 답변",
+      "off": "꺼짐 — 추천 미표시",
+      "on": "켜짐 — 매 대화마다 추천 표시",
+      "toggleLabel": "추천 답변 표시"
     }
   },
   "emotions": {
@@ -542,7 +575,11 @@
     "googleLogin": "Google로 로그인",
     "heroSubtitle": "나를 이해해주는 AI 여자친구",
     "termsAgreement": "진행함으로써 약관과 개인정보처리방침에 동의합니다.",
-    "resignupBlocked": "이 계정은 회원 탈퇴 처리되어 재가입이 불가능합니다. 다른 Google 계정으로 시도해 주세요."
+    "resignupBlocked": "이 계정은 회원 탈퇴 처리되어 재가입이 불가능합니다. 다른 Google 계정으로 시도해 주세요.",
+    "adminId": "아이디",
+    "adminPw": "비밀번호",
+    "adminSigningIn": "로그인 중...",
+    "adminSignIn": "로그인"
   },
   "welcome": {
     "title": "안녕하세요~ 만나서 반가워요!",
@@ -606,7 +643,12 @@
     "resetBg": "배경 초기화",
     "bgPickHint": "배경으로 사용할 이미지를 선택하세요",
     "bgPickImage": "이미지를 선택하세요",
-    "confirmBg": "배경으로 설정"
+    "confirmBg": "배경으로 설정",
+    "videoPlay": "영상 재생",
+    "videoUnlock": "영상 해금",
+    "loadMoreCount": "더 보기 (+{{count}})",
+    "tabExpression": "표정",
+    "tabGift": "선물"
   },
   "comment": {
     "title": "댓글",
@@ -967,7 +1009,8 @@
     "empty": "받은 알림이 없습니다.",
     "markAllRead": "모두 읽음",
     "justNow": "방금",
-    "goToPage": "이동하기"
+    "goToPage": "이동하기",
+    "detailNotFound": "알림을 불러오지 못했어요"
   },
   "maskShop": {
     "title": "마스크 상점",
@@ -1089,7 +1132,12 @@
       "switchedToPhone": "📱 메신저 모드로 전환했어요",
       "autoFallbackToast": "📱 함께 있는 친구가 없어서 메신저 모드로 전환했어요"
     },
-    "memoryNoneForChar": "아직 기억하는 게 없어요"
+    "memoryNoneForChar": "아직 기억하는 게 없어요",
+    "collapseStatus": "상태 패널 접기",
+    "enlargeSprite": "{{name}} 크게 보기",
+    "expandStatus": "상태 패널 펼치기",
+    "unlock": "해금",
+    "unlockVideo": "표정 영상 해금"
   },
   "memory": {
     "button": "기억",
@@ -1218,7 +1266,9 @@
     "send": "선물하기",
     "completed": "🎁 선물 완료",
     "noUnlockedContent": "해금된 콘텐츠가 없습니다.",
-    "rewatchHint": "해금한 콘텐츠는 캐릭터 상세의 갤러리 탭에서 다시 볼 수 있습니다."
+    "rewatchHint": "해금한 콘텐츠는 캐릭터 상세의 갤러리 탭에서 다시 볼 수 있습니다.",
+    "emptyBoughtHint": "미구매 탭에서 선물할 수 있어요.",
+    "rewatchHintGift": "해금한 콘텐츠는 선물 탭의 구매 목록에서 다시 볼 수 있어요."
   },
   "accountDelete": {
     "metaTitle": "계정 삭제 안내 - Pesona",
@@ -1286,7 +1336,19 @@
     "giftSent": "을(를) 선물했습니다",
     "timeLabel": "시간",
     "actionMenuOpen": "기능 버튼 열기",
-    "actionMenuClose": "기능 버튼 닫기"
+    "actionMenuClose": "기능 버튼 닫기",
+    "stateSleeping": "수면 중",
+    "statePajama": "잠옷",
+    "stateBusy": "바쁨",
+    "stateFree": "여유",
+    "together": "함께 있음",
+    "messenger": "메신저 대화",
+    "episodeLabel": "에피소드",
+    "gifted": "을(를) 선물했습니다",
+    "episodeSuccess": "에피소드 성공",
+    "episodeEnd": "에피소드 종료",
+    "eventLabel": "이벤트",
+    "episodeStart": "🎬 에피소드 시작:"
   },
   "story": {
     "badge": "스토리"
@@ -1341,5 +1403,49 @@
     "bizInfo4": "유선전화: 070-8094-0654",
     "bizInfo5": "통신판매신고번호: 2025-서울마포-2857",
     "bizInfo6": "이메일: busGwonyeong@gmail.com"
+  },
+  "profileVariant": {
+    "title": "프로필 이미지 변경"
+  },
+  "groupChatSettings": {
+    "spriteMode": {
+      "description": "입력창 위에 참여 캐릭터의 표정 이미지를 어떻게 보여줄지 선택합니다.",
+      "heading": "표정 이미지 표시"
+    },
+    "streamSpeed": {
+      "description": "메시지가 화면에 타이핑되는 속도를 선택합니다.",
+      "heading": "텍스트 출력 속도"
+    },
+    "suggestedReplies": {
+      "description": "내 차례에 보낼 만한 답변 후보를 버블 아래에 보여줍니다.",
+      "heading": "추천 답변",
+      "off": "꺼짐 — 답변 후보를 숨깁니다.",
+      "on": "켜짐 — 답변 후보를 보여줍니다.",
+      "toggleLabel": "추천 답변 표시"
+    },
+    "title": "채팅 설정"
+  },
+  "situationCards": {
+    "button": "상황극",
+    "continue": "이어하기",
+    "empty": "아직 상황극이 없어요",
+    "loadFailed": "불러오지 못했어요",
+    "lockedHint": "성인 인증하면 열려요",
+    "restartConfirm": "새로 시작",
+    "restartDesc": "이 상황극의 기존 진행 데이터가 삭제되고 처음부터 새로 시작됩니다.",
+    "restartTitle": "새로 시작할까요?",
+    "startFailed": "상황극을 시작하지 못했어요",
+    "startNew": "새 상황극",
+    "starting": "시작하는 중...",
+    "title": "상황극"
+  },
+  "vn": {
+    "inputPlaceholder": "직접 입력...",
+    "loadFailed": "불러오지 못했어요",
+    "send": "보내기",
+    "sendFailed": "전송하지 못했어요",
+    "videoUnlockFailed": "영상 해금에 실패했어요",
+    "voiceToggle": "음성",
+    "you": "나"
   }
 }
