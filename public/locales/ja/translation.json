@@ -364,7 +364,16 @@
       "portone": "本人認証サービスでエラーが発生しました。",
       "notFound": "認証情報が見つかりません。",
       "cancelled": "本人認証がキャンセルされました。",
-      "unknown": "不明なエラーが発生しました。"
+      "unknown": "不明なエラーが発生しました。",
+      "selfDeclareNotAllowed": "このアカウントは本人確認が必要です。",
+      "birthInvalid": "生年月日が正しくありません。"
+    },
+    "selfDeclare": {
+      "heading": "生年月日の確認",
+      "description": "アダルトコンテンツのご利用には生年月日の入力が必要です。\n{{minAge}}歳以上の方のみご利用いただけます。",
+      "birthLabel": "生年月日を入力してください",
+      "notice": "ご入力いただいた生年月日は年齢確認のみに使用されます。{{minAge}}歳未満の方はご利用いただけません。",
+      "submit": "確認する"
     }
   },
   "chatSettings": {

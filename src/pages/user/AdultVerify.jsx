@@ -44,6 +44,9 @@ const ERROR_TO_I18N = {
   DI_MISSING: 'adultVerify.error.diMissing',
   PORTONE_ERROR: 'adultVerify.error.portone',
   NOT_FOUND: 'adultVerify.error.notFound',
+  SELF_DECLARE_NOT_ALLOWED: 'adultVerify.error.selfDeclareNotAllowed',
+  BIRTH_DATE_REQUIRED: 'adultVerify.error.birthMissing',
+  BIRTH_DATE_INVALID: 'adultVerify.error.birthInvalid',
 }
 
 export default function AdultVerify() {
@@ -51,7 +54,9 @@ export default function AdultVerify() {
   const navigate = useNavigate()
   const { token, setAdultVerified } = useStore()
 
-  const [status, setStatus] = useState(null) // { verified, verifiedAt, birthDate, gender }
+  // status.requiredMethod: 'DANAL'(한국 본인인증) | 'SELF_DECLARED'(비한국 시장 생년월일 자기신고)
+  const [status, setStatus] = useState(null) // { verified, verifiedAt, birthDate, gender, requiredMethod, minAge }
+  const [birthInput, setBirthInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [verifying, setVerifying] = useState(false)
   const [errorKey, setErrorKey] = useState(null)
@@ -117,6 +122,31 @@ export default function AdultVerify() {
       .catch(() => setStatus({ verified: false }))
       .finally(() => setLoading(false))
   }, [token, navigate])
+
+  // 비한국 시장 자기신고. 서버가 국가 신호로 허용 여부를 다시 판정하므로
+  // 여기서 통과시켜도 한국 유저는 403 SELF_DECLARE_NOT_ALLOWED로 막힌다.
+  const submitSelfDeclare = async () => {
+    if (verifying) return
+    setVerifying(true)
+    setErrorKey(null)
+    setErrorRaw(null)
+    try {
+      const result = await api.post('/identity/self-declare', { birthDate: birthInput })
+      setStatus({
+        verified: true,
+        verifiedAt: result.verifiedAt,
+        birthDate: result.birthDate,
+        method: result.method,
+      })
+      setAdultVerified(true, result.verifiedAt)
+    } catch (err) {
+      const code = err?.data?.error
+      setErrorKey(ERROR_TO_I18N[code] || 'adultVerify.error.unknown')
+      setErrorRaw(err?.data?.message || null)
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   const startVerification = async () => {
     if (verifying) return
@@ -188,6 +218,10 @@ export default function AdultVerify() {
     )
   }
 
+  // 어떤 인증 화면을 띄울지는 서버 판정(requiredMethod)을 따른다. 최종 검사도 서버가 한다.
+  const isSelfDeclare = status?.requiredMethod === 'SELF_DECLARED'
+  const minAge = status?.minAge ?? 19
+
   return (
     <div className="absolute inset-0 flex flex-col bg-gray-950 z-20">
       <header
@@ -223,27 +257,59 @@ export default function AdultVerify() {
         ) : (
           <>
             <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 mb-4">
-              <h2 className="text-sm font-semibold text-white mb-2">{t('adultVerify.heading')}</h2>
+              <h2 className="text-sm font-semibold text-white mb-2">
+                {isSelfDeclare ? t('adultVerify.selfDeclare.heading') : t('adultVerify.heading')}
+              </h2>
               <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-line">
-                {t('adultVerify.description')}
+                {isSelfDeclare
+                  ? t('adultVerify.selfDeclare.description', { minAge })
+                  : t('adultVerify.description')}
               </p>
             </div>
 
             {errorKey && (
               <div className="bg-red-950/40 border border-red-800/50 rounded-xl px-4 py-3 mb-4">
-                <p className="text-xs text-red-300">{t(errorKey)}</p>
+                <p className="text-xs text-red-300">{t(errorKey, { minAge })}</p>
                 {errorRaw && <p className="text-[10px] text-red-400/70 mt-1">{errorRaw}</p>}
               </div>
             )}
 
-            <button
-              onClick={startVerification}
-              disabled={verifying}
-              className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-              style={NO_OUTLINE}
-            >
-              {verifying ? t('adultVerify.verifying') : t('adultVerify.start')}
-            </button>
+            {isSelfDeclare ? (
+              <>
+                <label className="block text-xs text-gray-400 mb-2" htmlFor="adult-birth-date">
+                  {t('adultVerify.selfDeclare.birthLabel')}
+                </label>
+                <input
+                  id="adult-birth-date"
+                  type="date"
+                  value={birthInput}
+                  onChange={(e) => setBirthInput(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="w-full px-4 py-3 mb-3 rounded-xl bg-gray-900 border border-gray-800 text-white text-sm focus:border-indigo-500"
+                  style={NO_OUTLINE}
+                />
+                <p className="text-[11px] text-gray-500 leading-relaxed mb-4">
+                  {t('adultVerify.selfDeclare.notice', { minAge })}
+                </p>
+                <button
+                  onClick={submitSelfDeclare}
+                  disabled={verifying || !birthInput}
+                  className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+                  style={NO_OUTLINE}
+                >
+                  {verifying ? t('adultVerify.verifying') : t('adultVerify.selfDeclare.submit')}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startVerification}
+                disabled={verifying}
+                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+                style={NO_OUTLINE}
+              >
+                {verifying ? t('adultVerify.verifying') : t('adultVerify.start')}
+              </button>
+            )}
           </>
         )}
       </div>
