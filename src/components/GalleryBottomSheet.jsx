@@ -275,7 +275,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           <line x1="15" y1="9" x2="15.01" y2="9" />
         </svg>
       ),
-      label: '표정',
+      label: t('gallery.tabExpression'),
     },
     {
       key: 'FEED',
@@ -311,7 +311,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
         </svg>
       ),
-      label: '선물',
+      label: t('gallery.tabGift'),
     },
   ]
 
@@ -542,7 +542,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                     <>
                       {gifts.filter((g) => !g.unlocked).length === 0 ? (
                         <div className="text-center text-gray-500 py-16 px-6">
-                          <p className="text-sm">{gifts.length > 0 ? '모든 선물을 보냈어요!' : '등록된 선물이 없습니다.'}</p>
+                          <p className="text-sm">{gifts.length > 0 ? t('gift.allSent') : t('gift.emptyGifts')}</p>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-2 px-3 py-3">
@@ -619,7 +619,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                   </div>
                                 ) : (
                                   <div className="h-12 flex items-center">
-                                    <span className="text-[10px] text-gray-500 italic">해금 콘텐츠 없음</span>
+                                    <span className="text-[10px] text-gray-500 italic">{t('gift.noUnlockContent')}</span>
                                   </div>
                                 )}
                               </div>
@@ -634,8 +634,8 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                     <>
                       {gifts.filter((g) => g.unlocked).length === 0 ? (
                         <div className="text-center text-gray-500 py-16 px-6">
-                          <p className="text-sm">아직 선물한 항목이 없습니다.</p>
-                          <p className="text-xs text-gray-600 mt-1">미구매 탭에서 선물할 수 있어요.</p>
+                          <p className="text-sm">{t('gift.emptyBought')}</p>
+                          <p className="text-xs text-gray-600 mt-1">{t('gift.emptyBoughtHint')}</p>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-4 py-3">
@@ -661,7 +661,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                       className="flex-shrink-0 px-3 py-1.5 text-[11px] font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-md disabled:opacity-50"
                                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                                     >
-                                      {isApplying ? '변경 중...' : '착용시키기'}
+                                      {isApplying ? t('gift.applying') : t('gift.apply')}
                                     </button>
                                   )}
                                 </div>
@@ -799,7 +799,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                   disabled={isUnlocking}
                                   className="absolute inset-0 flex items-center justify-center disabled:opacity-60"
                                   style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                                  aria-label={videoUnlocked ? '영상 재생' : '영상 해금'}
+                                  aria-label={videoUnlocked ? t('gallery.videoPlay') : t('gallery.videoUnlock')}
                                 >
                                   <div className="flex flex-col items-center gap-1">
                                     <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-lg">
@@ -843,7 +843,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                           className="mt-3 w-full py-2 text-xs text-gray-300 bg-gray-800/60 hover:bg-gray-800 rounded-lg"
                           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                         >
-                          {expressionsExpanded ? '접기' : `더 보기 (+${expressions.length - 9})`}
+                          {expressionsExpanded ? t('common.collapse') : t('gallery.loadMoreCount', { count: expressions.length - 9 })}
                         </button>
                       )}
                     </>
@@ -909,7 +909,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
             onClick={() => setVideoLightboxUrl(null)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="닫기"
+            aria-label={t('common.close')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -984,7 +984,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           actions={conversationId && allowBackgroundChange ? [
             {
               key: 'set-bg',
-              label: '배경으로 설정',
+              label: t('gallery.confirmBg'),
               icon: (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -1049,7 +1049,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 className="flex-1 py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {sending ? '전송 중...' : '선물하기'}
+                {sending ? t('gift.sending') : t('gift.send')}
               </button>
             </div>
           </div>
@@ -1062,7 +1062,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
           <div className="absolute inset-0 bg-black/80" />
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 pt-5 pb-3 text-center">
-              <p className="text-xs text-emerald-400 mb-1">🎁 선물 완료</p>
+              <p className="text-xs text-emerald-400 mb-1">{t('gift.completed')}</p>
               <p className="text-base font-bold text-white">{result.gift.name}</p>
             </div>
             {result.contents.length > 0 ? (
@@ -1114,10 +1114,10 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 )}
               </div>
             ) : (
-              <div className="px-5 py-6 text-center text-xs text-gray-500">해금된 콘텐츠가 없습니다.</div>
+              <div className="px-5 py-6 text-center text-xs text-gray-500">{t('gift.noUnlockedContent')}</div>
             )}
             <div className="px-5 py-4 flex flex-col gap-2">
-              <p className="text-[11px] text-gray-500 text-center">해금한 콘텐츠는 선물 탭의 구매 목록에서 다시 볼 수 있어요.</p>
+              <p className="text-[11px] text-gray-500 text-center">{t('gift.rewatchHintGift')}</p>
               <button
                 onClick={closeGiftResult}
                 className="w-full py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"

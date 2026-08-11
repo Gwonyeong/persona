@@ -107,7 +107,15 @@
     "edit": "編集",
     "user": "ユーザー",
     "generate": "生成する",
-    "error": "エラーが発生しました。"
+    "error": "エラーが発生しました。",
+    "collapse": "閉じる",
+    "stop": "停止",
+    "playAll": "全て再生",
+    "cancel2": "キャンセル",
+    "loading2": "読み込み中...",
+    "default": "デフォルト",
+    "back": "戻る",
+    "seeMore": "もっと見る"
   },
   "home": {
     "title": "Pesona - AIキャラクターチャット",
@@ -262,7 +270,25 @@
       "modeContinueDesc": "これまでのチャットとキャラ状態を引き継いで通話。通話内容はチャットにも蓄積されます",
       "modeSimple": "シンプル通話",
       "modeSimpleDesc": "過去の会話や状態を反映しない一回限りの通話。履歴・要約に残りません"
-    }
+    },
+    "videoUnlockFailed": "動画の解放に失敗しました",
+    "panelCollapse": "パネルを閉じる",
+    "panelExpand": "パネルを開く",
+    "processing": "処理中",
+    "unlockAction": "解放する",
+    "situationPlay": "シチュエーション",
+    "loadingHistory": "過去の会話を読み込み中...",
+    "finishingReply": "返信を仕上げ中...",
+    "unlockInAdultMode": "アダルトモードで解放",
+    "blurredHint": "ドキドキする一言…",
+    "addActionMarkup": "行動描写 ( ) を追加",
+    "openTools": "機能ボタンを開く",
+    "closeTools": "機能ボタンを閉じる",
+    "finalizing": "返信を仕上げ中...",
+    "playAll": "全て再生",
+    "playAllStop": "停止",
+    "suggestedSexualLocked": "アダルトモードで解放",
+    "errorVideoUnlock": "動画の解放に失敗しました"
   },
   "collection": {
     "title": "コレクション",
@@ -433,6 +459,13 @@
           "desc": "好きな呼び方を直接入力できます。"
         }
       }
+    },
+    "suggestedReplies": {
+      "description": "入力欄の上に送信できる返信候補を表示します。オフにすると表示されません。",
+      "heading": "返信候補",
+      "off": "オフ — 候補を表示しない",
+      "on": "オン — 毎回候補を表示",
+      "toggleLabel": "返信候補を表示"
     }
   },
   "emotions": {
@@ -542,7 +575,11 @@
     "googleLogin": "Googleでログイン",
     "heroSubtitle": "あなたを理解してくれるAI彼女",
     "termsAgreement": "続行することで、利用規約とプライバシーポリシーに同意したものとみなされます。",
-    "resignupBlocked": "このアカウントは退会済みのため、再登録できません。別のGoogleアカウントをお試しください。"
+    "resignupBlocked": "このアカウントは退会済みのため、再登録できません。別のGoogleアカウントをお試しください。",
+    "adminId": "ID",
+    "adminPw": "パスワード",
+    "adminSigningIn": "ログイン中...",
+    "adminSignIn": "ログイン"
   },
   "welcome": {
     "title": "こんにちは～ 会えて嬉しいです！",
@@ -606,7 +643,12 @@
     "resetBg": "リセット",
     "bgPickHint": "背景に使用する画像を選択してください",
     "bgPickImage": "画像を選択してください",
-    "confirmBg": "背景に設定"
+    "confirmBg": "背景に設定",
+    "videoPlay": "動画を再生",
+    "videoUnlock": "動画を解放",
+    "loadMoreCount": "もっと見る (+{{count}})",
+    "tabExpression": "表情",
+    "tabGift": "ギフト"
   },
   "comment": {
     "title": "コメント",
@@ -967,7 +1009,8 @@
     "empty": "お知らせはありません。",
     "markAllRead": "すべて既読",
     "justNow": "たった今",
-    "goToPage": "移動する"
+    "goToPage": "移動する",
+    "detailNotFound": "お知らせを読み込めませんでした"
   },
   "maskShop": {
     "title": "マスクショップ",
@@ -1089,7 +1132,12 @@
       "switchedToPhone": "📱 メッセンジャーモードに切り替えました",
       "autoFallbackToast": "📱 一緒にいる友達がいないのでメッセンジャーモードに切り替えました"
     },
-    "memoryNoneForChar": "まだ覚えていることはありません"
+    "memoryNoneForChar": "まだ覚えていることはありません",
+    "collapseStatus": "ステータスパネルを閉じる",
+    "enlargeSprite": "{{name}}を大きく表示",
+    "expandStatus": "ステータスパネルを開く",
+    "unlock": "解放",
+    "unlockVideo": "表情動画を解放"
   },
   "memory": {
     "button": "記憶",
@@ -1218,7 +1266,9 @@
     "send": "ギフトを贈る",
     "completed": "🎁 ギフト完了",
     "noUnlockedContent": "解除されたコンテンツがありません。",
-    "rewatchHint": "解除したコンテンツはキャラクター詳細のギャラリータブで再度確認できます。"
+    "rewatchHint": "解除したコンテンツはキャラクター詳細のギャラリータブで再度確認できます。",
+    "emptyBoughtHint": "未購入タブからギフトを贈れます。",
+    "rewatchHintGift": "解除したコンテンツはギフトタブの購入リストで再度確認できます。"
   },
   "accountDelete": {
     "metaTitle": "アカウント削除のご案内 - Pesona",
@@ -1286,7 +1336,19 @@
     "giftSent": "をプレゼントしました",
     "timeLabel": "時間",
     "actionMenuOpen": "アクションメニューを開く",
-    "actionMenuClose": "アクションメニューを閉じる"
+    "actionMenuClose": "アクションメニューを閉じる",
+    "stateSleeping": "就寝中",
+    "statePajama": "パジャマ",
+    "stateBusy": "忙しい",
+    "stateFree": "余裕あり",
+    "together": "一緒にいる",
+    "messenger": "メッセンジャー",
+    "episodeLabel": "エピソード",
+    "gifted": "を贈りました",
+    "episodeSuccess": "エピソード成功",
+    "episodeEnd": "エピソード終了",
+    "eventLabel": "イベント",
+    "episodeStart": "🎬 エピソード開始:"
   },
   "story": {
     "badge": "ストーリー"
@@ -1341,5 +1403,49 @@
     "bizInfo4": "電話: +82-70-8094-0654",
     "bizInfo5": "通信販売届出番号: 2025-ソウル麻浦-2857",
     "bizInfo6": "Eメール: busGwonyeong@gmail.com"
+  },
+  "profileVariant": {
+    "title": "プロフィール画像を変更"
+  },
+  "groupChatSettings": {
+    "spriteMode": {
+      "description": "入力欄の上に参加キャラクターの表情画像をどう表示するか選択します。",
+      "heading": "表情画像の表示"
+    },
+    "streamSpeed": {
+      "description": "メッセージが画面に表示される速度を選択します。",
+      "heading": "テキスト表示速度"
+    },
+    "suggestedReplies": {
+      "description": "自分の番に送れる返信候補をバブルの下に表示します。",
+      "heading": "返信候補",
+      "off": "オフ — 返信候補を隠します。",
+      "on": "オン — 返信候補を表示します。",
+      "toggleLabel": "返信候補を表示"
+    },
+    "title": "チャット設定"
+  },
+  "situationCards": {
+    "button": "シチュエーション",
+    "continue": "続きから",
+    "empty": "まだシチュエーションがありません",
+    "loadFailed": "読み込めませんでした",
+    "lockedHint": "年齢確認で解放されます",
+    "restartConfirm": "最初から",
+    "restartDesc": "このシチュエーションの進行データは削除され、最初からやり直します。",
+    "restartTitle": "最初からやり直しますか？",
+    "startFailed": "シチュエーションを開始できませんでした",
+    "startNew": "新しいシチュエーション",
+    "starting": "開始中...",
+    "title": "シチュエーション"
+  },
+  "vn": {
+    "inputPlaceholder": "自由入力...",
+    "loadFailed": "読み込めませんでした",
+    "send": "送信",
+    "sendFailed": "送信できませんでした",
+    "videoUnlockFailed": "動画の解放に失敗しました",
+    "voiceToggle": "音声",
+    "you": "あなた"
   }
 }
