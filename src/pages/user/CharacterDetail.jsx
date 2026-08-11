@@ -105,6 +105,8 @@ export default function CharacterDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
+  // 스토리(시나리오·스토리라인)는 한국어 콘텐츠만 존재한다. 번역 전까지 한국어 UI에서만 노출.
+  const isKoreanUi = (i18n.language || '').startsWith('ko')
   const { token, user, setUser } = useStore()
   const [character, setCharacter] = useState(null)
   const [existingConv, setExistingConv] = useState(null)
@@ -894,8 +896,10 @@ export default function CharacterDetail() {
             {/* 새로하기 버튼은 통합 모달 안으로 이동 — 메인 화면에서 제거. */}
           </div>
 
-          {/* 스토리 목록 — 시나리오 카드 + 단독 스토리 카드 혼합 노출 */}
-          {(scenarios.length > 0 || storylines.length > 0) && (
+          {/* 스토리 목록 — 시나리오 카드 + 단독 스토리 카드 혼합 노출
+              스토리 콘텐츠는 아직 한국어만 있어서 한국어 UI 사용자에게만 노출한다.
+              (번역이 채워지면 이 조건을 제거) */}
+          {isKoreanUi && (scenarios.length > 0 || storylines.length > 0) && (
             <div className="mt-5">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-gray-200">{t('character.storySection')}</h3>
