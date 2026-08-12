@@ -439,7 +439,7 @@ export default function CharacterStyles() {
   if (!character) return <div className="p-6 text-gray-400">로딩 중...</div>
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link to="/admin/characters" className="text-gray-400 hover:text-white text-sm">
           ← 목록

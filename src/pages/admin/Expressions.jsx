@@ -234,7 +234,7 @@ export default function Expressions() {
   if (!characters) return <div className="p-6 text-gray-400">로딩 중...</div>
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="mb-4">
         <h2 className="text-xl font-bold">표정 이미지</h2>
         <p className="text-sm text-gray-400 mt-1">

@@ -39,7 +39,8 @@ function SubscriptionTable({ rows }) {
     return <p className="p-4 text-gray-500 text-sm">기록이 없습니다.</p>
   }
   return (
-    <table className="w-full">
+    <div className="admin-x-scroll">
+    <table className="w-full min-w-[860px]">
       <thead>
         <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
           <th className="p-3">유저</th>
@@ -106,6 +107,7 @@ function SubscriptionTable({ rows }) {
         ))}
       </tbody>
     </table>
+    </div>
   )
 }
 
@@ -166,7 +168,7 @@ export default function FinanceSubscriptions() {
   const summary = data.summary
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-xl font-bold">구독 (라이트 요금제)</h2>
         <button
@@ -213,10 +215,10 @@ export default function FinanceSubscriptions() {
         </div>
       )}
 
-      <div className="grid grid-cols-5 gap-4">
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">활성 구독자</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-400">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-emerald-400">
             {summary.activeCount.toLocaleString('ko-KR')}
           </div>
           <div className="mt-1 text-xs text-gray-500">
@@ -230,30 +232,30 @@ export default function FinanceSubscriptions() {
             {(summary.payingNewCount ?? 0).toLocaleString('ko-KR')}
           </div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">취소 (만료 대기)</div>
-          <div className="mt-1 text-2xl font-bold text-amber-400">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-amber-400">
             {summary.pendingCancelCount.toLocaleString('ko-KR')}
           </div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">종료된 구독</div>
-          <div className="mt-1 text-2xl font-bold text-gray-300">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-gray-300">
             {summary.endedCount.toLocaleString('ko-KR')}
           </div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">무료 체험 중</div>
-          <div className="mt-1 text-2xl font-bold text-amber-300">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-amber-300">
             {summary.trialCount.toLocaleString('ko-KR')}
           </div>
           <div className="mt-1 text-xs text-gray-500">매출에서 제외됨</div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">
             월 예상 순수익 (수수료 {Math.round(summary.playStoreFeeRate * 100)}% 제외)
           </div>
-          <div className="mt-1 text-2xl font-bold text-indigo-300">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-indigo-300">
             {fmtKrw(summary.monthlyRevenueNetKrw)}
           </div>
           <div className="mt-1 text-xs text-gray-500">총액 {fmtKrw(summary.monthlyRevenueKrw)}</div>

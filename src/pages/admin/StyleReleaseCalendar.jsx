@@ -162,7 +162,7 @@ export default function StyleReleaseCalendar() {
             <button
               key={key}
               onClick={() => setSelectedKey(key)}
-              className={`min-h-[74px] rounded-lg border p-1.5 text-left transition-colors flex flex-col ${
+              className={`min-h-[52px] md:min-h-[74px] rounded-lg border p-1 md:p-1.5 text-left transition-colors flex flex-col ${
                 isSelected
                   ? 'border-indigo-500 bg-indigo-950/40'
                   : 'border-gray-800 hover:border-gray-700 bg-gray-900/40'
@@ -184,7 +184,25 @@ export default function StyleReleaseCalendar() {
                   {d.getDate()}
                 </span>
               </div>
-              <div className="mt-1 space-y-0.5 overflow-hidden">
+              {/* 모바일: 셀 내부 폭이 30px대라 이름이 3~4글자에서 잘린다.
+                  점 + 개수만 보여주고, 실제 내용은 아래 '선택한 날짜 상세'가 받는다. */}
+              <div className="md:hidden mt-1 flex flex-wrap items-center gap-0.5">
+                {dayItems.slice(0, 3).map((it) => (
+                  <span
+                    key={it.id}
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      it.status === 'scheduled' ? 'bg-sky-400' : 'bg-emerald-400'
+                    }`}
+                  />
+                ))}
+                {dayItems.length > 3 && (
+                  <span className="text-[9px] text-gray-500 leading-none ml-0.5">
+                    +{dayItems.length - 3}
+                  </span>
+                )}
+              </div>
+
+              <div className="hidden md:block mt-1 space-y-0.5 overflow-hidden">
                 {dayItems.slice(0, 2).map((it) => (
                   <div
                     key={it.id}
@@ -234,7 +252,7 @@ export default function StyleReleaseCalendar() {
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-sm text-white truncate">{it.name}</span>
                       {it.unlockMode === 'GACHA' && (
                         <span className="text-[9px] bg-fuchsia-900/60 text-fuchsia-300 px-1 py-0.5 rounded font-semibold">GACHA</span>

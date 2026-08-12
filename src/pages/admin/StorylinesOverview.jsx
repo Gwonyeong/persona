@@ -68,7 +68,7 @@ export default function StorylinesOverview() {
   return (
     <div>
       <StoryTabsHeader />
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">스토리 관리</h2>
         </div>
@@ -116,7 +116,8 @@ export default function StorylinesOverview() {
         ) : filtered.length === 0 ? (
           <p className="p-4 text-gray-500">캐릭터가 없습니다.</p>
         ) : (
-          <table className="w-full">
+          <div className="admin-x-scroll">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">캐릭터</th>
@@ -182,6 +183,7 @@ export default function StorylinesOverview() {
               })}
             </tbody>
           </table>
+          </div>
         )}
         </div>
       </div>

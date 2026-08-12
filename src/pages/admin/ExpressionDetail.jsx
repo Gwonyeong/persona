@@ -75,7 +75,7 @@ export default function ExpressionDetail() {
 
   if (notFound) {
     return (
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         <BackLink />
         <div className="text-center text-gray-500 py-16">캐릭터를 찾을 수 없습니다.</div>
       </div>
@@ -84,7 +84,7 @@ export default function ExpressionDetail() {
   if (!character) return <div className="p-6 text-gray-400">로딩 중...</div>
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <BackLink />
 
       <div className="flex items-end justify-between mb-4">
@@ -143,7 +143,7 @@ export default function ExpressionDetail() {
       {tab === 'bg' ? (
         <BackgroundsTab characterId={character.id} />
       ) : (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
+        <div className="bg-gray-900 rounded-xl border border-gray-800 admin-x-scroll">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-gray-800">

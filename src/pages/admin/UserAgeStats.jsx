@@ -23,7 +23,7 @@ function BucketBar({ label, value, total, color = 'bg-emerald-500' }) {
 
 function DistributionCard({ title, distribution, total, color, subtitle }) {
   return (
-    <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+    <div className="bg-gray-900 rounded-lg p-3 md:p-5 border border-gray-800">
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="text-base font-semibold">{title}</h3>
         <span className="text-sm text-gray-400">총 {total.toLocaleString()}명</span>
@@ -48,7 +48,7 @@ function BucketCharacterCard({ bucket, stats }) {
   const { userCount, payingUserCount, conversationCount, messageCount, topCharacters } = stats
   const payingPct = userCount > 0 ? (payingUserCount / userCount) * 100 : 0
   return (
-    <div className="bg-gray-900 rounded-lg p-5 border border-gray-800">
+    <div className="bg-gray-900 rounded-lg p-3 md:p-5 border border-gray-800">
       <div className="flex items-baseline justify-between mb-3">
         <h3 className="text-base font-semibold">{bucket}세</h3>
         <span className="text-xs text-gray-500">
@@ -154,19 +154,19 @@ export default function UserAgeStats({ embedded = false }) {
 
       <section>
         <h3 className="text-lg font-semibold mb-3">개요</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
+          <div className="bg-gray-900 rounded-lg p-3 md:p-4 border border-gray-800">
             <p className="text-sm text-gray-400">전체 가입자</p>
-            <p className="text-2xl font-bold mt-1">{totalUsers.toLocaleString()}</p>
+            <p className="text-lg md:text-2xl font-bold mt-1">{totalUsers.toLocaleString()}</p>
           </div>
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+          <div className="bg-gray-900 rounded-lg p-3 md:p-4 border border-gray-800">
             <p className="text-sm text-gray-400">본인인증 완료</p>
-            <p className="text-2xl font-bold mt-1">{verifiedUserCount.toLocaleString()}</p>
+            <p className="text-lg md:text-2xl font-bold mt-1">{verifiedUserCount.toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-1">{verifiedRate.toFixed(1)}% (전체 대비)</p>
           </div>
-          <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+          <div className="bg-gray-900 rounded-lg p-3 md:p-4 border border-gray-800">
             <p className="text-sm text-gray-400">결제 유저 (인증자 중)</p>
-            <p className="text-2xl font-bold mt-1">{payingUserCount.toLocaleString()}</p>
+            <p className="text-lg md:text-2xl font-bold mt-1">{payingUserCount.toLocaleString()}</p>
             <p className="text-xs text-gray-500 mt-1">{payingOfVerifiedRate.toFixed(1)}% (인증자 대비)</p>
           </div>
         </div>

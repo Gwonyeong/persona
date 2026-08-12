@@ -194,7 +194,7 @@ export default function Notifications() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">인앱 알림</h1>
         <button
@@ -207,7 +207,8 @@ export default function Notifications() {
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="admin-x-scroll">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-gray-800/50 text-gray-400">
             <tr>
               <th className="px-4 py-3 text-left">ID</th>
@@ -269,6 +270,7 @@ export default function Notifications() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {totalPages > 1 && (

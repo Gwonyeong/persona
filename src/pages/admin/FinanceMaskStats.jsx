@@ -54,7 +54,8 @@ function CategoryTable({ rows, colors, totalLabel, totalCount, totalAmount }) {
     return <p className="p-4 text-gray-500 text-sm">기록이 없습니다.</p>
   }
   return (
-    <table className="w-full">
+    <div className="admin-x-scroll">
+    <table className="w-full min-w-[560px]">
       <thead>
         <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
           <th className="p-3 w-8"></th>
@@ -85,6 +86,7 @@ function CategoryTable({ rows, colors, totalLabel, totalCount, totalAmount }) {
         </tr>
       </tbody>
     </table>
+    </div>
   )
 }
 
@@ -108,27 +110,27 @@ export default function FinanceMaskStats() {
   const { totals, usage, grants, rawByReason } = data
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-6">
       <h2 className="text-xl font-bold">마스크 사용 통계</h2>
       <p className="text-xs text-gray-500 -mt-4">ADMIN 유저의 거래는 제외됩니다.</p>
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">총 지급</div>
-          <div className="mt-1 text-2xl font-bold text-emerald-400">{fmtNum(totals.granted)}</div>
+          <div className="mt-1 text-lg md:text-2xl font-bold text-emerald-400">{fmtNum(totals.granted)}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">총 사용</div>
-          <div className="mt-1 text-2xl font-bold text-rose-400">{fmtNum(totals.used)}</div>
+          <div className="mt-1 text-lg md:text-2xl font-bold text-rose-400">{fmtNum(totals.used)}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">환불</div>
-          <div className="mt-1 text-2xl font-bold text-amber-400">{fmtNum(totals.refund)}</div>
+          <div className="mt-1 text-lg md:text-2xl font-bold text-amber-400">{fmtNum(totals.refund)}</div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">잔여 (지급+환불-사용)</div>
           <div
-            className={`mt-1 text-2xl font-bold ${
+            className={`mt-1 text-lg md:text-2xl font-bold ${
               totals.net >= 0 ? 'text-indigo-300' : 'text-red-400'
             }`}
           >
@@ -176,7 +178,8 @@ export default function FinanceMaskStats() {
         </button>
         {showRaw && (
           <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
-            <table className="w-full">
+            <div className="admin-x-scroll">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                   <th className="p-3">type</th>
@@ -204,6 +207,7 @@ export default function FinanceMaskStats() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </section>

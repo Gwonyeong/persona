@@ -78,7 +78,7 @@ export default function Users() {
   const testCount = users.filter(isTestUser).length
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h2 className="text-xl font-bold">유저 관리</h2>
         <div className="flex items-center gap-2">
@@ -111,7 +111,8 @@ export default function Users() {
         {visibleUsers.length === 0 ? (
           <p className="p-4 text-gray-500">유저가 없습니다.</p>
         ) : (
-          <table className="w-full">
+          <div className="admin-x-scroll">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">ID</th>
@@ -174,6 +175,7 @@ export default function Users() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

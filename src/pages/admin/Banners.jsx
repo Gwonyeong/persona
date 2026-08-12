@@ -108,7 +108,7 @@ export default function Banners() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">광고 배너 관리</h2>
         <button
@@ -125,7 +125,8 @@ export default function Banners() {
       </p>
 
       <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="admin-x-scroll">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="bg-gray-800/50 text-gray-400 text-xs">
             <tr>
               <th className="text-left px-4 py-2 w-32">이미지</th>
@@ -202,6 +203,7 @@ export default function Banners() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {editing && (

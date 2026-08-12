@@ -1325,7 +1325,7 @@ export default function Characters() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">캐릭터 관리</h2>
         <button
@@ -1455,7 +1455,8 @@ export default function Characters() {
             {tab === 'public' ? '공개된 캐릭터가 없습니다.' : tab === 'production' ? '제작중인 캐릭터가 없습니다.' : '비공개 캐릭터가 없습니다.'}
           </p>
         ) : (
-          <table className="w-full">
+          <div className="admin-x-scroll">
+          <table className="w-full min-w-[820px]">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">이름</th>
@@ -1657,6 +1658,7 @@ export default function Characters() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       </>
