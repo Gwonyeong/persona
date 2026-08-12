@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '../lib/api'
+import { useTagCategories } from '../lib/useTagCategories'
 import CharacterCard from './CharacterCard'
 
 // 관계 태그별로 캐릭터를 묶어 "제목 + 3열(최대 2줄=6개)" 섹션으로 출력.
@@ -47,14 +47,12 @@ function RelationSection({ label, collapsedItems, allItems, reducedData, safetyM
 
 export default function RelationSections({ characters, reducedData, safetyMode }) {
   const { t } = useTranslation()
-  const [relationOptions, setRelationOptions] = useState([])
-
-  useEffect(() => {
-    api
-      .get('/characters/tags')
-      .then(({ categories }) => setRelationOptions(categories.find((c) => c.key === 'relation')?.options || []))
-      .catch(() => setRelationOptions([]))
-  }, [])
+  // 자체 fetch 를 두면 언어 변경 시 갱신이 누락된다 — 언어별 캐시를 가진 공유 훅을 쓴다.
+  const categories = useTagCategories()
+  const relationOptions = useMemo(
+    () => categories.find((c) => c.key === 'relation')?.options || [],
+    [categories]
+  )
 
   // 관계가 여러 개인 캐릭터는 그중 하나에만 랜덤 배정. characters 갱신 시(=매 로드) 재계산.
   const chosenById = useMemo(() => {
