@@ -4,16 +4,6 @@ import { api } from '../../lib/api'
 import UserAgeStats from './UserAgeStats'
 import ExpressionUnlockStats from './ExpressionUnlockStats'
 
-const MASK_TYPE_LABELS = {
-  SIGNUP_BONUS: '가입 보너스',
-  PURCHASE: '구매',
-  USE: '사용',
-  REFUND: '환불',
-  MISSION_REWARD: '미션 보상',
-  AD_REWARD: '광고 보상',
-  SUBSCRIPTION_DAILY: '구독 데일리',
-}
-
 const TABS = [
   { key: 'overview', label: '개요' },
   { key: 'age', label: '유저 연령 통계' },
@@ -39,7 +29,7 @@ function OverviewTab() {
 
   if (!data) return <div className="text-gray-400">로딩 중...</div>
 
-  const { stats, popularCharacters, maskBreakdown = {} } = data
+  const { stats, popularCharacters } = data
   const retentionRate =
     stats.userCount > 0
       ? ((stats.retentionCount / stats.userCount) * 100).toFixed(1)
@@ -65,50 +55,6 @@ function OverviewTab() {
             value={stats.retentionCount}
             hint={`전체의 ${retentionRate}% (lastActiveAt - createdAt ≥ 2일)`}
           />
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-semibold mb-3">피드</h3>
-        <div className="grid grid-cols-4 gap-4">
-          <StatCard label="총 피드 게시물" value={stats.feedPostCount} />
-          <StatCard label="총 좋아요" value={stats.feedLikeCount} />
-          <StatCard label="총 댓글" value={stats.feedCommentCount} />
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-semibold mb-3">마스크</h3>
-        <div className="grid grid-cols-4 gap-4 mb-4">
-          <StatCard label="총 발행" value={stats.masksGranted} hint="가입/구매/보상 합계" />
-          <StatCard label="총 사용" value={stats.masksSpent} hint="USE 트랜잭션 합계" />
-          <StatCard label="순 잔여" value={stats.masksOutstanding} hint="발행 − 사용" />
-        </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
-                <th className="p-3">타입</th>
-                <th className="p-3">건수</th>
-                <th className="p-3">합계</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.keys(MASK_TYPE_LABELS).map((type) => {
-                const entry = maskBreakdown[type] || { amount: 0, count: 0 }
-                return (
-                  <tr key={type} className="border-b border-gray-800/50 text-sm">
-                    <td className="p-3">{MASK_TYPE_LABELS[type]}</td>
-                    <td className="p-3">{entry.count.toLocaleString()}</td>
-                    <td className={`p-3 ${entry.amount < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                      {entry.amount > 0 ? '+' : ''}
-                      {entry.amount.toLocaleString()}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
         </div>
       </section>
 
