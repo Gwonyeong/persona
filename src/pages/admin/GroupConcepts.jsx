@@ -234,6 +234,13 @@ export default function AdminGroupConcepts() {
                   <p className="text-xs text-gray-500 truncate mt-0.5">
                     배역 {Array.isArray(c.roles) ? c.roles.length : 0}: {(c.roles || []).map((r) => r.name).join(', ')}
                   </p>
+                  {/* 이 컨셉으로 개설된 단톡방 수 — 컨셉별 실사용량 */}
+                  <p className="text-xs mt-0.5">
+                    <span className="text-gray-500">개설된 방 </span>
+                    <span className={(c._count?.groupChats || 0) > 0 ? 'text-indigo-300 font-medium' : 'text-gray-600'}>
+                      {(c._count?.groupChats || 0).toLocaleString()}
+                    </span>
+                  </p>
                 </div>
                 <button onClick={() => openEdit(c)} className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs" style={NO_OUTLINE}>수정</button>
                 <button onClick={() => remove(c)} className="px-3 py-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-300 text-xs" style={NO_OUTLINE}>삭제</button>
