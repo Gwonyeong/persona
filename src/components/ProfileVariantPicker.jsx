@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 
 /**
@@ -12,6 +13,7 @@ import { api } from '../lib/api'
  * @param {(appliedVariantId: number|null) => void} onApplied 적용 후 호출 (부모에서 캐릭터 새로고침)
  */
 export default function ProfileVariantPicker({ open, characterId, onClose, onApplied }) {
+  const { t } = useTranslation()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -41,7 +43,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
       onClose()
     } catch (e) {
       console.error(e)
-      alert(e.data?.error || '적용 실패')
+      alert(e.data?.error || t('profileVariant.applyFailed'))
     } finally {
       setSaving(false)
     }
@@ -84,7 +86,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
                 {character.profileImage ? (
-                  <img src={character.profileImage} alt="기본" className="w-full h-full object-cover" />
+                  <img src={character.profileImage} alt={t('common.default')} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gray-800" />
                 )}
@@ -131,7 +133,7 @@ export default function ProfileVariantPicker({ open, characterId, onClose, onApp
 
             {variants.length === 0 && lockedVariants.length === 0 && (
               <p className="mt-4 text-xs text-center text-gray-500">
-                마스크 패스에서 프로필 이미지 보상을 받으면 여기에 추가돼요
+                {t('profileVariant.emptyHint')}
               </p>
             )}
           </>

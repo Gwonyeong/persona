@@ -1405,6 +1405,8 @@
     "bizInfo6": "이메일: busGwonyeong@gmail.com"
   },
   "profileVariant": {
+    "applyFailed": "적용 실패",
+    "emptyHint": "마스크 패스에서 프로필 이미지 보상을 받으면 여기에 추가돼요",
     "title": "프로필 이미지 변경"
   },
   "groupChatSettings": {
