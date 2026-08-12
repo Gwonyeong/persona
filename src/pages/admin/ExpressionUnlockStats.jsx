@@ -28,9 +28,9 @@ function isNsfw(emotion) {
 
 function StatCard({ label, value, hint }) {
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+    <div className="bg-gray-900 rounded-lg p-3 md:p-4 border border-gray-800">
       <p className="text-sm text-gray-400">{label}</p>
-      <p className="text-2xl font-bold mt-1">{Number(value).toLocaleString()}</p>
+      <p className="text-lg md:text-2xl font-bold mt-1">{Number(value).toLocaleString()}</p>
       {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
     </div>
   )
@@ -179,7 +179,7 @@ export default function ExpressionUnlockStats({ embedded = false }) {
 
       <section>
         <h3 className="text-lg font-semibold mb-3">개요</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4">
           <StatCard
             label="총 해금 건수"
             value={totalUnlocks}
@@ -218,7 +218,7 @@ export default function ExpressionUnlockStats({ embedded = false }) {
         )}
       </section>
 
-      <section className="grid grid-cols-2 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div>
           <h3 className="text-lg font-semibold mb-3">캐릭터별 해금 — Top {topN}</h3>
           <p className="text-xs text-gray-500 mb-3">

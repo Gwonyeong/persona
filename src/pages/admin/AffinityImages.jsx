@@ -65,7 +65,7 @@ export default function AffinityImages() {
   if (!characters) return <div className="p-6 text-gray-400">로딩 중...</div>
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-end justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold">호감도 이미지</h2>

@@ -77,7 +77,7 @@ export default function Inquiries() {
   const totalGranted = (selected?.grants || []).reduce((sum, g) => sum + g.amount, 0)
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <h2 className="text-xl font-bold mb-6">문의 관리</h2>
 
       <div className="flex gap-2 mb-4">
@@ -105,7 +105,8 @@ export default function Inquiries() {
         ) : inquiries.length === 0 ? (
           <p className="p-4 text-gray-500">문의가 없습니다.</p>
         ) : (
-          <table className="w-full">
+          <div className="admin-x-scroll">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">상태</th>
@@ -150,6 +151,7 @@ export default function Inquiries() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

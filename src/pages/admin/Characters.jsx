@@ -721,6 +721,7 @@ function NotifyCharacterModal({ character, onClose, onSent }) {
 export default function Characters() {
   const [characters, setCharacters] = useState([])
   const [editing, setEditing] = useState(null) // null | 'new' | character object
+  const [editLoading, setEditLoading] = useState(null) // 편집 폼용 전체 레코드 로딩 중인 캐릭터 id
   const [notifyTarget, setNotifyTarget] = useState(null) // null | character object
   const [form, setForm] = useState(EMPTY_FORM)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -833,7 +834,22 @@ export default function Characters() {
     setEditing('new')
   }
 
-  const openEdit = (c) => {
+  const openEdit = async (listChar) => {
+    // 목록 응답(GET /admin/characters)에는 프롬프트·번역 blob이 빠져 있다(페이로드 절감).
+    // 편집 폼은 그 값들이 필요하므로 전체 레코드를 이 시점에 따로 받아온다.
+    let c = listChar
+    setEditLoading(listChar.id)
+    try {
+      const { character } = await api.get(`/admin/characters/${listChar.id}`)
+      // 목록에만 있는 파생 필드(styles, _count, recentConversations7d 등)는 남기고 덮어쓴다.
+      if (character) c = { ...listChar, ...character }
+    } catch (e) {
+      alert(`캐릭터 정보를 불러오지 못했습니다: ${e.message || ''}`)
+      return
+    } finally {
+      setEditLoading(null)
+    }
+
     const v2Text = { ko: '', en: '', ja: '' }
     if (c.firstMessageV2) {
       try { v2Text.ko = JSON.stringify(c.firstMessageV2, null, 2) } catch { /* keep '' */ }
@@ -1309,7 +1325,7 @@ export default function Characters() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">캐릭터 관리</h2>
         <button
@@ -1439,7 +1455,8 @@ export default function Characters() {
             {tab === 'public' ? '공개된 캐릭터가 없습니다.' : tab === 'production' ? '제작중인 캐릭터가 없습니다.' : '비공개 캐릭터가 없습니다.'}
           </p>
         ) : (
-          <table className="w-full">
+          <div className="admin-x-scroll">
+          <table className="w-full min-w-[820px]">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">이름</th>
@@ -1601,10 +1618,11 @@ export default function Characters() {
                       </button>
                       <button
                         onClick={() => openEdit(c)}
-                        className="text-indigo-400 hover:text-indigo-300 text-xs"
+                        disabled={editLoading === c.id}
+                        className="text-indigo-400 hover:text-indigo-300 text-xs disabled:opacity-50"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        수정
+                        {editLoading === c.id ? '여는 중...' : '수정'}
                       </button>
                       <button
                         onClick={() => navigate(`/admin/characters/${c.id}/situations`)}
@@ -1640,6 +1658,7 @@ export default function Characters() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       </>

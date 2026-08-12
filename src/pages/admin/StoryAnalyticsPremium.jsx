@@ -167,7 +167,7 @@ export default function StoryAnalyticsPremium() {
   return (
     <div>
       <StoryTabsHeader />
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         <div className="mb-6">
           <h1 className="text-xl font-bold text-white">스토리 프리미엄 통계</h1>
           <p className="text-sm text-gray-400 mt-1">
@@ -324,7 +324,7 @@ function CharacterSection({ group, collapsed, onToggle, expandedStory, onToggleS
       </button>
 
       {!collapsed && (
-        <div className="border-t border-gray-800 overflow-x-auto">
+        <div className="border-t border-gray-800 admin-x-scroll">
           <table className="w-full text-sm">
             <thead className="bg-gray-800/40 text-gray-400 text-xs">
               <tr>

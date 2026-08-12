@@ -42,6 +42,51 @@ body:has(.admin-layout) #root {
   scrollbar-width: none;
 }
 
+/* 어드민 표·와이드 콘텐츠용 가로 스크롤 컨테이너.
+   전역 규칙이 스크롤바를 지워버려서, 모바일에서는 "옆으로 밀 수 있다"는 신호가
+   전혀 남지 않는다(콘텐츠가 잘린 것처럼 보임). 이 영역에서만 스크롤바를 되살린다. */
+.admin-x-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+.admin-x-scroll::-webkit-scrollbar {
+  display: block;
+  height: 6px;
+}
+
+.admin-x-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-x-scroll::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 3px;
+}
+
+/* 어드민 모바일 폰트 하한선.
+   어드민에는 text-[9px]~text-[11px] 같은 조밀한 텍스트가 480곳 넘게 쓰이는데,
+   데스크탑 밀도 기준이라 폰에서는 읽히지 않는다. 480곳을 개별 수정하는 대신
+   모바일에서만 하한을 올린다. (.admin-layout 스코프라 유저 앱에는 영향 없음)
+   데스크탑은 기존 밀도를 그대로 유지 — 어드민 표는 촘촘한 게 유리하다. */
+@media (max-width: 767px) {
+  .admin-layout .text-\[7px\],
+  .admin-layout .text-\[8px\],
+  .admin-layout .text-\[9px\],
+  .admin-layout .text-\[10px\] {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .admin-layout .text-\[11px\],
+  .admin-layout .text-\[12px\] {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+
 /* 스토리 선택지 확정 시 깜빡임 — 두 번 반복 (iteration-count 2) */
 @keyframes storyChoiceBlink {
   0%, 100% { opacity: 1; }

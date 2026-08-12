@@ -274,7 +274,7 @@ export default function Broadcasts() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">푸시 알림 관리</h2>
         <button
@@ -292,7 +292,8 @@ export default function Broadcasts() {
       </p>
 
       <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="admin-x-scroll">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="bg-gray-800/50 text-gray-400 text-xs">
             <tr>
               <th className="text-left px-4 py-2 w-24">상태</th>
@@ -411,6 +412,7 @@ export default function Broadcasts() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {editing && (

@@ -149,7 +149,7 @@ export default function CharacterSituations() {
   const btn = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">

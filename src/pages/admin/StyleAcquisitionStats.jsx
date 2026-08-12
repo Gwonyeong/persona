@@ -14,9 +14,9 @@ function daysSince(dateStr) {
 
 function StatCard({ label, value, hint }) {
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
+    <div className="bg-gray-900 rounded-lg p-3 md:p-4 border border-gray-800">
       <p className="text-sm text-gray-400">{label}</p>
-      <p className="text-2xl font-bold mt-1">{Number(value).toLocaleString()}</p>
+      <p className="text-lg md:text-2xl font-bold mt-1">{Number(value).toLocaleString()}</p>
       {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
     </div>
   )

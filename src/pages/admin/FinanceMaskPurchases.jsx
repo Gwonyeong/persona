@@ -24,6 +24,17 @@ function fmtKrw(value) {
   return `₩${(value || 0).toLocaleString('ko-KR')}`
 }
 
+// 모바일 캘린더 셀용 축약 표기.
+// 셀 내부 폭이 30px대라 ₩123,456 은 어떤 폰트 크기로도 잘린다 — 만원 단위로 줄인다.
+function fmtKrwCompact(value) {
+  const v = value || 0
+  if (Math.abs(v) >= 10000) {
+    const man = v / 10000
+    return `${Math.abs(man) >= 100 ? Math.round(man) : man.toFixed(1)}만`
+  }
+  return v.toLocaleString('ko-KR')
+}
+
 // KST 기준 YYYY-MM-DD 추출. verifiedAt이 어느 timezone이든 한국 거주자 기준 날짜로 묶기 위함.
 function getKstDateKey(value) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -171,34 +182,34 @@ function FinanceMaskPurchasesView({ items, summary }) {
   const monthStat = byMonth[selectedMonth] || { count: 0, revenue: 0, revenueNet: 0 }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-6">
       <h2 className="text-xl font-bold">마스크 구매</h2>
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">총 구매 건수</div>
-          <div className="mt-1 text-2xl font-bold text-gray-100">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-gray-100">
             {summary.totalCount.toLocaleString('ko-KR')}
           </div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">구매 유저 수</div>
-          <div className="mt-1 text-2xl font-bold text-amber-300">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-amber-300">
             {(summary.buyerCount ?? 0).toLocaleString('ko-KR')}
           </div>
           <div className="text-[11px] text-gray-500 mt-1">1번 이상 결제한 유저</div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">총 매출 (수수료 포함)</div>
-          <div className="mt-1 text-2xl font-bold text-gray-300">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-gray-300">
             {fmtKrw(summary.totalRevenueKrw)}
           </div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-3 md:p-4">
           <div className="text-xs text-gray-400">
             순수익 (수수료 {Math.round(summary.playStoreFeeRate * 100)}% 제외)
           </div>
-          <div className="mt-1 text-2xl font-bold text-indigo-300">
+          <div className="mt-1 text-lg md:text-2xl font-bold text-indigo-300">
             {fmtKrw(summary.totalRevenueNetKrw)}
           </div>
         </div>
@@ -213,7 +224,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
           {sortedMonths.length === 0 ? (
             <p className="p-4 text-gray-500 text-sm">기록이 없습니다.</p>
           ) : (
-            <table className="w-full">
+            <div className="admin-x-scroll">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                   <th className="p-3">월</th>
@@ -247,14 +259,15 @@ function FinanceMaskPurchasesView({ items, summary }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <h3 className="text-sm font-semibold text-gray-300">날짜별 매출</h3>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 text-xs">
             <button
               type="button"
               onClick={() => setSelectedMonth((m) => shiftMonthKey(m, -1))}
@@ -284,7 +297,7 @@ function FinanceMaskPurchasesView({ items, summary }) {
             </button>
           </div>
         </div>
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-2 md:p-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-400 mb-3">
             <span>
               건수 <span className="text-gray-200 font-medium">{monthStat.count.toLocaleString('ko-KR')}</span>
@@ -317,7 +330,7 @@ function FinanceMaskPurchasesView({ items, summary }) {
               return (
                 <div
                   key={cell.key}
-                  className={`aspect-square rounded border p-1.5 flex flex-col ${
+                  className={`aspect-square rounded border p-1 md:p-1.5 flex flex-col ${
                     hasData
                       ? 'bg-gray-800/70 border-gray-700'
                       : 'bg-gray-900 border-gray-800/60'
@@ -327,7 +340,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
                   {hasData ? (
                     <div className="mt-auto leading-tight">
                       <div className="text-[10px] text-indigo-300 font-semibold truncate">
-                        {fmtKrw(cell.stat.revenueNet)}
+                        <span className="md:hidden">{fmtKrwCompact(cell.stat.revenueNet)}</span>
+                        <span className="hidden md:inline">{fmtKrw(cell.stat.revenueNet)}</span>
                       </div>
                       <div className="text-[10px] text-gray-500 truncate">{cell.stat.count}건</div>
                     </div>
@@ -342,7 +356,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
       <section>
         <h3 className="text-sm font-semibold text-gray-300 mb-2">상품별 집계</h3>
         <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
-          <table className="w-full">
+          <div className="admin-x-scroll">
+          <table className="w-full min-w-[760px]">
             <thead>
               <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                 <th className="p-3">상품</th>
@@ -380,6 +395,7 @@ function FinanceMaskPurchasesView({ items, summary }) {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
 
@@ -403,7 +419,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
           {sortedBuyers.length === 0 ? (
             <p className="p-4 text-gray-500 text-sm">구매한 유저가 없습니다.</p>
           ) : (
-            <table className="w-full">
+            <div className="admin-x-scroll">
+            <table className="w-full min-w-[900px]">
               <thead>
                 <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                   <th className="p-3">유저</th>
@@ -463,6 +480,7 @@ function FinanceMaskPurchasesView({ items, summary }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </section>
@@ -473,7 +491,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
           {items.length === 0 ? (
             <p className="p-4 text-gray-500 text-sm">기록이 없습니다.</p>
           ) : (
-            <table className="w-full">
+            <div className="admin-x-scroll">
+            <table className="w-full min-w-[840px]">
               <thead>
                 <tr className="text-left text-sm text-gray-400 border-b border-gray-800">
                   <th className="p-3">유저</th>
@@ -481,8 +500,8 @@ function FinanceMaskPurchasesView({ items, summary }) {
                   <th className="p-3">마스크</th>
                   <th className="p-3">매출</th>
                   <th className="p-3">순수익</th>
-                  <th className="p-3">주문ID</th>
-                  <th className="p-3">검증일</th>
+                  <th className="p-3 whitespace-nowrap">주문ID</th>
+                  <th className="p-3 whitespace-nowrap">검증일</th>
                 </tr>
               </thead>
               <tbody>
@@ -523,6 +542,7 @@ function FinanceMaskPurchasesView({ items, summary }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </section>

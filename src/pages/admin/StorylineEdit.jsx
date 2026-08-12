@@ -541,7 +541,7 @@ export default function StorylineEdit() {
     : 0
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       {/* 헤더 */}
       <div className="mb-6 flex items-center gap-3">
         <button
