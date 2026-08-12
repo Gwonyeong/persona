@@ -1405,6 +1405,8 @@
     "bizInfo6": "Eメール: busGwonyeong@gmail.com"
   },
   "profileVariant": {
+    "applyFailed": "適用に失敗しました",
+    "emptyHint": "マスクパスでプロフィール画像の報酬を獲得すると、ここに追加されます",
     "title": "プロフィール画像を変更"
   },
   "groupChatSettings": {

@@ -1405,6 +1405,8 @@
     "bizInfo6": "Email: busGwonyeong@gmail.com"
   },
   "profileVariant": {
+    "applyFailed": "Failed to apply",
+    "emptyHint": "Profile images you earn from the Mask Pass will show up here",
     "title": "Change profile image"
   },
   "groupChatSettings": {
