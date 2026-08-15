@@ -69,6 +69,8 @@ export default function VnStory() {
   const [showModelSheet, setShowModelSheet] = useState(false)
   const [typed, setTyped] = useState('')
   const typingRef = useRef(null)
+  // 직접 입력 textarea — 전송 후 자동 확장된 높이를 되돌리기 위해 참조.
+  const textareaRef = useRef(null)
 
   const beatsRef = useRef([])
   useEffect(() => { beatsRef.current = beats }, [beats])
@@ -174,6 +176,7 @@ export default function VnStory() {
     setSending(true)
     setError(null)
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = ''
     // 선택지는 지우지 않음 — sending 동안엔 숨겨지고(atChoicePoint=false),
     // 실패(마스크 부족 등) 시 그대로 다시 노출된다. 성공 시에만 새 선택지로 교체.
     await runRound(msg, 1)
@@ -383,13 +386,20 @@ export default function VnStory() {
                 {c}
               </button>
             ))}
-            <div className="flex items-center gap-2">
-              <input
+            <div className="flex items-end gap-2">
+              {/* 엔터는 줄바꿈만 — 전송은 오른쪽 버튼으로만. (V1/V2/단톡방과 동일)
+                  문장 작성 중 실수 전송으로 마스크가 소모되는 것을 막는다. */}
+              <textarea
+                ref={textareaRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') doSend(input) }}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 116) + 'px'
+                }}
                 placeholder={t('vn.inputPlaceholder', { defaultValue: '직접 입력...' })}
-                className="flex-1 px-4 py-3 rounded-lg text-sm border bg-gray-900/85 border-gray-700 text-gray-100 placeholder-gray-500"
+                rows={1}
+                className="flex-1 px-4 py-3 rounded-lg text-sm border bg-gray-900/85 border-gray-700 text-gray-100 placeholder-gray-500 resize-none"
                 style={NO_OUTLINE}
               />
               <button
