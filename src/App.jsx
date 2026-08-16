@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Capacitor } from '@capacitor/core'
 import useStore from './store/useStore'
@@ -92,7 +92,6 @@ function App() {
   const { i18n } = useTranslation()
 
   const navigate = useNavigate()
-  const location = useLocation()
 
   // html lang 속성을 i18n 언어와 동기화
   useEffect(() => {
@@ -112,14 +111,8 @@ function App() {
     window.gtag('set', { user_id: user?.id || undefined })
   }, [token])
 
-  // GA4 SPA 페이지뷰 트래킹
-  useEffect(() => {
-    if (window.gtag) {
-      window.gtag('event', 'page_view', {
-        page_path: location.pathname,
-      })
-    }
-  }, [location.pathname])
+  // GA4 SPA 페이지뷰는 스트림의 향상된 측정(브라우저 기록 이벤트)이 처리한다.
+  // 여기서 page_view를 직접 쏘면 같은 조회가 두 번 잡히므로 보내지 않는다.
 
   // Capacitor 네이티브 뒤로가기 버튼 처리
   const navigateRef = useRef(navigate)
