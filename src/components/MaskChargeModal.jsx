@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
-import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases } from '../lib/billing'
+import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase } from '../lib/billing'
+import { recoverPendingPurchases, queueFailedPurchase } from '../lib/purchaseRecovery'
 import MaskIcon from './MaskIcon'
 
 async function verifyOnServer(productId, purchaseToken) {
@@ -42,19 +43,8 @@ export default function MaskChargeModal({ onClose }) {
         if (ready) {
           const products = await getProducts()
           setDebugInfo(`products: ${JSON.stringify(products?.map(p => p.productIdentifier || p.productId) || null)}`)
-          // 미완료 구매 복구 — 검증 시도 후 실패하면 강제 소비
-          const pending = await getPendingPurchases()
-          for (const purchase of pending) {
-            const pid = purchase.productIdentifier || purchase.productId
-            const pt = purchase.purchaseToken
-            try {
-              await verifyOnServer(pid, pt)
-            } catch {
-              try { await api.post('/masks/consume-purchase', { productId: pid, purchaseToken: pt }) } catch {}
-            }
-            // 서버 검증 성공/실패 무관하게 클라이언트 측 consume 처리
-            await consumePurchase(pt)
-          }
+          // 미지급 구매 복구 (실패한 토큰을 보존하는 공용 로직)
+          await recoverPendingPurchases()
         }
       }
     }
@@ -68,8 +58,16 @@ export default function MaskChargeModal({ onClose }) {
     try {
       const pkg = PACKAGES[selected]
 
-      // 구매 시도 기록
-      api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
+      // 구매 시도 기록 겸 서버 연결 확인.
+      // 여기서 실패하면 결제 후 지급 요청도 닿지 못할 가능성이 높다.
+      // 돈만 빠져나가고 마스크가 들어가지 않는 상황을 막기 위해 결제창을 열지 않는다.
+      try {
+        await api.post('/masks/purchase-attempt', { package: pkg.productId })
+      } catch {
+        setErrorMsg(t('myPage.purchaseNetworkError'))
+        setLoading(false)
+        return
+      }
 
       if (!isNative || !billingReady) {
         const cap = window.Capacitor
@@ -90,9 +88,14 @@ export default function MaskChargeModal({ onClose }) {
         return
       }
 
-      const serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken: token })
-      if (serverRes.error) {
-        setErrorMsg(`[DEBUG] Server: ${serverRes.error}`)
+      // 지급 요청. 실패해도 토큰을 버리지 않는다 — 결제는 이미 성공했으므로
+      // 큐에 남겨 다음 앱 실행 때 자동으로 다시 지급을 시도한다.
+      let serverRes
+      try {
+        serverRes = await verifyOnServer(pkg.productId, token)
+      } catch (err) {
+        queueFailedPurchase(pkg.productId, token)
+        setErrorMsg(t('myPage.purchasePendingRecovery'))
         setLoading(false)
         return
       }
@@ -100,7 +103,6 @@ export default function MaskChargeModal({ onClose }) {
       // 클라이언트 측에서도 consume 처리 (재구매 가능하게)
       await consumePurchase(token)
 
-      useStore.getState().setMasks(serverRes.masks)
       onClose()
     } catch (err) {
       const msg = err?.message || ''

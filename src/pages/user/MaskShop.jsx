@@ -5,7 +5,8 @@ import { useTranslation, Trans } from 'react-i18next'
 import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getPendingPurchases, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
+import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
+import { recoverPendingPurchases, queueFailedPurchase } from '../../lib/purchaseRecovery'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview, REVIEW_REWARD_UI_ENABLED } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
@@ -20,12 +21,6 @@ import {
 } from '../../lib/webPayment'
 
 const YOONHARIN_IMAGE_URL = 'https://zstwgwszakivdnhwbuei.supabase.co/storage/v1/object/public/pesona/dev/sprites/25/NEUTRAL.png'
-
-async function verifyOnServer(productId, purchaseToken) {
-  const result = await api.post('/masks/verify-purchase', { productId, purchaseToken })
-  useStore.getState().setMasks(result.masks)
-  return result
-}
 
 export default function MaskShop() {
   const { t } = useTranslation()
@@ -140,15 +135,8 @@ export default function MaskShop() {
         if (ready) {
           await getProducts()
           await getSubscriptionProducts()
-          const pending = await getPendingPurchases()
-          for (const purchase of pending) {
-            const pid = purchase.productIdentifier || purchase.productId
-            const pt = purchase.purchaseToken
-            try { await verifyOnServer(pid, pt) } catch {
-              try { await api.post('/masks/consume-purchase', { productId: pid, purchaseToken: pt }) } catch {}
-            }
-            await consumePurchase(pt)
-          }
+          // 미지급 구매 복구 (실패한 토큰을 보존하는 공용 로직)
+          await recoverPendingPurchases()
         }
       })
     }
@@ -418,7 +406,17 @@ export default function MaskShop() {
     setPurchaseError('')
     try {
       const pkg = PACKAGES[selectedPkg]
-      api.post('/masks/purchase-attempt', { package: pkg.productId }).catch(() => {})
+
+      // 구매 시도 기록 겸 서버 연결 확인.
+      // 여기서 실패하면 결제 후 지급 요청도 닿지 못할 가능성이 높다.
+      // 돈만 빠져나가고 마스크가 들어가지 않는 상황을 막기 위해 결제창을 열지 않는다.
+      try {
+        await api.post('/masks/purchase-attempt', { package: pkg.productId })
+      } catch {
+        setPurchaseError(t('myPage.purchaseNetworkError'))
+        setPurchasing(false)
+        return
+      }
 
       // 웹에서는 PG 결제로 분기한다. 앱(WebView 포함)에서는 이 분기를 절대 타지 않는다.
       // pgAllowed 는 서버가 이메일 허용목록으로 판단한 값 — 계약 전에는 테스트 계정만 true.
@@ -441,9 +439,14 @@ export default function MaskShop() {
         return
       }
 
-      const serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken })
-      if (serverRes.error) {
-        setPurchaseError(serverRes.error)
+      // 지급 요청. 실패해도 토큰을 버리지 않는다 — 결제는 이미 성공했으므로
+      // 큐에 남겨 다음 앱 실행 때 자동으로 다시 지급을 시도한다.
+      let serverRes
+      try {
+        serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken })
+      } catch (err) {
+        queueFailedPurchase(pkg.productId, purchaseToken)
+        setPurchaseError(t('myPage.purchasePendingRecovery'))
         setPurchasing(false)
         return
       }

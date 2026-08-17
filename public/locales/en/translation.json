@@ -332,6 +332,8 @@
     "purchaseEnvError": "Payment environment unavailable",
     "purchaseInfoError": "Payment info not found",
     "purchaseFailed": "Payment failed",
+    "purchaseNetworkError": "Your connection is unstable, so the payment can't be started. Please try again shortly.",
+    "purchasePendingRecovery": "Your payment went through, but we couldn't confirm delivery. Restart the app and it will be credited automatically.",
     "earnMasks": "Earn Masks",
     "watchAd": "Watch Ad for Masks",
     "watchAdAvailable": "Watch an ad and get 3 masks",
