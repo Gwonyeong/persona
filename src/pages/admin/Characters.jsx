@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 
 function TagSelector({ tags, onChange, categories: categoriesProp }) {
@@ -726,7 +726,17 @@ export default function Characters() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [dragOverColumn, setDragOverColumn] = useState(null)
-  const [tab, setTab] = useState('public') // 'public' | 'private'
+  // 탭은 ?tab= 쿼리로 유지한다 — 제작 페이지에서 '← 목록'으로 돌아올 때 제작중 탭으로 복귀시키기 위함.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const TAB_KEYS = ['public', 'production', 'private']
+  const tabParam = searchParams.get('tab')
+  const tab = TAB_KEYS.includes(tabParam) ? tabParam : 'public'
+  const setTab = (key) => {
+    const next = new URLSearchParams(searchParams)
+    if (key === 'public') next.delete('tab')
+    else next.set('tab', key)
+    setSearchParams(next, { replace: true })
+  }
   const [v2Lang, setV2Lang] = useState('ko')
   const [v2Busy, setV2Busy] = useState({ image: false, voice: false, translate: false, generate: false })
   const [v2DragOverIdx, setV2DragOverIdx] = useState(null)
@@ -773,16 +783,22 @@ export default function Characters() {
 
   // 제작중 준비도 — 이미 로드된 데이터로 계산. 기본 스타일(order 0)의 표정 커버 수 등.
   const READINESS_EMOTIONS = ['NEUTRAL', 'HAPPY', 'ANGRY', 'SAD', 'SHY']
+  // 표정이미지 준비 기준 — 감정 종류와 무관하게 '영상이 연결된 표정'이 이 개수 이상이면 완료로 본다.
+  const READINESS_MIN_VIDEOS = 5
   const getReadiness = (c) => {
     const baseStyle = (c.styles || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))[0]
-    const covered = new Set((baseStyle?.images || []).map((img) => img.emotion))
+    const images = baseStyle?.images || []
+    const covered = new Set(images.map((img) => img.emotion))
     const emotionCount = READINESS_EMOTIONS.filter((e) => covered.has(e)).length
+    const videoCount = images.filter((img) => !!img.videoFilePath).length
     return {
       voice: !!(c.voiceId && c.voiceId.trim()),
       emotionCount,
       emotionTotal: READINESS_EMOTIONS.length,
       sample: !!c.voiceSamples?.normal?.audioUrl,
       profile: !!c.profileImage,
+      expression: videoCount >= READINESS_MIN_VIDEOS,
+      videoCount,
     }
   }
 
@@ -1497,6 +1513,7 @@ export default function Characters() {
                               <Badge ok={r.voice} label="보이스" />
                               <Badge ok={r.sample} label="음성샘플" />
                               <Badge ok={r.profile} label="프로필" />
+                              <Badge ok={r.expression} label={`표정이미지 ${r.videoCount}`} />
                             </div>
                           )
                         })()}

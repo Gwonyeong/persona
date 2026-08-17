@@ -24,6 +24,10 @@ const NSFW_EMOTIONS = [
   { key: 'AROUSED_AFTERGLOW', label: '여운' },
 ]
 
+// 표정 준비 완료 기준 — 감정 종류와 무관하게 '영상이 연결된 표정'이 이 개수 이상.
+// (SFW 5종 커버를 요구하면 NSFW 전용으로 제작한 캐릭터가 영원히 미완으로 남는다)
+const READINESS_MIN_VIDEOS = 5
+
 const isVideoUrl = (url) => /\.(mp4|webm)(\?|$)/i.test(url || '')
 
 const truncate = (s, n) => (!s ? '' : s.length > n ? s.slice(0, n) + '…' : s)
@@ -104,6 +108,9 @@ export default function CharacterProduction() {
 
   const [statusBusy, setStatusBusy] = useState(false)
 
+  // 표정 감정 이동 중인 이미지 id (썸네일 오버레이용)
+  const [movingImageId, setMovingImageId] = useState(null)
+
   const load = () =>
     api.get('/admin/characters').then(({ characters }) => {
       setAllCharacters(characters)
@@ -132,14 +139,14 @@ export default function CharacterProduction() {
     return allCharacters.filter((c) => c.id !== character.id && (c.voiceId || '').trim() === v).map((c) => c.name)
   })()
 
-  // 준비도
+  // 준비도 — 표정은 감정 종류와 무관하게 '영상이 연결된 표정' 개수로 판정한다.
   const readiness = {
     voice: !!(character.voiceId && character.voiceId.trim()),
-    emotionCount: SFW_EMOTIONS.filter((e) => imagesFor(e.key).length > 0).length,
+    videoCount: (baseStyle?.images || []).filter((img) => !!img.videoFilePath).length,
     sample: !!character.voiceSamples?.normal?.audioUrl,
     profile: !!character.profileImage,
   }
-  const emotionDone = readiness.emotionCount >= SFW_EMOTIONS.length
+  const emotionDone = readiness.videoCount >= READINESS_MIN_VIDEOS
   const allReady = readiness.voice && emotionDone && readiness.sample && readiness.profile
   const hasVoiceId = !!(character.voiceId && character.voiceId.trim())
 
@@ -278,6 +285,19 @@ export default function CharacterProduction() {
     await load()
   }
 
+  // 자동분류가 틀린 컷을 다른 감정으로 옮긴다 (주 용도: NSFW → SFW).
+  const moveImageEmotion = async (imageId, emotion) => {
+    setMovingImageId(imageId)
+    try {
+      await api.patch(`/admin/images/${imageId}/emotion`, { emotion })
+      await load()
+    } catch (e) {
+      alert(`감정 변경 실패: ${e.message}`)
+    } finally {
+      setMovingImageId(null)
+    }
+  }
+
   // ── 음성 샘플 ─────────────────────────────────────────────
   const generateSampleText = async (kind) => {
     setVoiceSampleBusy((p) => ({ ...p, [kind]: 'text' }))
@@ -397,7 +417,8 @@ export default function CharacterProduction() {
     setStatusBusy(true)
     try {
       await api.patch(`/admin/characters/${character.id}/production`, { scheduledPublishAt: iso })
-      navigate('/admin/characters')
+      // 예약만 잡은 상태 = 아직 IN_PRODUCTION 이므로 제작중 탭으로 돌아간다
+      navigate('/admin/characters?tab=production')
     } catch (e) {
       alert(`예약 실패: ${e?.message || 'unknown'}`)
       setStatusBusy(false)
@@ -438,7 +459,7 @@ export default function CharacterProduction() {
     <div className="p-6 max-w-4xl">
       {/* 헤더 */}
       <div className="flex items-center gap-3 mb-6">
-        <Link to="/admin/characters" className="text-gray-400 hover:text-white text-sm">← 목록</Link>
+        <Link to="/admin/characters?tab=production" className="text-gray-400 hover:text-white text-sm">← 목록</Link>
         <h2 className="text-xl font-bold">{character.name} — 제작 워크스페이스</h2>
         <span className={`text-xs px-2 py-0.5 rounded ${statusMeta.cls}`}>{statusMeta.label}</span>
       </div>
@@ -448,7 +469,7 @@ export default function CharacterProduction() {
         <h3 className="text-sm font-semibold mb-3 text-gray-300">준비도</h3>
         <div className="grid grid-cols-2 gap-2">
           <ChecklistItem ok={readiness.voice} label="보이스 ID 등록" />
-          <ChecklistItem ok={emotionDone} label={`표정 이미지 ${readiness.emotionCount}/${SFW_EMOTIONS.length}`} />
+          <ChecklistItem ok={emotionDone} label={`표정 이미지 ${readiness.videoCount}/${READINESS_MIN_VIDEOS}`} />
           <ChecklistItem ok={readiness.sample} label="음성 샘플(기본)" />
           <ChecklistItem ok={readiness.profile} label="프로필 이미지" />
         </div>
@@ -758,14 +779,28 @@ export default function CharacterProduction() {
           <p className="text-xs font-semibold text-gray-400 mb-2">현재 등록된 표정</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {SFW_EMOTIONS.map((emo) => (
-              <EmotionCell key={emo.key} emo={emo} images={imagesFor(emo.key)} onRemove={removeImage} />
+              <EmotionCell
+                key={emo.key}
+                emo={emo}
+                images={imagesFor(emo.key)}
+                onRemove={removeImage}
+                onMove={moveImageEmotion}
+                movingImageId={movingImageId}
+              />
             ))}
           </div>
-          <details className="mt-3">
+          <details className="mt-3" open>
             <summary className="text-xs text-gray-400 cursor-pointer select-none">흥분 표정 (NSFW)</summary>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
               {NSFW_EMOTIONS.map((emo) => (
-                <EmotionCell key={emo.key} emo={emo} images={imagesFor(emo.key)} onRemove={removeImage} />
+                <EmotionCell
+                key={emo.key}
+                emo={emo}
+                images={imagesFor(emo.key)}
+                onRemove={removeImage}
+                onMove={moveImageEmotion}
+                movingImageId={movingImageId}
+              />
               ))}
             </div>
           </details>
@@ -895,7 +930,8 @@ function CopyField({ label, text, copied, onCopy }) {
 }
 
 // 표정 표시 셀 — 감정별 등록된 이미지/영상 썸네일 + 개별 삭제 (업로드는 상단 일괄 영상 분류로).
-function EmotionCell({ emo, images, onRemove }) {
+// 썸네일마다 'SFW로 이동' 메뉴가 붙어 자동분류가 틀린 컷을 옮길 수 있다.
+function EmotionCell({ emo, images, onRemove, onMove, movingImageId }) {
   return (
     <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-2">
       <div className="flex items-center justify-between mb-1.5">
@@ -907,20 +943,86 @@ function EmotionCell({ emo, images, onRemove }) {
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {images.map((img) => (
-            <div key={img.id} className="relative w-12 h-12 rounded overflow-hidden bg-gray-800 group">
-              {isVideoUrl(img.videoFilePath || img.filePath) ? (
-                <video src={img.videoFilePath || img.filePath} muted className="w-full h-full object-cover" />
-              ) : (
-                <img src={img.filePath} alt="" className="w-full h-full object-cover" />
-              )}
-              <button
-                onClick={() => onRemove(img.id)}
-                className="absolute top-0 right-0 bg-black/70 text-red-300 text-[10px] w-4 h-4 leading-none opacity-0 group-hover:opacity-100"
-                style={btnStyle}
-              >
-                ✕
-              </button>
-            </div>
+            <ExpressionThumb
+              key={img.id}
+              img={img}
+              currentEmotion={emo.key}
+              onRemove={onRemove}
+              onMove={onMove}
+              moving={movingImageId === img.id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 표정 썸네일 1개 — 영상 자동재생 + 삭제 + 다른 감정으로 이동.
+function ExpressionThumb({ img, currentEmotion, onRemove, onMove, moving }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const targets = SFW_EMOTIONS.filter((e) => e.key !== currentEmotion)
+
+  // 메뉴 바깥 클릭 시 닫기
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = () => setMenuOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [menuOpen])
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <div className="relative w-16 aspect-[9/16] rounded overflow-hidden bg-gray-800 group">
+        {isVideoUrl(img.videoFilePath || img.filePath) ? (
+          <video
+            src={img.videoFilePath || img.filePath}
+            poster={isVideoUrl(img.filePath) ? undefined : img.filePath}
+            muted
+            loop
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <img src={img.filePath} alt="" className="w-full h-full object-cover" />
+        )}
+
+        <button
+          onClick={() => onRemove(img.id)}
+          className="absolute top-0 right-0 bg-black/70 text-red-300 text-[10px] w-4 h-4 leading-none opacity-0 group-hover:opacity-100"
+          style={btnStyle}
+        >
+          ✕
+        </button>
+
+        {/* SFW로 이동 — 평소엔 숨어 있다가 썸네일에 올리면 하단에 뜬다 */}
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          disabled={moving}
+          className={`absolute bottom-0 inset-x-0 bg-black/75 text-[10px] py-0.5 leading-none ${
+            menuOpen ? 'opacity-100 text-blue-300' : 'opacity-0 group-hover:opacity-100 text-gray-200'
+          } disabled:opacity-60`}
+          style={btnStyle}
+        >
+          {moving ? '이동중…' : 'SFW ▾'}
+        </button>
+
+        {moving && <div className="absolute inset-0 bg-black/50" />}
+      </div>
+
+      {menuOpen && (
+        <div className="absolute z-20 left-0 top-full mt-1 w-24 rounded border border-gray-600 bg-gray-900 shadow-lg overflow-hidden">
+          <p className="text-[10px] text-gray-500 px-2 py-1 border-b border-gray-700">SFW로 이동</p>
+          {targets.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { setMenuOpen(false); onMove(img.id, t.key) }}
+              className="block w-full text-left text-[11px] px-2 py-1.5 text-gray-200 hover:bg-gray-700"
+              style={btnStyle}
+            >
+              {t.label}
+            </button>
           ))}
         </div>
       )}
