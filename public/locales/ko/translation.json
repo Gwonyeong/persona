@@ -332,6 +332,8 @@
     "purchaseEnvError": "결제 환경을 확인할 수 없습니다",
     "purchaseInfoError": "결제 정보를 확인할 수 없습니다",
     "purchaseFailed": "결제에 실패했습니다",
+    "purchaseNetworkError": "네트워크 연결이 불안정해 결제를 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    "purchasePendingRecovery": "결제는 완료되었으나 지급 확인에 실패했습니다. 앱을 다시 실행하시면 자동으로 지급됩니다.",
     "earnMasks": "마스크 얻기",
     "watchAd": "광고보고 마스크 얻기",
     "watchAdAvailable": "광고를 시청하고 가면 3개를 받으세요",

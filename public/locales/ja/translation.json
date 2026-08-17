@@ -332,6 +332,8 @@
     "purchaseEnvError": "決済環境を確認できません",
     "purchaseInfoError": "決済情報を確認できません",
     "purchaseFailed": "決済に失敗しました",
+    "purchaseNetworkError": "通信が不安定なため決済を開始できません。しばらくしてからもう一度お試しください。",
+    "purchasePendingRecovery": "決済は完了しましたが、付与の確認ができませんでした。アプリを再起動すると自動的に付与されます。",
     "earnMasks": "マスクを獲得",
     "watchAd": "広告を見てマスクをゲット",
     "watchAdAvailable": "広告を視聴してマスク3個をもらえます",

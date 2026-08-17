@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import useStore from './store/useStore'
 import { api } from './lib/api'
 import { registerPushNotifications } from './lib/push'
+import { recoverPendingPurchases } from './lib/purchaseRecovery'
 // Admin
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
@@ -186,6 +187,15 @@ function App() {
         registerPushNotifications()
       })
       .catch(() => clearAuth())
+  }, [token])
+
+  // 지급되지 않은 결제 복구.
+  // 결제는 성공했는데 검증 요청이 서버에 닿지 못하면 마스크가 들어가지 않는다.
+  // 예전에는 마스크 상점을 다시 열어야만 복구됐는데, 그걸 기다리지 않고
+  // 앱을 켤 때마다 확인한다.
+  useEffect(() => {
+    if (!token) return
+    recoverPendingPurchases().catch(() => {})
   }, [token])
 
   return (
