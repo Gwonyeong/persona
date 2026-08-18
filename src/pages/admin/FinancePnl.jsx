@@ -43,6 +43,45 @@ function Row({ label, value, sub, bold, positive, divider, indent }) {
   )
 }
 
+// 원가·수익 항목의 편집 폼이 동일해 하나로 쓴다.
+// USD로 정산되는 항목은 달러 값을, 원화 항목은 원 값을 받는다 (저장된 통화를 그대로 유지).
+function ItemEditor({ item, badge, onChange, onSave, saving }) {
+  const isUsd = item.amountUsd !== '' && item.amountUsd !== null
+  return (
+    <div className="mb-3 bg-gray-900 rounded-lg p-3 border border-gray-800">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-white font-medium">{item.label}</span>
+        <span className="text-[10px] text-gray-500">{badge}</span>
+      </div>
+      <div className="flex gap-2 items-end">
+        <label className="flex-1">
+          <span className="text-[11px] text-gray-400 block mb-1">{isUsd ? 'USD' : '원'}</span>
+          <input
+            type="number"
+            value={isUsd ? item.amountUsd : item.amountKrw}
+            onChange={(e) => onChange(isUsd ? { amountUsd: e.target.value } : { amountKrw: e.target.value })}
+            className="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 border border-gray-700"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          />
+        </label>
+        <label className="flex flex-col items-center pb-2">
+          <span className="text-[11px] text-gray-400 mb-1">사용</span>
+          <input type="checkbox" checked={item.active} onChange={(e) => onChange({ active: e.target.checked })} />
+        </label>
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="text-xs text-white bg-indigo-600 px-3 py-2 rounded-lg disabled:opacity-50"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          저장
+        </button>
+      </div>
+      {item.note && <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">{item.note}</p>}
+    </div>
+  )
+}
+
 function Card({ title, right, children }) {
   return (
     <section className="bg-gray-900 rounded-xl p-4 mb-4 border border-gray-800">
@@ -63,6 +102,7 @@ export default function FinancePnl() {
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(false)
   const [items, setItems] = useState([])
+  const [revItems, setRevItems] = useState([])
   const [rate, setRate] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -85,9 +125,33 @@ export default function FinancePnl() {
   }, [month])
 
   const openEditor = async () => {
-    const res = await api.get('/admin/finance/costs')
-    setItems(res.items.map((it) => ({ ...it, amountUsd: it.amountUsd ?? '', amountKrw: it.amountKrw ?? 0 })))
+    const [costRes, revRes] = await Promise.all([
+      api.get('/admin/finance/costs'),
+      api.get(`/admin/finance/revenues?month=${month}`),
+    ])
+    const norm = (it) => ({ ...it, amountUsd: it.amountUsd ?? '', amountKrw: it.amountKrw ?? 0 })
+    setItems(costRes.items.map(norm))
+    setRevItems(revRes.items.map(norm))
     setEditing(true)
+  }
+
+  const saveRevenue = async (it) => {
+    setSaving(true)
+    try {
+      await api.put(`/admin/finance/revenues/${it.id}`, {
+        label: it.label,
+        month: it.month,
+        amountKrw: it.amountKrw,
+        amountUsd: it.amountUsd === '' ? null : it.amountUsd,
+        vendor: it.vendor,
+        note: it.note,
+        active: it.active,
+        sortOrder: it.sortOrder,
+      })
+      await load(month)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const saveItem = async (it) => {
@@ -162,6 +226,22 @@ export default function FinancePnl() {
           }`}
           value={won(revenue.subscriptionNetKrw)}
         />
+        {(revenue.otherItems || []).map((it) => (
+          <Row
+            key={it.id}
+            label={it.label}
+            sub={
+              it.amountUsd != null
+                ? `${usd(it.amountUsd)} × ₩${cost.usdToKrw}${it.recurring ? ' · 매월' : ''}`
+                : it.vendor || (it.recurring ? '매월' : undefined)
+            }
+            value={
+              inProgress && !it.recurring
+                ? `${won(it.amountKrw)} (${won(it.projectedKrw)})`
+                : won(it.amountKrw)
+            }
+          />
+        ))}
         <Row
           label="수익 합계"
           value={inProgress ? `${won(revenue.totalNetKrw)} (${won(revenue.projectedTotalNetKrw)})` : won(revenue.totalNetKrw)}
@@ -279,64 +359,31 @@ export default function FinancePnl() {
                 <p className="text-[11px] text-gray-500 mt-1.5">USD 항목은 이 환율로 매번 다시 환산됩니다.</p>
               </div>
 
+              <div className="text-[11px] text-gray-400 mb-2">원가</div>
               {items.map((it, idx) => (
-                <div key={it.id} className="mb-3 bg-gray-900 rounded-lg p-3 border border-gray-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-white font-medium">{it.label}</span>
-                    <span className="text-[10px] text-gray-500">{CATEGORY_META[it.category]?.label}</span>
-                  </div>
-                  <div className="flex gap-2 items-end">
-                    {it.amountUsd !== '' && it.amountUsd !== null ? (
-                      <label className="flex-1">
-                        <span className="text-[11px] text-gray-400 block mb-1">USD</span>
-                        <input
-                          type="number"
-                          value={it.amountUsd}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, amountUsd: v } : p)))
-                          }}
-                          className="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 border border-gray-700"
-                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                        />
-                      </label>
-                    ) : (
-                      <label className="flex-1">
-                        <span className="text-[11px] text-gray-400 block mb-1">원</span>
-                        <input
-                          type="number"
-                          value={it.amountKrw}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, amountKrw: v } : p)))
-                          }}
-                          className="w-full bg-gray-800 text-gray-100 text-sm rounded-lg px-3 py-2 border border-gray-700"
-                          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                        />
-                      </label>
-                    )}
-                    <label className="flex flex-col items-center pb-2">
-                      <span className="text-[11px] text-gray-400 mb-1">사용</span>
-                      <input
-                        type="checkbox"
-                        checked={it.active}
-                        onChange={(e) => {
-                          const v = e.target.checked
-                          setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, active: v } : p)))
-                        }}
-                      />
-                    </label>
-                    <button
-                      onClick={() => saveItem(it)}
-                      disabled={saving}
-                      className="text-xs text-white bg-indigo-600 px-3 py-2 rounded-lg disabled:opacity-50"
-                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      저장
-                    </button>
-                  </div>
-                  {it.note && <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">{it.note}</p>}
-                </div>
+                <ItemEditor
+                  key={it.id}
+                  item={it}
+                  badge={CATEGORY_META[it.category]?.label}
+                  saving={saving}
+                  onChange={(patch) => setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)))}
+                  onSave={() => saveItem(it)}
+                />
+              ))}
+
+              <div className="text-[11px] text-gray-400 mb-2 mt-5">기타 수익</div>
+              {revItems.length === 0 && (
+                <div className="text-xs text-gray-600 pb-2">이 달의 수익 항목이 없습니다.</div>
+              )}
+              {revItems.map((it, idx) => (
+                <ItemEditor
+                  key={it.id}
+                  item={it}
+                  badge={it.month || '매월'}
+                  saving={saving}
+                  onChange={(patch) => setRevItems((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)))}
+                  onSave={() => saveRevenue(it)}
+                />
               ))}
             </div>
           </div>
