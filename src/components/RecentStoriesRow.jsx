@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
+import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
 
 // Scenario.jsx의 썸네일 슬라이드 패턴을 그대로 사용
 const THUMB_SLIDE_INTERVAL_MS = 2000
@@ -92,7 +93,7 @@ export default function RecentStoriesRow() {
                         return (
                           <img
                             key={idx}
-                            src={m.type === 'video' ? m.posterUrl : m.url}
+                            src={resizedImageUrl(m.type === 'video' ? m.posterUrl : m.url, IMG_W.LIST_THUMB)}
                             alt=""
                             className={baseCls}
                             style={blur ? LOCKED_MEDIA_STYLE : undefined}
@@ -102,7 +103,7 @@ export default function RecentStoriesRow() {
                       })
                     ) : fallbackThumb ? (
                       <img
-                        src={fallbackThumb}
+                        src={resizedImageUrl(fallbackThumb, IMG_W.LIST_THUMB)}
                         alt={s.title || ''}
                         draggable={false}
                         className="absolute inset-0 w-full h-full object-cover"
@@ -132,7 +133,7 @@ export default function RecentStoriesRow() {
                   <div className="flex items-center gap-1 max-w-full">
                     {s.character.profileImage ? (
                       <img
-                        src={s.character.profileImage}
+                        src={resizedImageUrl(s.character.profileImage, IMG_W.LIST_THUMB)}
                         alt=""
                         draggable={false}
                         className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0 ring-1 ring-gray-700"

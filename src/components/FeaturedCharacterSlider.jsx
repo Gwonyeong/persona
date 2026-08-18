@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LazyVideo from './LazyVideo'
+import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
 
 const AUTO_INTERVAL_MS = 6000
 const SWIPE_THRESHOLD_PX = 40
@@ -130,14 +131,14 @@ export default function FeaturedCharacterSlider({ characters, reducedData }) {
                   isVideo ? (
                     <LazyVideo
                       src={thumbUrl}
-                      poster={posterUrl}
+                      poster={resizedImageUrl(posterUrl, IMG_W.HERO)}
                       className="w-full h-full"
                       objectPosition="top"
                       active={isActiveSlide}
                     />
                   ) : (
                     <img
-                      src={thumbUrl}
+                      src={resizedImageUrl(thumbUrl, IMG_W.HERO)}
                       alt={c.name}
                       draggable={false}
                       className="w-full h-full object-cover object-top pointer-events-none"

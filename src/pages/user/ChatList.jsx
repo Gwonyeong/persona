@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
+import { resizedImageUrl, IMG_W } from '../../lib/imageUrl'
 import { goToLogin } from '../../lib/auth'
 import { timeAgo } from '../../lib/timeFormat'
 
@@ -170,7 +171,7 @@ export default function ChatList() {
                       <div className="relative flex-shrink-0">
                         <div className="w-14 h-14 rounded-full bg-gray-800 overflow-hidden">
                           {thumbUrl ? (
-                            <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                            <img src={resizedImageUrl(thumbUrl, IMG_W.LIST_THUMB)} alt="" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-600 text-lg">?</div>
                           )}

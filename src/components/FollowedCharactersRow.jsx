@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
 
 export default function FollowedCharactersRow({ characters }) {
   const { t } = useTranslation()
@@ -33,7 +34,7 @@ export default function FollowedCharactersRow({ characters }) {
                     <div className="relative w-full h-full rounded-full overflow-hidden bg-gray-800">
                       {thumb ? (
                         <img
-                          src={thumb}
+                          src={resizedImageUrl(thumb, IMG_W.LIST_THUMB)}
                           alt={c.name}
                           draggable={false}
                           className="absolute inset-0 w-full h-full object-cover"

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LazyVideo from './LazyVideo'
 import { useTagCategories } from '../lib/useTagCategories'
+import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
 
 function getImageUrl(filePath) {
   if (!filePath) return null
@@ -80,11 +81,15 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
     </div>
   )
 
+  // 카드 실폭은 2열 ≈225px / 3열 ≈150px. 레티나 감안해 약 2배 폭으로 변환해 받는다.
+  // 영상 URL은 헬퍼가 그대로 통과시키므로 LazyVideo src는 원본 그대로다.
+  const cardWidth = compact ? IMG_W.CARD_COMPACT : IMG_W.CARD
+
   const media = thumbUrl ? (
     isVideo ? (
-      <LazyVideo src={thumbUrl} poster={posterUrl} className="w-full h-full" />
+      <LazyVideo src={thumbUrl} poster={resizedImageUrl(posterUrl, cardWidth)} className="w-full h-full" />
     ) : (
-      <img src={thumbUrl} alt={c.name} className="w-full h-full object-cover" />
+      <img src={resizedImageUrl(thumbUrl, cardWidth)} alt={c.name} className="w-full h-full object-cover" />
     )
   ) : (
     <span className="text-4xl text-gray-600">?</span>
