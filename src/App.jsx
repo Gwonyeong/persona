@@ -28,6 +28,7 @@ import AdminUsers from './pages/admin/Users'
 import AdminBanners from './pages/admin/Banners'
 import AdminGroupConcepts from './pages/admin/GroupConcepts'
 import AdminBroadcasts from './pages/admin/Broadcasts'
+import FinancePnl from './pages/admin/FinancePnl'
 import FinanceSubscriptions from './pages/admin/FinanceSubscriptions'
 import FinanceMaskPurchases from './pages/admin/FinanceMaskPurchases'
 import FinanceMaskStats from './pages/admin/FinanceMaskStats'
@@ -229,6 +230,7 @@ function App() {
         <Route path="banners" element={<AdminBanners />} />
         <Route path="group-concepts" element={<AdminGroupConcepts />} />
         <Route path="broadcasts" element={<AdminBroadcasts />} />
+        <Route path="finance/pnl" element={<FinancePnl />} />
         <Route path="finance/subscriptions" element={<FinanceSubscriptions />} />
         <Route path="finance/mask-purchases" element={<FinanceMaskPurchases />} />
         <Route path="finance/mask-stats" element={<FinanceMaskStats />} />

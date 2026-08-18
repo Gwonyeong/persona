@@ -36,6 +36,7 @@ const NAV_ITEMS = [
     key: 'finance',
     label: '재무',
     children: [
+      { to: '/admin/finance/pnl', label: '손익' },
       { to: '/admin/finance/subscriptions', label: '구독' },
       { to: '/admin/finance/mask-purchases', label: '마스크 구매' },
       { to: '/admin/finance/mask-stats', label: '마스크 사용 통계' },
