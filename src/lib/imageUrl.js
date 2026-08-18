@@ -31,7 +31,11 @@ export function resizedImageUrl(url, width, quality = 75) {
   if (NON_TRANSFORMABLE.test(url)) return url
   // 이미 쿼리스트링이 붙어 있으면(서명 URL 등) 변환 대상에서 제외.
   if (url.includes('?')) return url
-  return `${url.replace(OBJECT_PATH, RENDER_PATH)}?width=${width}&quality=${quality}`
+  // resize=contain 필수. Supabase는 resize 기본값이 cover이고 height를 생략하면 원본 높이를
+  // 그대로 목표 높이로 잡기 때문에, width만 주면 세로는 안 줄이고 가로만 잘라낸다
+  // (720x1280 원본 + width=480 -> 480x1280 가운데 크롭). 그 위에 CSS object-cover가
+  // 한 번 더 크롭되면서 기기에서 이미지가 확대돼 보였다. contain이면 480x853로 비율이 유지된다.
+  return `${url.replace(OBJECT_PATH, RENDER_PATH)}?width=${width}&quality=${quality}&resize=contain`
 }
 
 // 화면별 권장 폭. CSS 폭 × 2(레티나) 기준으로 잡았다.
