@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
+import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
 
 // 홈 '새로운 의상' 로우 — 상점에 공개된 최신 의상을 의상 썸네일 원형으로 노출.
 // RecentStoriesRow와 동일한 UI 패턴(그라데이션 링 원형 + 하단 라벨).
@@ -60,7 +61,7 @@ export default function NewOutfitsRow() {
                       {/* 미인증 유저 성인전용 의상: 썸네일 완전 숨김 + SAFETY */}
                       {o.thumbnailUrl && !needVerify && (
                         <img
-                          src={o.thumbnailUrl}
+                          src={resizedImageUrl(o.thumbnailUrl, IMG_W.LIST_THUMB)}
                           alt={o.name || ''}
                           draggable={false}
                           className="absolute inset-0 w-full h-full object-cover"
@@ -79,7 +80,7 @@ export default function NewOutfitsRow() {
                     <div className="flex items-center gap-1 max-w-full">
                       {o.characterProfileImage ? (
                         <img
-                          src={o.characterProfileImage}
+                          src={resizedImageUrl(o.characterProfileImage, IMG_W.LIST_THUMB)}
                           alt=""
                           draggable={false}
                           className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0 ring-1 ring-gray-700"
