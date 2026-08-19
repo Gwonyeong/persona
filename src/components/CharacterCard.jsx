@@ -105,7 +105,7 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
       >
         <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center group-hover:ring-1 group-hover:ring-gray-700 transition-all">
           {media}
-          {(c.concept || labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
+          {(c.description || labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-8 pointer-events-none">
               {(labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
                 <div className="flex flex-wrap gap-1 mb-1">
@@ -122,8 +122,10 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
                   )}
                 </div>
               )}
-              {c.concept && (
-                <p className="text-[11px] font-medium text-gray-300 leading-snug line-clamp-2 drop-shadow">{c.concept}</p>
+              {/* 카드 캡션은 concept(첫 대사 한 줄)이 아니라 description(한 줄 관계 요약)을 쓴다.
+                  대사보다 "유저와 어떤 관계인지"가 카드에서 먼저 읽혀야 한다. */}
+              {c.description && (
+                <p className="text-[11px] font-medium text-gray-300 leading-snug line-clamp-2 drop-shadow">{c.description}</p>
               )}
             </div>
           )}
