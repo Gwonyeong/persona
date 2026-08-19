@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, useRef, useMemo, useCallback, memo } fro
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
+import { useReadSync } from '../../lib/useReadSync'
 // 통화 기능이 V2에 없어 마이크/앱 업데이트 체크 의존성도 제거.
 import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
@@ -671,6 +672,7 @@ const MessageBubble = memo(function MessageBubble({
 // V1 Chat.jsx와는 이 시점 이후로 독립적으로 진화한다 — 한쪽 수정이 다른 쪽에 자동 반영되지 않음.
 export default function ChatV2() {
   const { id } = useParams()
+  const { pingBurst } = useReadSync(id)
   const navigate = useNavigate()
   const [conversation, setConversation] = useState(null)
   const [messages, setMessages] = useState([])
@@ -905,22 +907,9 @@ export default function ChatV2() {
     })
   }, [id, token])
 
-  // 채팅 페이지에 있는 동안 주기적으로 읽음 처리 (heartbeat)
-  useEffect(() => {
-    // 진입 시 즉시 읽음 처리
-    api.post(`/conversations/${id}/read`).catch(() => {})
-
-    const interval = setInterval(() => {
-      api.post(`/conversations/${id}/read`).catch(() => {})
-    }, 5000) // 5초마다
-
-    return () => {
-      clearInterval(interval)
-      // 퇴장 시 keepalive fetch로 확실하게 읽음 처리 (탭 종료에도 전송 보장)
-      api.post(`/conversations/${id}/read`, {}, { keepalive: true }).catch(() => {})
-      window.dispatchEvent(new CustomEvent('chat-exited', { detail: { conversationId: parseInt(id), at: Date.now() } }))
-    }
-  }, [id])
+  // 읽음 동기화는 useReadSync 로 일원화 (진입 1회 + 전송당 burst + 퇴장 keepalive).
+  // 기존엔 채팅방에 있는 내내 5초마다 무조건 호출해 10분 체류 시 120회가 나갔다.
+  // 읽음 상태가 실제로 바뀌는 건 전송 직후 구간뿐이라 그때만 훑는다.
 
   useEffect(() => {
     if (!initialLoadRef.current) {
@@ -991,6 +980,8 @@ export default function ChatV2() {
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = ''
     setSending(true)
+    // read burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
+    pingBurst()
     setAttachedFeed(null)
     setShowGalleryTooltip(false)
     const feedImage = feedToSend?.images?.[0]?.filePath || null

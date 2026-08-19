@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, useRef, useMemo, useCallback, memo } fro
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
+import { useReadSync } from '../../lib/useReadSync'
 import { ensureAppUpToDate } from '../../lib/appUpdate'
 import useStore from '../../store/useStore'
 import GalleryBottomSheet from '../../components/GalleryBottomSheet'
@@ -482,6 +483,7 @@ const MessageBubble = memo(function MessageBubble({
 
 export default function Chat() {
   const { id } = useParams()
+  const { pingBurst } = useReadSync(id)
   const navigate = useNavigate()
   const [conversation, setConversation] = useState(null)
   const [situationCards, setSituationCards] = useState([])
@@ -528,7 +530,6 @@ export default function Chat() {
   const markedSeenRef = useRef(new Set())
   // read polling burst 윈도우 종료 시각(ms). send() 호출 시 + 60초로 갱신.
   // heartbeat useEffect의 5초 interval이 이 값을 보고 그 동안만 read 호출.
-  const readPollUntilRef = useRef(0)
   // 채팅방 전체 배경 — 유저가 갤러리에서 선택. AI가 덮어쓰지 않음.
   const [backgroundImage, setBackgroundImage] = useState(null)
   // 캐릭터 표정 sprite 뒤 backdrop — AI가 scene에 따라 자동 선택. 채팅방 배경과 독립.
@@ -825,26 +826,9 @@ export default function Chat() {
     })
   }, [id, token])
 
-  // 읽음 처리 — 이벤트 기반 burst polling.
-  // 평소엔 polling 안 함. 메시지 전송 시 send() 핸들러가 readPollUntilRef를 갱신해
-  // 그 시점부터 60초 동안만 5초 간격으로 read 호출 → 캐릭터 응답·후속 메시지가 도착하는
-  // 짧은 윈도우에서만 unread가 잘못 잡히는 걸 방지. 진입·퇴장 시는 항상 1회 호출.
-  useEffect(() => {
-    api.post(`/conversations/${id}/read`).catch(() => {})
-
-    const interval = setInterval(() => {
-      if (readPollUntilRef.current > Date.now()) {
-        api.post(`/conversations/${id}/read`).catch(() => {})
-      }
-    }, 5000)
-
-    return () => {
-      clearInterval(interval)
-      // 퇴장 시 keepalive fetch로 확실하게 읽음 처리 (탭 종료에도 전송 보장)
-      api.post(`/conversations/${id}/read`, {}, { keepalive: true }).catch(() => {})
-      window.dispatchEvent(new CustomEvent('chat-exited', { detail: { conversationId: parseInt(id), at: Date.now() } }))
-    }
-  }, [id])
+  // 읽음 동기화는 useReadSync 로 일원화 (진입 1회 + 전송당 burst + 퇴장 keepalive).
+  // 기존엔 5초 고정 간격으로 60초를 훑어 전송당 12회였다 — 실측에서 이 호출이 전체
+  // invocations의 29.3%로 최대 항목이라 backoff 로 5회로 줄였다.
 
   useEffect(() => {
     if (!initialLoadRef.current) {
@@ -919,8 +903,8 @@ export default function Chat() {
     if (textareaRef.current) textareaRef.current.style.height = ''
     setSuggestedReplies(null)
     setSending(true)
-    // read polling burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
-    readPollUntilRef.current = Date.now() + 60000
+    // read burst 시작 — 응답 스트림 + 후속 메시지 도착 동안 unread 동기화.
+    pingBurst()
     setAttachedFeed(null)
     setShowGalleryTooltip(false)
     const feedImage = feedToSend?.images?.[0]?.filePath || null
