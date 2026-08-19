@@ -107,8 +107,15 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
           {media}
           {(c.description || labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-8 pointer-events-none">
+              {/* 카드 캡션은 concept(첫 대사 한 줄)이 아니라 description(한 줄 관계 요약)을 쓴다.
+                  대사보다 "유저와 어떤 관계인지"가 먼저 읽혀야 해서 태그보다 위에 둔다. */}
+              {c.description && (
+                <p className="text-[13px] font-semibold text-white leading-snug line-clamp-2 drop-shadow mb-1.5">
+                  {c.description}
+                </p>
+              )}
               {(labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
-                <div className="flex flex-wrap gap-1 mb-1">
+                <div className="flex flex-wrap gap-1">
                   {[picked.mood, picked.personality].map(
                     (tg) =>
                       labelMap.get(tg) && (
@@ -121,11 +128,6 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
                       ),
                   )}
                 </div>
-              )}
-              {/* 카드 캡션은 concept(첫 대사 한 줄)이 아니라 description(한 줄 관계 요약)을 쓴다.
-                  대사보다 "유저와 어떤 관계인지"가 카드에서 먼저 읽혀야 한다. */}
-              {c.description && (
-                <p className="text-[11px] font-medium text-gray-300 leading-snug line-clamp-2 drop-shadow">{c.description}</p>
               )}
             </div>
           )}
