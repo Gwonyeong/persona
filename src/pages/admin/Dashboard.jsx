@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { api } from '../../lib/api'
 import UserAgeStats from './UserAgeStats'
 import ExpressionUnlockStats from './ExpressionUnlockStats'
+import CharacterPopularity from './CharacterPopularity'
 
 const TABS = [
   { key: 'overview', label: '개요' },
   { key: 'age', label: '유저 연령 통계' },
   { key: 'expressions', label: '표정 해금 통계' },
+  { key: 'popularity', label: '캐릭터 인기 지표' },
 ]
 
 function StatCard({ label, value, hint }) {
@@ -131,6 +133,7 @@ export default function Dashboard() {
       {activeTab === 'overview' && <OverviewTab />}
       {activeTab === 'age' && <UserAgeStats embedded />}
       {activeTab === 'expressions' && <ExpressionUnlockStats embedded />}
+      {activeTab === 'popularity' && <CharacterPopularity embedded />}
     </div>
   )
 }
