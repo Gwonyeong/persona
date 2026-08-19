@@ -10,6 +10,7 @@ import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import NewOutfitsRow from '../../components/NewOutfitsRow'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
+import RecommendedRow from '../../components/RecommendedRow'
 import RelationSections from '../../components/RelationSections'
 import CharacterCard from '../../components/CharacterCard'
 import MaskIcon from '../../components/MaskIcon'
@@ -154,9 +155,26 @@ export default function Home() {
     [recentJoined]
   )
 
+  // 추천 6명 — 서버가 실어 보낸 popRank(하루 1회 갱신되는 CharacterStat 스냅샷 순위) 오름차순.
+  // 최근 합류 4명과는 겹치지 않게 뺀다 (서버도 출시 14일 이내는 랭킹에서 제외하지만,
+  // publishedAt이 없는 레거시 캐릭터가 "최근 합류"에 뜨는 경로가 있어 클라에서도 한 번 더 막는다).
+  const recommended = useMemo(() => {
+    return characters
+      .filter((c) => c.popRank && !recentJoinedIds.has(c.id))
+      .sort((a, b) => a.popRank - b.popRank)
+      .slice(0, 6)
+  }, [characters, recentJoinedIds])
+
+  const recommendedIds = useMemo(
+    () => new Set(recommended.map((c) => c.id)),
+    [recommended]
+  )
+
+  // 상단 섹션에 이미 뜬 캐릭터는 하단 그리드에서 뺀다. 노출 총량은 그대로 두고 자리만 위로
+  // 올리는 셈이라, 인기 상위가 하단까지 두 번 먹어 롱테일이 밀리는 걸 막는다.
   const gridCharacters = useMemo(
-    () => characters.filter((c) => !recentJoinedIds.has(c.id)),
-    [characters, recentJoinedIds]
+    () => characters.filter((c) => !recentJoinedIds.has(c.id) && !recommendedIds.has(c.id)),
+    [characters, recentJoinedIds, recommendedIds]
   )
 
 
@@ -380,7 +398,14 @@ export default function Home() {
         safetyMode={safetyMode}
       />
 
-      {/* 추천 페소나 — 3열 카드. 일단 UI에서 숨김(false). 되살리려면 false 제거. */}
+      {/* 당신을 위한 추천 페소나 — popRank 상위 6명, 2열 그리드 */}
+      <RecommendedRow
+        characters={recommended}
+        reducedData={reducedData}
+        safetyMode={safetyMode}
+      />
+
+      {/* (구) 추천 페소나 — AROUSED 이미지 기준 슬라이더. UI에서 숨김(false) 유지. */}
       {false && featuredCharacters.length > 0 && (
         <div className="grid grid-cols-2 gap-3 mb-4">
           {featuredCharacters.slice(0, 3).map((c) => (
