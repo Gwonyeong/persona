@@ -66,7 +66,7 @@ export default function CharacterPopularity({ embedded }) {
       {!data.bucketAt ? (
         <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 text-sm text-gray-400 leading-relaxed">
           <p className="text-gray-200 font-semibold mb-2">아직 스냅샷이 없습니다.</p>
-          <p>서버 cron(CharacterStats 잡)은 매일 09:00 KST 에 한 번 돕니다.</p>
+          <p>서버 cron(CharacterStats 잡)은 매시간 돌면서 그날(KST) 스냅샷이 없을 때만 집계합니다.</p>
           <p className="mt-1">
             지금 바로 채우려면 서버에서{' '}
             <code className="text-indigo-300">node scripts/collect-character-stats.js --commit</code> 를 실행하세요.
