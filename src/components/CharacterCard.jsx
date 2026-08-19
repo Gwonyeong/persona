@@ -110,7 +110,7 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
               {/* 카드 캡션은 concept(첫 대사 한 줄)이 아니라 description(한 줄 관계 요약)을 쓴다.
                   대사보다 "유저와 어떤 관계인지"가 먼저 읽혀야 해서 태그보다 위에 둔다. */}
               {c.description && (
-                <p className="text-[13px] font-semibold text-white leading-snug line-clamp-2 drop-shadow mb-1.5">
+                <p className="text-[13px] font-semibold text-white leading-snug line-clamp-2 drop-shadow mb-1.5 break-keep break-words">
                   {c.description}
                 </p>
               )}
