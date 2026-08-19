@@ -109,11 +109,25 @@ export default function Home() {
     }
   }, [])
 
+  // 검색어는 디바운스해서 반영한다. search를 그대로 의존성에 두면 입력 한 글자마다
+  // /api/characters 가 나가는데, 이 라우트는 평균 100ms로 가벼운 편이 아니다.
+  // (2026-08-19 usage 계측에서 호출 수 상위 4위)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    // 검색어를 지운 경우는 즉시 반영 — 목록이 늦게 돌아오면 지운 티가 안 난다.
+    if (!search) {
+      setDebouncedSearch('')
+      return
+    }
+    const t = setTimeout(() => setDebouncedSearch(search), 350)
+    return () => clearTimeout(t)
+  }, [search])
+
   useEffect(() => {
     const params = new URLSearchParams()
-    if (search) params.set('search', search)
+    if (debouncedSearch) params.set('search', debouncedSearch)
     api.get(`/characters?${params}`).then(({ characters }) => setCharacters(characters))
-  }, [search, i18nInstance.language, safetyMode])
+  }, [debouncedSearch, i18nInstance.language, safetyMode])
 
   // 1:1 슬라이더는 search/sort/filter와 무관 — AROUSED 이미지 보유 캐릭터를
   // 가장 최근 흥분 이미지 업로드 시점 기준 최신순으로 로드.
