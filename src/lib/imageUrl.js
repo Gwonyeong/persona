@@ -31,10 +31,10 @@ const DPR = (() => {
 /**
  * @param {string|null|undefined} url  Supabase 공개 URL (그 외 값은 그대로 반환)
  * @param {number} cssWidth            표시되는 CSS 폭(px). 실제 요청 폭은 여기에 DPR을 곱한 값
- * @param {number} [quality=80]        품질 20~100
+ * @param {number} [quality=85]        품질 20~100
  * @returns {string|null|undefined}
  */
-export function resizedImageUrl(url, cssWidth, quality = 80) {
+export function resizedImageUrl(url, cssWidth, quality = 85) {
   if (!url || typeof url !== 'string') return url
   // Supabase 스토리지 원본 URL이 아니면 손대지 않는다 (외부 CDN·데이터 URL 등).
   if (!url.includes(OBJECT_PATH)) return url
@@ -49,6 +49,9 @@ export function resizedImageUrl(url, cssWidth, quality = 80) {
   return `${url.replace(OBJECT_PATH, RENDER_PATH)}?width=${width}&quality=${quality}&resize=contain`
 }
 
+// 품질 85. 672px(카드 실폭) 기준 실측 q80 65KB / q85 79KB / q90 108KB 으로,
+// q90은 체감 대비 66% 더 비싸서 85에서 끊었다.
+//
 // 화면별 실제 CSS 폭(px). 요청 폭은 여기에 기기 DPR(최대 3)을 곱한 값이 된다.
 // #root가 max-width 480px, 페이지 좌우 패딩이 px-4(16px씩)라 전폭 요소는 448px.
 // 원본보다 큰 폭을 요청해도 Supabase는 업스케일하지 않고 원본 해상도 그대로 돌려주므로
