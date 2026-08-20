@@ -81,9 +81,10 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
     </div>
   )
 
-  // 카드 실폭은 2열 ≈225px / 3열 ≈150px. 레티나 감안해 약 2배 폭으로 변환해 받는다.
+  // compact 카드도 3열이 아니라 2열(RecommendedRow·RecentJoinedRow)이라 실폭이 같다.
+  // 헬퍼가 DPR을 곱해주므로 여기서는 CSS 폭만 넘긴다.
   // 영상 URL은 헬퍼가 그대로 통과시키므로 LazyVideo src는 원본 그대로다.
-  const cardWidth = compact ? IMG_W.CARD_COMPACT : IMG_W.CARD
+  const cardWidth = IMG_W.CARD
 
   const media = thumbUrl ? (
     isVideo ? (

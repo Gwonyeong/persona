@@ -80,7 +80,7 @@ export default function NewOutfitsRow() {
                     <div className="flex items-center gap-1 max-w-full">
                       {o.characterProfileImage ? (
                         <img
-                          src={resizedImageUrl(o.characterProfileImage, IMG_W.LIST_THUMB)}
+                          src={resizedImageUrl(o.characterProfileImage, IMG_W.AVATAR_TINY)}
                           alt=""
                           draggable={false}
                           className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0 ring-1 ring-gray-700"
