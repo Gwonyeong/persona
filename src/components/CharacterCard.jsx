@@ -105,28 +105,32 @@ export default function CharacterCard({ character, reducedData, safetyMode, comp
       >
         <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center group-hover:ring-1 group-hover:ring-gray-700 transition-all">
           {media}
-          {(c.concept || labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-8 pointer-events-none">
-              {(labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
-                <div className="flex flex-wrap gap-1 mb-1">
-                  {[picked.mood, picked.personality].map(
-                    (tg) =>
-                      labelMap.get(tg) && (
-                        <span
-                          key={tg}
-                          className="text-[9px] leading-none px-1.5 py-1 rounded-full bg-white/20 text-white backdrop-blur-sm"
-                        >
-                          {labelMap.get(tg)}
-                        </span>
-                      ),
-                  )}
-                </div>
-              )}
-              {c.concept && (
-                <p className="text-[11px] font-medium text-gray-300 leading-snug line-clamp-2 drop-shadow">{c.concept}</p>
-              )}
-            </div>
-          )}
+          {/* 하단 딤드 — 캡션·태그 유무와 무관하게 항상 깔아 카드 톤을 통일하고,
+              밝은 이미지 위에서도 흰 캡션이 읽히게 한다. */}
+          <div className="absolute inset-x-0 bottom-0 min-h-[38%] flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-10 pointer-events-none">
+            {/* 카드 캡션은 concept(첫 대사 한 줄)이 아니라 description(한 줄 관계 요약)을 쓴다.
+                대사보다 "유저와 어떤 관계인지"가 먼저 읽혀야 해서 태그보다 위에 둔다. */}
+            {c.description && (
+              <p className="text-[13px] font-semibold text-white leading-snug line-clamp-2 drop-shadow mb-1.5 break-keep break-words">
+                {c.description}
+              </p>
+            )}
+            {(labelMap.get(picked.mood) || labelMap.get(picked.personality)) && (
+              <div className="flex flex-wrap gap-1">
+                {[picked.mood, picked.personality].map(
+                  (tg) =>
+                    labelMap.get(tg) && (
+                      <span
+                        key={tg}
+                        className="text-[9px] leading-none px-1.5 py-1 rounded-full bg-white/20 text-white backdrop-blur-sm"
+                      >
+                        {labelMap.get(tg)}
+                      </span>
+                    ),
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <div className="mt-1.5 flex items-start gap-1.5 text-white">
           <p className="font-semibold text-xs truncate flex-1 min-w-0 leading-tight text-gray-300">{c.name}</p>
