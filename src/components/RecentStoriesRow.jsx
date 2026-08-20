@@ -133,7 +133,7 @@ export default function RecentStoriesRow() {
                   <div className="flex items-center gap-1 max-w-full">
                     {s.character.profileImage ? (
                       <img
-                        src={resizedImageUrl(s.character.profileImage, IMG_W.LIST_THUMB)}
+                        src={resizedImageUrl(s.character.profileImage, IMG_W.AVATAR_TINY)}
                         alt=""
                         draggable={false}
                         className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0 ring-1 ring-gray-700"
