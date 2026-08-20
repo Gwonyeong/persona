@@ -532,10 +532,6 @@ export default function MaskShop() {
                 <span className="text-gray-500">&#10003;</span>
                 <span>{t('subscription.feature.characters')} · {t('subscription.featureValue.tenCharacters')}</span>
               </li>
-              <li className="text-xs text-gray-300 flex items-center gap-2">
-                <span className="text-gray-500">&#10003;</span>
-                <span>{t('subscription.feature.chat')} · {t('subscription.featureValue.maskCost')}</span>
-              </li>
             </ul>
           </div>
 
@@ -590,6 +586,10 @@ export default function MaskShop() {
                 </li>
               ))}
             </ul>
+
+            {/* 각주 — 구독해도 채팅 마스크는 그대로 소모된다는 점을 명시.
+                이 안내가 없어 "구독 = 무제한 채팅"으로 오해하는 문의가 반복됐다. */}
+            <p className="text-[11px] text-gray-400 mb-4 pl-1">{t('subscription.lightNote')}</p>
 
             {/* CTA */}
             {currentTier === 'LIGHT' ? (
