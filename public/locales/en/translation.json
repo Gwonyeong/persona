@@ -163,7 +163,10 @@
     "noChatsHint": "Pick a character from Home to start chatting",
     "startChat": "Start a conversation",
     "deleteTitle": "Delete conversation?",
-    "deleteDescription": "All chat history and affinity with {{name}} will be reset. This cannot be undone."
+    "deleteDescription": "All chat history and affinity with {{name}} will be reset. This cannot be undone.",
+    "tabNormal": "Chats",
+    "tabSituation": "Roleplay",
+    "deleteSituationDescription": "All progress in the roleplay \"{{title}}\" will be deleted. This cannot be undone."
   },
   "chat": {
     "online": "Online",

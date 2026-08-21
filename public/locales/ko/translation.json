@@ -163,7 +163,10 @@
     "noChatsHint": "홈에서 캐릭터를 선택해 대화를 시작해보세요",
     "startChat": "대화를 시작해보세요",
     "deleteTitle": "대화를 삭제할까요?",
-    "deleteDescription": "{{name}}과의 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다."
+    "deleteDescription": "{{name}}과의 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "tabNormal": "일반",
+    "tabSituation": "상황극",
+    "deleteSituationDescription": "'{{title}}' 상황극의 진행 내용이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
   },
   "chat": {
     "online": "활동 중",
