@@ -71,6 +71,27 @@ function formatKstDateFull(iso) {
   }).format(new Date(iso))
 }
 
+// 음성 샘플은 { normal: { text, audioUrl, locales: { ja: {...} } }, aroused: {...} } 구조다.
+// 편집 폼에서 쓰기 편하게 한국어 원본 + ja 번역본을 나란히 편 상태로 바꾼다.
+const emptyVoiceSample = () => ({ text: '', audioUrl: '', ja: { text: '', audioUrl: '', sourceText: '' } })
+
+function toVoiceSampleState(voiceSamples) {
+  const src = voiceSamples && typeof voiceSamples === 'object' ? voiceSamples : {}
+  const pick = (kind) => {
+    const s = src[kind] && typeof src[kind] === 'object' ? src[kind] : {}
+    const ja = s.locales?.ja && typeof s.locales.ja === 'object' ? s.locales.ja : {}
+    return {
+      text: s.text || '',
+      audioUrl: s.audioUrl || '',
+      ja: { text: ja.text || '', audioUrl: ja.audioUrl || '', sourceText: ja.sourceText || '' },
+    }
+  }
+  return { normal: pick('normal'), aroused: pick('aroused') }
+}
+
+// 한국어 대사를 다시 만든 뒤 일본어를 갱신하지 않으면 낡은 음성이 일본 유저에게 나간다.
+const isJaStale = (sample) => !!sample?.ja?.audioUrl && (sample.ja.sourceText || '') !== (sample.text || '')
+
 export default function CharacterProduction() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -97,7 +118,7 @@ export default function CharacterProduction() {
   const [bulkDrag, setBulkDrag] = useState(false)
 
   // 음성 샘플
-  const [voiceSamples, setVoiceSamples] = useState({ normal: { text: '', audioUrl: '' }, aroused: { text: '', audioUrl: '' } })
+  const [voiceSamples, setVoiceSamples] = useState({ normal: emptyVoiceSample(), aroused: emptyVoiceSample() })
   const [voiceSampleBusy, setVoiceSampleBusy] = useState({ normal: null, aroused: null })
   // 원클릭 자동 생성 (일반·흥분 대사 생성 → TTS → 저장)
   const [autoSample, setAutoSample] = useState({ running: false, step: '', error: null })
@@ -118,10 +139,7 @@ export default function CharacterProduction() {
       setCharacter(c || null)
       if (c) {
         setVoiceIdInput(c.voiceId || '')
-        setVoiceSamples({
-          normal: { text: c.voiceSamples?.normal?.text || '', audioUrl: c.voiceSamples?.normal?.audioUrl || '' },
-          aroused: { text: c.voiceSamples?.aroused?.text || '', audioUrl: c.voiceSamples?.aroused?.audioUrl || '' },
-        })
+        setVoiceSamples(toVoiceSampleState(c.voiceSamples))
       }
     })
 
@@ -317,13 +335,30 @@ export default function CharacterProduction() {
     setVoiceSampleBusy((p) => ({ ...p, [kind]: generateTts ? 'tts' : 'save' }))
     try {
       const { voiceSamples: updated } = await api.post(`/admin/characters/${character.id}/voice-sample/save`, { kind, text, generateTts })
-      setVoiceSamples({
-        normal: { text: updated?.normal?.text || '', audioUrl: updated?.normal?.audioUrl || '' },
-        aroused: { text: updated?.aroused?.text || '', audioUrl: updated?.aroused?.audioUrl || '' },
-      })
+      setVoiceSamples(toVoiceSampleState(updated))
       await load()
     } catch (e) {
       alert(`저장 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setVoiceSampleBusy((p) => ({ ...p, [kind]: null }))
+    }
+  }
+
+  // 한국어 대사를 일본어로 번역 → 같은 보이스로 일본어 TTS 생성 → locales.ja 저장.
+  // 일본 서비스에서 캐릭터 상세 예시 음성이 한국어로 들리지 않게 하려면 이 단계까지 끝내야 한다.
+  const translateSample = async (kind, lang = 'ja') => {
+    if (!hasVoiceId) { alert('보이스 ID를 먼저 확정/저장하세요.'); return }
+    if (!(voiceSamples[kind]?.text || '').trim()) { alert('한국어 대사를 먼저 만들어 저장하세요.'); return }
+    setVoiceSampleBusy((p) => ({ ...p, [kind]: lang }))
+    try {
+      const { voiceSamples: updated } = await api.post(
+        `/admin/characters/${character.id}/voice-sample/translate`,
+        { kind, lang, generateTts: true },
+      )
+      setVoiceSamples(toVoiceSampleState(updated))
+      await load()
+    } catch (e) {
+      alert(`일본어 음성 생성 실패: ${e?.data?.error || e?.message || 'unknown'}`)
     } finally {
       setVoiceSampleBusy((p) => ({ ...p, [kind]: null }))
     }
@@ -348,10 +383,16 @@ export default function CharacterProduction() {
         setAutoSample((p) => ({ ...p, step: `${label} 음성 생성 중...` }))
         const { voiceSamples: updated } = await api.post(`/admin/characters/${character.id}/voice-sample/save`, { kind, text, generateTts: true })
         updatedAll = updated
-        setVoiceSamples({
-          normal: { text: updated?.normal?.text || '', audioUrl: updated?.normal?.audioUrl || '' },
-          aroused: { text: updated?.aroused?.text || '', audioUrl: updated?.aroused?.audioUrl || '' },
-        })
+        setVoiceSamples(toVoiceSampleState(updated))
+
+        // 한국어가 확정된 뒤 곧바로 일본어 번역 + 일본어 음성까지 만든다 (일본 서비스용).
+        setAutoSample((p) => ({ ...p, step: `${label} 일본어 번역·음성 생성 중...` }))
+        const { voiceSamples: withJa } = await api.post(
+          `/admin/characters/${character.id}/voice-sample/translate`,
+          { kind, lang: 'ja', generateTts: true },
+        )
+        updatedAll = withJa
+        setVoiceSamples(toVoiceSampleState(withJa))
       }
       setAutoSample({ running: false, step: '', error: null })
     } catch (e) {
@@ -569,7 +610,8 @@ export default function CharacterProduction() {
         <div className="mt-5 pt-4 border-t border-gray-800">
           <p className="text-xs font-semibold text-gray-300 mb-1">🔊 음성 샘플 (캐릭터 상세 버블)</p>
           <p className="text-[11px] text-gray-500 mb-3">
-            버튼 하나로 <b className="text-gray-400">기본 / 흥분</b> 대사를 각각 생성하고, 위 보이스로 음성까지 만들어 저장합니다.
+            버튼 하나로 <b className="text-gray-400">기본 / 흥분</b> 대사를 각각 생성하고, 위 보이스로 한국어 음성 →
+            <b className="text-gray-400"> 일본어 번역 + 일본어 음성</b>까지 만들어 저장합니다.
           </p>
           {!hasVoiceId && (
             <p className="text-xs text-amber-400 mb-2">⚠ 보이스 ID를 먼저 확정/저장해야 음성 생성이 가능합니다.</p>
@@ -581,7 +623,7 @@ export default function CharacterProduction() {
             className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm font-medium disabled:opacity-50 w-full"
             style={btnStyle}
           >
-            {autoSample.running ? `⏳ ${autoSample.step || '생성 중...'}` : '✨ 대사 생성 + 음성 생성 (기본·흥분 한 번에)'}
+            {autoSample.running ? `⏳ ${autoSample.step || '생성 중...'}` : '✨ 대사 생성 + 음성 생성 (기본·흥분 / 한국어·일본어 한 번에)'}
           </button>
           {autoSample.error && <p className="text-[11px] text-red-400 mt-2 break-words">⚠ {autoSample.error}</p>}
 
@@ -592,12 +634,23 @@ export default function CharacterProduction() {
               return (
                 <div key={kind} className="bg-gray-800/50 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-gray-400 flex-shrink-0 w-16">{label}</span>
+                    <span className="text-[11px] text-gray-400 flex-shrink-0 w-16">🇰🇷 {label}</span>
                     {sample.audioUrl
                       ? <audio src={sample.audioUrl} controls className="h-8 flex-1 min-w-0" />
                       : <span className="text-[11px] text-gray-600">아직 음성 없음</span>}
                   </div>
                   {sample.text && <p className="text-[11px] text-gray-500 mt-1 break-words">{sample.text}</p>}
+
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-700/60">
+                    <span className="text-[11px] text-gray-400 flex-shrink-0 w-16">🇯🇵 {label}</span>
+                    {sample.ja?.audioUrl
+                      ? <audio src={sample.ja.audioUrl} controls className="h-8 flex-1 min-w-0" />
+                      : <span className="text-[11px] text-gray-600">아직 일본어 음성 없음 (일본 유저에겐 한국어가 재생됨)</span>}
+                  </div>
+                  {sample.ja?.text && <p className="text-[11px] text-gray-500 mt-1 break-words">{sample.ja.text}</p>}
+                  {isJaStale(sample) && (
+                    <p className="text-[11px] text-amber-400 mt-1">⚠ 한국어 대사가 바뀐 뒤 일본어를 다시 만들지 않았습니다 — 아래에서 재생성하세요.</p>
+                  )}
                 </div>
               )
             })}
@@ -648,7 +701,19 @@ export default function CharacterProduction() {
                       >
                         {busy === 'tts' ? 'TTS 생성 중...' : '🔊 저장 + 음성 생성'}
                       </button>
+                      <button
+                        onClick={() => translateSample(kind, 'ja')}
+                        disabled={!!busy || autoSample.running || !hasVoiceId || !sample.text.trim()}
+                        className="text-xs px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 disabled:opacity-50"
+                        style={btnStyle}
+                        title="저장된 한국어 대사를 일본어로 번역하고 일본어 음성을 생성합니다"
+                      >
+                        {busy === 'ja' ? '일본어 생성 중...' : '🇯🇵 일본어 번역 + 음성'}
+                      </button>
                     </div>
+                    {sample.ja?.text && (
+                      <p className="text-[11px] text-gray-500 mt-2 break-words">🇯🇵 {sample.ja.text}</p>
+                    )}
                   </div>
                 )
               })}

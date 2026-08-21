@@ -718,6 +718,24 @@ function NotifyCharacterModal({ character, onClose, onSent }) {
   )
 }
 
+// 음성 샘플 { normal: { text, audioUrl, locales: { ja } }, aroused: {...} } → 편집 폼 state
+function toVoiceSampleState(voiceSamples) {
+  const src = voiceSamples && typeof voiceSamples === 'object' ? voiceSamples : {}
+  const pick = (kind) => {
+    const s = src[kind] && typeof src[kind] === 'object' ? src[kind] : {}
+    const ja = s.locales?.ja && typeof s.locales.ja === 'object' ? s.locales.ja : {}
+    return {
+      text: s.text || '',
+      audioUrl: s.audioUrl || '',
+      ja: { text: ja.text || '', audioUrl: ja.audioUrl || '', sourceText: ja.sourceText || '' },
+    }
+  }
+  return { normal: pick('normal'), aroused: pick('aroused') }
+}
+
+// 한국어 대사가 바뀐 뒤 일본어를 다시 만들지 않은 상태 (일본 유저에게 낡은 음성이 나감)
+const isJaStale = (sample) => !!sample?.ja?.audioUrl && (sample.ja.sourceText || '') !== (sample.text || '')
+
 export default function Characters() {
   const [characters, setCharacters] = useState([])
   const [editing, setEditing] = useState(null) // null | 'new' | character object
@@ -741,7 +759,7 @@ export default function Characters() {
   const [v2Busy, setV2Busy] = useState({ image: false, voice: false, translate: false, generate: false })
   const [v2DragOverIdx, setV2DragOverIdx] = useState(null)
   // 음성 샘플 (캐릭터 상세 페이지 버블) — character.voiceSamples Json 컬럼에 저장됨. PUT /characters와 별개 엔드포인트.
-  const [voiceSamples, setVoiceSamples] = useState({ normal: { text: '', audioUrl: '' }, aroused: { text: '', audioUrl: '' } })
+  const [voiceSamples, setVoiceSamples] = useState(() => toVoiceSampleState(null))
   // busy[kind] = null | 'text' | 'save' | 'tts'
   const [voiceSampleBusy, setVoiceSampleBusy] = useState({ normal: null, aroused: null })
   const [nationality, setNationality] = useState('all') // 'all' | 'kr' | 'jp' | 'us'
@@ -904,11 +922,7 @@ export default function Characters() {
     })
     setV2Lang('ko')
     setV2Busy({ image: false, voice: false, translate: false, generate: false })
-    const vs = (c.voiceSamples && typeof c.voiceSamples === 'object') ? c.voiceSamples : {}
-    setVoiceSamples({
-      normal: { text: vs.normal?.text || '', audioUrl: vs.normal?.audioUrl || '' },
-      aroused: { text: vs.aroused?.text || '', audioUrl: vs.aroused?.audioUrl || '' },
-    })
+    setVoiceSamples(toVoiceSampleState(c.voiceSamples))
     setVoiceSampleBusy({ normal: null, aroused: null })
     setEditing(c)
   }
@@ -1025,12 +1039,26 @@ export default function Characters() {
         `/admin/characters/${editing.id}/voice-sample/save`,
         { kind, text, generateTts }
       )
-      setVoiceSamples({
-        normal: { text: updated?.normal?.text || '', audioUrl: updated?.normal?.audioUrl || '' },
-        aroused: { text: updated?.aroused?.text || '', audioUrl: updated?.aroused?.audioUrl || '' },
-      })
+      setVoiceSamples(toVoiceSampleState(updated))
     } catch (e) {
       alert(`저장 실패: ${e?.message || 'unknown'}`)
+    } finally {
+      setVoiceSampleBusy((prev) => ({ ...prev, [kind]: null }))
+    }
+  }
+
+  // 저장된 한국어 대사 → 일본어 번역 + 일본어 음성 생성 (locales.ja). 일본 서비스용.
+  const translateVoiceSample = async (kind, lang = 'ja') => {
+    if (!editing || editing === 'new') return
+    setVoiceSampleBusy((prev) => ({ ...prev, [kind]: lang }))
+    try {
+      const { voiceSamples: updated } = await api.post(
+        `/admin/characters/${editing.id}/voice-sample/translate`,
+        { kind, lang, generateTts: true }
+      )
+      setVoiceSamples(toVoiceSampleState(updated))
+    } catch (e) {
+      alert(`일본어 음성 생성 실패: ${e?.data?.error || e?.message || 'unknown'}`)
     } finally {
       setVoiceSampleBusy((prev) => ({ ...prev, [kind]: null }))
     }
@@ -2493,10 +2521,10 @@ export default function Characters() {
                     <label className="text-sm font-medium text-gray-200">음성 샘플 (상세 페이지 버블)</label>
                     <span className="text-[10px] text-gray-500">각 카드는 독립 저장</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 mb-3">'Gemini로 생성' → 텍스트 검토 → 'TTS 생성 + 저장'. aroused는 클라이언트에서 Safety Mode OFF일 때만 재생됨.</p>
+                  <p className="text-[10px] text-gray-500 mb-3">'Gemini로 생성' → 텍스트 검토 → 'TTS 생성 + 저장' → '🇯🇵 일본어'. aroused는 클라이언트에서 Safety Mode OFF일 때만 재생됨.</p>
                   {['normal', 'aroused'].map((kind) => {
                     const busy = voiceSampleBusy[kind]
-                    const sample = voiceSamples[kind] || { text: '', audioUrl: '' }
+                    const sample = voiceSamples[kind] || { text: '', audioUrl: '', ja: { text: '', audioUrl: '', sourceText: '' } }
                     const label = kind === 'normal' ? '일반' : '흥분 (TEASE)'
                     return (
                       <div key={kind} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 mb-2">
@@ -2543,7 +2571,29 @@ export default function Characters() {
                           >
                             {busy === 'tts' ? 'TTS 생성 중…' : 'TTS 생성 + 저장'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => translateVoiceSample(kind, 'ja')}
+                            disabled={!!busy || !sample.audioUrl || !form.voiceId.trim()}
+                            className="text-[11px] px-2 py-1 rounded bg-rose-600 text-white hover:bg-rose-500 disabled:opacity-50"
+                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                            title={!sample.audioUrl ? '한국어 음성을 먼저 저장하세요' : '저장된 한국어 대사를 일본어로 번역하고 일본어 음성을 생성합니다'}
+                          >
+                            {busy === 'ja' ? '일본어 생성 중…' : '🇯🇵 일본어 번역 + 음성'}
+                          </button>
                         </div>
+                        {(sample.ja?.audioUrl || sample.ja?.text) && (
+                          <div className="mt-2 pt-2 border-t border-gray-700/60">
+                            <span className="text-[10px] text-gray-400">🇯🇵 일본어</span>
+                            {sample.ja.audioUrl && (
+                              <audio src={sample.ja.audioUrl} controls preload="none" className="w-full mt-1 h-9" />
+                            )}
+                            {sample.ja.text && <p className="text-[10px] text-gray-500 mt-1 break-words">{sample.ja.text}</p>}
+                          </div>
+                        )}
+                        {isJaStale(sample) && (
+                          <p className="text-[10px] text-amber-400 mt-1">⚠ 한국어 대사가 바뀐 뒤 일본어 재생성 안 됨</p>
+                        )}
                       </div>
                     )
                   })}
