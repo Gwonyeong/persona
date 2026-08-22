@@ -28,6 +28,10 @@ export default function ChatList() {
   const { t } = useTranslation()
   const { token } = useStore()
   const [conversations, setConversations] = useState([])
+  // 진행 중인 상황극(VN) 세션 — 일반 대화와 다른 공간이라 탭으로 분리해 보여준다.
+  // 예전엔 캐릭터 채팅방 안의 상황극 아이콘이 유일한 진입로였다 (일반 방을 지우면 도달 불가).
+  const [situations, setSituations] = useState([])
+  const [tab, setTab] = useState('normal') // 'normal' | 'situation'
   const [search, setSearch] = useState('')
   const [editMode, setEditMode] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -36,7 +40,10 @@ export default function ChatList() {
 
   const load = () => {
     if (!token) return
-    api.get('/conversations').then(({ conversations }) => setConversations(conversations))
+    api.get('/conversations').then(({ conversations, situations }) => {
+      setConversations(conversations)
+      setSituations(Array.isArray(situations) ? situations : [])
+    })
   }
 
   useEffect(() => { load() }, [token])
@@ -52,8 +59,13 @@ export default function ChatList() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
+      // 상황극 세션도 같은 soft-delete 라우트를 탄다 (row 단위라 일반 대화에 영향 없음).
       await api.delete(`/conversations/${deleteTarget.id}`)
-      setConversations((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+      if (deleteTarget.kind === 'situation') {
+        setSituations((prev) => prev.filter((s) => s.id !== deleteTarget.id))
+      } else {
+        setConversations((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+      }
       setDeleteTarget(null)
     } catch (error) {
       console.error(error)
@@ -65,9 +77,28 @@ export default function ChatList() {
   // 1:1 대화만 (단톡방은 /group-chats 탭으로 분리됨) — updatedAt 내림차순 정렬
   const sorted = [...conversations].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
 
-  const filteredConversations = search.trim()
-    ? sorted.filter((c) => c.character.name.toLowerCase().includes(search.toLowerCase()))
+  const q = search.trim().toLowerCase()
+  const filteredConversations = q
+    ? sorted.filter((c) => c.character.name.toLowerCase().includes(q))
     : sorted
+
+  // 상황극은 캐릭터명·카드 제목 둘 다로 검색된다.
+  const filteredSituations = q
+    ? situations.filter(
+        (s) =>
+          s.character.name.toLowerCase().includes(q) ||
+          (s.title || '').toLowerCase().includes(q),
+      )
+    : situations
+
+  const hasSituationTab = situations.length > 0
+  // 마지막 세션을 지우면 탭이 사라지므로 일반 목록으로 되돌린다.
+  const activeTab = hasSituationTab ? tab : 'normal'
+  const isSituationTab = activeTab === 'situation'
+  const listCount = isSituationTab ? filteredSituations.length : filteredConversations.length
+  const situationUnread = situations.some(
+    (s) => s.updatedAt && (!s.lastReadAt || new Date(s.updatedAt) > new Date(s.lastReadAt)),
+  )
 
   return (
     <div className="pt-2 pb-2">
@@ -80,7 +111,7 @@ export default function ChatList() {
       <div className="px-4 pt-2 pb-3 flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold">{t('chatList.heading')}</h1>
         <div className="flex items-center gap-1">
-          {token && conversations.length > 0 && (
+          {token && (conversations.length > 0 || situations.length > 0) && (
             <button
               onClick={() => setEditMode((prev) => !prev)}
               className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${editMode ? 'text-indigo-400 bg-indigo-400/10' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
@@ -120,6 +151,37 @@ export default function ChatList() {
         </div>
       ) : (
         <>
+          {/* 일반 / 상황극 탭 — 진행 중인 상황극이 있을 때만 노출 */}
+          {hasSituationTab && (
+            <div className="px-4 mb-2">
+              <div className="flex gap-1 p-1 bg-gray-900 border border-gray-800 rounded-xl">
+                {[
+                  { key: 'normal', label: t('chatList.tabNormal'), count: conversations.length, dot: false },
+                  { key: 'situation', label: t('chatList.tabSituation'), count: situations.length, dot: situationUnread },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setTab(item.key)}
+                    className={`relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      activeTab === item.key
+                        ? 'bg-indigo-600/90 text-white'
+                        : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <span>{item.label}</span>
+                    <span className={`text-[11px] font-medium ${activeTab === item.key ? 'text-indigo-100' : 'text-gray-500'}`}>
+                      {item.count}
+                    </span>
+                    {item.dot && activeTab !== item.key && (
+                      <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 검색바 */}
           <div className="px-4 mb-2">
             <div className="relative">
@@ -135,7 +197,7 @@ export default function ChatList() {
             </div>
           </div>
 
-          {filteredConversations.length === 0 ? (
+          {listCount === 0 ? (
             <div className="text-center py-20 px-4">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-800 flex items-center justify-center">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
@@ -148,6 +210,64 @@ export default function ChatList() {
               {!search && (
                 <p className="text-gray-500 text-xs mt-1">{t('chatList.noChatsHint')}</p>
               )}
+            </div>
+          ) : isSituationTab ? (
+            <div>
+              {filteredSituations.map((s) => {
+                const thumbUrl = getImageUrl(s.character.profileImage) || getImageUrl(s.character.thumb)
+                const isUnread = s.updatedAt && (!s.lastReadAt || new Date(s.updatedAt) > new Date(s.lastReadAt))
+                const cardTitle = s.title || t('situationCards.title')
+
+                return (
+                  <div key={`s-${s.id}`} className="flex items-center">
+                    <button
+                      onClick={() => navigate(`/vn/${s.id}`)}
+                      className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 hover:bg-gray-900/60 transition-colors text-left"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <div className="w-14 h-14 rounded-full bg-gray-800 overflow-hidden">
+                          {thumbUrl ? (
+                            <img src={resizedImageUrl(thumbUrl, IMG_W.LIST_THUMB)} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-600 text-lg">?</div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-semibold text-sm flex-shrink-0 ${isUnread ? 'text-white' : 'text-gray-300'}`}>
+                            {s.character.name}
+                          </p>
+                          <span className="min-w-0 flex items-center gap-1 text-[10px] font-medium px-1.5 py-px rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                            {s.emoji && <span className="flex-shrink-0">{s.emoji}</span>}
+                            <span className="truncate">{cardTitle}</span>
+                          </span>
+                          <span className="text-xs text-gray-500 flex-shrink-0 ml-auto">{timeAgo(s.updatedAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className={`text-sm truncate flex-1 ${isUnread ? 'text-gray-300' : 'text-gray-500'}`}>
+                            {s.preview || t('chatList.startChat')}
+                          </p>
+                          {isUnread && <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />}
+                        </div>
+                      </div>
+                    </button>
+                    {editMode && (
+                      <button
+                        onClick={() => setDeleteTarget({ id: s.id, kind: 'situation', name: s.character.name, title: cardTitle })}
+                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-full mr-2 transition-colors"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div>
@@ -204,7 +324,7 @@ export default function ChatList() {
                     </button>
                     {editMode && (
                       <button
-                        onClick={() => setDeleteTarget({ id: conv.id, name: conv.character.name })}
+                        onClick={() => setDeleteTarget({ id: conv.id, kind: 'normal', name: conv.character.name })}
                         className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-full mr-2 transition-colors"
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
@@ -227,7 +347,9 @@ export default function ChatList() {
           <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6">
             <h3 className="text-lg font-bold text-white mb-2">{t('chatList.deleteTitle')}</h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-6">
-              {t('chatList.deleteDescription', { name: deleteTarget.name })}
+              {deleteTarget.kind === 'situation'
+                ? t('chatList.deleteSituationDescription', { title: deleteTarget.title })
+                : t('chatList.deleteDescription', { name: deleteTarget.name })}
             </p>
             <div className="flex gap-2">
               <button

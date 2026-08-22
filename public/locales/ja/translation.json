@@ -163,7 +163,10 @@
     "noChatsHint": "ホームでキャラクターを選んで会話を始めましょう",
     "startChat": "会話を始めましょう",
     "deleteTitle": "会話を削除しますか？",
-    "deleteDescription": "{{name}}との会話履歴と好感度がすべてリセットされます。この操作は元に戻せません。"
+    "deleteDescription": "{{name}}との会話履歴と好感度がすべてリセットされます。この操作は元に戻せません。",
+    "tabNormal": "チャット",
+    "tabSituation": "シチュエーション",
+    "deleteSituationDescription": "「{{title}}」の進行データはすべて削除されます。この操作は取り消せません。"
   },
   "chat": {
     "online": "オンライン",
