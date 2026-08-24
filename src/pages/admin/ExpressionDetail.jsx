@@ -4,7 +4,6 @@ import { api } from '../../lib/api'
 import {
   CharacterRow,
   AddStyleRow,
-  VideoJobsPanel,
   BackgroundsTab,
   EMOTION_TABS,
   TABS,
@@ -48,7 +47,7 @@ export default function ExpressionDetail() {
       return { ...c, styles: nextStyles, defaultStyle: nextDefault }
     })
   }
-  // VideoJobsPanel은 (characterId, styleId, image) 시그니처로 호출 — 다른 캐릭터 잡은 무시.
+  // (characterId, styleId, image) 시그니처 — 다른 캐릭터의 호출은 무시.
   const addImage = (cid, styleId, image) => {
     if (cid !== characterId) return
     patchStyle(styleId, (imgs) => [
@@ -200,7 +199,6 @@ export default function ExpressionDetail() {
         </div>
       )}
 
-      <VideoJobsPanel characters={[character]} onAddImage={addImage} />
     </div>
   )
 }
