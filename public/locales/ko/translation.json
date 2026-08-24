@@ -655,7 +655,18 @@
     "videoUnlock": "영상 해금",
     "loadMoreCount": "더 보기 (+{{count}})",
     "tabExpression": "표정",
-    "tabGift": "선물"
+    "tabGift": "선물",
+    "noExpressions": "등록된 표정이 없습니다.",
+    "seenExpressions": "본 표정: {{seen}} / {{total}}",
+    "purchaseTabUnbought": "미구매",
+    "purchaseTabBought": "구매",
+    "unlockedContentCount": "해금 콘텐츠 {{count}}개",
+    "noUnlockedContent": "해금된 콘텐츠가 없습니다",
+    "outfitChangeFailed": "의상 변경에 실패했어요.",
+    "giftAlreadySent": "이미 선물한 항목입니다.",
+    "giftSendFailed": "선물 전송에 실패했습니다.",
+    "giftConfirm": "{{name}}에게 선물하시겠습니까?",
+    "giftDeduct": "{{count}} 차감"
   },
   "comment": {
     "title": "댓글",
@@ -1456,5 +1467,9 @@
     "videoUnlockFailed": "영상 해금에 실패했어요",
     "voiceToggle": "음성",
     "you": "나"
+  },
+  "onboarding": {
+    "hostName": "윤하린",
+    "replayVoice": "다시 듣기"
   }
 }

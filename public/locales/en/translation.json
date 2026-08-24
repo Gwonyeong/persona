@@ -655,7 +655,18 @@
     "videoUnlock": "Unlock video",
     "loadMoreCount": "Show more (+{{count}})",
     "tabExpression": "Expressions",
-    "tabGift": "Gifts"
+    "tabGift": "Gifts",
+    "noExpressions": "No expressions registered.",
+    "seenExpressions": "Seen: {{seen}} / {{total}}",
+    "purchaseTabUnbought": "Not owned",
+    "purchaseTabBought": "Owned",
+    "unlockedContentCount": "{{count}} unlocked item(s)",
+    "noUnlockedContent": "No unlocked content yet",
+    "outfitChangeFailed": "Failed to change the outfit.",
+    "giftAlreadySent": "You already sent this gift.",
+    "giftSendFailed": "Failed to send the gift.",
+    "giftConfirm": "Send this to {{name}}?",
+    "giftDeduct": "{{count}} to spend"
   },
   "comment": {
     "title": "Comments",
@@ -1456,5 +1467,9 @@
     "videoUnlockFailed": "Failed to unlock the video",
     "voiceToggle": "Voice",
     "you": "You"
+  },
+  "onboarding": {
+    "hostName": "Yun Harin",
+    "replayVoice": "Play again"
   }
 }

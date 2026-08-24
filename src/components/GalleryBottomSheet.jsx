@@ -95,7 +95,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const EXPRESSION_VIDEO_COST = 10
   const handleUnlockExpressionVideo = async (exp) => {
     if (masks < EXPRESSION_VIDEO_COST) {
-      alert('마스크가 부족합니다.')
+      alert(t('gallery.insufficient'))
       onClose?.()
       navigate('/mask-shop?tab=subscription')
       return
@@ -114,11 +114,11 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
       if (res.masks !== undefined) setMasks(res.masks)
     } catch (err) {
       if (err?.error === 'INSUFFICIENT_MASKS') {
-        alert('마스크가 부족합니다.')
+        alert(t('gallery.insufficient'))
         onClose?.()
         navigate('/mask-shop?tab=subscription')
       } else {
-        alert('해금에 실패했어요.')
+        alert(t('gallery.unlockFailed'))
       }
     } finally {
       setUnlockingImageId(null)
@@ -146,7 +146,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
       onClose?.()
     } catch (err) {
       console.error('Apply outfit error:', err)
-      alert('의상 변경에 실패했어요.')
+      alert(t('gallery.outfitChangeFailed'))
     } finally {
       setApplyingId(null)
     }
@@ -155,7 +155,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
   const confirmSendGift = async () => {
     if (!pendingGift) return
     if (masks < pendingGift.maskCost) {
-      alert('마스크가 부족합니다.')
+      alert(t('gallery.insufficient'))
       onClose?.()
       navigate('/mask-shop?tab=subscription')
       return
@@ -179,15 +179,15 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
     } catch (err) {
       console.error('Send gift error:', err)
       if (err.status === 402) {
-        alert('마스크가 부족합니다.')
+        alert(t('gallery.insufficient'))
         onClose?.()
         navigate('/mask-shop?tab=subscription')
       } else if (err.status === 409) {
-        alert('이미 선물한 항목입니다.')
+        alert(t('gallery.giftAlreadySent'))
         setGifts((prev) => prev.map((g) => (g.id === pendingGift.id ? { ...g, unlocked: true } : g)))
         setPendingGift(null)
       } else {
-        alert('선물 전송에 실패했습니다.')
+        alert(t('gallery.giftSendFailed'))
       }
     } finally {
       setSending(false)
@@ -518,7 +518,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                         }`}
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        미구매 <span className="opacity-70">({unboughtCount})</span>
+                        {t('gallery.purchaseTabUnbought')} <span className="opacity-70">({unboughtCount})</span>
                       </button>
                       <button
                         onClick={() => setPurchaseTab('BOUGHT')}
@@ -529,7 +529,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                         }`}
                         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                       >
-                        구매 <span className="opacity-70">({boughtCount})</span>
+                        {t('gallery.purchaseTabBought')} <span className="opacity-70">({boughtCount})</span>
                       </button>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded-md flex-shrink-0">
@@ -651,7 +651,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm text-white font-medium truncate">{g.name}</p>
                                     <p className="text-[11px] text-gray-500">
-                                      해금 콘텐츠 {g.contents?.length || 0}개
+                                      {t('gallery.unlockedContentCount', { count: g.contents?.length || 0 })}
                                     </p>
                                   </div>
                                   {canApply && (
@@ -705,7 +705,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                                   </div>
                                 ) : (
                                   <div className="text-[11px] text-gray-600 italic py-3 text-center bg-gray-900/50 rounded-lg">
-                                    해금된 콘텐츠가 없습니다
+                                    {t('gallery.noUnlockedContent')}
                                   </div>
                                 )}
                               </section>
@@ -721,12 +721,12 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 <div className="px-3 py-3">
                   {expressions.length === 0 ? (
                     <p className="text-center text-sm text-gray-500 py-12">
-                      등록된 표정이 없습니다.
+                      {t('gallery.noExpressions')}
                     </p>
                   ) : (
                     <>
                       <p className="text-[11px] text-gray-500 mb-2 px-1">
-                        본 표정: {expressions.filter((e) => e.seen).length} / {expressions.length}
+                        {t('gallery.seenExpressions', { seen: expressions.filter((e) => e.seen).length, total: expressions.length })}
                       </p>
                       <div className="grid grid-cols-3 gap-2">
                         {(expressionsExpanded ? expressions : expressions.slice(0, 9)).map((exp) => {
@@ -1028,10 +1028,10 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 <img src={pendingGift.imageUrl} alt={pendingGift.name} className="w-full h-full object-cover" />
               </div>
               <p className="text-base text-white font-bold mb-1">{pendingGift.name}</p>
-              <p className="text-xs text-gray-400 mb-4">{characterName}에게 선물하시겠습니까?</p>
+              <p className="text-xs text-gray-400 mb-4">{t('gallery.giftConfirm', { name: characterName })}</p>
               <div className="flex items-center gap-1 text-sm text-white bg-gray-800 px-3 py-1.5 rounded-full mb-4">
                 <MaskIcon className="w-3.5 h-3.5" />
-                <span>{pendingGift.maskCost} 차감</span>
+                <span>{t('gallery.giftDeduct', { count: pendingGift.maskCost })}</span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -1041,7 +1041,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 className="flex-1 py-2.5 text-sm text-gray-400 bg-gray-800 hover:bg-gray-700 rounded-lg"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('common.cancel')}
               </button>
               <button
                 onClick={confirmSendGift}
@@ -1123,7 +1123,7 @@ export default function GalleryBottomSheet({ characterId, characterName, convers
                 className="w-full py-2.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                닫기
+                {t('common.close')}
               </button>
             </div>
           </div>

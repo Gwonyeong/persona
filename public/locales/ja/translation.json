@@ -655,7 +655,18 @@
     "videoUnlock": "動画を解放",
     "loadMoreCount": "もっと見る (+{{count}})",
     "tabExpression": "表情",
-    "tabGift": "ギフト"
+    "tabGift": "ギフト",
+    "noExpressions": "登録されている表情がありません。",
+    "seenExpressions": "見た表情: {{seen}} / {{total}}",
+    "purchaseTabUnbought": "未購入",
+    "purchaseTabBought": "購入済み",
+    "unlockedContentCount": "解放コンテンツ {{count}}件",
+    "noUnlockedContent": "解放されたコンテンツがありません",
+    "outfitChangeFailed": "衣装の変更に失敗しました。",
+    "giftAlreadySent": "すでにプレゼント済みの項目です。",
+    "giftSendFailed": "プレゼントの送信に失敗しました。",
+    "giftConfirm": "{{name}}さんにプレゼントしますか？",
+    "giftDeduct": "{{count}} 消費"
   },
   "comment": {
     "title": "コメント",
@@ -1456,5 +1467,9 @@
     "videoUnlockFailed": "動画の解放に失敗しました",
     "voiceToggle": "音声",
     "you": "あなた"
+  },
+  "onboarding": {
+    "hostName": "ユン・ハリン",
+    "replayVoice": "もう一度聞く"
   }
 }
