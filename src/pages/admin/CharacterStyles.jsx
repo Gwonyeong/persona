@@ -20,13 +20,10 @@ function isVideoUrl(url) {
   return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v')
 }
 
-// 영상 패널 — 한 이미지의 videoFilePath 관리 (업로드 / AI 생성 / URL 연결 / 기존 영상 선택 / 삭제)
+// 영상 패널 — 한 이미지의 videoFilePath 관리 (업로드 / URL 연결 / 기존 영상 선택 / 교체 / 삭제)
 function VideoPanel({ img, styleId, onDone }) {
-  // gen: null | { status: 'generating' | 'preview', videoUrl?: string }
-  const [gen, setGen] = useState(null)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [linking, setLinking] = useState(false)
-  const [prompt, setPrompt] = useState('')
   // mode: null | 'url' | 'picker'
   const [mode, setMode] = useState(null)
   const [urlInput, setUrlInput] = useState('')
@@ -69,23 +66,11 @@ function VideoPanel({ img, styleId, onDone }) {
     input.click()
   }
 
-  const generateWithAI = async () => {
-    setGen({ status: 'generating' })
-    try {
-      const { videoUrl } = await api.post(`/admin/images/${img.id}/generate-video-seedance`, { prompt: prompt.trim() || undefined })
-      setGen({ status: 'preview', videoUrl })
-    } catch (err) {
-      alert('영상 생성 실패: ' + (err?.error || err?.message || '알 수 없는 오류'))
-      setGen(null)
-    }
-  }
-
   const linkVideoUrl = async (url) => {
     if (!url) return
     setLinking(true)
     try {
       await api.post(`/admin/images/${img.id}/link-video`, { videoUrl: url })
-      setGen(null)
       setMode(null)
       setUrlInput('')
       onDone()
@@ -131,46 +116,6 @@ function VideoPanel({ img, styleId, onDone }) {
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >
           연결 해제
-        </button>
-      </div>
-    )
-  }
-
-  // 생성 중
-  if (gen?.status === 'generating') {
-    return (
-      <div className="mt-1 text-xs text-yellow-400 flex items-center gap-1 py-2">
-        <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="42 100" strokeLinecap="round" />
-        </svg>
-        생성 중...
-      </div>
-    )
-  }
-
-  // 생성 결과 미리보기
-  if (gen?.status === 'preview') {
-    return (
-      <div className="mt-1 flex flex-col gap-0.5">
-        <video
-          src={gen.videoUrl}
-          className="w-full aspect-square rounded object-cover"
-          autoPlay loop muted playsInline
-        />
-        <button
-          onClick={() => linkVideoUrl(gen.videoUrl)}
-          disabled={linking}
-          className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          {linking ? '연결 중...' : '✓ 연결'}
-        </button>
-        <button
-          onClick={() => setGen(null)}
-          className="text-xs text-gray-500 hover:text-gray-400"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        >
-          취소
         </button>
       </div>
     )
@@ -270,7 +215,7 @@ function VideoPanel({ img, styleId, onDone }) {
     )
   }
 
-  // 기본 — 3가지 액션 (업로드 / URL / AI 생성)
+  // 기본 — 3가지 액션 (업로드 / 기존 선택 / URL 연결)
   return (
     <div className="mt-1 flex flex-col gap-0.5">
       <button
@@ -295,22 +240,6 @@ function VideoPanel({ img, styleId, onDone }) {
       >
         🔗 URL로 연결
       </button>
-      <div className="flex items-center gap-0.5">
-        <input
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="프롬프트(선택)"
-          className="w-full bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-[10px] min-w-0"
-        />
-        <button
-          onClick={generateWithAI}
-          className="text-[10px] text-violet-400 hover:text-violet-300 whitespace-nowrap"
-          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          title="AI로 영상 생성"
-        >
-          🤖
-        </button>
-      </div>
     </div>
   )
 }
