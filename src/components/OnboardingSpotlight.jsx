@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { HOST_NAME, HOST_AVATAR } from '../lib/onboardingHost'
+import { HOST_AVATAR } from '../lib/onboardingHost'
 import { loadVoices, playVoiceByKey, stopVoice } from '../lib/onboardingVoices'
 
 const PADDING = 8
@@ -298,10 +298,10 @@ export default function OnboardingSpotlight({ active, steps, onComplete }) {
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-700/50">
             <img
               src={HOST_AVATAR}
-              alt={HOST_NAME}
+              alt={t('onboarding.hostName')}
               className="w-7 h-7 rounded-full object-cover ring-1 ring-indigo-400/50 flex-shrink-0"
             />
-            <span className="text-sm font-semibold text-white flex-1">{HOST_NAME}</span>
+            <span className="text-sm font-semibold text-white flex-1">{t('onboarding.hostName')}</span>
             {step.page && step.key && (
               <button
                 onClick={(e) => {

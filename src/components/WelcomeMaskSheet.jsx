@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
 import useStore from '../store/useStore'
 import useBackHandler from '../hooks/useBackHandler'
-import { HOST_NAME, HOST_AVATAR } from '../lib/onboardingHost'
+import { HOST_AVATAR } from '../lib/onboardingHost'
 import { loadVoices, playVoiceByKey, stopVoice } from '../lib/onboardingVoices'
 import MaskIcon from './MaskIcon'
 
@@ -47,7 +47,7 @@ export default function WelcomeMaskSheet() {
           <div className="relative">
             <img
               src={HOST_AVATAR}
-              alt={HOST_NAME}
+              alt={t('onboarding.hostName')}
               className="w-24 h-24 rounded-full object-cover ring-2 ring-indigo-500/40"
               style={{ boxShadow: '0 0 24px 6px rgba(99, 102, 241, 0.35)' }}
             />
@@ -57,13 +57,13 @@ export default function WelcomeMaskSheet() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 mt-2">
-            <p className="text-xs text-gray-400 font-medium">{HOST_NAME}</p>
+            <p className="text-xs text-gray-400 font-medium">{t('onboarding.hostName')}</p>
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 loadVoices().then(() => playVoiceByKey('welcome', 'title'))
               }}
-              aria-label="다시 듣기"
+              aria-label={t('onboarding.replayVoice')}
               className="text-gray-500 hover:text-indigo-400 transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
