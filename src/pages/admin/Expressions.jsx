@@ -1298,6 +1298,9 @@ const PREV_EMOTION_MAP = {
 
 function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, images, allStyleImages, onClose, onUpload, uploading, onRemove, onAdd, onUpdate }) {
   const [removingId, setRemovingId] = useState(null)
+  // 컷 교체 진행 중인 이미지 id / 드래그가 올라온 셀 id
+  const [replacingId, setReplacingId] = useState(null)
+  const [dropTargetId, setDropTargetId] = useState(null)
   const [aiOpen, setAiOpen] = useState(false)
   const [bgImage, setBgImage] = useState(null)
   const [seedanceImage, setSeedanceImage] = useState(null)
@@ -1409,6 +1412,65 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
     input.click()
   }
 
+  // 컷 교체 — 같은 CharacterImage 행의 파일만 갈아끼운다. 행 ID가 유지되므로
+  // 이미 마스크를 낸 유저의 해금 기록(SeenCharacterImage.videoUnlockedAt)이 살아남는다.
+  // 삭제 후 재업로드는 CASCADE로 해금이 소멸하니 컷 개선에는 절대 쓰지 않는다.
+  const handleReplaceImage = async (img, file) => {
+    if (!file || replacingId) return
+    setReplacingId(img.id)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const { image: updated } = await api.post(`/admin/images/${img.id}/replace`, fd)
+      onUpdate?.(img.id, { filePath: updated.filePath, videoFilePath: updated.videoFilePath ?? null })
+    } catch (err) {
+      alert('교체 실패: ' + (err?.error || err?.message))
+    } finally {
+      setReplacingId(null)
+    }
+  }
+
+  // 연결 영상 교체 — videoFilePath만 새 파일로 교체 (해금 기록 유지)
+  const handleReplaceVideo = async (img, file) => {
+    if (!file || replacingId) return
+    setReplacingId(img.id)
+    try {
+      const fd = new FormData()
+      fd.append('video', file)
+      const { image: updated } = await api.post(`/admin/images/${img.id}/video`, fd)
+      onUpdate?.(img.id, { videoFilePath: updated.videoFilePath })
+    } catch (err) {
+      alert('영상 교체 실패: ' + (err?.error || err?.message))
+    } finally {
+      setReplacingId(null)
+    }
+  }
+
+  const pickAndReplace = (img, { video = false } = {}) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = video ? 'video/mp4,video/webm' : 'image/*,video/mp4,video/webm'
+    input.onchange = (e) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      if (video) handleReplaceVideo(img, file)
+      else handleReplaceImage(img, file)
+    }
+    input.click()
+  }
+
+  // 드롭으로 교체 — 실수로 놓는 경우가 있어 확인을 받는다 (버튼 클릭은 확인 없음)
+  const handleReplaceDrop = (img, e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDropTargetId(null)
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    const isVideoFile = (file.type || '').startsWith('video/')
+    if (!confirm(`이 컷의 ${isVideoFile ? '파일' : '이미지'}을 "${file.name}" 으로 교체할까요?\n(해금 기록은 유지됩니다)`)) return
+    handleReplaceImage(img, file)
+  }
+
   const handleRemove = async (imageId) => {
     if (!confirm('이 이미지를 삭제하시겠습니까?')) return
     setRemovingId(imageId)
@@ -1500,14 +1562,38 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
             return (
               <div
                 key={img.id}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (dropTargetId !== img.id) setDropTargetId(img.id)
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault()
+                  setDropTargetId((prev) => (prev === img.id ? null : prev))
+                }}
+                onDrop={(e) => handleReplaceDrop(img, e)}
                 className={`rounded-md overflow-hidden bg-gray-800 ${
-                  needsVideo ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-gray-900' : ''
+                  dropTargetId === img.id
+                    ? 'ring-2 ring-indigo-400 ring-offset-1 ring-offset-gray-900'
+                    : needsVideo
+                      ? 'ring-2 ring-red-500/70 ring-offset-1 ring-offset-gray-900'
+                      : ''
                 }`}
               >
                 <div className="relative group">
                 <div className="aspect-[3/4]">
                   <ExpressionThumb src={img.filePath} className="w-full h-full object-cover" />
                 </div>
+                {dropTargetId === img.id && (
+                  <div className="absolute inset-0 bg-indigo-600/70 flex items-center justify-center text-[10px] font-bold text-white pointer-events-none">
+                    놓으면 교체
+                  </div>
+                )}
+                {replacingId === img.id && (
+                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-[10px] text-white pointer-events-none">
+                    교체 중...
+                  </div>
+                )}
                 {isGhost && (
                   <button
                     onClick={() => setRelinkPickerForVideo(img)}
@@ -1596,7 +1682,7 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                 </button>
                 </div>
                 {hasLinkedVideoPreview && (
-                  <div className="bg-black border-t border-emerald-700/40 relative">
+                  <div className="bg-black border-t border-emerald-700/40 relative group">
                     <video
                       src={img.videoFilePath}
                       autoPlay
@@ -1609,8 +1695,44 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
                     <span className="absolute top-1 left-1 text-[9px] font-bold bg-emerald-500/90 text-white px-1.5 py-0.5 rounded-full pointer-events-none">
                       🔗 연결 영상
                     </span>
+                    <button
+                      onClick={() => pickAndReplace(img, { video: true })}
+                      disabled={replacingId === img.id}
+                      className="absolute top-1 right-1 px-1.5 h-5 rounded-full bg-black/70 hover:bg-indigo-600 text-white text-[9px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center disabled:opacity-50"
+                      style={NO_OUTLINE}
+                      title="영상 파일만 교체 — 해금 기록 유지 (이미 마스크 낸 유저도 새 영상을 봅니다)"
+                    >
+                      🔄 영상 교체
+                    </button>
                   </div>
                 )}
+                {/* 교체 바 — 삭제 후 재업로드와 달리 행 ID를 유지해 해금 기록을 보존한다 */}
+                <div className="flex items-stretch border-t border-gray-700/60 divide-x divide-gray-700/60">
+                  <button
+                    onClick={() => pickAndReplace(img)}
+                    disabled={replacingId === img.id}
+                    className="flex-1 py-1 text-[9px] text-gray-300 hover:bg-indigo-600 hover:text-white transition-colors disabled:opacity-50"
+                    style={NO_OUTLINE}
+                    title={
+                      isVid
+                        ? '이 영상 파일을 교체 — 행 유지, 해금 기록 보존'
+                        : '이 컷의 이미지를 교체 — 행 유지, 해금 기록 보존 (연결 영상은 그대로)'
+                    }
+                  >
+                    🔄 {isVid ? '영상 파일' : '이미지'} 교체
+                  </button>
+                  {!isVid && !img.videoFilePath && (
+                    <button
+                      onClick={() => pickAndReplace(img, { video: true })}
+                      disabled={replacingId === img.id}
+                      className="flex-1 py-1 text-[9px] text-gray-300 hover:bg-emerald-600 hover:text-white transition-colors disabled:opacity-50"
+                      style={NO_OUTLINE}
+                      title="이 컷에 연결 영상 업로드"
+                    >
+                      ＋ 영상
+                    </button>
+                  )}
+                </div>
               </div>
             )
           }
@@ -1701,9 +1823,11 @@ function EmotionSlotManager({ characterId, styleId, emotion, emotionLabel, image
           emotion={emotion}
           emotionLabel={emotionLabel}
           onClose={() => setBgImage(null)}
-          onReplaced={(oldId, newImage) => {
-            onRemove(oldId)
-            onAdd({ ...newImage, emotion })
+          onReplaced={(imageId, updated) => {
+            onUpdate?.(imageId, {
+              filePath: updated.filePath,
+              videoFilePath: updated.videoFilePath ?? null,
+            })
           }}
         />
       )}
@@ -2956,17 +3080,10 @@ function BackgroundRemovalModal({ image, styleId, emotion, emotionLabel, onClose
       )
       const fd = new FormData()
       fd.append('image', file)
-      fd.append('emotion', emotion)
-      fd.append('description', '배경 제거 처리')
-      const { image: uploaded } = await api.post(`/admin/styles/${styleId}/images`, fd)
-      try {
-        await api.delete(`/admin/images/${image.id}`)
-      } catch (delErr) {
-        // 삭제 실패해도 새 이미지는 살려두고 사용자에게 알림
-        console.error('원본 이미지 삭제 실패:', delErr)
-        setError('새 이미지는 저장됐지만 원본 삭제에 실패했습니다. 수동으로 삭제하세요.')
-      }
-      onReplaced(image.id, uploaded)
+      // in-place 교체 — 예전엔 신규 업로드 + 원본 삭제였는데, 그러면 CASCADE로
+      // 그 컷의 해금 기록(유저가 낸 마스크)이 함께 사라졌다.
+      const { image: updated } = await api.post(`/admin/images/${image.id}/replace`, fd)
+      onReplaced(image.id, updated)
       onClose()
     } catch (e) {
       setError(e.message || '교체 실패')

@@ -114,6 +114,17 @@ function VideoPanel({ img, styleId, onDone }) {
           className="w-full aspect-square rounded object-cover"
           autoPlay loop muted playsInline
         />
+        {/* 교체는 같은 행의 videoFilePath만 갈아끼우므로 이미 마스크를 낸 유저의
+            해금 기록이 유지된다. '해제 → 재업로드'와 달리 공백 구간도 없다. */}
+        <button
+          onClick={triggerFileUpload}
+          disabled={uploadingFile}
+          className="text-xs text-indigo-300 hover:text-indigo-200 disabled:opacity-50"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          title="영상 파일 교체 — 해금 기록 유지"
+        >
+          {uploadingFile ? '교체 중...' : '🔄 영상 교체'}
+        </button>
         <button
           onClick={removeVideo}
           className="text-xs text-red-400 hover:text-red-300"
