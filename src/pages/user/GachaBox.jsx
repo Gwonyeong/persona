@@ -190,7 +190,17 @@ export default function GachaBox() {
       </Helmet>
 
       {/* Hero 영역 — 배경 이미지 + 그라데이션 오버레이 + 상단 액션 */}
-      <div className="relative aspect-[4/5] w-full overflow-hidden">
+      {/* Hero — 기본은 4:5 지만, 화면이 짧으면 뽑기 버튼이 접혀 스크롤해야 보였다.
+          아래 콘텐츠(주요 보상 + 버튼 + 천장 바 + safe-area) 높이를 확보하고 남는 만큼만 쓴다.
+          object-cover 라 줄어든 만큼 위아래가 잘릴 뿐 가로는 그대로다. */}
+      <div
+        className="relative aspect-[4/5] w-full overflow-hidden"
+        style={{
+          // aspect-ratio 는 컨테이너 폭(#root 480px 상한) 기준이라 그대로 두고,
+          // 화면이 짧을 때만 max-height 로 눌러 아래 콘텐츠 자리를 만든다.
+          maxHeight: 'max(240px, calc(100dvh - 320px - env(safe-area-inset-bottom)))',
+        }}
+      >
         {box.coverImage ? (
           <img
             src={box.coverImage}
