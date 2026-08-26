@@ -51,6 +51,8 @@
     "draw1Free": "1回 — 無料（残り{{count}}回）",
     "draw1": "1回 —",
     "draw10": "10回 —",
+    "drawing": "抽選中...",
+    "drawingHint": "画面を閉じずに少々お待ちください",
     "pityPickCta": "🎁 好きな報酬を選べます！",
     "pityRemaining": "確定報酬まで残り{{count}}回",
     "insufficientMasks": "マスクが足りません。",

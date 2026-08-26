@@ -34,6 +34,21 @@ const RARITY_LABEL_COLOR = {
   D: 'text-gray-300',
 }
 
+function Spinner({ size = 18 }) {
+  return (
+    <svg
+      className="animate-spin text-white"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeDasharray="42 100" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // 서버 lib/gacha.js 의 PREVIEW_ITEM_LIMIT 과 같은 값이어야 한다.
 // (어드민 등록 상한 · 목록 응답 take · 여기 세 곳이 어긋나면 등록해도 덜 노출된다.)
 const PREVIEW_ITEM_LIMIT = 5
@@ -59,7 +74,9 @@ export default function GachaBox() {
   const [drawResult, setDrawResult] = useState(null) // { results, blockedReason, totalCost, ... }
   const [showPityPick, setShowPityPick] = useState(false)
   const [showOdds, setShowOdds] = useState(false)
-  const [drawing, setDrawing] = useState(false)
+  // 진행 중인 추첨 회차 수 (0 = 대기). 어느 버튼에 스피너를 넣을지 구분하는 용도도 겸한다.
+  const [drawingCount, setDrawingCount] = useState(0)
+  const drawing = drawingCount > 0
 
   const load = async () => {
     try {
@@ -82,7 +99,7 @@ export default function GachaBox() {
 
   const draw = async (count) => {
     if (drawing) return
-    setDrawing(true)
+    setDrawingCount(count)
     try {
       const result = await api.post(`/gacha/boxes/${boxId}/draw`, { count })
       // 유저 마스크 잔액 업데이트
@@ -106,11 +123,14 @@ export default function GachaBox() {
         alert(t('gacha.drawFailed', { msg: code || err.message }))
       }
     } finally {
-      setDrawing(false)
+      setDrawingCount(0)
     }
   }
 
   const handlePityPick = async (itemId) => {
+    // 추첨과 같은 무게의 동작인데 가드가 없어 연타하면 요청이 중복으로 나갔다.
+    if (drawing) return
+    setDrawingCount(1)
     try {
       const result = await api.post(`/gacha/boxes/${boxId}/pity-pick`, { itemId })
       setShowPityPick(false)
@@ -124,6 +144,8 @@ export default function GachaBox() {
       await load()
     } catch (err) {
       alert(t('gacha.claimFailed', { msg: err.data?.error || err.message }))
+    } finally {
+      setDrawingCount(0)
     }
   }
 
@@ -243,7 +265,9 @@ export default function GachaBox() {
             }`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {has1Free ? (
+            {drawingCount === 1 ? (
+              <Spinner />
+            ) : has1Free ? (
               <>{t('gacha.draw1Free', { count: freeRemaining })}</>
             ) : (
               <>
@@ -257,7 +281,13 @@ export default function GachaBox() {
             className="py-3 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-semibold disabled:bg-gray-700 disabled:text-gray-500 inline-flex items-center justify-center gap-1"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {t('gacha.draw10')} {box.bulkCost ?? box.cost * 10} <MaskIcon />
+            {drawingCount === 10 ? (
+              <Spinner />
+            ) : (
+              <>
+                {t('gacha.draw10')} {box.bulkCost ?? box.cost * 10} <MaskIcon />
+              </>
+            )}
           </button>
         </div>
 
@@ -288,6 +318,19 @@ export default function GachaBox() {
           </div>
         )}
       </div>
+
+      {/* 추첨 진행 오버레이 — 마스크가 빠지는 동작이고 10연은 수 초가 걸린다.
+          연타·이탈을 막고 진행 중임을 분명히 보여준다. */}
+      {drawing && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <Spinner size={40} />
+          <p className="text-sm font-semibold text-white">
+            {t('gacha.drawing')}
+            {drawingCount === 10 ? ` (${drawingCount})` : ''}
+          </p>
+          <p className="text-xs text-gray-400">{t('gacha.drawingHint')}</p>
+        </div>
+      )}
 
       {drawResult && (
         <ResultModal
@@ -788,9 +831,10 @@ function ResultCard({ result }) {
   const isStyleSet = result.rewardType === 'STYLE_SET'
   const characterName = result.snapshot?.payload?.characterName
   const characterProfileImage = result.snapshot?.payload?.characterProfileImage
-  // 표정+영상 세트면 결과 카드 본체에 영상 재생, 그 외엔 이미지
+  // 영상이 딸린 보상은 결과 카드 본체에서 재생, 그 외엔 이미지.
+  // STYLE_SET 은 서버가 해금된 스타일 안에서 대표 컷을 랜덤으로 골라 스냅샷에 넣어준다.
   const videoUrl =
-    result.rewardType === 'EXPRESSION_BUNDLE'
+    result.rewardType === 'EXPRESSION_BUNDLE' || result.rewardType === 'STYLE_SET'
       ? result.snapshot?.payload?.videoFilePath
       : null
   // EXPRESSION: 캡션은 캐릭터명만. STYLE_SET: 캐릭터명 위에 스타일명 작게. 그 외: displayName.
@@ -800,6 +844,12 @@ function ResultCard({ result }) {
       ? characterName || ''
       : result.displayName || rewardTypeLabel(t, result.rewardType)
   const subText = isStyleSet ? result.displayName : null
+
+  // 미디어가 로드되기 전엔 등급 그라디언트만 보여 결과 공개 순간 색만 번쩍인다.
+  // 그 구간에 스켈레톤 광택을 얹어 '로딩 중'으로 읽히게 한다.
+  const hasMedia = !!(videoUrl || result.previewUrl)
+  const [mediaLoaded, setMediaLoaded] = useState(false)
+  const markLoaded = () => setMediaLoaded(true)
 
   return (
     <div className={`relative aspect-[9/16] rounded-lg overflow-hidden bg-gradient-to-br ${colorCls}`}>
@@ -811,13 +861,24 @@ function ResultCard({ result }) {
           muted
           playsInline
           className="w-full h-full object-cover"
+          onLoadedData={markLoaded}
+          onError={markLoaded}
         />
       ) : result.previewUrl ? (
-        <img src={result.previewUrl} alt="" className="w-full h-full object-cover" />
+        <img
+          src={result.previewUrl}
+          alt=""
+          className="w-full h-full object-cover"
+          onLoad={markLoaded}
+          onError={markLoaded}
+        />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-xs text-center px-2">
           {result.displayName || rewardTypeLabel(t, result.rewardType)}
         </div>
+      )}
+      {hasMedia && !mediaLoaded && (
+        <div className="absolute inset-0 gacha-shimmer pointer-events-none" aria-hidden="true" />
       )}
       <div className="absolute inset-x-0 bottom-0 px-2 py-1.5 bg-gradient-to-t from-black/85 to-transparent">
         {subText && (
