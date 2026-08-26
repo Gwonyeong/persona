@@ -34,12 +34,16 @@ const RARITY_LABEL_COLOR = {
   D: 'text-gray-300',
 }
 
-// 미리보기 후보 중 가장 높은 등급의 아이템만 추려서 반환 (최대 4개).
+// 서버 lib/gacha.js 의 PREVIEW_ITEM_LIMIT 과 같은 값이어야 한다.
+// (어드민 등록 상한 · 목록 응답 take · 여기 세 곳이 어긋나면 등록해도 덜 노출된다.)
+const PREVIEW_ITEM_LIMIT = 5
+
+// 미리보기 후보 중 가장 높은 등급의 아이템만 추려서 반환.
 function pickTopRarity(previewItems) {
   if (!previewItems?.length) return []
   for (const r of RARITY_ORDER) {
     const ofRarity = previewItems.filter((p) => p.rarity === r)
-    if (ofRarity.length > 0) return ofRarity.slice(0, 4)
+    if (ofRarity.length > 0) return ofRarity.slice(0, PREVIEW_ITEM_LIMIT)
   }
   return []
 }
@@ -213,11 +217,14 @@ export default function GachaBox() {
         className="px-4 mt-4"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
-        {/* 주요 보상 — 가장 높은 등급만, 최대 4개. 어드민이 isPreview 켠 것 중에서 필터. */}
+        {/* 주요 보상 — 가장 높은 등급만. 어드민이 isPreview 켠 것 중에서 필터. */}
         {topPreviewItems.length > 0 && (
           <div className="mb-4">
             <p className="text-[11px] text-gray-400 mb-1.5">{t('gacha.mainRewards')}</p>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div
+              className="grid gap-1.5"
+              style={{ gridTemplateColumns: `repeat(${Math.min(topPreviewItems.length, PREVIEW_ITEM_LIMIT)}, minmax(0, 1fr))` }}
+            >
               {topPreviewItems.map((p) => (
                 <DetailPreviewTile key={p.id} item={p} />
               ))}

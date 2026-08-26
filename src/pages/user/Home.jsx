@@ -75,26 +75,20 @@ export default function Home() {
 
   const [unclaimedPassCount, setUnclaimedPassCount] = useState(0)
   const [gachaFreeRemaining, setGachaFreeRemaining] = useState(0)
-  const [primaryGachaBoxId, setPrimaryGachaBoxId] = useState(null)
   useEffect(() => {
     if (token) {
       api.get('/masks/balance').then(({ masks }) => setMasks(masks)).catch(() => {})
       api.get('/notifications/unread-count').then(({ count }) => setUnreadNotifCount(count)).catch(() => {})
       // 홈 뱃지엔 unclaimedEligibleCount만 필요 → minimal 모드로 무거운 tier 전체 응답 회피
       api.get('/mask-pass?minimal=true').then(({ unclaimedEligibleCount }) => setUnclaimedPassCount(unclaimedEligibleCount || 0)).catch(() => {})
-      // 가챠 박스 전체 무료 잔여 합계 + 메인 박스 ID 캐시 — 성인인증 안 된 유저는 403이라 catch로 무시
+      // 가챠 박스 전체 무료 잔여 합계 — 성인인증 안 된 유저는 403이라 catch로 무시
       api
         .get('/gacha/boxes')
         .then(({ boxes }) => {
           const sum = (boxes || []).reduce((acc, b) => acc + (b.free?.remaining || 0), 0)
           setGachaFreeRemaining(sum)
-          // 메인 박스 = 가장 최근 활성 박스 (createdAt desc 정렬됨)
-          setPrimaryGachaBoxId(boxes?.[0]?.id || null)
         })
-        .catch(() => {
-          setGachaFreeRemaining(0)
-          setPrimaryGachaBoxId(null)
-        })
+        .catch(() => setGachaFreeRemaining(0))
     }
   }, [token])
 
@@ -301,9 +295,7 @@ export default function Home() {
             )}
             {token && (
               <button
-                onClick={() =>
-                  navigate(primaryGachaBoxId ? `/gacha/${primaryGachaBoxId}` : '/gacha')
-                }
+                onClick={() => navigate('/gacha')}
                 aria-label="가챠"
                 className="relative w-8 h-8 flex items-center justify-center rounded-full text-fuchsia-300 hover:text-fuchsia-200 hover:bg-fuchsia-900/30 transition-colors"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}

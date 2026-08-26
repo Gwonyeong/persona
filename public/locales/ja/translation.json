@@ -30,6 +30,7 @@
   },
   "gacha": {
     "pageTitle": "ガチャ — Pesona",
+    "listHeading": "ガチャ",
     "boxPageTitle": "{{name}} — ガチャ",
     "adultRequired": "成人認証が必要です",
     "adultDesc": "ガチャは成人認証を完了した会員のみ利用できます。",

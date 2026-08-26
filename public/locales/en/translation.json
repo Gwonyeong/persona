@@ -30,6 +30,7 @@
   },
   "gacha": {
     "pageTitle": "Gacha — Pesona",
+    "listHeading": "Gacha",
     "boxPageTitle": "{{name}} — Gacha",
     "adultRequired": "Adult verification required",
     "adultDesc": "Gacha is available only to adult-verified members.",

@@ -30,6 +30,7 @@
   },
   "gacha": {
     "pageTitle": "가챠 — 페소나",
+    "listHeading": "가챠",
     "boxPageTitle": "{{name}} — 가챠",
     "adultRequired": "성인 인증이 필요해요",
     "adultDesc": "가챠는 성인 인증을 마친 회원만 이용할 수 있어요.",
