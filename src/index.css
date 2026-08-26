@@ -110,3 +110,14 @@ body:has(.admin-layout) #root {
   100% { transform: translateX(120%); opacity: 0; }
 }
 
+
+/* 가챠 보상 카드 — 이미지/영상이 로드되기 전 등급 그라디언트 위를 훑는 스켈레톤 광택.
+   등급 색(S=보라 등)만 덩그러니 보이던 구간을 '로딩 중'으로 읽히게 한다. */
+@keyframes gachaShimmer {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+.gacha-shimmer {
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.26) 50%, transparent 68%);
+  animation: gachaShimmer 1.25s ease-in-out infinite;
+}

@@ -51,6 +51,8 @@
     "draw1Free": "×1 — Free ({{count}} left)",
     "draw1": "×1 —",
     "draw10": "×10 —",
+    "drawing": "Drawing...",
+    "drawingHint": "Please wait — don’t close this screen",
     "pityPickCta": "🎁 You can pick the reward you want!",
     "pityRemaining": "{{count}} draws to guaranteed reward",
     "insufficientMasks": "Not enough masks.",
