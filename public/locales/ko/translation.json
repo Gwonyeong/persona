@@ -1238,6 +1238,7 @@
         "intimate": "친밀"
       },
       "userAddressLabel": "캐릭터가 부르는 호칭",
+      "addressChip": "호칭",
       "userAddressPlaceholder": "예: 오빠, 자기, 그대",
       "userAddressHint": "비워두면 캐릭터 기본 호칭 사용",
       "conceptLabel": "컨셉",

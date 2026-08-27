@@ -1238,6 +1238,7 @@
         "intimate": "Intimate"
       },
       "userAddressLabel": "How character calls you",
+      "addressChip": "Calls you",
       "userAddressPlaceholder": "e.g. babe, hon, name",
       "userAddressHint": "Leave blank to use character default",
       "conceptLabel": "Concept",

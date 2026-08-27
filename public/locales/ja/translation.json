@@ -1238,6 +1238,7 @@
         "intimate": "親密"
       },
       "userAddressLabel": "キャラクターが呼ぶ呼称",
+      "addressChip": "呼称",
       "userAddressPlaceholder": "例：あなた、君、名前",
       "userAddressHint": "空欄ならキャラクターデフォルトを使用",
       "conceptLabel": "コンセプト",

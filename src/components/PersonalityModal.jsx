@@ -63,7 +63,8 @@ function presetPreview(preset, t) {
     chips.push({ key: 'hon', label: t(`personality.edit.honorific.${preset.honorificLevel}`) })
   if (preset.physicalDistance)
     chips.push({ key: 'dist', label: t(`personality.edit.distance.${preset.physicalDistance}`) })
-  if (preset.userAddress) chips.push({ key: 'addr', label: `호칭 "${preset.userAddress}"` })
+  if (preset.userAddress)
+    chips.push({ key: 'addr', label: `${t('personality.edit.addressChip')} "${preset.userAddress}"` })
   return {
     chips,
     concept: preset.conceptOverride || null,
@@ -80,7 +81,10 @@ function originalPreview(original, t) {
   if (original.physicalDistance)
     chips.push({ key: 'dist', label: t(`personality.edit.distance.${original.physicalDistance}`) })
   if (original.defaultUserNickname)
-    chips.push({ key: 'addr', label: `호칭 "${original.defaultUserNickname}"` })
+    chips.push({
+      key: 'addr',
+      label: `${t('personality.edit.addressChip')} "${original.defaultUserNickname}"`,
+    })
   return {
     chips,
     concept: original.concept || null,
@@ -184,7 +188,14 @@ export default function PersonalityModal({ open, conversationId, characterName, 
     // 새 프리셋: 캐릭터 기본값들을 미리 선택 상태로 채움 → 사용자가 원하는 부분만 변경.
     const initial = emptyDraft()
     if (original) {
-      if (original.relationship) {
+      // 미번역 필드는 프리필하지 않는다.
+      // promptDataV1(relationship·coreTraits)은 ja/en 번역본이 없어서 비-ko 유저에게도
+      // 한국어 그대로 내려온다. 그걸 draft 에 채우면 유저가 못 읽는 한국어를 그대로 저장하게 되고,
+      // 저장된 값은 시스템 프롬프트에 "절대 우선"으로 주입돼 응답까지 한국어로 끌고 간다.
+      // 서버가 original.untranslatedFields 로 어떤 필드가 그런지 알려준다.
+      const untranslated = new Set(original.untranslatedFields || [])
+
+      if (original.relationship && !untranslated.has('relationship')) {
         // 캐릭터 기본 relationship 텍스트 → custom + customLabel.
         // 표준 6 프리셋(friend/lover/...)에 정확히 매칭이 어렵고, 자유 텍스트라 custom 슬롯이 자연스러움.
         const label = String(original.relationship)
@@ -197,7 +208,11 @@ export default function PersonalityModal({ open, conversationId, characterName, 
       if (original.physicalDistance) initial.physicalDistance = original.physicalDistance
       if (original.defaultUserNickname) initial.userAddress = original.defaultUserNickname
       if (original.concept) initial.conceptOverride = String(original.concept).slice(0, MAX_CONCEPT_LEN)
-      if (Array.isArray(original.coreTraits) && original.coreTraits.length > 0) {
+      if (
+        Array.isArray(original.coreTraits) &&
+        original.coreTraits.length > 0 &&
+        !untranslated.has('coreTraits')
+      ) {
         initial.traitsOverride = original.coreTraits
           .filter((t) => typeof t === 'string' && t.trim())
           .slice(0, MAX_TRAIT_ITEMS)
@@ -442,7 +457,7 @@ function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, o
               )}
               {concept && (
                 <div className="flex items-start gap-1.5">
-                  <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">컨셉</span>
+                  <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">{t('personality.edit.conceptLabel')}</span>
                   <span className="text-[11px] text-gray-300 leading-snug break-words whitespace-pre-wrap">
                     {concept}
                   </span>
@@ -450,7 +465,7 @@ function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, o
               )}
               {traits.length > 0 && (
                 <div className="flex items-start gap-1.5">
-                  <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">성격</span>
+                  <span className="text-[10px] text-gray-500 mt-0.5 shrink-0">{t('personality.edit.traitsLabel')}</span>
                   <ul className="text-[11px] text-gray-300 leading-snug list-disc list-inside space-y-0.5 min-w-0">
                     {traits.map((tr, i) => (
                       <li key={i} className="break-words whitespace-pre-wrap">
