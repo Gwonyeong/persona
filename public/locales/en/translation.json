@@ -264,6 +264,7 @@
       "modePtt": "Tap to talk",
       "modeVad": "Auto detect",
       "costPerTurn": "{{count}} mask(s) per turn",
+      "costFreeTrial": "{{count}} free trial turns left · no masks used",
       "errorSend": "Failed to send",
       "errorEmpty": "No speech detected",
       "errorInvalidAudio": "Couldn't hear you clearly. Please try again",

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, useRef, useMemo, useCallback, memo } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -508,6 +508,12 @@ export default function Chat() {
   const [hasMoreBefore, setHasMoreBefore] = useState(false)
   const windowStartRef = useRef(0)
   const loadingOlderRef = useRef(false)
+  // 이전 청크를 앞에 붙이면 스크롤 기준점이 통째로 밀린다. 붙이기 직전의 높이/위치를 담아두고
+  // DOM 반영 직후(useLayoutEffect)에 보정한다. rAF 로 미루면 한 프레임 튀어 보인다.
+  const scrollRestoreRef = useRef(null)
+  // 위 보정과 하단 자동 스크롤이 같은 messages 변경에 동시에 걸린다. 이 플래그가 서 있으면
+  // 하단 스크롤을 한 번 건너뛴다 — 없으면 과거 대화를 불러오자마자 맨 아래로 튕긴다.
+  const skipAutoScrollRef = useRef(false)
   // 채팅창에 렌더되는 메시지 role — 초기 로드/이전 청크 로드에서 동일하게 필터링.
   const isRenderable = (m) => ['CHARACTER', 'USER', 'GENERATED_IMAGE', 'NARRATION', 'GIFT'].includes(m.role)
   const [input, setInput] = useState('')
@@ -676,15 +682,13 @@ export default function Chat() {
   const loadMore = useCallback(async () => {
     const container = scrollContainerRef.current
     if (!container) return
-    const prevHeight = container.scrollHeight
-    const prevTop = container.scrollTop
-    const restoreScroll = () => requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight - prevHeight + prevTop
-    })
+    const markRestore = () => {
+      scrollRestoreRef.current = { prevHeight: container.scrollHeight, prevTop: container.scrollTop }
+    }
 
     if (visibleStart > 0) {
+      markRestore()
       setVisibleCount((c) => Math.min(messages.length, c + PAGE_SIZE))
-      restoreScroll()
       return
     }
 
@@ -698,9 +702,10 @@ export default function Chat() {
       setHasMoreBefore(!!conv.hasMoreBefore)
       const older = (conv.messages || []).filter(isRenderable)
       if (older.length) {
+        markRestore()
+        skipAutoScrollRef.current = true
         setMessages((prev) => [...older, ...prev])
         setVisibleCount((c) => c + older.length)
-        restoreScroll()
       }
     } catch {
       // 이전 청크 로드 실패는 조용히 무시 (다음 스크롤에서 재시도)
@@ -708,6 +713,16 @@ export default function Chat() {
       loadingOlderRef.current = false
     }
   }, [visibleStart, messages.length, hasMoreBefore, id])
+
+  // 앞쪽에 메시지가 붙어 늘어난 높이만큼 스크롤을 내려, 보고 있던 메시지를 제자리에 붙잡아 둔다.
+  useLayoutEffect(() => {
+    const pending = scrollRestoreRef.current
+    if (!pending) return
+    scrollRestoreRef.current = null
+    const container = scrollContainerRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight - pending.prevHeight + pending.prevTop
+  }, [messages, visibleCount])
 
   useEffect(() => {
     // 로컬에 안 그린 게 남았거나(visibleStart>0), 서버에 이전 청크가 더 있으면 옵저버 부착.
@@ -831,6 +846,11 @@ export default function Chat() {
   // invocations의 29.3%로 최대 항목이라 backoff 로 5회로 줄였다.
 
   useEffect(() => {
+    // 이전 청크 prepend 로 인한 변경이면 하단으로 끌어내리지 않는다 (위치 보정은 useLayoutEffect 담당).
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false
+      return
+    }
     if (!initialLoadRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
@@ -1772,8 +1792,11 @@ export default function Chat() {
           return base
         })()}
       >
-        {/* 페이지네이션: 시작부터 표시 중일 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드 */}
-        {visibleStart === 0 ? (
+        {/* 페이지네이션: 진짜 첫 메시지까지 왔을 때만 인트로 카드, 그 외엔 sentinel로 위로 스크롤 시 추가 로드.
+            hasMoreBefore 를 빼먹으면 초기 로드(서버가 limit=PAGE_SIZE 로 잘라 주므로 visibleStart 는 항상 0)에서
+            sentinel 이 아예 렌더되지 않아 옵저버가 붙지 못하고, 이전 청크를 영영 못 불러온다. 아래 옵저버 effect 의
+            bail 조건과 반드시 같은 식을 써야 한다. */}
+        {visibleStart === 0 && !hasMoreBefore ? (
           profileUrl && (
             <div className="flex justify-start mt-3">
               <div className="w-7 flex-shrink-0 mr-2">
