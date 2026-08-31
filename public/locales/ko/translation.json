@@ -264,6 +264,7 @@
       "modePtt": "탭하여 말하기",
       "modeVad": "자동 감지",
       "costPerTurn": "1턴당 마스크 {{count}}개",
+      "costFreeTrial": "무료 체험 {{count}}턴 남음 · 마스크 사용 안 함",
       "errorSend": "전송에 실패했어요",
       "errorEmpty": "말소리가 감지되지 않았어요",
       "errorInvalidAudio": "음성이 잘 들리지 않았어요. 다시 한 번 말해주세요",

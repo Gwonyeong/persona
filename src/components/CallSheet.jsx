@@ -366,7 +366,12 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
         </div>
 
         <p className="text-[11px] text-gray-500">
-          {t('chat.call.costPerTurn', { count: COST_PER_TURN + (safetyMode === false ? 3 : 0) })} · {t('chat.call.secured')}
+          {/* 체험 턴이 남아 있으면 서버가 마스크를 걷지 않는다 (calls.js turnCost=0). 비용 문구도 맞춰 바꾼다. */}
+          {showFreeCallBadge
+            ? t('chat.call.costFreeTrial', { count: remainingFreeCalls })
+            : t('chat.call.costPerTurn', { count: COST_PER_TURN + (safetyMode === false ? 3 : 0) })}
+          {' · '}
+          {t('chat.call.secured')}
         </p>
       </div>
       )}
