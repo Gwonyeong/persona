@@ -5,7 +5,7 @@ import { useTranslation, Trans } from 'react-i18next'
 import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
-import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions } from '../../lib/billing'
+import { isNativeBillingAvailable, initBilling, getProducts, purchaseProduct, consumePurchase, getSubscriptionProducts, purchaseSubscription, getActiveSubscriptions, getLastBillingFailure } from '../../lib/billing'
 import { recoverPendingPurchases, queueFailedPurchase } from '../../lib/purchaseRecovery'
 import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview, REVIEW_REWARD_UI_ENABLED } from '../../lib/review'
@@ -206,7 +206,15 @@ export default function MaskShop() {
         return
       }
 
-      if (!isNative || !billingReady) {
+      // 마스크 구매와 같은 이유로, 한 번 실패한 초기화를 여기서 되살려 본다.
+      let ready = billingReady
+      if (isNative && !ready) {
+        ready = await initBilling()
+        setBillingReady(ready)
+        if (ready) await getSubscriptionProducts()
+      }
+
+      if (!isNative || !ready) {
         setSubError(t('subscription.googlePlayError'))
         setSubLoading(false)
         return
@@ -342,6 +350,16 @@ export default function MaskShop() {
     }
   }
 
+  // 결제 시도가 어디서 끝났는지 서버에 남긴다.
+  // 이게 없으면 "시도했다"는 기록만 남아, 결제창조차 못 연 유저와 결제창을 닫은 유저를
+  // 구분할 수 없다. 실패해도 결제 흐름을 막지 않으므로 await 하지 않는다.
+  const reportAttemptOutcome = (attemptId, stage, detail) => {
+    if (!attemptId) return
+    api
+      .post(`/masks/purchase-attempt/${attemptId}/outcome`, { stage, detail: detail || undefined })
+      .catch(() => {})
+  }
+
   // 웹 PG 결제 성공 후 처리. 구글 인앱결제 경로와 동일하게 첫 구매 보너스를 반영한다.
   const applyPgPurchaseResult = (result) => {
     if (typeof result.masks === 'number') setMasks(result.masks)
@@ -404,6 +422,7 @@ export default function MaskShop() {
     if (requireLogin()) return
     setPurchasing(true)
     setPurchaseError('')
+    let attemptId = null
     try {
       const pkg = PACKAGES[selectedPkg]
 
@@ -411,7 +430,8 @@ export default function MaskShop() {
       // 여기서 실패하면 결제 후 지급 요청도 닿지 못할 가능성이 높다.
       // 돈만 빠져나가고 마스크가 들어가지 않는 상황을 막기 위해 결제창을 열지 않는다.
       try {
-        await api.post('/masks/purchase-attempt', { package: pkg.productId })
+        const started = await api.post('/masks/purchase-attempt', { package: pkg.productId })
+        attemptId = started?.id ?? null
       } catch {
         setPurchaseError(t('myPage.purchaseNetworkError'))
         setPurchasing(false)
@@ -425,7 +445,18 @@ export default function MaskShop() {
         return
       }
 
-      if (!isNative || !billingReady) {
+      // billingReady 가 false 여도 여기서 한 번 더 되살려 본다.
+      // 초기화가 한 번 실패했다는 이유만으로 포기하면, 유저는 앱을 완전히 껐다 켜기 전까지
+      // 결제할 방법이 없다 — 그 사이 계속 "결제 환경을 확인할 수 없습니다"만 본다.
+      let ready = billingReady
+      if (isNative && !ready) {
+        ready = await initBilling()
+        setBillingReady(ready)
+        if (ready) await getProducts()
+      }
+
+      if (!isNative || !ready) {
+        reportAttemptOutcome(attemptId, 'BLOCKED', isNative ? getLastBillingFailure() : 'NOT_NATIVE')
         setPurchaseError(t('myPage.purchaseEnvError'))
         setPurchasing(false)
         return
@@ -434,6 +465,7 @@ export default function MaskShop() {
       const result = await purchaseProduct(pkg.productId)
       const purchaseToken = result?.purchaseToken || result?.transactionReceipt?.purchaseToken || result?.receipt
       if (!purchaseToken) {
+        reportAttemptOutcome(attemptId, 'NO_TOKEN')
         setPurchaseError(t('myPage.purchaseInfoError'))
         setPurchasing(false)
         return
@@ -446,12 +478,14 @@ export default function MaskShop() {
         serverRes = await api.post('/masks/verify-purchase', { productId: pkg.productId, purchaseToken })
       } catch (err) {
         queueFailedPurchase(pkg.productId, purchaseToken)
+        reportAttemptOutcome(attemptId, 'VERIFY_FAILED', err?.message)
         setPurchaseError(t('myPage.purchasePendingRecovery'))
         setPurchasing(false)
         return
       }
 
       await consumePurchase(purchaseToken)
+      reportAttemptOutcome(attemptId, 'PURCHASED')
       setMasks(serverRes.masks)
       if (serverRes.firstPurchaseBonus) {
         setFirstPurchaseEligible(false)
@@ -459,7 +493,9 @@ export default function MaskShop() {
       }
     } catch (err) {
       const msg = err?.message || ''
-      if (!msg.includes('USER_CANCELED') && !msg.includes('userCancelled')) {
+      const canceled = msg.includes('USER_CANCELED') || msg.includes('userCancelled')
+      reportAttemptOutcome(attemptId, canceled ? 'CANCELED' : 'ERROR', canceled ? null : msg)
+      if (!canceled) {
         setPurchaseError(msg || t('myPage.purchaseFailed'))
       }
     }
