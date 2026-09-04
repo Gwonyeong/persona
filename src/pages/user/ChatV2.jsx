@@ -1122,7 +1122,8 @@ export default function ChatV2() {
             setShowTyping(false)
             setSending(false)
             window.gtag?.('event', 'chat_message', { conversation_id: id })
-            if (!pushPromptShownRef.current && token) {
+            // 마이페이지에서 직접 알림을 끈 유저에게는 다시 권하지 않는다.
+            if (!pushPromptShownRef.current && token && user?.pushEnabled !== false) {
               getPushPermissionStatus().then((status) => {
                 if (status === 'default') {
                   pushPromptShownRef.current = true

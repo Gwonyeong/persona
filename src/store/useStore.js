@@ -20,6 +20,8 @@ const useStore = create((set) => ({
   setSubscription: (subscription) => set({ subscription }),
   setSafetyMode: (safetyMode) =>
     set((s) => ({ user: s.user ? { ...s.user, safetyMode } : s.user })),
+  setPushEnabled: (pushEnabled) =>
+    set((s) => ({ user: s.user ? { ...s.user, pushEnabled } : s.user })),
   setAdultVerified: (verified, verifiedAt = null) =>
     set((s) => ({
       user: s.user

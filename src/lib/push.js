@@ -124,6 +124,12 @@ async function requestNativePushPermission() {
   }
 }
 
+// 주의: 이것만으로는 알림이 멈추지 않는다.
+// 서버가 보내는 FCM 메시지에 notification 블록이 들어 있어 안드로이드 OS 가 직접 띄우고,
+// 리스너 제거는 그 표시에 아무 영향이 없다. 기기의 FCM 토큰을 알 방법도 없어
+// (@capacitor/push-notifications 에 getToken 이 없다) 토큰 삭제로 끌 수도 없다.
+// 실제 차단은 서버의 User.pushEnabled 가 담당한다 — 여기서는 토큰을 그대로 남겨,
+// 다시 켤 때 재등록 절차 없이 즉시 동작하게 한다.
 async function unregisterNativePush() {
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications')
