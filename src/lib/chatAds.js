@@ -40,8 +40,13 @@ function write(key, value) {
 }
 
 function isFreeTier() {
-  const { subscription } = useStore.getState()
-  return (subscription?.tier || 'FREE') === 'FREE'
+  const { user, subscription } = useStore.getState()
+  // 서버가 알려준 실효 티어(subscriptionTier)만 신뢰한다. 구독 해지 후 잔여 기간처럼
+  // Subscription row 상태와 실효 티어가 어긋나는 경우까지 여기서 이미 정리돼 있다.
+  // 아직 티어를 모르는 구간(딥링크 인증 직후 등 /auth/me 응답 전)에는 광고를 띄우지 않는다 —
+  // 유료 유저에게 잘못 노출하는 쪽이 광고 한 번 거르는 것보다 나쁘다.
+  const tier = subscription?.tier || user?.subscriptionTier
+  return tier === 'FREE'
 }
 
 /**

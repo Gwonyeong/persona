@@ -56,7 +56,7 @@ const TABS = [
 
 export default function UserLayout() {
   const { t } = useTranslation()
-  const { token, subscription } = useStore()
+  const { token, subscription, user } = useStore()
   const location = useLocation()
   const navigate = useNavigate()
   const [hasUnread, setHasUnread] = useState(false)
@@ -73,7 +73,9 @@ export default function UserLayout() {
   const hideFooter = isFullscreenPage || isGachaPage
   const hideNav = isFullscreenPage || isGachaPage
 
-  const isFreeTier = (subscription?.tier || 'FREE') === 'FREE'
+  // 티어를 아직 모르는 구간(로그인 직후 /auth/me 응답 전)에는 배너를 띄우지 않는다.
+  // 'subscription 이 없으면 FREE' 로 두면 그 찰나에 유료 유저에게 광고가 붙는다.
+  const isFreeTier = (subscription?.tier || user?.subscriptionTier) === 'FREE'
   const shouldShowBanner = !isFullscreenPage && isFreeTier
   const adMobAvailable = isAdMobAvailable()
   const reserveBannerSlot = shouldShowBanner && adMobAvailable
