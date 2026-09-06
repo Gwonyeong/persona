@@ -14,6 +14,7 @@ import MaskIcon from '../../components/MaskIcon'
 // V2는 통화 기능 미지원 — CallSheet 미사용.
 import InsufficientMasksModal from '../../components/InsufficientMasksModal'
 import { getPushPermissionStatus, requestPushPermission } from '../../lib/push'
+import { noteChatSend } from '../../lib/chatAds'
 import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
 // import AdBanner from '../../components/AdBanner'
@@ -750,6 +751,8 @@ export default function ChatV2() {
   const audioRef = useRef(null)
   const audioQueueRef = useRef([])
   const isPlayingQueueRef = useRef(false)
+  // 전면 광고가 떠 있는 동안 true — 음성 재생을 광고가 닫힐 때까지 보류한다.
+  const adBlockingRef = useRef(false)
   const playbackTimeoutRef = useRef(null)
   // 라이브 큐: 다음 애니메이션이 시작될 시각(ms 타임스탬프). 새 버블은 이 시각까지 대기.
   const nextAnimStartRef = useRef(0)
@@ -934,6 +937,9 @@ export default function ChatV2() {
   }, [])
 
   const playFromQueue = useCallback(() => {
+    // 전면 광고가 떠 있는 동안에는 어떤 경로로도 재생을 시작하지 않는다
+    // (큐의 1초 간격 타이머가 광고 중에 만료되어 다음 버블이 터지는 것까지 막는다).
+    if (adBlockingRef.current) return
     if (isPlayingQueueRef.current) return
     if (audioQueueRef.current.length === 0) {
       setIsPlayingAll(false)
@@ -993,6 +999,24 @@ export default function ChatV2() {
     const body = { content: text, chatModel }
     if (feedToSend) body.feedPostId = feedToSend.id
     if (voiceMode && character?.voiceId) body.voiceWithChat = true
+
+    // 무료 요금제: N번째 전송이면 지금 전면 광고를 띄운다.
+    // 응답 생성·TTS 는 광고 뒤에서 그대로 진행되고, 음성 재생만 광고가 닫힐 때까지 미룬다.
+    const adClosed = noteChatSend()
+    if (adClosed) {
+      adBlockingRef.current = true
+      // 직전 턴 음성이나 '전체 재생'이 흐르는 중일 수 있다 — 광고가 덮는 동안 멈춰 둔다.
+      const pausedAudio = audioRef.current && !audioRef.current.paused ? audioRef.current : null
+      pausedAudio?.pause()
+      adClosed.finally(() => {
+        adBlockingRef.current = false
+        if (pausedAudio && audioRef.current === pausedAudio) {
+          pausedAudio.play().catch(() => {})
+        } else {
+          playFromQueue()
+        }
+      })
+    }
 
     await performStreamRound({ body, text, tempUserMsg, confirmedUserMsg, retriesLeft: 1 })
   }
@@ -1059,6 +1083,7 @@ export default function ChatV2() {
           }
           case 'audio': {
             // 서버 TTS 도착 — 즉시 큐에 추가하여 순차 재생 (라이브 모드에선 버블이 이미 등장한 뒤)
+            // 광고 표시 중이면 playFromQueue 가 자체적으로 보류한다 (닫힌 뒤 이어서 재생).
             audioQueueRef.current.push(data.audioUrl)
             playFromQueue()
             break

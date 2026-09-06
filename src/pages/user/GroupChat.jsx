@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { formatChatTime } from '../../lib/timeFormat'
+import { noteChatSend, holdPlayingAudioDuring } from '../../lib/chatAds'
 import MaskIcon from '../../components/MaskIcon'
 import { isVideoUrl, CrossfadeMedia, SpriteMedia } from '../../components/SpriteMedia'
 
@@ -433,6 +434,12 @@ export default function GroupChat() {
     setInput('')
     if (inputRef.current) inputRef.current.style.height = ''
     setSending(true)
+
+    // 무료 요금제: N번째 전송이면 전면 광고 (1:1 채팅과 같은 카운터를 공유).
+    // 응답은 광고 뒤에서 계속 생성된다. 단톡방 음성은 유저가 직접 재생하는 <audio> 라
+    // 새로 터질 일은 없지만, 이미 재생 중이던 것은 광고가 덮는 동안 멈춰 둔다.
+    const adClosed = noteChatSend()
+    if (adClosed) holdPlayingAudioDuring(adClosed)
 
     try {
       let receivedMessages = null
