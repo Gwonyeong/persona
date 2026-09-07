@@ -13,11 +13,11 @@
 import useStore from '../store/useStore'
 import { isInterstitialConfigured, prepareInterstitialAd, showInterstitialAd } from './admob'
 
-// 기본 10턴. VITE_CHAT_AD_EVERY 로 덮어쓸 수 있다 (에뮬레이터 테스트·노출 빈도 튜닝용).
+// 기본 15턴. VITE_CHAT_AD_EVERY 로 덮어쓸 수 있다 (에뮬레이터 테스트·노출 빈도 튜닝용).
 export const CHAT_TURNS_PER_AD =
   parseInt(import.meta.env.VITE_CHAT_AD_EVERY, 10) > 0
     ? parseInt(import.meta.env.VITE_CHAT_AD_EVERY, 10)
-    : 10
+    : 15
 
 const COUNT_KEY = 'chatAdTurnCount'
 const PENDING_KEY = 'chatAdPending'
