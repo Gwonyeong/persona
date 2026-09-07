@@ -48,6 +48,14 @@ function kstDayKey(date) {
   return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+// ISO → 'MM/DD HH:mm' (KST). 값이 없으면 '없음'.
+function fmtKst(iso) {
+  if (!iso) return '없음'
+  const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getUTCMonth() + 1)}/${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`
+}
+
 // 이미 예약된 날짜(occupiedKeys: Set<'YYYY-MM-DD'>)를 피해, 내일(KST)부터 가장 빠른 빈 슬롯을 찾는다.
 // 1일 1캐릭터 원칙 — 하루 한 명만. 반환: { n, iso } (n=며칠 뒤, iso=공개 예약 UTC ISO)
 function findEarliestSlot(occupiedKeys) {
@@ -129,6 +137,11 @@ export default function CharacterProduction() {
 
   const [statusBusy, setStatusBusy] = useState(false)
 
+  // 번역 상태 — 번역이 없으면 서버가 조용히 한국어로 폴백해서 화면엔 아무 신호가 안 뜬다.
+  // 그래서 제작 워크스페이스에서 눈으로 확인할 수 있게 별도 조회한다.
+  const [trStatus, setTrStatus] = useState(null)
+  const [trBusy, setTrBusy] = useState(false)
+
   // 표정 감정 이동 중인 이미지 id (썸네일 오버레이용)
   const [movingImageId, setMovingImageId] = useState(null)
 
@@ -143,7 +156,17 @@ export default function CharacterProduction() {
       }
     })
 
+  const loadTrStatus = () => {
+    setTrBusy(true)
+    return api
+      .get(`/admin/characters/${id}/translation-status`)
+      .then(setTrStatus)
+      .catch(() => setTrStatus(null))
+      .finally(() => setTrBusy(false))
+  }
+
   useEffect(() => { load() }, [id])
+  useEffect(() => { loadTrStatus() }, [id])
 
   if (!character) return <div className="p-6 text-gray-400">로딩 중...</div>
 
@@ -514,6 +537,44 @@ export default function CharacterProduction() {
           <ChecklistItem ok={readiness.sample} label="음성 샘플(기본)" />
           <ChecklistItem ok={readiness.profile} label="프로필 이미지" />
         </div>
+      </div>
+
+      {/* 번역 상태 — 누락은 에러 없이 한국어 폴백으로 나가므로 여기서만 보인다 */}
+      <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-gray-300">번역 상태</h3>
+          <button
+            onClick={loadTrStatus}
+            disabled={trBusy}
+            className="text-[11px] px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 text-gray-400 disabled:opacity-50"
+            style={btnStyle}
+          >
+            {trBusy ? '조회 중…' : '↻ 새로고침'}
+          </button>
+        </div>
+
+        {!trStatus ? (
+          <p className="text-xs text-gray-500">{trBusy ? '불러오는 중…' : '상태를 불러오지 못했습니다.'}</p>
+        ) : !trStatus.hasEverTranslated ? (
+          <p className="text-xs text-red-400">
+            ⚠ 아직 한 번도 번역되지 않았습니다 — 공개 중이라면 일본·영어 유저에게 <b>한국어 그대로</b> 나갑니다.
+            <span className="block text-[11px] text-gray-500 mt-1">
+              해결: <code className="text-gray-400">npm run translate:backfill -- --id {trStatus.characterId}</code>
+            </span>
+          </p>
+        ) : (
+          <>
+            {trStatus.stale && (
+              <p className="text-[11px] text-amber-400 mb-2">
+                ⚠ 한국어 원문이 마지막 번역({fmtKst(trStatus.translatedAt)}) 이후 변경됨 — 재번역 대상입니다.
+              </p>
+            )}
+            <TranslationGrid status={trStatus} />
+            <p className="text-[11px] text-gray-500 mt-2">
+              마지막 번역 {fmtKst(trStatus.translatedAt)} · 번역이 없으면 에러 없이 한국어로 폴백합니다.
+            </p>
+          </>
+        )}
       </div>
 
       {/* 1. voiceId + 음성 샘플 */}
@@ -957,6 +1018,76 @@ export default function CharacterProduction() {
         </div>
       </Section>
     </div>
+  )
+}
+
+// 번역 상태 표 — 언어(ja/en) × 항목(필드·상황극 카드·의상 이름·음성 샘플).
+// 항목이 0개면 '—'로 두고 완료로 세지 않는다(해당 캐릭터에 카드가 없는 경우 등).
+const TR_ROWS = [
+  { key: 'fields', label: '캐릭터 필드' },
+  { key: 'cards', label: '상황극 카드' },
+  { key: 'styles', label: '의상 이름' },
+  { key: 'voiceSamples', label: '음성 샘플' },
+]
+const TR_LANGS = [{ key: 'ja', label: '일본어' }, { key: 'en', label: '영어' }]
+
+function TranslationCell({ part }) {
+  if (!part || part.total === 0) return <span className="text-gray-600">—</span>
+  const staleN = part.stale?.length || 0
+  const done = part.done === part.total && staleN === 0
+  return (
+    <span className={done ? 'text-green-400' : 'text-amber-400'}>
+      {done ? '✅' : '⚠'} {part.done}/{part.total}
+      {staleN > 0 && <span className="text-amber-500"> (변경 {staleN})</span>}
+    </span>
+  )
+}
+
+function TranslationGrid({ status }) {
+  // 누락·변경 항목의 이름을 모아 표 아래에 붙인다 — 무엇을 고쳐야 하는지 바로 알 수 있게.
+  const details = []
+  for (const { key: lang, label: langLabel } of TR_LANGS) {
+    const L = status.langs?.[lang]
+    if (!L) continue
+    if (L.fields?.missing?.length) details.push(`${langLabel} 필드 누락: ${L.fields.missing.join(', ')}`)
+    if (L.cards?.missing?.length) details.push(`${langLabel} 카드 누락: ${L.cards.missing.map((c) => c.title).join(', ')}`)
+    if (L.cards?.stale?.length) details.push(`${langLabel} 카드 원문 변경: ${L.cards.stale.map((c) => c.title).join(', ')}`)
+    if (L.styles?.missing?.length) details.push(`${langLabel} 의상 누락: ${L.styles.missing.map((s) => s.name).join(', ')}`)
+    if (L.voiceSamples?.missing?.length) details.push(`${langLabel} 음성 누락: ${L.voiceSamples.missing.join(', ')}`)
+  }
+
+  return (
+    <>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-gray-500">
+            <th className="text-left font-normal pb-1">항목</th>
+            {TR_LANGS.map((l) => (
+              <th key={l.key} className="text-left font-normal pb-1 w-24">{l.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {TR_ROWS.map((r) => (
+            <tr key={r.key} className="border-t border-gray-800">
+              <td className="py-1 text-gray-400">{r.label}</td>
+              {TR_LANGS.map((l) => (
+                <td key={l.key} className="py-1">
+                  <TranslationCell part={status.langs?.[l.key]?.[r.key]} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {details.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {details.map((d, i) => (
+            <li key={i} className="text-[11px] text-amber-400/80">· {d}</li>
+          ))}
+        </ul>
+      )}
+    </>
   )
 }
 
