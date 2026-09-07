@@ -6,7 +6,7 @@ import i18n from '../../i18n'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
-import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications } from '../../lib/push'
+import { requestPushPermission, getPushPermissionStatus, unregisterPushNotifications, registerPushNotifications } from '../../lib/push'
 import MaskIcon from '../../components/MaskIcon'
 
 const LANGUAGES = [
@@ -40,7 +40,7 @@ function resizeImage(file, maxSize = 512) {
 
 export default function MyPage() {
   const { t } = useTranslation()
-  const { token, masks, setMasks, clearAuth } = useStore()
+  const { token, masks, setMasks, clearAuth, user, setPushEnabled } = useStore()
   const navigate = useNavigate()
 
   const [dbUser, setDbUser] = useState(null)
@@ -50,6 +50,10 @@ export default function MyPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [pushStatus, setPushStatus] = useState('default')
+  const [pushBusy, setPushBusy] = useState(false)
+  // 알림이 실제로 도착하려면 OS 권한과 서버 수신 설정이 둘 다 켜져 있어야 한다.
+  // 예전에는 OS 권한만 봐서, 끈 직후에도 앱을 다시 켜면 켜진 것처럼 보였다.
+  const pushOn = pushStatus === 'granted' && user?.pushEnabled !== false
   const [showLangModal, setShowLangModal] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'collection' ? 'collection' : 'profile')
@@ -284,20 +288,37 @@ export default function MyPage() {
         {pushStatus !== 'unsupported' && (
           <button
             onClick={async () => {
-              if (pushStatus === 'granted') {
-                await unregisterPushNotifications()
-                setPushStatus('default')
-              } else {
-                const result = await requestPushPermission()
-                setPushStatus(result)
+              if (pushBusy) return
+              setPushBusy(true)
+              try {
+                if (pushOn) {
+                  // OS 권한은 앱이 끌 수 없으므로 서버에 수신 거부를 남긴다.
+                  // 웹 구독은 여기서 함께 해제 — 네이티브 토큰은 그대로 두고
+                  // 서버 게이트만 닫아, 다시 켤 때 재등록 없이 바로 동작하게 한다.
+                  await unregisterPushNotifications()
+                  const { pushEnabled } = await api.put('/push/preference', { enabled: false })
+                  setPushEnabled(pushEnabled)
+                } else {
+                  const result = pushStatus === 'granted' ? 'granted' : await requestPushPermission()
+                  setPushStatus(result)
+                  if (result !== 'granted') return // OS 단계에서 거부되면 서버 값은 건드리지 않는다
+                  await registerPushNotifications()
+                  const { pushEnabled } = await api.put('/push/preference', { enabled: true })
+                  setPushEnabled(pushEnabled)
+                }
+              } catch (e) {
+                console.warn('push preference toggle failed', e)
+              } finally {
+                setPushBusy(false)
               }
             }}
-            className="w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors"
+            disabled={pushBusy}
+            className={`w-full flex items-center justify-between px-4 py-3.5 text-sm hover:bg-gray-800/50 transition-colors ${pushBusy ? 'opacity-50' : ''}`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
             <span className="text-gray-200">{t('myPage.notifications')}</span>
-            <div className={`w-10 h-[22px] rounded-full relative transition-colors ${pushStatus === 'granted' ? 'bg-indigo-600' : 'bg-gray-700'}`}>
-              <div className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white transition-transform ${pushStatus === 'granted' ? 'translate-x-[20px]' : 'translate-x-0.5'}`} />
+            <div className={`w-10 h-[22px] rounded-full relative transition-colors ${pushOn ? 'bg-indigo-600' : 'bg-gray-700'}`}>
+              <div className={`absolute top-0.5 w-[18px] h-[18px] rounded-full bg-white transition-transform ${pushOn ? 'translate-x-[20px]' : 'translate-x-0.5'}`} />
             </div>
           </button>
         )}
