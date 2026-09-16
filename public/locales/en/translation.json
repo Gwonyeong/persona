@@ -1163,6 +1163,8 @@
   },
   "memory": {
     "button": "Memory",
+    "capacityNotice": "Long-term memory is full!",
+    "capacityNoticeHint": "Lock important memories to keep them safe",
     "modal": {
       "title": "{{name}}'s memory",
       "subtitle": "{{used}}/{{total}} slots",
@@ -1176,7 +1178,13 @@
       "addButton": "Add a memory",
       "newPlaceholder": "Write something the character should always remember",
       "pin": "Pin",
+      "pinGuideTitle": "Lock memories that matter",
       "pinHint": "You can add or edit memories. Pinned (🔒) memories never fade over time.",
+      "pinAction": "Lock",
+      "unpinAction": "Unlock",
+      "pinnedBadge": "Locked",
+      "pinned": "Memory locked",
+      "unpinned": "Memory unlocked",
       "save": "Save",
       "cancel": "Cancel",
       "delete": "Delete",

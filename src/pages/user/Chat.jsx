@@ -554,6 +554,9 @@ export default function Chat() {
   // 장기기억(LTM) 슬롯 — 책 버튼 색 결정에 used/count 사용. 모달이 갱신할 때마다 onUpdate로 반영.
   const [showMemoryModal, setShowMemoryModal] = useState(false)
   const [memorySnapshot, setMemorySnapshot] = useState(null) // { slot:{used,count,capReached} }
+  const [showMemoryCapacityNotice, setShowMemoryCapacityNotice] = useState(false)
+  const memoryCapacityNoticeShownRef = useRef(false)
+  const memoryRefreshTimersRef = useRef([])
   // 캐릭터 personality 프리셋 — 활성 프리셋 content가 시스템 프롬프트에 주입됨.
   const [showPersonalityModal, setShowPersonalityModal] = useState(false)
   const [showCallChooser, setShowCallChooser] = useState(false)
@@ -788,15 +791,41 @@ export default function Chat() {
     }
   }, [id])
 
-  // 장기기억 슬롯 스냅샷 — 책 버튼 색 결정용 (가득 차면 강조색).
+  const applyMemorySnapshot = useCallback((res) => {
+    setMemorySnapshot(res)
+    const notice = res?.capacityNotice
+    if (!notice?.eventId || !notice?.occurredAt) return
+    const today = new Date().toLocaleDateString('en-CA')
+    const eventDay = new Date(notice.occurredAt).toLocaleDateString('en-CA')
+    if (eventDay !== today) return
+    const key = `pesona:memory-capacity-notice:${user?.id || 'user'}:${id}:${today}`
+    try {
+      if (localStorage.getItem(key)) return
+      localStorage.setItem(key, String(notice.eventId))
+    } catch (_) {
+      // WebView 저장소를 사용할 수 없어도 현재 세션에서는 한 번만 표시한다.
+      if (memoryCapacityNoticeShownRef.current) return
+    }
+    memoryCapacityNoticeShownRef.current = true
+    setShowMemoryCapacityNotice(true)
+  }, [id, user?.id])
+
+  const refreshMemorySnapshot = useCallback(() => {
+    if (!id) return Promise.resolve()
+    return api.get(`/memory/conversations/${id}`).then(applyMemorySnapshot).catch(() => {})
+  }, [id, applyMemorySnapshot])
+
+  // 장기기억 슬롯 스냅샷 — 책 버튼 색 결정 + 당일 capacity 삭제 안내용.
   // 모달 열 때 한 번 더 fetch하므로 실패해도 색만 부정확 — 조용히 무시.
   useEffect(() => {
     if (!id) return
-    api
-      .get(`/memory/conversations/${id}`)
-      .then((res) => setMemorySnapshot(res))
-      .catch(() => {})
-  }, [id])
+    refreshMemorySnapshot()
+  }, [id, refreshMemorySnapshot])
+
+  useEffect(() => () => {
+    memoryRefreshTimersRef.current.forEach(clearTimeout)
+    memoryRefreshTimersRef.current = []
+  }, [])
 
   useEffect(() => {
     initialLoadRef.current = true
@@ -1125,6 +1154,11 @@ export default function Chat() {
             if (data.consumedFreeVoice && typeof data.freeVoiceUses === 'number' && user) {
               setUser({ ...user, freeVoiceUses: data.freeVoiceUses })
             }
+            // 기억 추출은 응답 저장 뒤 비동기로 끝난다. 잠시 뒤 슬롯/삭제 이벤트를 갱신한다.
+            memoryRefreshTimersRef.current.forEach(clearTimeout)
+            memoryRefreshTimersRef.current = [4000, 12000].map((delay) =>
+              setTimeout(refreshMemorySnapshot, delay),
+            )
             break
           }
           case 'error':
@@ -1719,20 +1753,39 @@ export default function Chat() {
               const isMemoryFull =
                 memorySnapshot?.slot && memorySnapshot.slot.used >= memorySnapshot.slot.count
               return (
-                <button
-                  onClick={() => setShowMemoryModal(true)}
-                  className={`w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors ${
-                    isMemoryFull ? 'ring-2 ring-amber-400' : ''
-                  }`}
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  aria-label={t('memory.button')}
-                  title={t('memory.button')}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isMemoryFull ? '#fcd34d' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                  </svg>
-                </button>
+                <div className="relative">
+                  {showMemoryCapacityNotice && (
+                    <button
+                      onClick={() => {
+                        setShowMemoryCapacityNotice(false)
+                        setShowMemoryModal(true)
+                      }}
+                      className="absolute bottom-full right-0 mb-2 w-max max-w-[220px] rounded-xl border border-amber-300/50 bg-amber-50 px-3 py-2 text-left text-xs font-semibold text-amber-950 shadow-xl animate-fade-in"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {t('memory.capacityNotice')}
+                      <span className="block mt-0.5 text-[10px] font-normal text-amber-800">{t('memory.capacityNoticeHint')}</span>
+                      <span className="absolute top-full right-4 h-0 w-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-amber-50" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowMemoryCapacityNotice(false)
+                      setShowMemoryModal(true)
+                    }}
+                    className={`w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700/50 flex items-center justify-center shadow-lg transition-colors ${
+                      showMemoryCapacityNotice ? 'ring-2 ring-amber-300 animate-pulse' : isMemoryFull ? 'ring-2 ring-amber-400' : ''
+                    }`}
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    aria-label={t('memory.button')}
+                    title={t('memory.button')}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isMemoryFull || showMemoryCapacityNotice ? '#fcd34d' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
+                  </button>
+                </div>
               )
             })()}
             <div className="relative">
@@ -2426,7 +2479,7 @@ export default function Chat() {
         conversationId={conversation.id}
         characterName={character?.name}
         onClose={() => setShowMemoryModal(false)}
-        onUpdate={(s) => setMemorySnapshot(s)}
+        onUpdate={applyMemorySnapshot}
       />
       <PersonalityModal
         open={showPersonalityModal}
