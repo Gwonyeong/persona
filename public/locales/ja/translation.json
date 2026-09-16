@@ -1163,6 +1163,8 @@
   },
   "memory": {
     "button": "記憶",
+    "capacityNotice": "長期記憶がいっぱいです！",
+    "capacityNoticeHint": "大切な記憶はロックして守れます",
     "modal": {
       "title": "{{name}}の記憶",
       "subtitle": "{{used}}/{{total}} スロット",
@@ -1176,7 +1178,13 @@
       "addButton": "記憶を追加",
       "newPlaceholder": "キャラクターに覚えておいてほしいことを書いてください",
       "pin": "固定",
+      "pinGuideTitle": "大切な記憶はロックしましょう",
       "pinHint": "記憶を直接追加・編集できます。固定（🔒）した記憶は時間が経っても消えません。",
+      "pinAction": "ロック",
+      "unpinAction": "ロック解除",
+      "pinnedBadge": "ロック中",
+      "pinned": "記憶をロックしました",
+      "unpinned": "記憶のロックを解除しました",
       "save": "保存",
       "cancel": "キャンセル",
       "delete": "削除",

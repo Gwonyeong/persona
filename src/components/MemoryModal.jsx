@@ -173,6 +173,29 @@ export default function MemoryModal({ open, conversationId, characterName, onClo
     }
   }
 
+  const handleTogglePin = async (i) => {
+    if (saving) return
+    const item = ltm[i]
+    const orig = factOf(item)
+    const nextPinned = !pinnedOf(item)
+    setSaving(true)
+    try {
+      const res = await api.put(`/memory/conversations/${conversationId}/facts/${i}`, {
+        pinned: nextPinned,
+        expectedFact: orig,
+      })
+      applyResult(res)
+      setToast({
+        kind: 'success',
+        text: t(nextPinned ? 'memory.modal.pinned' : 'memory.modal.unpinned'),
+      })
+    } catch (err) {
+      toastFromErr(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleUnlock = async () => {
     if (unlocking || capReached) return
     setUnlocking(true)
@@ -288,7 +311,21 @@ export default function MemoryModal({ open, conversationId, characterName, onClo
           <div className="text-center text-gray-500 text-sm py-8">…</div>
         ) : (
           <>
-            <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">{t('memory.modal.pinHint')}</p>
+            <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2.5">
+              <div className="flex items-start gap-2">
+                <span className="mt-0.5 flex-shrink-0 text-amber-300"><LockIcon filled /></span>
+                <div>
+                  <p className="text-xs font-semibold text-amber-200">{t('memory.modal.pinGuideTitle')}</p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-amber-100/70">{t('memory.modal.pinHint')}</p>
+                </div>
+              </div>
+            </div>
+
+            {isFull && (
+              <div className="mb-3 rounded-lg border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-[11px] leading-relaxed text-orange-200">
+                {t('memory.modal.capWarning')}
+              </div>
+            )}
 
             {/* 추가 버튼 / 신규 에디터 */}
             {editingIdx === 'new' ? (
@@ -323,21 +360,36 @@ export default function MemoryModal({ open, conversationId, characterName, onClo
                 const pinned = pinnedOf(item)
                 if (editingIdx === i) return <div key={i}>{editor}</div>
                 return (
-                  <button
+                  <div
                     key={i}
-                    onClick={() => openEdit(i)}
-                    className={`text-left rounded-md px-3 py-1.5 border transition-colors ${
+                    className={`flex items-stretch rounded-md border transition-colors overflow-hidden ${
                       pinned
                         ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15'
                         : 'bg-gray-800/70 border-gray-700/60 hover:bg-gray-800'
                     }`}
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    <span className="flex items-start gap-1.5">
-                      {pinned && <span className="mt-0.5 flex-shrink-0 text-amber-300"><LockIcon filled /></span>}
+                    <button
+                      onClick={() => openEdit(i)}
+                      className="min-w-0 flex-1 px-3 py-2 text-left"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
                       <span className="text-xs text-gray-100 leading-snug break-words whitespace-pre-wrap">{fact}</span>
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      onClick={() => handleTogglePin(i)}
+                      disabled={saving}
+                      className={`w-[68px] flex-shrink-0 border-l flex flex-col items-center justify-center gap-0.5 transition-colors disabled:opacity-50 ${
+                        pinned
+                          ? 'border-amber-500/30 bg-amber-500/15 text-amber-300'
+                          : 'border-gray-700/60 bg-gray-900/35 text-gray-400 hover:text-amber-300'
+                      }`}
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      aria-label={t(pinned ? 'memory.modal.unpinAction' : 'memory.modal.pinAction')}
+                    >
+                      <LockIcon filled={pinned} />
+                      <span className="text-[9px] font-medium">{t(pinned ? 'memory.modal.pinnedBadge' : 'memory.modal.pinAction')}</span>
+                    </button>
+                  </div>
                 )
               })}
 

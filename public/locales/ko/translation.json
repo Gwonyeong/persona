@@ -1163,6 +1163,8 @@
   },
   "memory": {
     "button": "기억",
+    "capacityNotice": "장기기억이 가득 찼어요!",
+    "capacityNoticeHint": "중요한 기억은 잠가서 지킬 수 있어요",
     "modal": {
       "title": "{{name}}의 기억",
       "subtitle": "{{used}}/{{total}} 슬롯",
@@ -1176,7 +1178,13 @@
       "addButton": "기억 직접 추가",
       "newPlaceholder": "캐릭터가 꼭 기억할 내용을 적어주세요",
       "pin": "고정",
+      "pinGuideTitle": "중요한 기억은 잠가두세요",
       "pinHint": "기억을 직접 추가·수정할 수 있어요. 고정(🔒)한 기억은 시간이 지나도 사라지지 않아요.",
+      "pinAction": "잠그기",
+      "unpinAction": "잠금 해제",
+      "pinnedBadge": "잠금됨",
+      "pinned": "이 기억을 잠갔어요",
+      "unpinned": "기억 잠금을 해제했어요",
       "save": "저장",
       "cancel": "취소",
       "delete": "삭제",
