@@ -415,6 +415,7 @@ export default function PersonalityModal({ open, conversationId, characterName, 
 
 // preview 는 { chips: [{key,label}], concept: string|null, traits: string[] } 또는 null.
 function PresetCard({ title, subtitle, preview, active, activeLabel, onSelect, onEdit }) {
+  const { t } = useTranslation()
   const chips = preview?.chips || []
   const concept = preview?.concept || null
   const traits = preview?.traits || []
