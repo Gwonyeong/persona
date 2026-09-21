@@ -91,9 +91,8 @@ export default function CharacterCollection() {
       navigate('/adult-verify')
       return
     }
-    // 무료 의상(maskCost=0)은 항상 세트로, 잔액 검사 없이 바로 받는다.
-    const isFree = buyStyle.maskCost === 0
-    const cost = isFree ? 0 : variant === 'single' ? (buyStyle.singleMaskCost ?? 10) : buyStyle.maskCost
+    // 가격 0 은 variant 단위로 유효하다 (예: 단일 무료 + 세트 150). 0 이면 잔액 검사 없이 받는다.
+    const cost = variant === 'single' ? (buyStyle.singleMaskCost ?? 10) : buyStyle.maskCost
     if (masks < cost) {
       navigate('/mask-shop?tab=subscription')
       return
@@ -351,7 +350,7 @@ export default function CharacterCollection() {
                       {/* 상점 구매 가능 의상: 가격 뱃지 노출 */}
                       {buyable && (
                         <div className="absolute top-1 right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/70 text-[10px] font-semibold text-white">
-                          {o.maskCost === 0 ? (
+                          {(o.videoCount > 0 ? (o.singleMaskCost ?? 10) : o.maskCost) === 0 ? (
                             <span className="text-amber-300">{t('maskShop.styleFree')}</span>
                           ) : (
                             <>
@@ -470,14 +469,18 @@ export default function CharacterCollection() {
                   )}
                 </button>
                 {/* 단일 — 이미지만 (영상 있는 스타일에서만) */}
-                {buyStyle.videoCount > 0 && buyStyle.maskCost !== 0 && (
+                {buyStyle.videoCount > 0 && (
                   <button
                     onClick={() => purchaseStyle('single')}
                     disabled={purchasing}
                     className="w-full py-2.5 rounded-xl bg-gray-800 border border-gray-700 text-gray-100 active:bg-gray-750 transition-colors disabled:opacity-50 flex flex-col items-center gap-0.5"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    <span className="text-sm font-semibold inline-flex items-center gap-1.5"><MaskIcon /> {buyStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}</span>
+                    <span className="text-sm font-semibold inline-flex items-center gap-1.5">
+                      {(buyStyle.singleMaskCost ?? 10) === 0
+                        ? `${t('maskShop.styleFreeClaim')} · ${t('maskShop.stylePurchaseSingle')}`
+                        : <><MaskIcon /> {buyStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}</>}
+                    </span>
                     <span className="text-[10px] text-gray-400">{t('maskShop.styleSingleDesc')}</span>
                   </button>
                 )}

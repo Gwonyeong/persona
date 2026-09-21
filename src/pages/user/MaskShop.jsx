@@ -327,9 +327,8 @@ export default function MaskShop() {
       navigate('/adult-verify')
       return
     }
-    // 무료 의상(maskCost=0)은 항상 세트로, 잔액 검사 없이 바로 받는다.
-    const isFree = item.maskCost === 0
-    const cost = isFree ? 0 : variant === 'single' ? (item.singleMaskCost ?? 10) : item.maskCost
+    // 가격 0 은 variant 단위로 유효하다 (예: 단일 무료 + 세트 150). 0 이면 잔액 검사 없이 받는다.
+    const cost = variant === 'single' ? (item.singleMaskCost ?? 10) : item.maskCost
     if (masks < cost) {
       setDetailStyle(null)
       setActiveTab('shop')
@@ -337,9 +336,9 @@ export default function MaskShop() {
     }
     setPurchasingStyleId(item.styleId)
     try {
-      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, { variant: isFree ? 'set' : variant })
+      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, { variant })
       if (res.masks !== undefined) setMasks(res.masks)
-      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: isFree ? 'set' : variant } : s)))
+      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: variant } : s)))
       setDetailStyle(null)
       setToast({ kind: 'success', text: t('maskShop.stylePurchased') })
     } catch (err) {
@@ -1131,7 +1130,7 @@ export default function MaskShop() {
                         <span className="text-emerald-400 font-semibold">{t('maskShop.styleOwned')}</span>
                       ) : needVerify ? (
                         <span className="text-rose-300 font-semibold">{t('maskShop.styleAdultVerify')}</span>
-                      ) : item.maskCost === 0 ? (
+                      ) : (item.videoCount > 0 ? (item.singleMaskCost ?? 10) : item.maskCost) === 0 ? (
                         <span className="text-amber-300 font-bold">{t('maskShop.styleFree')}</span>
                       ) : (
                         <span className="inline-flex items-center gap-0.5 text-indigo-300 font-bold">
@@ -1290,12 +1289,13 @@ export default function MaskShop() {
                           </>
                         )}
                       </span>
+                      {/* 세트 설명 */}
                       <span className="text-[10px] text-indigo-200/90">{t('maskShop.styleSetDesc')}</span>
                     </>
                   )}
                 </button>
                 {/* 단일 — 표정 이미지만 (영상 개별 해금). 영상이 있는 스타일에서만 노출 */}
-                {detailStyle.videoCount > 0 && detailStyle.maskCost !== 0 && (
+                {detailStyle.videoCount > 0 && (
                   <button
                     onClick={() => purchaseStyle(detailStyle, 'single')}
                     disabled={purchasingStyleId === detailStyle.styleId}
@@ -1303,7 +1303,13 @@ export default function MaskShop() {
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
                     <span className="text-sm font-bold inline-flex items-center gap-1.5">
-                      <MaskIcon /> {detailStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}
+                      {(detailStyle.singleMaskCost ?? 10) === 0 ? (
+                        `${t('maskShop.styleFreeClaim')} · ${t('maskShop.stylePurchaseSingle')}`
+                      ) : (
+                        <>
+                          <MaskIcon /> {detailStyle.singleMaskCost ?? 10} · {t('maskShop.stylePurchaseSingle')}
+                        </>
+                      )}
                     </span>
                     <span className="text-[10px] text-gray-400">{t('maskShop.styleSingleDesc')}</span>
                   </button>
