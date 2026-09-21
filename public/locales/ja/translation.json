@@ -1067,6 +1067,8 @@
     "stylePreviewLabel": "プレビュー",
     "styleUnlockNote": "セットは表情画像と連携動画がすべて解放されます。シングルは表情画像のみ解放され、動画はチャットで個別に解放できます。",
     "stylePurchaseSet": "セット購入",
+    "styleFree": "無料",
+    "styleFreeClaim": "無料で受け取る",
     "stylePurchaseSingle": "シングル購入",
     "styleSetDesc": "表情画像 + 連携動画すべて",
     "styleSingleDesc": "表情画像のみ・動画は個別解放",

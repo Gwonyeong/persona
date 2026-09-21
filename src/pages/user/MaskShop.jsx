@@ -327,7 +327,9 @@ export default function MaskShop() {
       navigate('/adult-verify')
       return
     }
-    const cost = variant === 'single' ? (item.singleMaskCost ?? 10) : item.maskCost
+    // 무료 의상(maskCost=0)은 항상 세트로, 잔액 검사 없이 바로 받는다.
+    const isFree = item.maskCost === 0
+    const cost = isFree ? 0 : variant === 'single' ? (item.singleMaskCost ?? 10) : item.maskCost
     if (masks < cost) {
       setDetailStyle(null)
       setActiveTab('shop')
@@ -335,9 +337,9 @@ export default function MaskShop() {
     }
     setPurchasingStyleId(item.styleId)
     try {
-      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, { variant })
+      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, { variant: isFree ? 'set' : variant })
       if (res.masks !== undefined) setMasks(res.masks)
-      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: variant } : s)))
+      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: isFree ? 'set' : variant } : s)))
       setDetailStyle(null)
       setToast({ kind: 'success', text: t('maskShop.stylePurchased') })
     } catch (err) {
@@ -1129,6 +1131,8 @@ export default function MaskShop() {
                         <span className="text-emerald-400 font-semibold">{t('maskShop.styleOwned')}</span>
                       ) : needVerify ? (
                         <span className="text-rose-300 font-semibold">{t('maskShop.styleAdultVerify')}</span>
+                      ) : item.maskCost === 0 ? (
+                        <span className="text-amber-300 font-bold">{t('maskShop.styleFree')}</span>
                       ) : (
                         <span className="inline-flex items-center gap-0.5 text-indigo-300 font-bold">
                           {/* 영상 있는 스타일은 단일가(최저가)부터 노출 */}
@@ -1278,14 +1282,20 @@ export default function MaskShop() {
                   ) : (
                     <>
                       <span className="text-sm font-bold inline-flex items-center gap-1.5">
-                        <MaskIcon /> {detailStyle.maskCost} · {t('maskShop.stylePurchaseSet')}
+                        {detailStyle.maskCost === 0 ? (
+                          t('maskShop.styleFreeClaim')
+                        ) : (
+                          <>
+                            <MaskIcon /> {detailStyle.maskCost} · {t('maskShop.stylePurchaseSet')}
+                          </>
+                        )}
                       </span>
                       <span className="text-[10px] text-indigo-200/90">{t('maskShop.styleSetDesc')}</span>
                     </>
                   )}
                 </button>
                 {/* 단일 — 표정 이미지만 (영상 개별 해금). 영상이 있는 스타일에서만 노출 */}
-                {detailStyle.videoCount > 0 && (
+                {detailStyle.videoCount > 0 && detailStyle.maskCost !== 0 && (
                   <button
                     onClick={() => purchaseStyle(detailStyle, 'single')}
                     disabled={purchasingStyleId === detailStyle.styleId}

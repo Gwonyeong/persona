@@ -77,7 +77,7 @@ export default function CharacterCollection() {
 
   // 미보유 의상 클릭 — SHOP 이면 구매 모달, GACHA 면 가챠 유도
   const onLockedOutfit = (o) => {
-    if (o.unlockMode === 'SHOP' && o.maskCost > 0) {
+    if (o.unlockMode === 'SHOP' && o.maskCost >= 0) {
       // 성인 전용 의상은 미인증 시 인증 페이지로
       if (o.adultOnly && !user?.adultVerified) { navigate('/adult-verify'); return }
       setBuyStyle(o)
@@ -91,7 +91,9 @@ export default function CharacterCollection() {
       navigate('/adult-verify')
       return
     }
-    const cost = variant === 'single' ? (buyStyle.singleMaskCost ?? 10) : buyStyle.maskCost
+    // 무료 의상(maskCost=0)은 항상 세트로, 잔액 검사 없이 바로 받는다.
+    const isFree = buyStyle.maskCost === 0
+    const cost = isFree ? 0 : variant === 'single' ? (buyStyle.singleMaskCost ?? 10) : buyStyle.maskCost
     if (masks < cost) {
       navigate('/mask-shop?tab=subscription')
       return
@@ -329,7 +331,7 @@ export default function CharacterCollection() {
               data.outfits.length === 0 ? <EmptyTab t={t} /> : (
                 <div className="grid grid-cols-3 gap-2">
                   {data.outfits.map((o) => {
-                    const buyable = !o.owned && o.unlockMode === 'SHOP' && o.maskCost > 0
+                    const buyable = !o.owned && o.unlockMode === 'SHOP' && o.maskCost >= 0
                     return (
                     <div
                       key={o.id}
@@ -348,9 +350,15 @@ export default function CharacterCollection() {
                       )}
                       {/* 상점 구매 가능 의상: 가격 뱃지 노출 */}
                       {buyable && (
-                        <div className="absolute top-1 right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/70 text-white text-[10px] font-semibold">
-                          <MaskIcon className="w-3 h-3" />
-                          {o.videoCount > 0 ? `${o.singleMaskCost ?? 10}~` : o.maskCost}
+                        <div className="absolute top-1 right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/70 text-[10px] font-semibold text-white">
+                          {o.maskCost === 0 ? (
+                            <span className="text-amber-300">{t('maskShop.styleFree')}</span>
+                          ) : (
+                            <>
+                              <MaskIcon className="w-3 h-3" />
+                              {o.videoCount > 0 ? `${o.singleMaskCost ?? 10}~` : o.maskCost}
+                            </>
+                          )}
                         </div>
                       )}
                       {!o.owned && o.adultOnly && (
@@ -454,13 +462,15 @@ export default function CharacterCollection() {
                     <span className="text-sm font-semibold py-0.5">{t('common.loading')}</span>
                   ) : (
                     <>
-                      <span className="text-sm font-semibold inline-flex items-center gap-1.5"><MaskIcon /> {buyStyle.maskCost} · {t('maskShop.stylePurchaseSet')}</span>
+                      <span className="text-sm font-semibold inline-flex items-center gap-1.5">
+                        {buyStyle.maskCost === 0 ? t('maskShop.styleFreeClaim') : <><MaskIcon /> {buyStyle.maskCost} · {t('maskShop.stylePurchaseSet')}</>}
+                      </span>
                       <span className="text-[10px] text-indigo-200/90">{t('maskShop.styleSetDesc')}</span>
                     </>
                   )}
                 </button>
                 {/* 단일 — 이미지만 (영상 있는 스타일에서만) */}
-                {buyStyle.videoCount > 0 && (
+                {buyStyle.videoCount > 0 && buyStyle.maskCost !== 0 && (
                   <button
                     onClick={() => purchaseStyle('single')}
                     disabled={purchasing}
