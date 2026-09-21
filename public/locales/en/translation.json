@@ -1067,6 +1067,8 @@
     "stylePreviewLabel": "Preview",
     "styleUnlockNote": "The set unlocks all expression images and their videos. Single unlocks the expression images only — videos can be unlocked individually in chat.",
     "stylePurchaseSet": "Buy set",
+    "styleFree": "Free",
+    "styleFreeClaim": "Get it free",
     "stylePurchaseSingle": "Buy single",
     "styleSetDesc": "All expression images + videos",
     "styleSingleDesc": "Expression images only · videos unlocked separately",
