@@ -6,6 +6,7 @@ import useStore from './store/useStore'
 import { api } from './lib/api'
 import { registerPushNotifications } from './lib/push'
 import { recoverPendingPurchases } from './lib/purchaseRecovery'
+import { syncAccountLanguage } from './lib/syncLanguage'
 // Admin
 import AdminLayout from './pages/admin/AdminLayout'
 import Dashboard from './pages/admin/Dashboard'
@@ -186,6 +187,11 @@ function App() {
       .then(({ user }) => {
         setUser(user)
         registerPushNotifications()
+        // 계정 언어가 앱 언어와 어긋나 있으면 맞춘다 (캐릭터가 엉뚱한 언어로 말하는 것 방지).
+        // 로그인 직후와 재접속을 한곳에서 커버한다 — 이미 어긋난 기존 계정도 여기서 교정된다.
+        syncAccountLanguage(user).then((synced) => {
+          if (synced) setUser({ ...user, language: synced })
+        })
       })
       .catch(() => clearAuth())
   }, [token])
