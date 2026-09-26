@@ -15,6 +15,11 @@ let initPromise = null
 // isBillingSupported()가 응답하지 않는 경우(Play 스토어 상태 이상 등)를 끊는다.
 // 타임아웃 없이 두면 promise가 영원히 pending으로 남아 billingReady가 계속 false다.
 const INIT_TIMEOUT_MS = 8000
+// 네이티브 플러그인은 내부적으로 BillingClient 연결을 최대 약 10초 기다린다.
+// JS 타임아웃 직후 곧바로 다시 호출하면 아직 정리 중인 첫 연결과 충돌할 수 있으므로,
+// 첫 실패 뒤 정리 시간을 준 다음 한 번만 자동 재시도한다.
+const INIT_MAX_ATTEMPTS = 2
+const INIT_RETRY_DELAY_MS = 3000
 
 // 마지막 init 실패 원인. 결제 시도 실패를 서버에 남길 때 함께 보낸다.
 let lastInitFailure = null
@@ -37,6 +42,10 @@ function withTimeout(promise, ms, label) {
   })
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export function initBilling() {
   if (initPromise) return initPromise
 
@@ -51,13 +60,32 @@ export function initBilling() {
       NativePurchases = module.NativePurchases
       PURCHASE_TYPE = module.PURCHASE_TYPE
 
-      const { isBillingSupported } = await withTimeout(
-        NativePurchases.isBillingSupported(),
-        INIT_TIMEOUT_MS,
-        'isBillingSupported',
-      )
-      if (!isBillingSupported) lastInitFailure = 'NOT_SUPPORTED'
-      return isBillingSupported
+      let lastError = null
+      for (let attemptNumber = 1; attemptNumber <= INIT_MAX_ATTEMPTS; attemptNumber += 1) {
+        try {
+          const { isBillingSupported } = await withTimeout(
+            NativePurchases.isBillingSupported(),
+            INIT_TIMEOUT_MS,
+            'isBillingSupported',
+          )
+          if (isBillingSupported) return true
+          lastError = new Error('NOT_SUPPORTED')
+        } catch (e) {
+          lastError = e
+        }
+
+        if (attemptNumber < INIT_MAX_ATTEMPTS) {
+          console.warn(`Billing init attempt ${attemptNumber} failed; retrying`, lastError)
+          await wait(INIT_RETRY_DELAY_MS)
+        }
+      }
+
+      const detail = lastError?.message || lastError
+      lastInitFailure = detail === 'NOT_SUPPORTED'
+        ? 'NOT_SUPPORTED_AFTER_RETRY'
+        : `INIT_ERROR_AFTER_RETRY: ${detail}`
+      console.error('Billing init failed after retry:', lastError)
+      return false
     } catch (e) {
       console.error('Billing init failed:', e)
       lastInitFailure = `INIT_ERROR: ${e?.message || e}`
