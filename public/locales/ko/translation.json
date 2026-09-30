@@ -296,7 +296,8 @@
     "playAll": "전체 재생",
     "playAllStop": "중지",
     "suggestedSexualLocked": "성인 모드에서 잠금 해제",
-    "errorVideoUnlock": "영상 해금에 실패했어요"
+    "errorVideoUnlock": "영상 해금에 실패했어요",
+    "voiceUnavailable": "지금은 음성을 만들 수 없어 텍스트로만 답했어요. 음성 추가요금은 받지 않았습니다."
   },
   "collection": {
     "title": "보관함",

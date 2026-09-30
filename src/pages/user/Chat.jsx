@@ -1060,6 +1060,13 @@ export default function Chat() {
             playFromQueue()
             break
           }
+          case 'voice_unavailable': {
+            // ElevenLabs 크레딧 고갈 — 음성 없이 텍스트로만 진행된다.
+            // 마스크 음성 추가요금은 서버가 이미 환불했으므로 잔액을 다시 읽어 맞춘다.
+            showError(t('chat.voiceUnavailable'), 5000)
+            if (data?.masks != null) setUser({ ...user, masks: data.masks })
+            break
+          }
           case 'done': {
             const { responseMessages } = data
             const rawCharMsgs = responseMessages.filter((m) => m.role === 'CHARACTER' || m.role === 'NARRATION')

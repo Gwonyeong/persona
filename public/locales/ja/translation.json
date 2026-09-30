@@ -296,7 +296,8 @@
     "playAll": "全て再生",
     "playAllStop": "停止",
     "suggestedSexualLocked": "アダルトモードで解放",
-    "errorVideoUnlock": "動画の解放に失敗しました"
+    "errorVideoUnlock": "動画の解放に失敗しました",
+    "voiceUnavailable": "現在音声を生成できないため、テキストのみで返答しました。音声の追加料金はいただいていません。"
   },
   "collection": {
     "title": "コレクション",

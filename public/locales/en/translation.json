@@ -296,7 +296,8 @@
     "playAll": "Play all",
     "playAllStop": "Stop",
     "suggestedSexualLocked": "Unlock in adult mode",
-    "errorVideoUnlock": "Failed to unlock the video"
+    "errorVideoUnlock": "Failed to unlock the video",
+    "voiceUnavailable": "Voice is unavailable right now, so this reply is text only. You were not charged the voice surcharge."
   },
   "collection": {
     "title": "Collection",
