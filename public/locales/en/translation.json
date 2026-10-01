@@ -1358,6 +1358,7 @@
     "labelMe": "Me",
     "labelCharacterFallback": "Character",
     "replay": "Replay",
+    "replayStop": "Stop",
     "chooserTitle": "Start a call",
     "continueLabel": "📞 Continue previous call",
     "turnsCount": "{{count}} turns",

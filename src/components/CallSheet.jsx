@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import useCall from '../hooks/useCall'
 import useStore from '../store/useStore'
@@ -38,7 +38,63 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
   const [errorMsg, setErrorMsg] = useState(null)
   // 몰입 모드 — 우상단 X 클릭 시 true. 배경 sprite 만 남기고 모든 UI 숨김. 화면 탭하면 false 로 복귀.
   const [uiHidden, setUiHidden] = useState(false)
+
   const isSimple = callMode === 'simple'
+
+  // 지난 대사 다시 듣기 — 재생 중인 음성의 audioUrl. null 이면 아무것도 안 울린다.
+  // Audio 엘리먼트는 useCall 과 같은 방식으로 하나만 만들어 재사용한다
+  // (누를 때마다 new Audio() 를 만들면 추적이 안 되고 겹쳐 울린다).
+  const [replayingUrl, setReplayingUrl] = useState(null)
+  const replayAudioRef = useRef(null)
+
+  const stopReplay = useCallback(() => {
+    const audio = replayAudioRef.current
+    if (audio) {
+      try {
+        audio.pause()
+        audio.currentTime = 0
+      } catch {}
+    }
+    setReplayingUrl(null)
+  }, [])
+
+  // 같은 대사를 다시 누르면 정지, 다른 대사를 누르면 재생 중인 것을 갈아 끼운다.
+  const toggleReplay = useCallback((url) => {
+    if (!url) return
+    if (replayingUrl === url) {
+      stopReplay()
+      return
+    }
+    try {
+      if (!replayAudioRef.current) replayAudioRef.current = new Audio()
+      const audio = replayAudioRef.current
+      // src 를 바꾸면 진행 중인 재생은 자동으로 끊긴다. 명시적으로 먼저 멈춰 상태를 맞춘다.
+      try { audio.pause() } catch {}
+      audio.src = url
+      audio.currentTime = 0
+      audio.onended = () => setReplayingUrl(null)
+      audio.onerror = () => setReplayingUrl(null)
+      setReplayingUrl(url)
+      audio.play().catch(() => setReplayingUrl(null))
+    } catch {
+      setReplayingUrl(null)
+    }
+  }, [replayingUrl, stopReplay])
+
+  // 통화 시트가 닫히면 재생을 멈춘다. 닫은 뒤에도 목소리가 계속 들리면 안 된다.
+  useEffect(() => {
+    if (!open) stopReplay()
+  }, [open, stopReplay])
+
+  // 언마운트 시 정리 — 엘리먼트를 버려 메모리/디코더를 놓아준다.
+  useEffect(() => () => {
+    const audio = replayAudioRef.current
+    if (audio) {
+      try { audio.pause() } catch {}
+      audio.src = ''
+      replayAudioRef.current = null
+    }
+  }, [])
 
   const user = useStore((s) => s.user)
   const setUser = useStore((s) => s.setUser)
@@ -271,13 +327,6 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
           if (aiText) merged.push({ role: 'assistant', content: aiText, live: true })
           if (merged.length === 0) return null
           const tail = merged.slice(-5)
-          const playAudioMsg = (url) => {
-            if (!url) return
-            try {
-              const a = new Audio(url)
-              a.play().catch(() => {})
-            } catch {}
-          }
           return (
             <div
               ref={(el) => { if (el) el.scrollTop = el.scrollHeight }}
@@ -290,17 +339,29 @@ export default function CallSheet({ open, onClose, onFreeUsesExhausted, conversa
                 const label = isUser ? t('call.labelMe') : (character?.name || t('call.labelCharacterFallback'))
                 const canReplay = !isUser && !m.live && !!m.audioUrl
                 if (canReplay) {
+                  const isPlaying = replayingUrl === m.audioUrl
                   return (
                     <button
                       key={i}
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); playAudioMsg(m.audioUrl) }}
-                      className="w-full text-left bg-white/15 hover:bg-white/25 active:bg-white/30 border border-white/15 rounded-lg px-2.5 py-2 flex items-start gap-2 transition-colors cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); toggleReplay(m.audioUrl) }}
+                      className={`w-full text-left border rounded-lg px-2.5 py-2 flex items-start gap-2 transition-colors cursor-pointer ${
+                        isPlaying
+                          ? 'bg-pink-400/25 border-pink-300/40'
+                          : 'bg-white/15 hover:bg-white/25 active:bg-white/30 border-white/15'
+                      }`}
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                      title={t('call.replay')}
+                      title={isPlaying ? t('call.replayStop') : t('call.replay')}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-pink-200 flex-shrink-0 mt-0.5" aria-hidden="true">
-                        <path d="M8 5v14l11-7z" />
+                        {isPlaying ? (
+                          <>
+                            <rect x="6" y="5" width="4" height="14" />
+                            <rect x="14" y="5" width="4" height="14" />
+                          </>
+                        ) : (
+                          <path d="M8 5v14l11-7z" />
+                        )}
                       </svg>
                       <span className="leading-snug">
                         <span className="text-pink-200 font-medium mr-1.5">{label}</span>

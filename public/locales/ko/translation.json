@@ -1358,6 +1358,7 @@
     "labelMe": "나",
     "labelCharacterFallback": "캐릭터",
     "replay": "다시 재생",
+    "replayStop": "재생 정지",
     "chooserTitle": "통화 시작",
     "continueLabel": "📞 통화 기록 이어서",
     "turnsCount": "{{count}}턴",

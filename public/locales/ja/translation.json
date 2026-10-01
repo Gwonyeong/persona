@@ -1358,6 +1358,7 @@
     "labelMe": "わたし",
     "labelCharacterFallback": "キャラクター",
     "replay": "再生",
+    "replayStop": "再生停止",
     "chooserTitle": "通話を始める",
     "continueLabel": "📞 通話履歴を続ける",
     "turnsCount": "{{count}}ターン",
