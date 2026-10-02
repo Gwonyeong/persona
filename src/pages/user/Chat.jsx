@@ -1003,6 +1003,14 @@ export default function Chat() {
     const handleRoundFailure = (data) => {
       stopAllPlayback()
       setMessages((prev) => prev.filter((m) => m._round !== roundId))
+      // 콘텐츠 차단은 모델이 거부한 결정적 실패다. 자동 재시도해도 똑같이 막히므로
+      // 즉시 멈추고 이유를 알려준다 — 안내가 없으면 유저가 같은 내용을 계속 재전송한다.
+      if (data?.code === 'CONTENT_BLOCKED') {
+        setShowTyping(false)
+        setSending(false)
+        showError(t('chat.errorContentBlocked'), 6000)
+        return
+      }
       if (retriesLeft > 0) {
         // 자동 재시도. typing indicator는 유지하여 유저에게 응답 진행 인상.
         setShowTyping(true)
@@ -1194,7 +1202,7 @@ export default function Chat() {
         setInsufficientMasksFor('message')
         return
       }
-      handleRoundFailure({ refunded: true })
+      handleRoundFailure({ refunded: true, code: error?.data?.code })
     }
   }
 

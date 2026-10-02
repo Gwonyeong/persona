@@ -222,6 +222,7 @@
     "safetyHintCtaVerify": "성인 인증하기",
     "errorSend": "메시지 전송에 실패했습니다",
     "errorRefunded": "메시지 전송에 실패하여 마스크가 복구되었습니다",
+    "errorContentBlocked": "이 내용은 AI가 응답할 수 없어 전송되지 않았어요. 표현을 바꿔서 다시 보내주세요. 마스크는 차감되지 않았습니다.",
     "minorBlockedWarned": "아동·청소년 관련 부적절한 내용으로 메시지가 검열되었습니다. 반복 시 마스크가 차감되고 이용이 제한될 수 있습니다.",
     "minorBlocked": "아동·청소년 관련 부적절한 내용으로 메시지가 검열되었습니다. (마스크가 차감되었습니다)",
     "imageGenRequest": "요청하기",
