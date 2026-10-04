@@ -474,6 +474,12 @@ export default function Storyline() {
   // ── 진행 로직 ───────────────────────────────────────────
   const advance = () => {
     if (!node) return
+    // CHAT 노드의 mode:'user' 아이템이 아직 전송 전이면 — 첫 탭은 유저 버블만 띄운다 (일반 진행과 같은 1탭=1줄 리듬).
+    // 초록 보내기 버튼을 누르지 않고 화면 우측을 탭해도 똑같이 전개되도록 여기서 흡수.
+    if (node.nodeType === 'CHAT' && currentItem?.mode === 'user' && !userSent) {
+      setUserSent(true)
+      return
+    }
     // userSent가 true면 (사용자 메시지 버블이 노출 중) — 한 번 더 탭한 것이므로 그제서야 다음 아이템으로
     if (userSent) setUserSent(false)
     if (hasScript && scriptIndex < script.length - 1) {
@@ -520,7 +526,7 @@ export default function Storyline() {
   }
 
   // 사용자 send 버튼 클릭 — 즉시 advance 안 하고 user 버블만 노출하는 중간 상태로 진입
-  // 화면을 한 번 더 탭(advance)하면 그때서야 다음 아이템(캐릭터 메시지)으로 진행
+  // 화면 우측 탭(advance)도 같은 동작. 한 번 더 탭하면 그때서야 다음 아이템(캐릭터 메시지)으로 진행
   const handleUserSend = () => {
     setUserSent(true)
   }
@@ -648,10 +654,9 @@ export default function Storyline() {
     ? getCrossChapterChatBlock(sequence, nodeIndex, scriptIndex, choices)
     : []
 
-  // CHAT 노드의 mode:'user' 아이템 → 자동 버블 대신 화면 하단 "보내기" 버튼으로 처리
-  // 클릭 전: chat history에서 제외 + UserInputButton 노출
-  // 클릭 시: scriptIndex 진행 → 다음 렌더에서 chatBlock walker가 user item을 history로 포함
+  // CHAT 노드의 mode:'user' 아이템 → 자동 버블 대신 화면 하단 "보내기" 버튼(미리보기)으로 처리
   // userSent=false면 user 버블 자리에 send 버튼 노출 (버블은 chatBlock에서 제외)
+  //   → 버튼 클릭 또는 화면 우측 탭(advance) 둘 다 userSent=true 로 버블만 띄움
   // userSent=true면 user 버블이 chatBlock에 포함되고, 다음 아이템(캐릭터 메시지)은 아직 안 보임
   // 다음 화면 탭으로 advance 시 userSent=false + scriptIndex++ → 다음 아이템 등장
   const showUserAsButton = isChatNode && currentItem?.mode === 'user' && !userSent
@@ -786,7 +791,8 @@ export default function Storyline() {
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             aria-label="이전"
           />
-          {!waitingChoice && !showUserAsButton && (
+          {/* 선택지 대기 중엔 우측 탭 비활성. 단 user 아이템 전송 전이면 켜서 탭으로 버블을 띄울 수 있게 */}
+          {(!waitingChoice || showUserAsButton) && (
             <button
               onClick={advance}
               className="absolute right-0 top-0 bottom-0 w-1/2 z-10 bg-transparent"
@@ -1280,7 +1286,7 @@ function UserInputButton({ item, userName, onClick }) {
           </svg>
         </span>
       </button>
-      <p className="text-[10px] text-gray-500 text-right mt-1.5 pr-1">탭해서 {userName}로 보내기</p>
+      <p className="text-[10px] text-gray-500 text-right mt-1.5 pr-1">화면을 탭해서 {userName}로 보내기</p>
     </div>
   )
 }
