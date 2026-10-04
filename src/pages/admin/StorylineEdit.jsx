@@ -4,6 +4,7 @@ import { api } from '../../lib/api'
 import AssetLibraryModal from './AssetLibraryModal'
 import AssetPromptsTab from './AssetPromptsTab'
 import VoiceTab from './VoiceTab'
+import StorylineTranslateTab, { collectUnits as collectTranslateUnits, lookupTranslation, isVoiceUnit, voiceStatus } from './StorylineTranslateTab'
 import MaskIcon from '../../components/MaskIcon'
 
 // 라이브러리 kind → script 아이템 필드 매핑
@@ -192,6 +193,8 @@ export default function StorylineEdit() {
       ...(s.assetPrompts ? { assetPrompts: s.assetPrompts } : {}),
       ...(s.assetUrls ? { assetUrls: s.assetUrls } : {}),
       ...(s.assetPosters ? { assetPosters: s.assetPosters } : {}),
+      // 스토리 카드 제목/설명 번역 — 번역 탭에서 직접 고친 값이 저장되도록 왕복시킨다 (노드/선택지 번역은 serializeNodesForEditor 가 실어 보냄)
+      ...(s.translations !== undefined ? { translations: s.translations } : {}),
       guestCharacterIds: (s.characters || []).map((sc) => sc.characterId),
       nodes: serializeNodesForEditor(s.nodes || []),
     }
@@ -468,6 +471,154 @@ export default function StorylineEdit() {
     }, 3500)
   }
 
+  // ── 번역 탭 (server/src/lib/storylineI18n.js 와 같은 translations 구조) ────────────
+  const TRANSLATE_LANG = 'ja'
+  const [translating, setTranslating] = useState(null) // { done, total } | null
+  const [jaVoiceProgress, setJaVoiceProgress] = useState(null) // { done, total, failures } | null
+
+  // 서버가 돌려준 translations 를 state 에 머지 (DB 는 이미 갱신됨 → dirty 아님)
+  function mergeTranslationResult(res) {
+    setStoryline((prev) => {
+      if (!prev) return prev
+      const nodeTr = new Map((res.nodes || []).map((n) => [n.id, n.translations]))
+      const choiceTr = new Map((res.choices || []).map((c) => [c.id, c.translations]))
+      const nodes = (prev.nodes || []).map((n) => {
+        const choices = (n.choices || []).map((c) => (choiceTr.has(c.id) ? { ...c, translations: choiceTr.get(c.id) } : c))
+        return { ...n, ...(nodeTr.has(n.id) ? { translations: nodeTr.get(n.id) } : {}), choices }
+      })
+      return { ...prev, nodes, ...(res.storyline ? { translations: res.storyline } : {}) }
+    })
+    setSelectedChapter((prev) => {
+      if (!prev) return prev
+      const n = (res.nodes || []).find((x) => x.id === prev.id)
+      return n ? { ...prev, translations: n.translations } : prev
+    })
+  }
+
+  async function translateStoryline(scope, keys) {
+    if (dirty) {
+      setStatusMsg({ type: 'error', text: '저장되지 않은 변경이 있습니다. 먼저 저장해 주세요.' })
+      setTimeout(() => setStatusMsg(null), 3000)
+      return
+    }
+    const total = scope === 'selected' ? (keys || []).length : collectTranslateUnits(storyline).length
+    setTranslating({ done: 0, total })
+    try {
+      const res = await api.post(`/admin/storylines/${id}/translate`, { lang: TRANSLATE_LANG, scope, ...(scope === 'selected' ? { keys } : {}) })
+      mergeTranslationResult(res)
+      const failed = (res.requested || 0) - (res.translated || 0)
+      setStatusMsg(
+        failed > 0 || res.failedChunks > 0
+          ? { type: 'error', text: `${res.translated}개 번역 · ${failed}개 누락 (chunk 실패 ${res.failedChunks}) — 다시 "미번역·변경분 일괄"을 누르면 누락분만 재시도합니다` }
+          : { type: 'success', text: res.requested === 0 ? '번역할 항목이 없습니다' : `${res.translated}개 번역 완료 (DB 저장됨)` }
+      )
+    } catch (e) {
+      console.error(e)
+      setStatusMsg({ type: 'error', text: e?.data?.error || e?.message || '번역 실패' })
+    } finally {
+      setTranslating(null)
+      setTimeout(() => setStatusMsg(null), 5000)
+    }
+  }
+
+  // 번역본 직접 수정 — state 만 바꾸고 dirty. 저장은 상단 "변경사항 저장"(replace) 으로.
+  function updateTranslation(unit, value) {
+    const lang = TRANSLATE_LANG
+    const setField = (tr, field, v) => ({ ...(tr || {}), [lang]: { ...((tr || {})[lang] || {}), [field]: v } })
+    if (unit.kind === 'meta') {
+      setStoryline((prev) => (prev ? { ...prev, translations: setField(prev.translations, unit.field, value) } : prev))
+    } else if (unit.kind === 'choice') {
+      patchNode(unit.nodeId, (n) => ({
+        ...n,
+        choices: (n.choices || []).map((c) => (c.id === unit.choiceId ? { ...c, translations: setField(c.translations, unit.field, value) } : c)),
+      }))
+    } else if (unit.kind === 'result') {
+      patchNode(unit.nodeId, (n) => ({ ...n, translations: setField(n.translations, unit.field, value) }))
+    } else if (unit.kind === 'script') {
+      patchNode(unit.nodeId, (n) => {
+        const tr = n.translations || {}
+        const cur = tr[lang] || {}
+        const len = Array.isArray(n.script) ? n.script.length : 0
+        const arr = Array.isArray(cur.script) ? cur.script.slice() : []
+        while (arr.length < len) arr.push(null)
+        const entry = { ...(arr[unit.idx] || {}), [unit.field]: value }
+        // 본문을 처음 손으로 채우는 경우 src 를 현재 원문으로 — 이후 원문 수정 시 stale 판정이 가능하도록
+        if (unit.field !== 'name' && entry.src == null) entry.src = unit.text
+        arr[unit.idx] = entry
+        return { ...n, translations: { ...tr, [lang]: { ...cur, script: arr } } }
+      })
+    }
+    setDirty(true)
+  }
+
+  function patchNode(nodeId, updater) {
+    setStoryline((prev) => (prev ? { ...prev, nodes: (prev.nodes || []).map((n) => (n.id === nodeId ? updater(n) : n)) } : prev))
+    setSelectedChapter((prev) => (prev && prev.id === nodeId ? updater(prev) : prev))
+  }
+
+  // 번역본 음성 1개 — unit 은 CHAPTER character 본문 단위. 결과는 translations[lang].script[idx].voiceUrl 에.
+  async function generateTranslatedVoice(unit, textOverride) {
+    const node = (storyline?.nodes || []).find((n) => n.id === unit.nodeId)
+    const text = (textOverride ?? lookupTranslation({ ...unit, node }, storyline, TRANSLATE_LANG)?.value ?? '').trim()
+    if (!text) throw new Error('번역본이 비어 있습니다')
+    const voiceId = resolveSpeakerVoiceId(node, storyline)
+    if (!voiceId) throw new Error('이 캐릭터에 voiceId가 설정되지 않았습니다')
+    const res = await api.post(`/admin/storylines/${id}/voice/generate`, { text, voiceId, emotion: 'NEUTRAL', lang: TRANSLATE_LANG })
+    if (!res?.url) throw new Error('서버 응답에 url이 없습니다')
+    patchNode(unit.nodeId, (n) => {
+      const tr = n.translations || {}
+      const cur = tr[TRANSLATE_LANG] || {}
+      const arr = Array.isArray(cur.script) ? cur.script.slice() : []
+      arr[unit.idx] = { ...(arr[unit.idx] || {}), voiceUrl: res.url, voiceSrc: text }
+      return { ...n, translations: { ...tr, [TRANSLATE_LANG]: { ...cur, script: arr } } }
+    })
+    setDirty(true)
+    return res.url
+  }
+
+  // 번역본 음성 일괄 — 번역이 있는 character 대사 중 음성 없음/구버전만 (overwrite 면 전부)
+  async function bulkGenerateTranslatedVoice(opts = {}) {
+    const { overwrite = false } = opts
+    const units = collectTranslateUnits(storyline).filter(isVoiceUnit)
+    const targets = []
+    for (const u of units) {
+      const tr = lookupTranslation(u, storyline, TRANSLATE_LANG)
+      if (!tr?.value) continue
+      const st = voiceStatus(u, storyline, TRANSLATE_LANG)
+      if (overwrite || st !== 'ok') targets.push({ unit: u, text: tr.value })
+    }
+    if (targets.length === 0) {
+      setStatusMsg({ type: 'error', text: '생성할 번역본 대사가 없습니다 (먼저 번역하세요)' })
+      setTimeout(() => setStatusMsg(null), 2500)
+      return
+    }
+    if (!confirm(`번역본 음성 ${targets.length}개를 생성합니다. (실패한 행은 그대로 둡니다)\n완료 후 상단 "변경사항 저장"을 눌러야 반영됩니다.`)) return
+    setJaVoiceProgress({ done: 0, total: targets.length, failures: [] })
+    const failures = []
+    let done = 0
+    const concurrency = 3
+    let cursor = 0
+    async function worker() {
+      while (cursor < targets.length) {
+        const t = targets[cursor++]
+        try {
+          await generateTranslatedVoice(t.unit, t.text)
+        } catch (e) {
+          failures.push({ key: t.unit.key, msg: e?.data?.error || e?.message || '실패' })
+        }
+        done++
+        setJaVoiceProgress({ done, total: targets.length, failures: [...failures] })
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, worker))
+    setStatusMsg(
+      failures.length === 0
+        ? { type: 'success', text: `번역본 음성 ${targets.length}개 생성 완료 — "변경사항 저장"으로 반영하세요` }
+        : { type: 'error', text: `${targets.length - failures.length}개 성공 · ${failures.length}개 실패` }
+    )
+    setTimeout(() => { setStatusMsg(null); setJaVoiceProgress(null) }, 4000)
+  }
+
   const saveMeta = async () => {
     setSaving(true)
     setStatusMsg(null)
@@ -615,6 +766,7 @@ export default function StorylineEdit() {
           { key: 'meta', label: '메타데이터' },
           { key: 'assets', label: `에셋${assetPromptCount > 0 ? ` (${assetPromptCount})` : ''}` },
           { key: 'voice', label: '보이스' },
+          { key: 'translate', label: '번역 (ja)' },
           { key: 'json', label: 'JSON 편집 (전체 교체)' },
         ].map((t) => (
           <button
@@ -858,6 +1010,21 @@ export default function StorylineEdit() {
           onGenerateVoice={generateVoiceForItem}
           onBulkGenerateAll={bulkGenerateVoiceForAll}
           bulkVoiceProgress={bulkVoiceProgress}
+        />
+      )}
+
+      {/* 번역 탭 — 원문/번역 대조 편집 + Gemini 번역 + 번역본 TTS */}
+      {tab === 'translate' && (
+        <StorylineTranslateTab
+          storyline={storyline}
+          lang={TRANSLATE_LANG}
+          dirty={dirty}
+          translating={translating}
+          onTranslate={translateStoryline}
+          onEditTranslation={updateTranslation}
+          onGenerateVoice={(unit) => generateTranslatedVoice(unit)}
+          onBulkGenerateVoice={bulkGenerateTranslatedVoice}
+          voiceProgress={jaVoiceProgress}
         />
       )}
 

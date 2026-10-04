@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation, Trans } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import MaskIcon from '../../components/MaskIcon'
@@ -158,6 +159,7 @@ const TEXT_BOX_STYLE = {
 }
 
 export default function Storyline() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const { user, token, masks, setMasks } = useStore()
@@ -576,7 +578,7 @@ export default function Storyline() {
           choiceId: choice.id,
           nextNodeId,
         })
-        setToast('저장 완료')
+        setToast(t('storyline.saved'))
         setLockedAtIndex(lockTarget)
         if (res.masks != null) setMasks(res.masks)
       } catch (e) {
@@ -601,7 +603,7 @@ export default function Storyline() {
       setLockedAtIndex(0)
       setCompleteCalled(false)
       setShowRestartModal(false)
-      setToast('새 진행 시작')
+      setToast(t('storyline.restarted'))
       setCurrentBgm(storyline?.defaultBgm || null)
       setCurrentBgs(null)
     } catch (e) {
@@ -624,21 +626,21 @@ export default function Storyline() {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </div>
-            <p className="text-white text-sm font-bold">로그인이 필요해요</p>
-            <p className="text-xs leading-relaxed">로그인 후 스토리를 진행할 수 있어요.</p>
+            <p className="text-white text-sm font-bold">{t('storyline.loginRequiredTitle')}</p>
+            <p className="text-xs leading-relaxed">{t('storyline.loginRequiredBody')}</p>
           </>
         ) : (
-          <p>스토리를 불러오지 못했습니다.</p>
+          <p>{t('storyline.loadFailed')}</p>
         )}
-        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400 mt-1" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>돌아가기</button>
+        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400 mt-1" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>{t('storyline.goBack')}</button>
       </div>
     )
   }
   if (!storyline) {
-    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">로딩 중...</div>
+    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">{t('storyline.loading')}</div>
   }
   if (!node) {
-    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">스토리 끝</div>
+    return <div className="flex items-center justify-center h-dvh bg-black text-gray-400">{t('storyline.end')}</div>
   }
 
   // 노드 타입 & 아이템 분류
@@ -792,7 +794,7 @@ export default function Storyline() {
             onClick={goBack}
             className="absolute left-0 top-0 bottom-0 w-1/2 z-10 bg-transparent"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-            aria-label="이전"
+            aria-label={t('storyline.prev')}
           />
           {/* 선택지 대기 중엔 우측 탭 비활성. 단 user 아이템 전송 전이면 켜서 탭으로 버블을 띄울 수 있게 */}
           {(!waitingChoice || showUserAsButton) && (
@@ -800,7 +802,7 @@ export default function Storyline() {
               onClick={advance}
               className="absolute right-0 top-0 bottom-0 w-1/2 z-10 bg-transparent"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="다음"
+              aria-label={t('storyline.next')}
             />
           )}
         </>
@@ -815,7 +817,7 @@ export default function Storyline() {
           onClick={() => navigate(-1)}
           className="w-9 h-9 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-full text-white"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          aria-label="닫기"
+          aria-label={t('storyline.close')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -826,7 +828,7 @@ export default function Storyline() {
           onClick={() => setAudioMuted((m) => !m)}
           className={`w-9 h-9 flex items-center justify-center backdrop-blur-sm rounded-full transition-colors ${audioMuted ? 'bg-black/50 text-gray-400' : 'bg-black/50 text-white'}`}
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-          aria-label={audioMuted ? '음향 켜기' : '음향 끄기'}
+          aria-label={audioMuted ? t('storyline.soundOn') : t('storyline.soundOff')}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 18V5l12-2v13" />
@@ -862,7 +864,7 @@ export default function Storyline() {
             onClick={(e) => { e.stopPropagation(); setMediaLightbox(null) }}
             className="absolute right-4 z-10 w-10 h-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-full text-white"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', top: 'calc(env(safe-area-inset-top) + 14px)' }}
-            aria-label="닫기"
+            aria-label={t('storyline.close')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -905,13 +907,13 @@ export default function Storyline() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-white">프리미엄 미디어</h3>
+              <h3 className="text-lg font-bold text-white">{t('storyline.premiumMediaTitle')}</h3>
             </div>
             <p className="text-sm text-gray-300 leading-relaxed text-center mb-2">
-              마스크 <span className="text-amber-400 font-bold">{unlockModal.maskCost}개</span>를 이용해 해금할 수 있어요!
+              <Trans i18nKey="storyline.premiumMediaDesc" values={{ count: unlockModal.maskCost }} components={{ b: <span className="text-amber-400 font-bold" /> }} />
             </p>
             <p className="text-xs text-gray-500 text-center mb-5">
-              현재 잔액: <span className="text-gray-300">{masks ?? 0} 마스크</span>
+              <span className="text-gray-300">{t('storyline.balance', { count: masks ?? 0 })}</span>
             </p>
             <div className="flex gap-2">
               <button
@@ -920,12 +922,12 @@ export default function Storyline() {
                 className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium disabled:opacity-50"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('storyline.cancel')}
               </button>
               <button
                 onClick={async () => {
                   if (!token) {
-                    setToast('로그인이 필요합니다')
+                    setToast(t('storyline.loginRequired'))
                     return
                   }
                   if ((masks ?? 0) < (unlockModal.maskCost || 0)) {
@@ -943,9 +945,9 @@ export default function Storyline() {
                       return next
                     })
                     setUnlockModal(null)
-                    setToast('🖼️ 해금 완료')
+                    setToast(t('storyline.unlocked'))
                   } catch (e) {
-                    const msg = e?.data?.error || e?.message || '해금 실패'
+                    const msg = e?.data?.error || e?.message || t('storyline.unlockFailed')
                     setToast(msg)
                   } finally {
                     setUnlocking(false)
@@ -956,10 +958,10 @@ export default function Storyline() {
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
                 {unlocking
-                  ? '해금 중...'
+                  ? t('storyline.unlocking')
                   : (masks ?? 0) < (unlockModal.maskCost || 0)
-                    ? '마스크 충전하기'
-                    : <><MaskIcon /> {unlockModal.maskCost} 지불</>}
+                    ? t('storyline.chargeMasks')
+                    : <><MaskIcon /> {t('storyline.pay', { count: unlockModal.maskCost })}</>}
               </button>
             </div>
           </div>
@@ -976,7 +978,7 @@ export default function Storyline() {
             onClick={() => setChatLightbox(null)}
             className="absolute right-4 z-10 w-10 h-10 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-full text-white"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', top: 'calc(env(safe-area-inset-top) + 14px)' }}
-            aria-label="닫기"
+            aria-label={t('storyline.close')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -1012,12 +1014,12 @@ export default function Storyline() {
             className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-white mb-2">새로하기</h3>
+            <h3 className="text-lg font-bold text-white mb-2">{t('storyline.restartTitle')}</h3>
             <p className="text-sm text-gray-300 leading-relaxed mb-2">
-              기존 진행 데이터가 제거되고 처음부터 다시 시작됩니다.
+              {t('storyline.restartBody')}
             </p>
             <p className="text-xs text-emerald-400 leading-relaxed mb-6">
-              해금한 이미지는 그대로 유지됩니다.
+              {t('storyline.restartKeep')}
             </p>
             <div className="flex gap-2">
               <button
@@ -1026,7 +1028,7 @@ export default function Storyline() {
                 className="flex-1 py-2.5 bg-gray-800 text-gray-200 rounded-xl hover:bg-gray-700 transition-colors text-sm font-medium disabled:opacity-50"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                취소
+                {t('storyline.cancel')}
               </button>
               <button
                 onClick={handleRestart}
@@ -1034,7 +1036,7 @@ export default function Storyline() {
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-colors text-sm font-medium disabled:opacity-50"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {restarting ? '준비 중...' : '새로하기'}
+                {restarting ? t('storyline.restartPreparing') : t('storyline.restart')}
               </button>
             </div>
           </div>
@@ -1060,6 +1062,7 @@ export default function Storyline() {
 //   user: 유저명 우측 뱃지(에메랄드), content
 // ───────────────────────────────────────────────────────────
 function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onChoice, selectingChoiceId }) {
+  const { t } = useTranslation()
   let speakerName = null
   let badgeSide = 'left'
   let badgeColor = 'bg-indigo-600'
@@ -1074,7 +1077,7 @@ function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onC
     text = item.content || ''
     badgeColor = 'bg-indigo-600'
   } else if (item.mode === 'user') {
-    speakerName = item.name || user?.name || '나'
+    speakerName = item.name || user?.name || t('storyline.you')
     text = item.content || ''
     badgeSide = 'right'
     badgeColor = 'bg-emerald-600'
@@ -1121,10 +1124,11 @@ function VnTextBoxView({ item, storyline, user, showChoices, choices, masks, onC
 // Chat Block 뷰 — 누적 말풍선
 // ───────────────────────────────────────────────────────────
 function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoices, choices, userButton, onUserButtonClick, onChoice, selectingChoiceId, onMediaClick, unlockedMedia, onUnlockRequest, onMediaPreview }) {
+  const { t } = useTranslation()
   const characterName = storyline.character?.name || ''
   // 채팅 아바타는 Character 테이블의 profileImage만 사용 (fallback 없음)
   const profileUrl = storyline.character?.profileImage || null
-  const userName = user?.name || '나'
+  const userName = user?.name || t('storyline.you')
 
   const pickedChoice = selectingChoiceId
     ? choices?.find((c) => c.id === selectingChoiceId)
@@ -1286,15 +1290,16 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
 // 클릭하면 advance 호출 → 다음 렌더에서 user 버블이 채팅 히스토리에 누적됨
 // ───────────────────────────────────────────────────────────
 function UserInputButton({ item, userName, onClick }) {
+  const { t } = useTranslation()
   return (
     <div className="relative">
       <button
         onClick={onClick}
         className="w-full text-left px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm transition-colors flex items-center gap-3 shadow-xl"
         style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-        aria-label={`보내기: ${item.content}`}
+        aria-label={t('storyline.sendLabel', { text: item.content })}
       >
-        <span className="flex-1 leading-relaxed whitespace-pre-line">{item.content || (item.mediaUrl ? '(첨부)' : '')}</span>
+        <span className="flex-1 leading-relaxed whitespace-pre-line">{item.content || (item.mediaUrl ? t('storyline.attachment') : '')}</span>
         <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />
@@ -1302,7 +1307,7 @@ function UserInputButton({ item, userName, onClick }) {
           </svg>
         </span>
       </button>
-      <p className="text-[10px] text-gray-500 text-right mt-1.5 pr-1">화면을 탭해서 {userName}로 보내기</p>
+      <p className="text-[10px] text-gray-500 text-right mt-1.5 pr-1">{t('storyline.tapToSend', { name: userName })}</p>
     </div>
   )
 }
@@ -1311,6 +1316,7 @@ function UserInputButton({ item, userName, onClick }) {
 // 채팅 미디어 버블 — CHAT의 mode:'media' 아이템 (이미지/영상/프리미엄)
 // ───────────────────────────────────────────────────────────
 function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview, onMediaLoaded }) {
+  const { t } = useTranslation()
   const isVideo = line.variant === 'video'
   const isPremium = line.variant === 'premium'
   const locked = isPremium && !isUnlocked
@@ -1380,7 +1386,7 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <p className="text-[11px] text-white font-bold drop-shadow">탭해서 해금</p>
+              <p className="text-[11px] text-white font-bold drop-shadow">{t('storyline.tapToUnlock')}</p>
               <p className="text-[10px] text-amber-200 mt-0.5 drop-shadow"><MaskIcon /> {line.maskCost || 0}</p>
             </div>
           )}
@@ -1442,6 +1448,7 @@ function ChoiceButtons({ choices, masks, onChoice, selectingChoiceId }) {
 // Result 뷰 — 결말 페이지 + 프리미엄 미디어 그리드
 // ───────────────────────────────────────────────────────────
 function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClose, onRestart, onNextPart, onMediaClick }) {
+  const { t } = useTranslation()
   return (
     <div
       className="absolute inset-0 overflow-auto bg-black"
@@ -1457,7 +1464,7 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
           return (
             <div className="mb-8">
               <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
-                프리미엄 컨텐츠 ({unlockedCount} / {premiumMedia.length})
+                {t('storyline.premiumContents', { unlocked: unlockedCount, total: premiumMedia.length })}
               </h3>
               <div className="grid grid-cols-3 gap-2">
                 {premiumMedia.map((m, i) => {
@@ -1538,7 +1545,7 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
               className="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              <span>다음 파트로</span>
+              <span>{t('storyline.nextPart')}</span>
               <span className="opacity-80 text-xs font-medium truncate max-w-[60%]">{nextPart.title}</span>
               {nextPart.locked && (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -1553,7 +1560,7 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
             className={`w-full py-3 ${nextPart && token ? 'bg-gray-800 active:bg-gray-700 border border-gray-700' : 'bg-indigo-600 active:bg-indigo-700'} text-white text-sm font-semibold rounded-lg transition-colors`}
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            돌아가기
+            {t('storyline.goBack')}
           </button>
           {token && (
             <button
@@ -1561,7 +1568,7 @@ function ResultView({ node, storyline, premiumMedia = [], token, nextPart, onClo
               className="w-full py-3 bg-gray-800 active:bg-gray-700 border border-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
             >
-              새로하기
+              {t('storyline.restart')}
             </button>
           )}
         </div>
