@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import MaskIcon from '../../components/MaskIcon'
+import InsufficientMasksModal from '../../components/InsufficientMasksModal'
 
 // 메인 + 분기 노드를 사용자 선택에 따라 평탄화한 sequence
 function computeSequence(allNodes, choices) {
@@ -212,6 +213,8 @@ export default function Storyline() {
 
   // 프리미엄 미디어 해금 상태 — Set<mediaUrl>
   const [unlockedMedia, setUnlockedMedia] = useState(new Set())
+  // 마스크 부족 시 구매 유도 시트 (채팅 페이지와 동일 컴포넌트) — 프리미엄 선택지·프리미엄 미디어 해금 공용
+  const [insufficientMasksOpen, setInsufficientMasksOpen] = useState(false)
   // 해금 모달 — { mediaUrl, maskCost } | null
   const [unlockModal, setUnlockModal] = useState(null)
   const [unlocking, setUnlocking] = useState(false)
@@ -543,7 +546,7 @@ export default function Storyline() {
     const isPremium = choice.choiceType === 'PREMIUM'
     const cost = choice.maskCost || 0
     if (isPremium && cost > 0 && (masks ?? 0) < cost) {
-      setToast('마스크가 부족합니다')
+      setInsufficientMasksOpen(true)
       return
     }
 
@@ -579,7 +582,7 @@ export default function Storyline() {
       } catch (e) {
         const errMsg = e?.response?.data?.error || e?.message
         if (errMsg && errMsg.toLowerCase().includes('mask')) {
-          setToast('마스크가 부족합니다')
+          setInsufficientMasksOpen(true)
         } else {
           console.error('Save choice failed:', e)
         }
@@ -926,7 +929,8 @@ export default function Storyline() {
                     return
                   }
                   if ((masks ?? 0) < (unlockModal.maskCost || 0)) {
-                    setToast('마스크가 부족합니다')
+                    setUnlockModal(null)
+                    setInsufficientMasksOpen(true)
                     return
                   }
                   setUnlocking(true)
@@ -947,11 +951,15 @@ export default function Storyline() {
                     setUnlocking(false)
                   }
                 }}
-                disabled={unlocking || (masks ?? 0) < (unlockModal.maskCost || 0)}
+                disabled={unlocking}
                 className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-500 transition-colors text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               >
-                {unlocking ? '해금 중...' : <><MaskIcon /> {unlockModal.maskCost} 지불</>}
+                {unlocking
+                  ? '해금 중...'
+                  : (masks ?? 0) < (unlockModal.maskCost || 0)
+                    ? '마스크 충전하기'
+                    : <><MaskIcon /> {unlockModal.maskCost} 지불</>}
               </button>
             </div>
           </div>
@@ -1032,6 +1040,14 @@ export default function Storyline() {
           </div>
         </div>
       )}
+
+      {/* 마스크 부족 → 구매 유도 시트 (채팅 페이지와 동일). 캐릭터 표정 이미지는 스토리 응답에 emotion 필드가 없어 프로필 이미지로 폴백됨 */}
+      <InsufficientMasksModal
+        open={insufficientMasksOpen}
+        onClose={() => setInsufficientMasksOpen(false)}
+        currentStyle={storyline.character?.styles?.[0]}
+        profileUrl={storyline.character?.profileImage || null}
+      />
     </div>
   )
 }
@@ -1411,9 +1427,7 @@ function ChoiceButtons({ choices, masks, onChoice, selectingChoiceId }) {
             <span className="flex-1">{c.label}</span>
             {isPremium && cost > 0 && (
               <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${insufficient ? 'bg-red-950/60 text-red-300 border-red-900/50' : 'bg-amber-950/70 text-amber-200 border-amber-700/50'}`}>
-                <svg width="16" height="10" viewBox="0 0 32 20" fill="currentColor" fillRule="evenodd" style={{ transform: 'scaleY(-1)' }}>
-                  <path d="M0 10C0 5 3.5 0 8.5 0c2.5 0 4.5 1.2 7.5 4 3-2.8 5-4 7.5-4C28.5 0 32 5 32 10c0 2.5-1 4.5-2.8 6-1.2 1-2.8 1.8-4.2 2.2-1.5.4-2.8.3-3.8-.2-1.2-.6-2.2-1.8-3.5-3.8L16 11l-1.7 3.2c-1.3 2-2.3 3.2-3.5 3.8-1 .5-2.3.6-3.8.2C5.6 17.8 4 17 2.8 16 1 14.5 0 12.5 0 10zM7 7.5C5.5 7.5 4.2 8.5 3.8 10c-.3 1 .2 1.8 1 2.2 1 .5 2.3.3 3.4-.3 1.2-.7 2-1.7 2.3-2.8.3-1-.1-1.8-1-2.2-.5-.2-1.2-.2-1.8-.1l-.7.2zM25 7.5l-.7-.2c-.6-.1-1.3-.1-1.8.1-.9.4-1.3 1.2-1 2.2.3 1.1 1.1 2.1 2.3 2.8 1.1.6 2.4.8 3.4.3.8-.4 1.3-1.2 1-2.2-.4-1.5-1.7-2.5-3.2-2.5z" />
-                </svg>
+                <MaskIcon />
                 {cost}
               </span>
             )}
