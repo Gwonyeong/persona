@@ -1525,6 +1525,10 @@
     "tapToSend": "Tap the screen to send as {{name}}",
     "tapToUnlock": "Tap to unlock",
     "premiumContents": "Premium content ({{unlocked}} / {{total}})",
-    "nextPart": "Next part"
+    "nextPart": "Next part",
+    "allTitle": "All stories",
+    "viewAll": "View all",
+    "count": "{{count}}",
+    "empty": "No stories published yet."
   }
 }

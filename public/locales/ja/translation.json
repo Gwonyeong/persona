@@ -1525,6 +1525,10 @@
     "tapToSend": "画面をタップして{{name}}として送信",
     "tapToUnlock": "タップで解放",
     "premiumContents": "プレミアムコンテンツ ({{unlocked}} / {{total}})",
-    "nextPart": "次のパートへ"
+    "nextPart": "次のパートへ",
+    "allTitle": "すべてのストーリー",
+    "viewAll": "すべて見る",
+    "count": "{{count}}件",
+    "empty": "まだ公開されたストーリーがありません。"
   }
 }

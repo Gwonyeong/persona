@@ -2,20 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../lib/api'
-import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
+import StoryGridCard from './StoryGridCard'
 
-// 홈 — 최근 공개 스토리 썸네일 그리드 (한 줄 3개, 9:16 카드).
+// 홈 — 최근 공개 스토리 썸네일 그리드 (한 줄 3개 × 최대 2줄). 전부 보려면 헤더의 "전체보기" → /storylines.
 // 데이터는 /storylines/recent (완료한 스토리 제외, publishedAt 최신순). 썸네일은 서버가
 // thumbnailImage → coverImage → 캐릭터 프로필 순으로 폴백해서 내려준다.
-// 카드 디자인은 CharacterDetail 의 스토리 카드(9:16 + 하단 그라데이션 제목)를 3열 크기로 줄인 것.
-const LIMIT = 6
-const LOCKED_STYLE = { filter: 'blur(3px)', transform: 'scale(1.06)' }
-
-// 어드민이 아직 교체하지 않은 자리표시자('PLACEHOLDER:...')는 URL 이 아니다 — 라이브 공개 스토리에도
-// 남아 있어(2026-10 기준 4편 중 3편) 그대로 <img> 에 넣으면 깨진 이미지가 뜬다. 캐릭터 프로필로 폴백.
-function usableUrl(url) {
-  return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null
-}
+const COLS = 3
+const MAX_ROWS = 2
+const LIMIT = COLS * MAX_ROWS
 
 export default function HomeStoryGrid() {
   const { t, i18n } = useTranslation()
@@ -30,7 +24,7 @@ export default function HomeStoryGrid() {
     if (!isKoreanUi) return
     api
       .get(`/storylines/recent?limit=${LIMIT}`)
-      .then(({ storylines }) => setStories(storylines || []))
+      .then(({ storylines }) => setStories((storylines || []).slice(0, LIMIT)))
       .catch(() => setStories([]))
   }, [isKoreanUi])
 
@@ -46,67 +40,20 @@ export default function HomeStoryGrid() {
         >
           NEW
         </span>
+        <button
+          onClick={() => navigate('/storylines')}
+          className="ml-auto flex items-center gap-0.5 text-xs text-gray-400 active:text-white"
+          style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        >
+          {t('storyline.viewAll')}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        {stories.map((s) => {
-          const locked = !!s.locked
-          const thumb = usableUrl(s.thumbnailImage) || usableUrl(s.character?.profileImage)
-          return (
-            <button
-              key={s.id}
-              onClick={() => navigate(s.scenarioId ? `/scenarios/${s.scenarioId}` : `/storylines/${s.id}`)}
-              className="relative aspect-[9/16] rounded-xl overflow-hidden bg-gray-900 border border-gray-800 active:border-indigo-500 transition-colors text-left"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={s.title || ''}
-            >
-              {thumb ? (
-                <img
-                  src={resizedImageUrl(thumb, IMG_W.CARD)}
-                  alt=""
-                  draggable={false}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={locked ? LOCKED_STYLE : undefined}
-                  loading="lazy"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/60 to-purple-900/40" />
-              )}
-
-              {/* 잠금 (미로그인 / FREE 티어) */}
-              {locked && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-8 h-8 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                      <rect x="3" y="11" width="18" height="11" rx="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  </div>
-                </div>
-              )}
-
-              {/* 하단 — 캐릭터 + 제목 */}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-2 pt-8 pb-2">
-                {s.character && (
-                  <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                    {usableUrl(s.character.profileImage) ? (
-                      <img
-                        src={resizedImageUrl(s.character.profileImage, IMG_W.AVATAR_TINY)}
-                        alt=""
-                        draggable={false}
-                        className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0 ring-1 ring-white/20"
-                      />
-                    ) : (
-                      <div className="w-3.5 h-3.5 rounded-full bg-gray-700 flex-shrink-0" />
-                    )}
-                    <span className="text-[10px] text-gray-300 truncate">{s.character.name}</span>
-                  </div>
-                )}
-                <p className="text-[11px] font-semibold text-white leading-snug line-clamp-2">{s.title}</p>
-              </div>
-            </button>
-          )
-        })}
+        {stories.map((s) => <StoryGridCard key={s.id} story={s} />)}
       </div>
     </div>
   )
