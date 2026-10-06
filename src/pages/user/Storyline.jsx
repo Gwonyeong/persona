@@ -271,6 +271,11 @@ export default function Storyline() {
       })
       .catch((e) => {
         if (e?.status === 403 && e?.data?.locked) {
+          // 비로그인 → 안내 화면 대신 로그인 페이지로. 로그인하면 이 스토리로 바로 복귀 (returnTo)
+          if (e.data.reason === 'AUTH_REQUIRED') {
+            navigate(`/login?returnTo=${encodeURIComponent(`/storylines/${id}`)}`, { replace: true })
+            return
+          }
           setError({ locked: true, reason: e.data.reason })
           return
         }
@@ -632,7 +637,17 @@ export default function Storyline() {
         ) : (
           <p>{t('storyline.loadFailed')}</p>
         )}
-        <button onClick={() => navigate(-1)} className="text-sm text-indigo-400 mt-1" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>{t('storyline.goBack')}</button>
+        {isLocked ? (
+          <button
+            onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/storylines/${id}`)}`, { replace: true })}
+            className="mt-2 px-5 py-2.5 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {t('common.login')}
+          </button>
+        ) : (
+          <button onClick={() => navigate(-1)} className="text-sm text-indigo-400 mt-1" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>{t('storyline.goBack')}</button>
+        )}
       </div>
     )
   }

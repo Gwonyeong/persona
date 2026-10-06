@@ -17,10 +17,17 @@ export default function StoryGridCard({ story: s }) {
   const locked = !!s.locked
   const thumb = usableUrl(s.thumbnailImage) || usableUrl(s.character?.profileImage)
   const progress = s.progress // 'COMPLETED' | 'IN_PROGRESS' | null | undefined
+  const target = s.scenarioId ? `/scenarios/${s.scenarioId}` : `/storylines/${s.id}`
+
+  // 잠금(=비로그인)이면 플레이어의 403 왕복 없이 바로 로그인으로. 로그인 후 원래 목적지로 복귀.
+  const handleClick = () => {
+    if (locked) navigate(`/login?returnTo=${encodeURIComponent(target)}`)
+    else navigate(target)
+  }
 
   return (
     <button
-      onClick={() => navigate(s.scenarioId ? `/scenarios/${s.scenarioId}` : `/storylines/${s.id}`)}
+      onClick={handleClick}
       className="relative aspect-[9/16] rounded-xl overflow-hidden bg-gray-900 border border-gray-800 active:border-indigo-500 transition-colors text-left"
       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
       aria-label={s.title || ''}
