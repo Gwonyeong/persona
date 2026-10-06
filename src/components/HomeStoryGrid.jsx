@@ -11,6 +11,12 @@ import { resizedImageUrl, IMG_W } from '../lib/imageUrl'
 const LIMIT = 6
 const LOCKED_STYLE = { filter: 'blur(3px)', transform: 'scale(1.06)' }
 
+// 어드민이 아직 교체하지 않은 자리표시자('PLACEHOLDER:...')는 URL 이 아니다 — 라이브 공개 스토리에도
+// 남아 있어(2026-10 기준 4편 중 3편) 그대로 <img> 에 넣으면 깨진 이미지가 뜬다. 캐릭터 프로필로 폴백.
+function usableUrl(url) {
+  return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null
+}
+
 export default function HomeStoryGrid() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -45,6 +51,7 @@ export default function HomeStoryGrid() {
       <div className="grid grid-cols-3 gap-2">
         {stories.map((s) => {
           const locked = !!s.locked
+          const thumb = usableUrl(s.thumbnailImage) || usableUrl(s.character?.profileImage)
           return (
             <button
               key={s.id}
@@ -53,9 +60,9 @@ export default function HomeStoryGrid() {
               style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
               aria-label={s.title || ''}
             >
-              {s.thumbnailImage ? (
+              {thumb ? (
                 <img
-                  src={resizedImageUrl(s.thumbnailImage, IMG_W.CARD)}
+                  src={resizedImageUrl(thumb, IMG_W.CARD)}
                   alt=""
                   draggable={false}
                   className="absolute inset-0 w-full h-full object-cover"
@@ -82,7 +89,7 @@ export default function HomeStoryGrid() {
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent px-2 pt-8 pb-2">
                 {s.character && (
                   <div className="flex items-center gap-1 mb-0.5 min-w-0">
-                    {s.character.profileImage ? (
+                    {usableUrl(s.character.profileImage) ? (
                       <img
                         src={resizedImageUrl(s.character.profileImage, IMG_W.AVATAR_TINY)}
                         alt=""
