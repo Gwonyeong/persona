@@ -37,6 +37,14 @@ export default function Login() {
     navigate(returnTo, { replace: true })
   }
 
+  // 닫기 — 로그인 없이 나가는 경우. returnTo 가 로그인 필수 페이지(스토리 등)면 거기로 보내봤자
+  // 다시 이 페이지로 튕겨 루프가 되므로, 이전 화면으로 돌아가고 이전 화면이 없으면(직접 진입) 홈으로.
+  const dismiss = () => {
+    if (token) return goBack()
+    if (window.history.state?.idx > 0) navigate(-1)
+    else navigate('/', { replace: true })
+  }
+
   // WebView에서 딥링크로 토큰이 들어오면 자동 복귀
   useEffect(() => {
     if (!hadTokenRef.current && token) {
@@ -306,7 +314,7 @@ export default function Login() {
         )}
 
         <button
-          onClick={goBack}
+          onClick={dismiss}
           className="mt-5 text-xs text-white/60 hover:text-white/80 transition-colors"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', background: 'transparent' }}
         >
