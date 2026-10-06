@@ -16,19 +16,16 @@ export default function HomeStoryGrid() {
   const navigate = useNavigate()
   const [stories, setStories] = useState(null)
 
-  // 스토리 번역 데이터가 채워지기 전까지는 한국어 UI 에서만 노출 (CharacterDetail 과 같은 게이트).
-  // 어드민 번역 탭으로 공개 스토리 번역이 끝나면 이 조건을 제거한다.
-  const isKoreanUi = (i18n.language || '').startsWith('ko')
-
+  // 언어 게이트 없음 — 2026-10-06 라이브 스토리 전편 ja 번역 완료(server/docs/storyline-i18n.md).
+  // 서버가 Accept-Language 에 맞춰 제목·대사를 내려준다. 음성은 ja 가 없으면 ko 로 폴백.
   useEffect(() => {
-    if (!isKoreanUi) return
     api
       .get(`/storylines/recent?limit=${LIMIT}`)
       .then(({ storylines }) => setStories((storylines || []).slice(0, LIMIT)))
       .catch(() => setStories([]))
-  }, [isKoreanUi])
+  }, [i18n.language])
 
-  if (!isKoreanUi || !stories || stories.length === 0) return null
+  if (!stories || stories.length === 0) return null
 
   return (
     <div className="mb-4">
