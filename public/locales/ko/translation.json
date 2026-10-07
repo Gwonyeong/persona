@@ -309,6 +309,8 @@
     "tabImages": "이미지",
     "tabVideos": "영상",
     "tabOutfits": "의상",
+    "tabStories": "스토리",
+    "storyLocked": "아직 해금하지 않은 컷",
     "voicesCollected": "특별 보이스",
     "voicesChat": "대화에서 생성된 목소리",
     "voicesChatMore": "최근 {{count}}개만 표시돼요",
@@ -1529,6 +1531,8 @@
     "allTitle": "전체 스토리",
     "viewAll": "전체보기",
     "count": "{{count}}편",
+    "partsBadge": "{{count}}파트",
+    "unplayed": "아직 플레이하지 않음",
     "empty": "아직 공개된 스토리가 없어요."
   }
 }

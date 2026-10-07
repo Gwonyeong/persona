@@ -309,6 +309,8 @@
     "tabImages": "Images",
     "tabVideos": "Videos",
     "tabOutfits": "Outfits",
+    "tabStories": "Stories",
+    "storyLocked": "Not unlocked yet",
     "voicesCollected": "Special voices",
     "voicesChat": "Voices from your chats",
     "voicesChatMore": "Showing the latest {{count}} only",
@@ -1529,6 +1531,8 @@
     "allTitle": "All stories",
     "viewAll": "View all",
     "count": "{{count}}",
+    "partsBadge": "{{count}} parts",
+    "unplayed": "Not played yet",
     "empty": "No stories published yet."
   }
 }
