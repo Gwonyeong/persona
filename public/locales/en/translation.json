@@ -309,6 +309,8 @@
     "tabImages": "Images",
     "tabVideos": "Videos",
     "tabOutfits": "Outfits",
+    "tabStories": "Stories",
+    "storyLocked": "Not unlocked yet",
     "voicesCollected": "Special voices",
     "voicesChat": "Voices from your chats",
     "voicesChatMore": "Showing the latest {{count}} only",
@@ -1525,6 +1527,12 @@
     "tapToSend": "Tap the screen to send as {{name}}",
     "tapToUnlock": "Tap to unlock",
     "premiumContents": "Premium content ({{unlocked}} / {{total}})",
-    "nextPart": "Next part"
+    "nextPart": "Next part",
+    "allTitle": "All stories",
+    "viewAll": "View all",
+    "count": "{{count}}",
+    "partsBadge": "{{count}} parts",
+    "unplayed": "Not played yet",
+    "empty": "No stories published yet."
   }
 }

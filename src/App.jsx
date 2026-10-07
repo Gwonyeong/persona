@@ -42,6 +42,7 @@ import Home from './pages/user/Home'
 import CharacterDetail from './pages/user/CharacterDetail'
 import Storyline from './pages/user/Storyline'
 import Scenario from './pages/user/Scenario'
+import Storylines from './pages/user/Storylines'
 import CharacterFeed from './pages/user/CharacterFeed'
 import ChatList from './pages/user/ChatList'
 import Chat from './pages/user/Chat'
@@ -252,6 +253,7 @@ function App() {
       <Route path="/login" element={<Login />} />
 
       {/* 스토리 플레이어 (풀스크린, 탭바 없음) */}
+      <Route path="/storylines" element={<Storylines />} />
       <Route path="/storylines/:id" element={<Storyline />} />
 
       {/* V2 채팅 테스트 (풀스크린, 탭바 없음, 임시) */}

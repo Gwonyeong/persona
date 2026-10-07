@@ -9,6 +9,7 @@ import useStore from '../../store/useStore'
 import usePrefersReducedData from '../../hooks/usePrefersReducedData'
 import HomeBannerSlider from '../../components/HomeBannerSlider'
 import NewOutfitsRow from '../../components/NewOutfitsRow'
+import HomeStoryGrid from '../../components/HomeStoryGrid'
 import RecentJoinedRow from '../../components/RecentJoinedRow'
 import RecommendedRow from '../../components/RecommendedRow'
 import RelationSections from '../../components/RelationSections'
@@ -338,6 +339,9 @@ export default function Home() {
 
         {/* 새로운 의상 (상점 공개 최신 의상) */}
         <NewOutfitsRow />
+
+        {/* 최근 공개된 스토리 — 썸네일 3열 그리드 (비어 있으면 섹션 자체를 숨김) */}
+        <HomeStoryGrid />
 
         {/* 안전모드 토글 — NSFW 게이트 */}
         <div className="flex items-center pb-2">

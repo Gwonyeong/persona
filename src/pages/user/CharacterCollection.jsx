@@ -119,6 +119,7 @@ export default function CharacterCollection() {
       { key: 'images', label: t('collection.tabImages'), count: data.counts.images },
       { key: 'videos', label: t('collection.tabVideos'), count: data.counts.videos },
       { key: 'outfits', label: t('collection.tabOutfits'), count: data.counts.outfits },
+      { key: 'stories', label: t('collection.tabStories'), count: data.counts.stories ?? 0 },
     ]
   }, [data, t])
 
@@ -130,7 +131,9 @@ export default function CharacterCollection() {
     }
   }, [data, tabs, tab])
 
-  const totalCount = data ? data.counts.voices + data.counts.images + data.counts.videos + data.counts.outfits : 0
+  const totalCount = data
+    ? data.counts.voices + data.counts.images + data.counts.videos + data.counts.outfits + (data.counts.stories ?? 0)
+    : 0
 
   return (
     <div className="relative min-h-full bg-gray-950 text-gray-100 pb-12">
@@ -369,6 +372,92 @@ export default function CharacterCollection() {
                         <span className={`text-[11px] truncate block ${o.owned ? 'text-white' : 'text-gray-400'}`}>{o.name}</span>
                       </div>
                     </div>
+                    )
+                  })}
+                </div>
+              )
+            )}
+
+            {/* 스토리 — 스토리별 섹션 안에 프리미엄 컷. 미해금 컷도 블러로 함께 노출(도감). */}
+            {tab === 'stories' && (
+              !data.stories?.length ? <EmptyTab t={t} /> : (
+                <div className="space-y-5">
+                  {data.stories.map((g) => {
+                    // 해금한 컷만 뷰어 대상 — 잠긴 컷은 열리지 않는다
+                    const unlockedList = g.media.filter((m) => m.unlocked)
+                    return (
+                      <section key={g.id}>
+                        <div className="flex items-baseline gap-2 mb-2">
+                          <h3 className="text-sm font-bold text-gray-100 truncate">{g.title}</h3>
+                          <span className="text-[11px] text-gray-500 flex-shrink-0">
+                            {g.unlockedCount}/{g.total}
+                          </span>
+                        </div>
+                        {g.scenarioTitle && g.scenarioTitle !== g.title && (
+                          <p className="text-[11px] text-indigo-300/80 -mt-1.5 mb-2 truncate">{g.scenarioTitle}</p>
+                        )}
+                        <div className="grid grid-cols-3 gap-2">
+                          {g.media.map((m, i) => {
+                            const locked = !m.unlocked
+                            const poster = m.type === 'video' ? m.posterUrl : m.url
+                            return (
+                              <button
+                                key={`${g.id}-${i}`}
+                                onClick={() => {
+                                  if (locked) return
+                                  setViewer({
+                                    images: unlockedList.map((x) => ({
+                                      filePath: x.url,
+                                      type: x.type === 'video' ? 'VIDEO' : 'IMAGE',
+                                    })),
+                                    index: unlockedList.findIndex((x) => x.url === m.url),
+                                  })
+                                }}
+                                disabled={locked}
+                                aria-label={locked ? t('collection.storyLocked') : g.title}
+                                className="relative rounded-lg overflow-hidden bg-gray-800 border border-gray-700"
+                                style={{ aspectRatio: '9 / 16', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                              >
+                                {poster ? (
+                                  <img
+                                    src={poster}
+                                    alt=""
+                                    loading="lazy"
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    style={locked ? { filter: 'blur(14px)', transform: 'scale(1.08)' } : undefined}
+                                  />
+                                ) : (
+                                  // 포스터 없는 레거시 영상 — 잠김이면 블러된 첫 프레임만 보여준다
+                                  <video
+                                    src={m.url}
+                                    muted
+                                    playsInline
+                                    preload="metadata"
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    style={locked ? { filter: 'blur(14px)', transform: 'scale(1.08)' } : undefined}
+                                  />
+                                )}
+                                {locked && <div className="absolute inset-0 bg-black/40" />}
+                                {locked && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm border border-white/30 flex items-center justify-center text-white">
+                                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                )}
+                                {!locked && m.type === 'video' && (
+                                  <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z" /></svg>
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </section>
                     )
                   })}
                 </div>
