@@ -9,6 +9,10 @@ import {
   TABS,
   NO_OUTLINE,
 } from './Expressions'
+import ArousedGenerator from './ArousedGenerator'
+
+// 상세 화면 전용 탭 — 목록(Expressions)의 TABS 에는 넣지 않는다.
+const DETAIL_TABS = [...TABS, { id: 'gen', label: '흥분 컷 생성' }]
 
 // 표정 이미지 — 단일 캐릭터 상세. 목록(Expressions)에서 프로필/이름으로 진입.
 // 감정 탭(SFW/NSFW/배경), 스타일 행, 업로드/영상 등 관리 UI를 이 캐릭터로 스코프해서 제공.
@@ -16,8 +20,8 @@ export default function ExpressionDetail() {
   const { characterId } = useParams()
   const [character, setCharacter] = useState(null)
   const [notFound, setNotFound] = useState(false)
-  const [tab, setTab] = useState('sfw') // sfw | nsfw | bg
-  const currentEmotions = tab === 'bg' ? [] : EMOTION_TABS[tab].emotions
+  const [tab, setTab] = useState('sfw') // sfw | nsfw | bg | gen
+  const currentEmotions = EMOTION_TABS[tab]?.emotions || []
 
   const reload = () => {
     api
@@ -108,13 +112,13 @@ export default function ExpressionDetail() {
 
         {/* 탭: 일반 / NSFW / 배경 */}
         <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
-          {TABS.map((def) => (
+          {DETAIL_TABS.map((def) => (
             <button
               key={def.id}
               onClick={() => setTab(def.id)}
               className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
                 tab === def.id
-                  ? def.id === 'nsfw'
+                  ? def.id === 'nsfw' || def.id === 'gen'
                     ? 'bg-pink-600 text-white'
                     : def.id === 'bg'
                       ? 'bg-amber-600 text-white'
@@ -139,7 +143,17 @@ export default function ExpressionDetail() {
         </div>
       )}
 
-      {tab === 'bg' ? (
+      {tab === 'gen' ? (
+        <ArousedGenerator
+          character={character}
+          styles={styles}
+          onImageSaved={(styleId, image) => {
+            const exists = styles.find((s) => s.id === styleId)?.images.some((i) => i.id === image.id)
+            if (exists) updateImage(styleId, image.id, { videoFilePath: image.videoFilePath })
+            else addImage(characterId, styleId, image)
+          }}
+        />
+      ) : tab === 'bg' ? (
         <BackgroundsTab characterId={character.id} />
       ) : (
         <div className="bg-gray-900 rounded-xl border border-gray-800 admin-x-scroll">
