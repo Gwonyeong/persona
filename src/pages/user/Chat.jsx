@@ -1620,7 +1620,9 @@ export default function Chat() {
           </div>
         )}
         {/* FULL 모드: sprite를 화면 상단부 배경으로 깔고, 메시지는 하단 박스에서 스크롤.
-            sprite 영역 = 화면 위 60%, 메시지 박스 = 하단 40%. 영상 카드는 박스 바로 위 우측. */}
+            sprite 영역 = 화면 위 60%, 메시지 박스 = 하단 40%.
+            미해금 영상이 있으면 배경 자체를 블러 영상으로 깔고 해금 버튼만 박스 바로 위 우측에 띄운다.
+            해금 시 src는 같은 영상 그대로라 레이어 교체 없이 블러만 걷힌다. */}
         {spriteMode === 'FULL' && activeSpriteUrl && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {spriteBackgroundImage && (
@@ -1631,34 +1633,28 @@ export default function Chat() {
               />
             )}
             <CrossfadeMedia
-              src={activeSpriteUrl}
+              src={bubbleNeedsUnlock ? latestCharacterSprite.videoFilePath : activeSpriteUrl}
               variant="sprite"
               className="absolute inset-0 w-full h-full object-cover object-top"
+              // 화면 전체 크기라 카드용 blur(8px)로는 비친다 — 세게 + 가장자리 번짐 숨기려 살짝 확대
+              style={bubbleNeedsUnlock ? { filter: 'blur(24px)', transform: 'scale(1.1)' } : undefined}
             />
-            {/* 미해금 영상 카드 — 메시지 박스 바로 위 우측 */}
+            {/* 미해금 영상 해금 바 — 메시지 박스 바로 위, 가로 전체 */}
             {bubbleNeedsUnlock && (
-              <div
-                className="absolute right-3 w-16 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50 shadow-lg cursor-pointer pointer-events-auto z-30"
-                style={{ aspectRatio: '9 / 16', bottom: 'calc(42% + 8px)' }}
+              <button
+                type="button"
+                className="absolute left-8 right-8 py-2.5 bg-black/75 backdrop-blur-sm border border-white/20 rounded-xl flex items-center justify-center gap-2 shadow-lg pointer-events-auto z-30"
+                style={{ bottom: 'calc(42% + 24px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
               >
-                <CrossfadeMedia
-                  src={latestCharacterSprite.videoFilePath}
-                  variant="sprite"
-                  className="absolute inset-0 w-full h-full object-cover object-bottom blur"
-                />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-black/75 backdrop-blur-sm border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center shadow-lg">
-                    <div className="flex items-center gap-0.5 text-white text-[11px] font-bold leading-none">
-                      <MaskIcon style={{ width: '0.9em', height: '0.9em' }} />
-                      <span>10</span>
-                    </div>
-                    <span className="text-white/90 text-[9px] font-medium mt-0.5 leading-none">
-                      {unlockingVideo ? t('chat.processing') : t('chat.unlockAction')}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                <span className="flex items-center gap-1 text-white text-sm font-bold leading-none">
+                  <MaskIcon style={{ width: '1em', height: '1em' }} />
+                  <span>10</span>
+                </span>
+                <span className="text-white/90 text-sm font-medium leading-none">
+                  {unlockingVideo ? t('chat.processing') : t('chat.unlockAction')}
+                </span>
+              </button>
             )}
           </div>
         )}
