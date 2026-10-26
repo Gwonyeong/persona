@@ -664,8 +664,18 @@ export default function CharacterProduction() {
           </button>
         </div>
         {voiceDupNames.length > 0 && (
-          <p className="text-xs text-red-400 mt-2">⚠ 이 보이스 ID는 다른 캐릭터와 중복됩니다: {voiceDupNames.join(', ')}</p>
+          <p className="text-xs text-amber-300/90 mt-2">♻️ 이 보이스는 다른 캐릭터 {voiceDupNames.length}명과 함께 씁니다: {voiceDupNames.join(', ')}</p>
         )}
+        {voiceIdInput.trim() !== (character.voiceId || '').trim() && (
+          <p className="text-[11px] text-indigo-300 mt-1">저장 버튼을 눌러야 이 캐릭터에 반영됩니다.</p>
+        )}
+
+        <VoiceLibrary
+          characters={allCharacters}
+          currentId={character.id}
+          selectedVoiceId={voiceIdInput.trim()}
+          onSelect={setVoiceIdInput}
+        />
 
         {/* 음성 샘플 — 보이스 확정 후 버튼 하나로 일반·흥분 대사 생성 + TTS까지 */}
         <div className="mt-5 pt-4 border-t border-gray-800">
@@ -1088,6 +1098,116 @@ function TranslationGrid({ status }) {
         </ul>
       )}
     </>
+  )
+}
+
+// 기존 캐릭터 목소리 재활용 — 목록 응답(allCharacters)의 voiceId를 묶어 사용 캐릭터 수와 함께 보여준다.
+// 미리듣기는 그 목소리를 쓰는 캐릭터의 음성 샘플(voiceSamples.normal/aroused)을 재사용해 ElevenLabs 호출이 없다.
+function VoiceLibrary({ characters, currentId, selectedVoiceId, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const voices = (() => {
+    const map = new Map()
+    for (const c of characters) {
+      const v = (c.voiceId || '').trim()
+      if (!v || c.id === currentId) continue
+      if (!map.has(v)) map.set(v, { voiceId: v, users: [], normal: null, aroused: null })
+      const entry = map.get(v)
+      entry.users.push(c)
+      const s = c.voiceSamples || {}
+      if (!entry.normal && s.normal?.audioUrl) entry.normal = { url: s.normal.audioUrl, text: s.normal.text, from: c.name }
+      if (!entry.aroused && s.aroused?.audioUrl) entry.aroused = { url: s.aroused.audioUrl, text: s.aroused.text, from: c.name }
+    }
+    return [...map.values()].sort((a, b) => b.users.length - a.users.length || a.users[0].name.localeCompare(b.users[0].name))
+  })()
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? voices.filter((v) => v.voiceId.toLowerCase().includes(q) || v.users.some((c) => (c.name || '').toLowerCase().includes(q)))
+    : voices
+
+  return (
+    <div className="mt-4 rounded-lg border border-gray-800 bg-gray-950/40">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+        style={btnStyle}
+      >
+        <span className="text-xs font-semibold text-gray-200">♻️ 기존 캐릭터 목소리에서 고르기 <span className="text-gray-500 font-normal">({voices.length}개 보이스)</span></span>
+        <span className="text-gray-500 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="캐릭터 이름 또는 보이스 ID 검색"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs mb-2"
+            style={btnStyle}
+          />
+          <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+            {filtered.length === 0 && <p className="text-[11px] text-gray-500 py-2">해당하는 보이스가 없습니다.</p>}
+            {filtered.map((v) => {
+              const selected = v.voiceId === selectedVoiceId
+              const avatar = v.users.find((c) => c.profileImage)?.profileImage
+              return (
+                <div
+                  key={v.voiceId}
+                  className={`rounded-lg p-2.5 border ${selected ? 'border-emerald-500/60 bg-emerald-500/5' : 'border-gray-800 bg-gray-800/40'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {avatar ? (
+                      <img src={avatar} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 text-[10px] font-semibold flex-shrink-0">
+                          {v.users.length}명 사용
+                        </span>
+                        <span className="text-xs text-gray-200 truncate">{v.users.map((c) => c.name).join(', ')}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 font-mono truncate mt-0.5">{v.voiceId}</p>
+                    </div>
+                    <button
+                      onClick={() => onSelect(v.voiceId)}
+                      disabled={selected}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-[11px] font-medium disabled:opacity-60 flex-shrink-0"
+                      style={btnStyle}
+                    >
+                      {selected ? '✓ 선택됨' : '이 목소리 선택'}
+                    </button>
+                  </div>
+
+                  {(v.normal || v.aroused) ? (
+                    <div className="mt-2 space-y-1">
+                      {[['normal', '기본'], ['aroused', '흥분']].map(([kind, label]) => {
+                        const s = v[kind]
+                        if (!s) return null
+                        return (
+                          <div key={kind} className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400 w-7 flex-shrink-0">{label}</span>
+                            <audio src={s.url} controls preload="none" className="h-7 flex-1 min-w-0" />
+                          </div>
+                        )
+                      })}
+                      <p className="text-[10px] text-gray-500 truncate">
+                        "{truncate(v.normal?.text || v.aroused?.text, 60)}" — {(v.normal || v.aroused).from} 샘플
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-500 mt-2">음성 샘플이 없어 미리듣기를 할 수 없습니다.</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
