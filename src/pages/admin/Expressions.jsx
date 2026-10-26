@@ -2219,6 +2219,7 @@ function ArousedPipelineModal({ characterId, styleId, characterName, teaseImages
   const [selectedImage, setSelectedImage] = useState(teaseImages[0] || null)
   const [customUrl, setCustomUrl] = useState('')
   const [mode, setMode] = useState('image') // 'image' | 'video'
+  const [videoModel, setVideoModel] = useState('minimax') // 'minimax' | 'seedance'
   const [jobId, setJobId] = useState(null)
   const [job, setJob] = useState(null)
   const [starting, setStarting] = useState(false)
@@ -2235,7 +2236,9 @@ function ArousedPipelineModal({ characterId, styleId, characterName, teaseImages
       const endpoint = mode === 'image'
         ? `/admin/characters/${characterId}/start-aroused-image-pipeline`
         : `/admin/characters/${characterId}/start-aroused-pipeline`
-      const { jobId: id } = await api.post(endpoint, { styleId, referenceImageUrl: referenceUrl })
+      const body = { styleId, referenceImageUrl: referenceUrl }
+      if (mode === 'video') body.videoModel = videoModel
+      const { jobId: id } = await api.post(endpoint, body)
       setJobId(id)
     } catch (err) {
       setError(err.message || '시작 실패')
@@ -2336,6 +2339,24 @@ function ArousedPipelineModal({ characterId, styleId, characterName, teaseImages
                 🎬 비디오+이미지
               </button>
             </div>
+
+            {mode === 'video' && (
+              <div className="flex gap-2 mb-3">
+                {[
+                  { key: 'seedance', label: 'Seedance 2.0 Fast', sub: '720p' },
+                  { key: 'minimax', label: 'MiniMax H3', sub: '768p' },
+                ].map(m => (
+                  <button
+                    key={m.key}
+                    onClick={() => setVideoModel(m.key)}
+                    className={`flex-1 py-1.5 text-xs rounded-xl font-semibold transition-all ${videoModel === m.key ? 'bg-blue-900/60 border border-blue-500 text-blue-200' : 'bg-gray-800 border border-gray-700 text-gray-400 hover:bg-gray-700'}`}
+                    style={NO_OUTLINE}
+                  >
+                    {m.label} <span className="text-[10px] font-normal opacity-70">{m.sub}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-3 mb-4 text-[11px] text-gray-400 leading-relaxed">
               <p className="font-semibold text-gray-300 mb-1">진행 순서</p>
