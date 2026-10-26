@@ -15,6 +15,7 @@ const newDraft = (slot, presetId) => ({
   key: ++draftSeq,
   slot,
   presetId,
+  adaptation: null, // { key: ref|color, prompt, adapted } — 레퍼런스에 맞춘 프롬프트, 카드당 1회
   imgs: {}, // modelKey → { status, url, error, saving }
   savedFrom: null, // 저장에 쓴 modelKey
   savedImage: null,
@@ -127,16 +128,38 @@ export default function ArousedGenerator({ character, styles, onImageSaved }) {
   const patchImg = (key, modelKey, fn) =>
     patch(key, (d) => ({ ...d, imgs: { ...d.imgs, [modelKey]: fn(d.imgs[modelKey] || {}) } }))
 
-  const generateImage = (draft, modelKeys) => {
+  // 레퍼런스·속옷 색이 같으면 이미 조정한 프롬프트 재사용, 바뀌었으면 OpenRouter 로 다시 조정
+  const ensureAdaptation = async (draft) => {
+    const key = `${effectiveRef}|${underwearColor}`
+    if (draft.adaptation?.key === key) return draft.adaptation
+    const r = await api.post('/admin/aroused-gen/adapt', {
+      referenceUrl: effectiveRef,
+      presetId: draft.presetId,
+      underwearColor,
+    })
+    const adaptation = { key, prompt: r.prompt, adapted: r.adapted }
+    patch(draft.key, (d) => ({ ...d, adaptation }))
+    return adaptation
+  }
+
+  const generateImage = async (draft, modelKeys) => {
     if (!effectiveRef) return alert('레퍼런스 이미지를 선택하세요.')
+    for (const modelKey of modelKeys) patchImg(draft.key, modelKey, () => ({ status: 'running' }))
+    let adaptation
+    try {
+      adaptation = await ensureAdaptation(draft)
+    } catch (e) {
+      for (const modelKey of modelKeys) patchImg(draft.key, modelKey, () => ({ status: 'error', error: `프롬프트 조정 실패: ${e.message}` }))
+      return
+    }
     for (const modelKey of modelKeys) {
-      patchImg(draft.key, modelKey, () => ({ status: 'running' }))
       api
         .post('/admin/aroused-gen/image', {
           referenceUrl: effectiveRef,
           presetId: draft.presetId,
           underwearColor,
           model: modelKey,
+          promptOverride: adaptation.prompt,
         })
         .then(({ predictionId }) => poll(predictionId, 3000, (r) => patchImg(draft.key, modelKey, () => r)))
         .catch((e) => patchImg(draft.key, modelKey, () => ({ status: 'error', error: e.message })))
@@ -414,6 +437,7 @@ export default function ArousedGenerator({ character, styles, onImageSaved }) {
                       onChangePreset={(presetId) =>
                         patch(d.key, (x) => ({ ...newDraft(x.slot, presetId), key: x.key }))
                       }
+                      onResetAdaptation={() => patch(d.key, (x) => ({ ...x, adaptation: null }))}
                       onRemove={() => setDrafts((ds) => ds.filter((x) => x.key !== d.key))}
                       onGenerate={() => generateImage(d, modelKeysFor(genMode))}
                       onRegenerateModel={(modelKey) => generateImage(d, [modelKey])}
@@ -441,6 +465,7 @@ function DraftCard({
   imageModels,
   videoOptions,
   onChangePreset,
+  onResetAdaptation,
   onRemove,
   onGenerate,
   onRegenerateModel,
@@ -480,6 +505,22 @@ function DraftCard({
         </button>
       </div>
       <p className="text-[11px] text-gray-400 leading-snug">{preset?.desc}</p>
+      {draft.adaptation && (
+        <details className="text-[10px] text-gray-500">
+          <summary className="cursor-pointer select-none">
+            {draft.adaptation.adapted ? '🪄 레퍼런스에 맞춘 프롬프트' : '⚠️ 조정 실패 — 원본 프리셋 사용'}
+          </summary>
+          <p className="mt-1 whitespace-pre-wrap leading-snug text-gray-400">{draft.adaptation.prompt}</p>
+          <button
+            onClick={onResetAdaptation}
+            disabled={anyRunning}
+            className="mt-1 text-[10px] text-indigo-300 hover:text-indigo-200 disabled:opacity-40"
+            style={NO_OUTLINE}
+          >
+            다음 생성 때 다시 조정
+          </button>
+        </details>
+      )}
 
       {/* 이미지 — 모델별 타일 */}
       {tiles.length > 0 && (
