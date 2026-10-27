@@ -78,29 +78,32 @@ export default function GroupChatCast() {
   // 컨셉의 배역은 전부 채워야 방을 만들 수 있다(서버도 동일 검증).
   const minRoles = concept?.roles?.length || 1
 
-  const nextEmptySlot = (arr, from) => {
-    for (let i = 0; i < arr.length; i++) {
-      const idx = (from + i) % arr.length
+  // 다음 빈 슬롯 — 없으면(배역이 다 찼으면) 현재 슬롯에 머문다. 슬롯 수 밖으로 넘어가지 않게.
+  const nextEmptySlot = (arr, current) => {
+    for (let i = 1; i <= arr.length; i++) {
+      const idx = (current + i) % arr.length
       if (!arr[idx]) return idx
     }
-    return from
+    return current
   }
 
-  // 캐릭터 탭 — 이미 배정돼 있으면 해제(토글), 아니면 활성 슬롯에 배정하고 다음 빈 슬롯으로 이동.
+  // 캐릭터 탭 — 선택된(활성) 배역에 그 캐릭터를 넣는다. 배역에 이미 다른 캐릭터가 있으면 교체.
+  // 다른 배역에 있던 캐릭터면 그 배역에서 빼고 옮긴다(한 캐릭터 = 한 배역). 활성 배역에 이미 있는 캐릭터를
+  // 다시 탭하면 해제. 배정 후엔 다음 빈 배역으로 이동하고, 다 찼으면 현재 배역에 머문다.
   const toggleCharacter = (characterId) => {
-    setAssignments((prev) => {
-      const existingSlot = prev.indexOf(characterId)
-      if (existingSlot !== -1) {
-        const next = [...prev]
-        next[existingSlot] = null
-        setActiveSlot(existingSlot)
-        return next
-      }
-      const next = [...prev]
-      next[activeSlot] = characterId
-      setActiveSlot(nextEmptySlot(next, activeSlot + 1))
-      return next
-    })
+    const slot = Math.min(Math.max(activeSlot, 0), assignments.length - 1)
+    if (slot < 0) return
+    const next = [...assignments]
+    if (next[slot] === characterId) {
+      next[slot] = null
+      setAssignments(next)
+      return
+    }
+    const existingSlot = next.indexOf(characterId)
+    if (existingSlot !== -1) next[existingSlot] = null
+    next[slot] = characterId
+    setAssignments(next)
+    setActiveSlot(nextEmptySlot(next, slot))
   }
 
   const clearSlot = (slotIdx) => {
