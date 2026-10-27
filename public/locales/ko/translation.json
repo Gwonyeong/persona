@@ -1114,7 +1114,7 @@
     "characters": "캐릭터",
     "start": "이 배역으로 시작",
     "starting": "만드는 중...",
-    "needMore": "배역을 {{count}}개 이상 채워주세요",
+    "needMore": "배역 {{count}}개를 모두 채워주세요",
     "adultRequired": "이 상황극은 성인 인증이 필요해요",
     "loadFailed": "불러오지 못했어요"
   },

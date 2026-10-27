@@ -1114,7 +1114,7 @@
     "characters": "Characters",
     "start": "Start with this cast",
     "starting": "Creating...",
-    "needMore": "Fill at least {{count}} roles",
+    "needMore": "Fill all {{count}} roles",
     "adultRequired": "This roleplay requires adult verification",
     "loadFailed": "Failed to load"
   },

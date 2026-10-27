@@ -1114,7 +1114,7 @@
     "characters": "キャラクター",
     "start": "この配役で始める",
     "starting": "作成中...",
-    "needMore": "配役を{{count}}つ以上埋めてください",
+    "needMore": "{{count}}つの配役をすべて埋めてください",
     "adultRequired": "このロールプレイは成人認証が必要です",
     "loadFailed": "読み込めませんでした"
   },

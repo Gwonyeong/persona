@@ -75,7 +75,8 @@ export default function GroupChatCast() {
   }, [characters, followedIds])
 
   const assignedCount = assignments.filter(Boolean).length
-  const minRoles = concept?.minRoles || 2
+  // 컨셉의 배역은 전부 채워야 방을 만들 수 있다(서버도 동일 검증).
+  const minRoles = concept?.roles?.length || 1
 
   const nextEmptySlot = (arr, from) => {
     for (let i = 0; i < arr.length; i++) {
