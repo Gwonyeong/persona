@@ -482,6 +482,38 @@ const MessageBubble = memo(function MessageBubble({
   )
 })
 
+// 같은 메시지는 항상 같은 이미지를 고르도록 createdAt+index 시드로 후보 중 하나 선택.
+function pickSeeded(candidates, msg, i) {
+  if (candidates.length === 1) return candidates[0]
+  const seed = String(msg.createdAt || '') + '|' + i
+  let h = 0
+  for (let s = 0; s < seed.length; s++) h = ((h << 5) - h + seed.charCodeAt(s)) | 0
+  return candidates[Math.abs(h) % candidates.length]
+}
+
+// 서버 routes/conversations.js#pickFallbackEmotion 과 동일 규칙 — 미등록 emotion을 가장 가까운 등록 단계로.
+const AROUSED_STAGE_ORDER = [
+  'AROUSED_TEASE', 'AROUSED_TOPLESS', 'AROUSED_NUDE', 'AROUSED_FOREPLAY',
+  'AROUSED_INSERT', 'AROUSED_INSERT_ALT', 'AROUSED_CLIMAX', 'AROUSED_AFTERGLOW',
+]
+function pickFallbackEmotion(target, available) {
+  const set = new Set(available)
+  if (set.has(target)) return target
+  if (String(target).startsWith('AROUSED_')) {
+    const idx = AROUSED_STAGE_ORDER.indexOf(target)
+    if (idx >= 0) {
+      const ranked = AROUSED_STAGE_ORDER
+        .map((e, i) => ({ e, dist: Math.abs(i - idx), order: i }))
+        .filter((c) => c.e !== target && set.has(c.e))
+        .sort((a, b) => a.dist - b.dist || a.order - b.order)
+      if (ranked[0]) return ranked[0].e
+    }
+    if (set.has('SHY')) return 'SHY'
+  }
+  if (set.has('NEUTRAL')) return 'NEUTRAL'
+  return available[0] || null
+}
+
 export default function Chat() {
   const { id } = useParams()
   const { pingBurst } = useReadSync(id)
@@ -1435,11 +1467,22 @@ export default function Chat() {
           .map((img) => ({ ...img, styleId: style.id })),
       )
       if (candidates.length === 0) continue
-      if (candidates.length === 1) return candidates[0]
-      const seed = String(msg.createdAt || '') + '|' + i
-      let h = 0
-      for (let s = 0; s < seed.length; s++) h = ((h << 5) - h + seed.charCodeAt(s)) | 0
-      return candidates[Math.abs(h) % candidates.length]
+      return pickSeeded(candidates, msg, i)
+    }
+    // 매칭되는 메시지가 하나도 없으면(예: 첫 메시지 emotion이 SHY인데 SHY 이미지 미등록)
+    // 최신 캐릭터 메시지 기준으로 서버와 같은 규칙의 fallback emotion을 적용 — 진입 직후 빈 화면 방지.
+    // 서버는 대화 턴마다 fallback을 박지만 대화 생성 시 첫 메시지엔 적용하지 않는다.
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.role !== 'CHARACTER' || !msg.emotion) continue
+      const pool = activeStyles.flatMap((style) =>
+        (style.images || [])
+          .filter((img) => !isVideoUrl(img.filePath))
+          .map((img) => ({ ...img, styleId: style.id })),
+      )
+      const fallback = pickFallbackEmotion(msg.emotion, [...new Set(pool.map((img) => img.emotion))])
+      const candidates = pool.filter((img) => img.emotion === fallback)
+      return candidates.length ? pickSeeded(candidates, msg, i) : null
     }
     return null
   }, [messages, conversation, chatStyles])

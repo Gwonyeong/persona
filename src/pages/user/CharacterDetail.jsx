@@ -132,10 +132,10 @@ export default function CharacterDetail() {
   // 통합 채팅 모달 — 메시지 보내기 버튼 클릭 시 진입점.
   //   step 'mode': 기본 채팅 vs 컨셉 채팅 선택
   //   step 'preset': 컨셉 채팅의 preset 3개 선택
+  //   step 'sprite': 기본 채팅 새로 만들기 전 표정 이미지 출력 방식 선택 (action: 'start' | 'reset')
   const [chatModal, setChatModal] = useState({ open: false, step: 'mode' })
-  // 기본 채팅 표정 이미지 출력 방식 — 모달에서 '기본'(BUBBLE) / '전체'(FULL) 선택.
-  // null = 미선택 → 기존 대화방 값 유지, 신규는 FULL.
-  const [basicSpriteMode, setBasicSpriteMode] = useState(null)
+  // 기본 채팅 표정 이미지 출력 방식 — 'FULL'(전체, 디폴트) | 'BUBBLE'(기본)
+  const [basicSpriteMode, setBasicSpriteMode] = useState('FULL')
   const [showReport, setShowReport] = useState(false)
   const [showProfilePicker, setShowProfilePicker] = useState(false)
   const [tagCategories, setTagCategories] = useState([])
@@ -242,30 +242,23 @@ export default function CharacterDetail() {
   }
   const closeChatModal = () => setChatModal({ open: false, step: 'mode' })
 
-  const pickedSpriteMode = basicSpriteMode ?? existingConv?.spriteMode ?? 'FULL'
-  // 이어하기/초기화 시 모달에서 바꾼 표정 출력 방식을 대화방에 반영. 실패해도 진입은 막지 않는다.
-  const applyBasicSpriteMode = async (conversationId, currentMode) => {
-    if (pickedSpriteMode === currentMode) return
-    try {
-      await api.patch(`/conversations/${conversationId}/sprite-mode`, { mode: pickedSpriteMode })
-    } catch (error) {
-      console.error('applyBasicSpriteMode error:', error)
-    }
+  // 대화방을 새로 만드는 경로(신규 시작·초기화)는 표정 출력 방식 선택 단계를 거친다.
+  const openSpriteStep = (action) => {
+    setBasicSpriteMode('FULL')
+    setChatModal({ open: true, step: 'sprite', action })
   }
 
   // === 기본 채팅 (V1) ===
-  // V1 conversation 이어서: 그대로 navigate. 없으면 새로 생성.
-  const handleBasicResume = async () => {
-    if (!existingConv) return handleBasicStart()
-    setStarting(true)
-    await applyBasicSpriteMode(existingConv.conversationId, existingConv.spriteMode)
+  // V1 conversation 이어서: 그대로 navigate (표정 출력 방식은 대화방 설정 유지). 없으면 선택 단계로.
+  const handleBasicResume = () => {
+    if (!existingConv) return openSpriteStep('start')
     navigate(`/chats/${existingConv.conversationId}`)
   }
   const handleBasicStart = async () => {
     closeChatModal()
     setStarting(true)
     try {
-      const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id), spriteMode: pickedSpriteMode })
+      const { conversation, conversationCount } = await api.post('/conversations', { characterId: parseInt(id), spriteMode: basicSpriteMode })
       window.gtag?.('event', 'chat_start', { character_id: id, conversation_id: conversation.id })
       if (shouldShowReview(conversationCount)) {
         setShowReviewModal(true)
@@ -288,8 +281,11 @@ export default function CharacterDetail() {
     setStarting(true)
     try {
       const { conversation } = await api.post(`/conversations/${existingConv.conversationId}/reset`)
-      // reset은 기존 spriteMode를 이어받으므로 그 값 기준으로 비교
-      await applyBasicSpriteMode(conversation.id, existingConv.spriteMode)
+      // reset은 기존 spriteMode를 이어받으므로 선택값과 다를 때만 반영. 실패해도 진입은 막지 않는다.
+      if (basicSpriteMode !== existingConv.spriteMode) {
+        await api.patch(`/conversations/${conversation.id}/sprite-mode`, { mode: basicSpriteMode })
+          .catch((error) => console.error('sprite-mode apply error:', error))
+      }
       navigate(`/chats/${conversation.id}`)
     } catch (error) {
       console.error(error)
@@ -1486,6 +1482,12 @@ export default function CharacterDetail() {
                     <p className="text-[11px] text-gray-400 mt-0.5">{t('character.presetSelectDesc')}</p>
                   </>
                 )}
+                {chatModal.step === 'sprite' && (
+                  <>
+                    <h3 className="text-base font-bold text-white">{t('chatSettings.spriteMode.heading')}</h3>
+                    <p className="text-[11px] text-gray-400 mt-0.5">{t('chatSettings.spriteMode.description')}</p>
+                  </>
+                )}
                 {(chatModal.step === 'confirm-basic' || chatModal.step === 'confirm-concept') && (
                   <>
                     <h3 className="text-base font-bold text-white">{t('character.restartConfirmTitle')}</h3>
@@ -1516,32 +1518,9 @@ export default function CharacterDetail() {
                       <p className="text-[11px] text-gray-400 mt-0.5">{t('character.basicChatDesc')}</p>
                     </div>
                   </div>
-                  {/* 표정 이미지 출력 방식 — 전체(FULL) / 기본(BUBBLE) */}
-                  <div className="mb-3">
-                    <p className="text-[11px] font-medium text-gray-300 mb-1.5">{t('chatSettings.spriteMode.heading')}</p>
-                    <div className="flex gap-1.5 p-1 rounded-xl bg-gray-900/70 border border-gray-700/60">
-                      {['FULL', 'BUBBLE'].map((mode) => {
-                        const selected = pickedSpriteMode === mode
-                        return (
-                          <button
-                            key={mode}
-                            onClick={() => setBasicSpriteMode(mode)}
-                            disabled={starting}
-                            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${selected ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-                            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                          >
-                            {t(`chatSettings.spriteMode.options.${mode}.title`)}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {(pickedSpriteMode === 'FULL' || pickedSpriteMode === 'BUBBLE') && (
-                      <p className="text-[10px] text-gray-500 mt-1.5 leading-relaxed">{t(`chatSettings.spriteMode.options.${pickedSpriteMode}.desc`)}</p>
-                    )}
-                  </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={existingConv ? handleBasicResume : handleBasicStart}
+                      onClick={existingConv ? handleBasicResume : () => openSpriteStep('start')}
                       disabled={starting}
                       className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
@@ -1591,6 +1570,51 @@ export default function CharacterDetail() {
               </div>
             )}
 
+            {chatModal.step === 'sprite' && (
+              <div className="flex flex-col gap-2.5">
+                {['FULL', 'BUBBLE'].map((mode) => {
+                  const selected = basicSpriteMode === mode
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setBasicSpriteMode(mode)}
+                      disabled={starting}
+                      className={`text-left rounded-2xl border p-4 transition-colors ${selected ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-700/60 bg-gray-800/40 hover:border-gray-600'}`}
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${selected ? 'border-indigo-400' : 'border-gray-500'}`}>
+                          {selected && <span className="w-2 h-2 rounded-full bg-indigo-400" />}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white">{t(`chatSettings.spriteMode.options.${mode}.title`)}</p>
+                          <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{t(`chatSettings.spriteMode.options.${mode}.desc`)}</p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+                <div className="flex gap-2 mt-1">
+                  <button
+                    onClick={() => setChatModal({ open: true, step: 'mode' })}
+                    disabled={starting}
+                    className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-200 text-sm font-semibold rounded-xl transition-colors"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {t('common.back')}
+                  </button>
+                  <button
+                    onClick={() => (chatModal.action === 'reset' ? handleBasicReset() : handleBasicStart())}
+                    disabled={starting}
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    {t('character.startChat')}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {(chatModal.step === 'confirm-basic' || chatModal.step === 'confirm-concept') && (
               <div className="flex flex-col gap-3">
                 <div className="rounded-2xl border border-red-500/30 bg-red-500/8 p-4">
@@ -1614,7 +1638,7 @@ export default function CharacterDetail() {
                   </button>
                   <button
                     onClick={() => {
-                      if (chatModal.step === 'confirm-basic') handleBasicReset()
+                      if (chatModal.step === 'confirm-basic') openSpriteStep('reset')
                       else setChatModal({ open: true, step: 'preset' })
                     }}
                     disabled={starting}
