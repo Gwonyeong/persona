@@ -18,6 +18,11 @@ const EMOTION_VIDEO_MASK_COST = 10
 
 const MAX_MEMBERS = 4
 
+// 말풍선으로 그려지는 메시지 — 빈 content는 건너뛰되 생성 이미지는 포함.
+function isRenderableMessage(m) {
+  return !!(m.content || m.role === 'GENERATED_IMAGE')
+}
+
 function getImageUrl(filePath) {
   if (!filePath) return null
   if (filePath.startsWith('http')) return filePath
@@ -152,8 +157,16 @@ export default function GroupChat() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  // 방을 방금 생성한 경우(캐스팅/신규) — 초기 스크롤을 바닥이 아닌 맨 위로 두어 오프닝을 처음부터 읽게 한다.
-  const justCreatedRef = useRef(location.state?.justCreated === true)
+  // 방을 방금 생성한 경우(캐스팅/신규) — 오프닝 메시지를 첫 메시지부터 1초 간격으로 하나씩 노출하고,
+  // 그동안 상단 상태 패널은 접어둔다(메시지를 가리지 않게). 마지막 메시지가 보일 때 패널이 내려온다.
+  const justCreated = location.state?.justCreated === true
+  const OPENING_REVEAL_INTERVAL_MS = 1000
+  // null = 전부 노출. 숫자 = renderableMessages 앞에서부터 그 개수만 노출(오프닝 순차 노출 중).
+  const [revealLimit, setRevealLimit] = useState(justCreated ? 0 : null)
+  // history state는 새로고침에도 남으므로 읽은 즉시 비워 재진입 시 오프닝 연출이 반복되지 않게 한다.
+  useEffect(() => {
+    if (justCreated) navigate(location.pathname, { replace: true, state: null })
+  }, [])
   const { t } = useTranslation()
   const { token, user, setMasks } = useStore()
   const [groupChat, setGroupChat] = useState(null)
@@ -172,7 +185,7 @@ export default function GroupChat() {
   const [presenceModeToast, setPresenceModeToast] = useState(null) // 'PHONE_AUTO' | 'PHONE' | 'IN_PERSON' | null
   const [blockToast, setBlockToast] = useState(null) // 검열 차단 안내 메시지(문자열) | null
   const [safetyConfirmVisible, setSafetyConfirmVisible] = useState(false)
-  const [showStatusPanel, setShowStatusPanel] = useState(true) // 상단 캐릭터 상태 패널 접기/펼치기 (1:1 채팅과 동일)
+  const [showStatusPanel, setShowStatusPanel] = useState(!justCreated) // 상단 캐릭터 상태 패널 접기/펼치기 (1:1 채팅과 동일)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   // 페이지네이션 — 초기엔 최근 PAGE_SIZE개만 서버에서 받고(전송량 절감), 위로 스크롤 시
@@ -244,22 +257,24 @@ export default function GroupChat() {
     // 오버레이 뒤로 새 버블이 가려진다. 컨테이너를 scrollHeight까지 밀면 확보해둔 paddingBottom
     // (=bottomBarHeight+8, 스프라이트 행 포함)만큼 아래로 스크롤돼 새 버블이 오버레이 위로 온전히 보인다.
     // ResizeObserver로 bottomBarHeight(=paddingBottom)가 갱신된 다음 프레임에 한 번 더 맞춰 스프라이트가
-    // 방금 늘어난 경우까지 커버.
+    // 방금 늘어난 경우까지 커버. revealLimit — 오프닝 순차 노출 중 한 개씩 늘 때마다 새 버블을 따라 내려간다.
     const el = scrollContainerRef.current
     if (!el) return
-    // 방 생성 직후 첫 렌더: 오프닝을 처음부터 읽도록 맨 위 고정(바닥으로 튕기지 않음). 이후 턴부터는 정상 바닥 스크롤.
-    if (justCreatedRef.current) {
-      el.scrollTop = 0
-      justCreatedRef.current = false
-      return
-    }
     el.scrollTop = el.scrollHeight
     const raf = requestAnimationFrame(() => {
       const el2 = scrollContainerRef.current
       if (el2) el2.scrollTop = el2.scrollHeight
     })
     return () => cancelAnimationFrame(raf)
-  }, [lastMessageAt, streamingBubbles, bottomBarHeight])
+  }, [lastMessageAt, streamingBubbles, bottomBarHeight, revealLimit])
+
+  // 오프닝이 끝나 상태 패널이 펼쳐지는 동안(topBarHeight 증가 → paddingTop 증가) 마지막 메시지가 하단 오버레이
+  // 뒤로 밀리지 않도록 바닥을 따라간다. 그 외의 패널 토글에선 유저 스크롤 위치를 건드리지 않는다.
+  useEffect(() => {
+    if (Date.now() > followBottomUntilRef.current) return
+    const el = scrollContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [topBarHeight])
 
   // 상·하단 오버레이 높이 측정 — presence 칩 개수/스프라이트 행 유무에 따라 가변이므로 ResizeObserver로 추적.
   // 메시지 영역 top/bottom 오프셋에 반영해 상단 아래에서 시작하고 인풋 박스 위에서 잘리게 함.
@@ -319,26 +334,62 @@ export default function GroupChat() {
     return (groupChat.members || []).map((m) => m.character?.name).filter(Boolean).join(', ')
   }, [groupChat])
 
+  // 화면에 노출된 메시지 — 오프닝 순차 노출 중이면 렌더 가능한 메시지 기준 앞에서 revealLimit개까지만.
+  // 표정 스프라이트·발화 강조·말풍선 목록이 모두 이걸 보므로 오프닝과 함께 한 칸씩 진행된다.
+  const shownMessages = useMemo(() => {
+    const msgs = groupChat?.messages || []
+    if (revealLimit == null) return msgs
+    let seen = 0
+    for (let i = 0; i < msgs.length; i++) {
+      if (!isRenderableMessage(msgs[i])) continue
+      if (seen === revealLimit) return msgs.slice(0, i)
+      seen++
+    }
+    return msgs
+  }, [groupChat?.messages, revealLimit])
+
+  // 오프닝 순차 노출 — 로드 직후 첫 메시지를 바로 띄우고 이후 1초마다 하나씩. 다 나오면 상태 패널을 펼친다.
+  const allRenderableCount = useMemo(
+    () => (groupChat?.messages || []).filter(isRenderableMessage).length,
+    [groupChat?.messages]
+  )
+  // 패널이 펼쳐지는 동안 상단 오버레이가 커지며 메시지가 아래로 밀리므로, 그 사이엔 바닥을 계속 따라간다.
+  const followBottomUntilRef = useRef(0)
+  useEffect(() => {
+    if (revealLimit == null || !groupChat) return
+    if (revealLimit >= allRenderableCount) {
+      setRevealLimit(null)
+      followBottomUntilRef.current = Date.now() + 600
+      setShowStatusPanel(true)
+      return
+    }
+    const timer = setTimeout(
+      () => setRevealLimit((n) => (n == null ? n : n + 1)),
+      revealLimit === 0 ? 0 : OPENING_REVEAL_INTERVAL_MS
+    )
+    return () => clearTimeout(timer)
+  }, [revealLimit, allRenderableCount, groupChat])
+
   // 각 캐릭터의 최신 발화 감정 — messages를 역순 스캔해 characterId별 첫(=가장 최근) emotion.
   const latestEmotionByChar = useMemo(() => {
     const map = new Map()
-    const msgs = groupChat?.messages || []
+    const msgs = shownMessages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const m = msgs[i]
       if (m.role !== 'CHARACTER' || !m.characterId) continue
       if (!map.has(m.characterId)) map.set(m.characterId, m.emotion || 'NEUTRAL')
     }
     return map
-  }, [groupChat?.messages])
+  }, [shownMessages])
 
   // 캐릭터별 발화 횟수 — 표정 이미지 변형(seed)용. 발화가 늘 때마다 같은 감정이라도 다른 컷으로 로테이션.
   const speakCountByChar = useMemo(() => {
     const map = new Map()
-    for (const m of groupChat?.messages || []) {
+    for (const m of shownMessages) {
       if (m.role === 'CHARACTER' && m.characterId) map.set(m.characterId, (map.get(m.characterId) || 0) + 1)
     }
     return map
-  }, [groupChat?.messages])
+  }, [shownMessages])
 
   // 방금 말한(강조 대상) 캐릭터 — 스트리밍 중이면 마지막 스트리밍 버블, 아니면 마지막 CHARACTER 메시지.
   const speakingCharacterId = useMemo(() => {
@@ -346,13 +397,13 @@ export default function GroupChat() {
       const b = streamingBubbles[i]
       if (b.role === 'CHARACTER' && b.characterId) return b.characterId
     }
-    const msgs = groupChat?.messages || []
+    const msgs = shownMessages
     for (let i = msgs.length - 1; i >= 0; i--) {
       const m = msgs[i]
       if (m.role === 'CHARACTER' && m.characterId) return m.characterId
     }
     return null
-  }, [groupChat?.messages, streamingBubbles])
+  }, [shownMessages, streamingBubbles])
 
   // 인풋 위 1줄에 그릴 참여 페소나 표정 sprite (최대 4명, order순).
   const spriteParticipants = useMemo(() => {
@@ -424,6 +475,12 @@ export default function GroupChat() {
       role: 'USER',
       content: text,
       createdAt: new Date().toISOString(),
+    }
+
+    // 오프닝 순차 노출 도중에 보내면 남은 오프닝을 즉시 전부 노출하고 패널도 펼친다.
+    if (revealLimit != null) {
+      setRevealLimit(null)
+      setShowStatusPanel(true)
     }
 
     // 낙관적 업데이트
@@ -575,10 +632,12 @@ export default function GroupChat() {
   }, [blockToast])
 
 
-  // 렌더 가능한 메시지 전체 목록 (memoize — 인풋 타이핑 리렌더마다 filter 재계산 방지).
+  // 렌더 가능한 메시지 목록 (memoize — 인풋 타이핑 리렌더마다 filter 재계산 방지).
+  // shownMessages 기준이라 오프닝 순차 노출 중엔 아직 안 나온 메시지가 빠지고, 그룹핑(prev/next) 판정도
+  // 이 목록 기준이라 다음 메시지 때문에 말풍선 묶음이 미리 붙지 않는다.
   const renderableMessages = useMemo(
-    () => (groupChat?.messages || []).filter((m) => m.content || m.role === 'GENERATED_IMAGE'),
-    [groupChat?.messages]
+    () => shownMessages.filter(isRenderableMessage),
+    [shownMessages]
   )
 
   // 렌더 페이지네이션 — 최근 visibleCount개만 DOM에 그림. slice는 뒤(최신)에서 잘라 항상 최신이 보이게.
@@ -708,8 +767,14 @@ export default function GroupChat() {
 
       </div>
 
-      {/* 상태 패널 — 유저 장소 + 동행/원격 그룹. 헤더와 분리된 보더 카드 (1:1 채팅 상태 패널과 동일 스타일). 셰브론으로 접기/펼치기. */}
-      {showStatusPanel && (
+      {/* 상태 패널 — 유저 장소 + 동행/원격 그룹. 헤더와 분리된 보더 카드 (1:1 채팅 상태 패널과 동일 스타일). 셰브론으로 접기/펼치기.
+          grid-rows 0fr↔1fr 트랜지션으로 위에서 내려오듯 펼쳐진다(방 생성 직후엔 오프닝이 다 나온 뒤 펼침). */}
+      <div
+        className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+        style={{ gridTemplateRows: showStatusPanel ? '1fr' : '0fr', opacity: showStatusPanel ? 1 : 0 }}
+        aria-hidden={!showStatusPanel}
+      >
+      <div className="min-h-0 overflow-hidden">
       <div className="mx-3 mt-2 px-3 py-2 rounded-2xl border border-gray-800/50 bg-gray-900/75 flex-shrink-0 space-y-2">
         <div className="text-[11px] text-gray-400">
           {t('groupChat.yourLocation')}: <span className="text-gray-100 font-medium">{groupChat.userLocation || '집'}</span>
@@ -779,7 +844,8 @@ export default function GroupChat() {
           </div>
         ))}
       </div>
-      )}
+      </div>
+      </div>
 
       {/* 모드 토글 행 — 좌측: Safety + 메신저 모드(대면/전화) 토글, 우측: 설정(표정 출력 방식) */}
       <div className="flex justify-between items-center px-3 py-2 flex-shrink-0 gap-2">
