@@ -106,7 +106,7 @@ export default function AdminGroupConcepts() {
     }
   })
   const removeRole = (idx) => setForm((f) => {
-    if (f.roles.length <= 2) return f
+    if (f.roles.length <= 1) return f
     return {
       ...f,
       roles: f.roles.filter((_, i) => i !== idx),
@@ -177,7 +177,7 @@ export default function AdminGroupConcepts() {
     setError(null)
     if (!form.title.trim()) { setError('제목을 입력하세요'); return }
     if (!form.relationFraming.trim()) { setError('관계 프레이밍을 입력하세요'); return }
-    if (form.roles.filter((r) => r.name.trim()).length < 2) { setError('배역을 2개 이상 입력하세요'); return }
+    if (form.roles.filter((r) => r.name.trim()).length < 1) { setError('배역을 1개 이상 입력하세요'); return }
     setSaving(true)
     try {
       const payload = buildPayload()
@@ -344,7 +344,7 @@ export default function AdminGroupConcepts() {
             </label>
             <label className="text-xs text-gray-400">
               최소 배역 수 (캐스팅 필수)
-              <input type="number" min={2} max={form.roles.length} value={form.minRoles} onChange={(e) => setBase({ minRoles: e.target.value })} className={inputCls + ' mt-1'} />
+              <input type="number" min={1} max={form.roles.length} value={form.minRoles} onChange={(e) => setBase({ minRoles: e.target.value })} className={inputCls + ' mt-1'} />
             </label>
             <label className="col-span-2 text-xs text-gray-400">
               첫 장면 장소
