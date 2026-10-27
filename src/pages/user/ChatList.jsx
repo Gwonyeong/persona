@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -24,6 +24,15 @@ function getCharacterOnlineStatus(activeHours) {
   return slot?.status || 'free'
 }
 
+// 단톡방 대표 썸네일 (프로필 우선 → 첫 스타일의 NEUTRAL 이미지)
+function groupMemberThumb(character) {
+  if (!character) return null
+  const thumb = character.styles?.[0]?.images?.[0]
+  return getImageUrl(character.profileImage) || getImageUrl(thumb?.filePath)
+}
+
+const TAB_KEYS = ['normal', 'situation', 'group']
+
 export default function ChatList() {
   const { t } = useTranslation()
   const { token } = useStore()
@@ -31,7 +40,12 @@ export default function ChatList() {
   // 진행 중인 상황극(VN) 세션 — 일반 대화와 다른 공간이라 탭으로 분리해 보여준다.
   // 예전엔 캐릭터 채팅방 안의 상황극 아이콘이 유일한 진입로였다 (일반 방을 지우면 도달 불가).
   const [situations, setSituations] = useState([])
-  const [tab, setTab] = useState('normal') // 'normal' | 'situation'
+  // 단톡방(컨셉 채팅) 대화방 — 원래 /group-chats 탭에 있던 목록. 그 탭은 컨셉 카드 전용이 됐다.
+  const [groupChats, setGroupChats] = useState([])
+  // ?tab=group 으로 들어오면 해당 탭부터 — 단톡방에서 뒤로가기 시 이 목록으로 돌아온다.
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab')
+  const [tab, setTab] = useState(TAB_KEYS.includes(initialTab) ? initialTab : 'normal') // 'normal' | 'situation' | 'group'
   const [search, setSearch] = useState('')
   const [editMode, setEditMode] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -44,6 +58,7 @@ export default function ChatList() {
       setConversations(conversations)
       setSituations(Array.isArray(situations) ? situations : [])
     })
+    api.get('/group-chats').then(({ groupChats }) => setGroupChats(groupChats || [])).catch(() => {})
   }
 
   useEffect(() => { load() }, [token])
@@ -59,6 +74,12 @@ export default function ChatList() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
+      if (deleteTarget.kind === 'group') {
+        await api.delete(`/group-chats/${deleteTarget.id}`)
+        setGroupChats((prev) => prev.filter((g) => g.id !== deleteTarget.id))
+        setDeleteTarget(null)
+        return
+      }
       // 상황극 세션도 같은 soft-delete 라우트를 탄다 (row 단위라 일반 대화에 영향 없음).
       await api.delete(`/conversations/${deleteTarget.id}`)
       if (deleteTarget.kind === 'situation') {
@@ -74,7 +95,7 @@ export default function ChatList() {
     }
   }
 
-  // 1:1 대화만 (단톡방은 /group-chats 탭으로 분리됨) — updatedAt 내림차순 정렬
+  // 1:1 대화 (단톡방은 아래 group 탭) — updatedAt 내림차순 정렬
   const sorted = [...conversations].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
 
   const q = search.trim().toLowerCase()
@@ -91,14 +112,31 @@ export default function ChatList() {
       )
     : situations
 
-  const hasSituationTab = situations.length > 0
-  // 마지막 세션을 지우면 탭이 사라지므로 일반 목록으로 되돌린다.
-  const activeTab = hasSituationTab ? tab : 'normal'
+  // 단톡방은 방 제목·멤버 이름으로 검색된다.
+  const filteredGroupChats = [...groupChats]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .filter((gc) => {
+      if (!q) return true
+      const title = (gc.title || '').toLowerCase()
+      const memberNames = (gc.members || []).map((m) => (m.character?.name || '').toLowerCase()).join(' ')
+      return title.includes(q) || memberNames.includes(q)
+    })
+
+  const isUnreadRow = (r) => r.updatedAt && (!r.lastReadAt || new Date(r.updatedAt) > new Date(r.lastReadAt))
+  // 상황극·단톡방 탭은 항목이 있을 때만 노출. 마지막 항목을 지우면 탭이 사라지므로 일반 목록으로 되돌린다.
+  const tabs = [
+    { key: 'normal', label: t('chatList.tabNormal'), count: conversations.length, dot: false },
+    situations.length > 0 && { key: 'situation', label: t('chatList.tabSituation'), count: situations.length, dot: situations.some(isUnreadRow) },
+    groupChats.length > 0 && { key: 'group', label: t('chatList.tabGroup'), count: groupChats.length, dot: groupChats.some(isUnreadRow) },
+  ].filter(Boolean)
+  const activeTab = tabs.some((x) => x.key === tab) ? tab : 'normal'
   const isSituationTab = activeTab === 'situation'
-  const listCount = isSituationTab ? filteredSituations.length : filteredConversations.length
-  const situationUnread = situations.some(
-    (s) => s.updatedAt && (!s.lastReadAt || new Date(s.updatedAt) > new Date(s.lastReadAt)),
-  )
+  const isGroupTab = activeTab === 'group'
+  const listCount = isSituationTab
+    ? filteredSituations.length
+    : isGroupTab
+      ? filteredGroupChats.length
+      : filteredConversations.length
 
   return (
     <div className="pt-2 pb-2">
@@ -111,7 +149,7 @@ export default function ChatList() {
       <div className="px-4 pt-2 pb-3 flex items-center justify-between gap-2">
         <h1 className="text-xl font-bold">{t('chatList.heading')}</h1>
         <div className="flex items-center gap-1">
-          {token && (conversations.length > 0 || situations.length > 0) && (
+          {token && (conversations.length > 0 || situations.length > 0 || groupChats.length > 0) && (
             <button
               onClick={() => setEditMode((prev) => !prev)}
               className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${editMode ? 'text-indigo-400 bg-indigo-400/10' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
@@ -151,14 +189,11 @@ export default function ChatList() {
         </div>
       ) : (
         <>
-          {/* 일반 / 상황극 탭 — 진행 중인 상황극이 있을 때만 노출 */}
-          {hasSituationTab && (
+          {/* 일반 / 상황극 / 단톡방 탭 — 일반 외 탭이 하나라도 있을 때만 노출 */}
+          {tabs.length > 1 && (
             <div className="px-4 mb-2">
               <div className="flex gap-1 p-1 bg-gray-900 border border-gray-800 rounded-xl">
-                {[
-                  { key: 'normal', label: t('chatList.tabNormal'), count: conversations.length, dot: false },
-                  { key: 'situation', label: t('chatList.tabSituation'), count: situations.length, dot: situationUnread },
-                ].map((item) => (
+                {tabs.map((item) => (
                   <button
                     key={item.key}
                     onClick={() => setTab(item.key)}
@@ -210,6 +245,61 @@ export default function ChatList() {
               {!search && (
                 <p className="text-gray-500 text-xs mt-1">{t('chatList.noChatsHint')}</p>
               )}
+            </div>
+          ) : isGroupTab ? (
+            <div>
+              {filteredGroupChats.map((gc) => {
+                const isUnread = isUnreadRow(gc)
+                const memberNames = (gc.members || []).map((m) => m.character?.name).filter(Boolean).join(', ')
+                const displayTitle = gc.title || memberNames || '...'
+                const previewText = gc.preview?.content || t('chatList.startChat')
+                return (
+                  <div key={`g-${gc.id}`} className="flex items-center">
+                    <button
+                      onClick={() => navigate(`/group-chats/${gc.id}`)}
+                      className="flex items-center gap-3 flex-1 min-w-0 px-4 py-3 hover:bg-gray-900/60 transition-colors text-left"
+                      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      {/* 멤버 콜라주 — 2x2 그리드 */}
+                      <div className="relative flex-shrink-0 w-14 h-14 rounded-full overflow-hidden bg-gray-800 grid grid-cols-2 grid-rows-2 gap-px">
+                        {(gc.members || []).slice(0, 4).map((m, i) => {
+                          const url = groupMemberThumb(m.character)
+                          return (
+                            <div key={i} className="bg-gray-700 overflow-hidden">
+                              {url ? <img src={resizedImageUrl(url, IMG_W.LIST_THUMB)} alt="" className="w-full h-full object-cover" /> : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600/20 text-indigo-300 flex-shrink-0">
+                            {gc.members?.length || 0}
+                          </span>
+                          <p className={`font-semibold text-sm truncate ${isUnread ? 'text-white' : 'text-gray-300'}`}>{displayTitle}</p>
+                          <span className="text-xs text-gray-500 flex-shrink-0 ml-auto">{timeAgo(gc.updatedAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className={`text-sm truncate flex-1 ${isUnread ? 'text-gray-300' : 'text-gray-500'}`}>{previewText}</p>
+                          {isUnread && <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />}
+                        </div>
+                      </div>
+                    </button>
+                    {editMode && (
+                      <button
+                        onClick={() => setDeleteTarget({ id: gc.id, kind: 'group', name: displayTitle })}
+                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-full mr-2 transition-colors"
+                        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ) : isSituationTab ? (
             <div>
@@ -345,9 +435,13 @@ export default function ChatList() {
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
           <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-white mb-2">{t('chatList.deleteTitle')}</h3>
+            <h3 className="text-lg font-bold text-white mb-2">
+              {deleteTarget.kind === 'group' ? t('groupChat.deleteTitle') : t('chatList.deleteTitle')}
+            </h3>
             <p className="text-sm text-gray-400 leading-relaxed mb-6">
-              {deleteTarget.kind === 'situation'
+              {deleteTarget.kind === 'group'
+                ? t('groupChat.deleteDescription')
+                : deleteTarget.kind === 'situation'
                 ? t('chatList.deleteSituationDescription', { title: deleteTarget.title })
                 : t('chatList.deleteDescription', { name: deleteTarget.name })}
             </p>

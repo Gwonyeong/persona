@@ -169,6 +169,7 @@
     "deleteDescription": "{{name}}과의 대화 내역과 호감도가 모두 초기화됩니다. 이 작업은 되돌릴 수 없습니다.",
     "tabNormal": "일반",
     "tabSituation": "상황극",
+    "tabGroup": "컨셉 채팅",
     "deleteSituationDescription": "'{{title}}' 상황극의 진행 내용이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
   },
   "chat": {
@@ -783,7 +784,7 @@
   },
   "nav": {
     "home": "홈",
-    "groupChats": "단톡방",
+    "groupChats": "컨셉 채팅",
     "chats": "대화",
     "my": "마이"
   },
@@ -1085,21 +1086,21 @@
     "videoRewardView": "보러가기"
   },
   "groupChatList": {
-    "title": "단톡방 - Pesona",
-    "heading": "단톡방",
-    "metaDescription": "여러 페소나와 함께하는 단체 톡방",
-    "searchPlaceholder": "단톡방 검색",
+    "title": "컨셉 채팅 - Pesona",
+    "heading": "컨셉 채팅",
+    "metaDescription": "여러 페소나와 함께하는 상황극 채팅",
+    "searchPlaceholder": "대화방 검색",
     "noSearchResults": "검색 결과가 없어요",
-    "empty": "아직 단톡방이 없어요",
-    "emptyHint": "아래 추천 조합으로 바로 시작해보세요",
-    "loginPrompt": "로그인하고 단톡방을 시작하세요",
-    "myRooms": "내 단톡방",
+    "empty": "아직 대화방이 없어요",
+    "emptyHint": "아래 상황극으로 바로 시작해보세요",
+    "loginPrompt": "로그인하고 컨셉 채팅을 시작하세요",
+    "myRooms": "내 대화방",
     "recommended": "이런 조합은 어때요?",
     "recommendedHint": "탭하면 바로 단톡방이 만들어져요",
     "concepts": "상황극 시작하기",
     "conceptsHint": "상황을 고르고 원하는 캐릭터를 배역에 캐스팅하세요",
     "freeCombo": "캐릭터 직접 고르기",
-    "createRoom": "새 단톡방",
+    "createRoom": "새 대화방",
     "starting": "만드는 중..."
   },
   "groupChatCast": {

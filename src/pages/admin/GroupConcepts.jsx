@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../lib/api'
 
 const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
@@ -13,6 +13,7 @@ function emptyForm() {
   return {
     id: null,
     emoji: '',
+    coverImage: '',
     safety: 'SFW',
     status: 'DRAFT',
     order: 0,
@@ -51,6 +52,7 @@ function hydrateForm(c) {
   return {
     id: c.id,
     emoji: c.emoji || '',
+    coverImage: c.coverImage || '',
     safety: c.safety || 'SFW',
     status: c.status || 'DRAFT',
     order: c.order || 0,
@@ -72,6 +74,9 @@ export default function AdminGroupConcepts() {
   const [langTab, setLangTab] = useState('ko')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [coverDragOver, setCoverDragOver] = useState(false)
+  const coverInputRef = useRef(null)
 
   const load = () => {
     setLoading(true)
@@ -153,6 +158,7 @@ export default function AdminGroupConcepts() {
     const ja = trLang('ja'); if (ja) translations.ja = ja
     return {
       emoji: form.emoji.trim() || null,
+      coverImage: form.coverImage || null,
       safety: form.safety,
       status: form.status,
       order: Number(form.order) || 0,
@@ -186,6 +192,23 @@ export default function AdminGroupConcepts() {
     }
   }
 
+  // 커버는 고르는 즉시 업로드해 URL만 폼에 담는다 — 저장은 다른 필드와 함께.
+  const uploadCover = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return
+    setCoverUploading(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const { url } = await api.post('/admin/group-concepts/cover', fd)
+      setBase({ coverImage: url })
+    } catch (err) {
+      setError(err.message || '커버 업로드 실패')
+    } finally {
+      setCoverUploading(false)
+    }
+  }
+
   const remove = async (c) => {
     if (!window.confirm(`"${c.title}" 컨셉을 삭제할까요? (기존 방은 유지됩니다)`)) return
     try {
@@ -202,7 +225,7 @@ export default function AdminGroupConcepts() {
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold text-white">단톡방 상황극 컨셉</h1>
+          <h1 className="text-xl font-bold text-white">컨셉 채팅 (단톡방 상황극)</h1>
           <p className="text-sm text-gray-500 mt-0.5">여자친구/며느리/아이돌 등 상황을 만들고 배역을 정의합니다. 유저가 배역에 캐릭터를 캐스팅합니다.</p>
         </div>
         {!form && (
@@ -222,7 +245,11 @@ export default function AdminGroupConcepts() {
           <div className="space-y-2">
             {concepts.map((c) => (
               <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-900 border border-gray-800">
-                <span className="text-xl">{c.emoji || '🎬'}</span>
+                {c.coverImage ? (
+                  <img src={c.coverImage} alt="" className="w-[72px] aspect-video rounded-md object-cover flex-shrink-0" />
+                ) : (
+                  <span className="text-xl">{c.emoji || '🎬'}</span>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-white font-medium text-sm truncate">{c.title}</span>
@@ -253,6 +280,44 @@ export default function AdminGroupConcepts() {
       {/* 편집 폼 */}
       {form && (
         <div className="space-y-4">
+          {/* 카드 커버 — 유저 '컨셉 채팅' 탭 가로 카드(16:9)에 그대로 깔린다. 없으면 이모지 카드. */}
+          <div className="flex gap-3 items-start">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setCoverDragOver(true) }}
+              onDragLeave={() => setCoverDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setCoverDragOver(false); uploadCover(e.dataTransfer.files?.[0]) }}
+              onClick={() => !coverUploading && coverInputRef.current?.click()}
+              className={`relative w-56 aspect-video flex-shrink-0 rounded-lg overflow-hidden border border-dashed cursor-pointer bg-gray-800 ${coverDragOver ? 'border-indigo-500 bg-indigo-950/30' : 'border-gray-700'}`}
+            >
+              {form.coverImage ? (
+                <img src={form.coverImage} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-500 text-[11px] text-center px-2">
+                  커버 이미지를 드래그하거나 클릭
+                </div>
+              )}
+              {coverUploading && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs text-gray-200">업로드 중...</div>
+              )}
+            </div>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { uploadCover(e.target.files?.[0]); e.target.value = '' }}
+            />
+            <div className="text-xs text-gray-500 space-y-2 pt-1">
+              <p className="text-gray-400 font-medium">카드 커버 (16:9 가로)</p>
+              <p>하단 절반은 제목·설명 오버레이로 덮이니 얼굴은 위쪽에 두세요.</p>
+              <p>유저 '컨셉 채팅' 탭의 카드 배경으로 쓰입니다. 비우면 이모지 카드로 나갑니다.</p>
+              <p>수위와 무관하게 모든 유저에게 보이니 <b className="text-gray-300">SFW 이미지</b>로 올려주세요.</p>
+              {form.coverImage && (
+                <button onClick={() => setBase({ coverImage: '' })} className="text-red-400 hover:text-red-300" style={NO_OUTLINE}>커버 제거</button>
+              )}
+            </div>
+          </div>
+
           {/* 공통 설정 */}
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-gray-400">
@@ -379,7 +444,7 @@ export default function AdminGroupConcepts() {
 
           <div className="flex gap-2 pt-2">
             <button onClick={closeForm} disabled={saving} className="flex-1 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium" style={NO_OUTLINE}>취소</button>
-            <button onClick={save} disabled={saving} className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold disabled:opacity-50" style={NO_OUTLINE}>
+            <button onClick={save} disabled={saving || coverUploading} className="flex-1 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold disabled:opacity-50" style={NO_OUTLINE}>
               {saving ? '저장 중...' : form.id ? '저장' : '생성'}
             </button>
           </div>

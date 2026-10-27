@@ -169,6 +169,7 @@
     "deleteDescription": "All chat history and affinity with {{name}} will be reset. This cannot be undone.",
     "tabNormal": "Chats",
     "tabSituation": "Roleplay",
+    "tabGroup": "Concept",
     "deleteSituationDescription": "All progress in the roleplay \"{{title}}\" will be deleted. This cannot be undone."
   },
   "chat": {
@@ -783,7 +784,7 @@
   },
   "nav": {
     "home": "Home",
-    "groupChats": "Groups",
+    "groupChats": "Concepts",
     "chats": "Chats",
     "my": "My"
   },
@@ -1085,21 +1086,21 @@
     "videoRewardView": "View it"
   },
   "groupChatList": {
-    "title": "Group Chats - Pesona",
-    "heading": "Group Chats",
-    "metaDescription": "Group chats with multiple personas",
-    "searchPlaceholder": "Search group chats",
+    "title": "Concept Chat - Pesona",
+    "heading": "Concept Chat",
+    "metaDescription": "Roleplay chats with multiple personas",
+    "searchPlaceholder": "Search rooms",
     "noSearchResults": "No results",
-    "empty": "No group chats yet",
-    "emptyHint": "Start instantly with a suggested combo below",
-    "loginPrompt": "Log in to start a group chat",
+    "empty": "No rooms yet",
+    "emptyHint": "Start right away with a roleplay below",
+    "loginPrompt": "Log in to start a concept chat",
     "myRooms": "My rooms",
     "recommended": "Try these combos",
     "recommendedHint": "Tap to create a group chat instantly",
     "concepts": "Start a roleplay",
     "conceptsHint": "Pick a situation and cast characters into roles",
     "freeCombo": "Pick characters yourself",
-    "createRoom": "New group",
+    "createRoom": "New room",
     "starting": "Creating..."
   },
   "groupChatCast": {

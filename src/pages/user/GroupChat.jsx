@@ -228,7 +228,7 @@ export default function GroupChat() {
       setVideoUnlockedImageIds(new Set(Array.isArray(videoUnlockedImageIds) ? videoUnlockedImageIds : []))
     }).catch((err) => {
       console.error(err)
-      if (err.status === 404) navigate('/group-chats', { replace: true })
+      if (err.status === 404) navigate('/chats?tab=group', { replace: true })
     })
   }, [id, token])
 
@@ -643,7 +643,7 @@ export default function GroupChat() {
   async function handleDelete() {
     try {
       await api.delete(`/group-chats/${id}`)
-      navigate('/group-chats', { replace: true })
+      navigate('/chats?tab=group', { replace: true })
     } catch (err) {
       console.error(err)
     }
@@ -667,7 +667,7 @@ export default function GroupChat() {
       {/* 헤더 — 슬림 글래스 바 */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800/30 bg-gray-900/30">
         <button
-          onClick={() => navigate('/group-chats')}
+          onClick={() => navigate('/chats?tab=group')}
           className="w-9 h-9 flex items-center justify-center rounded-full text-gray-300 hover:bg-gray-800"
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
         >

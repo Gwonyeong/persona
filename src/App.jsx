@@ -132,6 +132,9 @@ function App() {
           window.history.back()
         } else if (/^\/chats\/[^/]+$/.test(window.location.pathname)) {
           navigateRef.current('/chats', { replace: true })
+        } else if (/^\/group-chats\/\d+$/.test(window.location.pathname)) {
+          // 단톡방 목록은 대화 탭의 단톡방 탭으로 옮겨졌다
+          navigateRef.current('/chats?tab=group', { replace: true })
         } else if (/^\/group-chats\/.+/.test(window.location.pathname)) {
           navigateRef.current('/group-chats', { replace: true })
         } else {

@@ -169,6 +169,7 @@
     "deleteDescription": "{{name}}との会話履歴と好感度がすべてリセットされます。この操作は元に戻せません。",
     "tabNormal": "チャット",
     "tabSituation": "シチュエーション",
+    "tabGroup": "コンセプト",
     "deleteSituationDescription": "「{{title}}」の進行データはすべて削除されます。この操作は取り消せません。"
   },
   "chat": {
@@ -783,7 +784,7 @@
   },
   "nav": {
     "home": "ホーム",
-    "groupChats": "グループ",
+    "groupChats": "コンセプト",
     "chats": "チャット",
     "my": "マイ"
   },
@@ -1085,21 +1086,21 @@
     "videoRewardView": "見に行く"
   },
   "groupChatList": {
-    "title": "グループチャット - Pesona",
-    "heading": "グループチャット",
-    "metaDescription": "複数のペルソナとのグループチャット",
-    "searchPlaceholder": "グループチャットを検索",
+    "title": "コンセプトチャット - Pesona",
+    "heading": "コンセプトチャット",
+    "metaDescription": "複数のペルソナと楽しむシチュエーションチャット",
+    "searchPlaceholder": "ルームを検索",
     "noSearchResults": "結果がありません",
-    "empty": "まだグループチャットがありません",
-    "emptyHint": "下のおすすめの組み合わせから始めましょう",
-    "loginPrompt": "ログインしてグループチャットを始めましょう",
+    "empty": "まだルームがありません",
+    "emptyHint": "下のシチュエーションからすぐに始めましょう",
+    "loginPrompt": "ログインしてコンセプトチャットを始めましょう",
     "myRooms": "マイルーム",
     "recommended": "こんな組み合わせはいかが？",
     "recommendedHint": "タップするとすぐに作成できます",
     "concepts": "ロールプレイを始める",
     "conceptsHint": "シチュエーションを選び、キャラを配役にキャスティング",
     "freeCombo": "キャラを自分で選ぶ",
-    "createRoom": "新規グループ",
+    "createRoom": "新規ルーム",
     "starting": "作成中..."
   },
   "groupChatCast": {
