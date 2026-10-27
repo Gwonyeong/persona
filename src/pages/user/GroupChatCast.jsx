@@ -63,15 +63,15 @@ export default function GroupChatCast() {
     return () => { cancelled = true }
   }, [conceptId, token, t])
 
-  // 팔로우한 캐릭터 먼저 노출
-  const orderedCharacters = useMemo(() => {
+  // 팔로우한 캐릭터를 맨 위 섹션으로 따로 노출, 그 아래 나머지 캐릭터.
+  const { followedCharacters, otherCharacters } = useMemo(() => {
     const followed = []
     const others = []
     for (const c of characters) {
       if (followedIds.has(c.id)) followed.push(c)
       else others.push(c)
     }
-    return [...followed, ...others]
+    return { followedCharacters: followed, otherCharacters: others }
   }, [characters, followedIds])
 
   const assignedCount = assignments.filter(Boolean).length
@@ -113,6 +113,36 @@ export default function GroupChatCast() {
       return next
     })
     setActiveSlot(slotIdx)
+  }
+
+  const renderCharacter = (c) => {
+    const assignedSlot = assignments.indexOf(c.id)
+    const selected = assignedSlot !== -1
+    const thumbUrl = charThumb(c)
+    return (
+      <button
+        key={c.id}
+        onClick={() => toggleCharacter(c.id)}
+        className={`relative rounded-xl overflow-hidden border transition-all ${
+          selected ? 'border-indigo-500 ring-2 ring-indigo-500/40' : 'border-gray-800 hover:border-gray-600'
+        }`}
+        style={NO_OUTLINE}
+      >
+        <div className="aspect-square bg-gray-800">
+          {thumbUrl ? (
+            <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-600 text-lg">?</div>
+          )}
+        </div>
+        {selected && (
+          <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[10px] font-bold px-1 truncate max-w-[80%]">
+            {concept.roles[assignedSlot]?.name?.slice(0, 3) || assignedSlot + 1}
+          </div>
+        )}
+        <div className="px-2 py-1.5 bg-gray-900 text-xs text-white truncate">{c.name}</div>
+      </button>
+    )
   }
 
   const charById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters])
@@ -252,36 +282,17 @@ export default function GroupChatCast() {
 
           {/* 캐릭터 그리드 */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
+            {followedCharacters.length > 0 && (
+              <>
+                <p className="text-[11px] font-semibold text-gray-400 mb-2">{t('groupChatCast.followedSection')}</p>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {followedCharacters.map(renderCharacter)}
+                </div>
+                <p className="text-[11px] font-semibold text-gray-400 mb-2">{t('groupChatCast.allSection')}</p>
+              </>
+            )}
             <div className="grid grid-cols-3 gap-2">
-              {orderedCharacters.map((c) => {
-                const assignedSlot = assignments.indexOf(c.id)
-                const selected = assignedSlot !== -1
-                const thumbUrl = charThumb(c)
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => toggleCharacter(c.id)}
-                    className={`relative rounded-xl overflow-hidden border transition-all ${
-                      selected ? 'border-indigo-500 ring-2 ring-indigo-500/40' : 'border-gray-800 hover:border-gray-600'
-                    }`}
-                    style={NO_OUTLINE}
-                  >
-                    <div className="aspect-square bg-gray-800">
-                      {thumbUrl ? (
-                        <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-600 text-lg">?</div>
-                      )}
-                    </div>
-                    {selected && (
-                      <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[10px] font-bold px-1 truncate max-w-[80%]">
-                        {concept.roles[assignedSlot]?.name?.slice(0, 3) || assignedSlot + 1}
-                      </div>
-                    )}
-                    <div className="px-2 py-1.5 bg-gray-900 text-xs text-white truncate">{c.name}</div>
-                  </button>
-                )
-              })}
+              {otherCharacters.map(renderCharacter)}
             </div>
           </div>
 

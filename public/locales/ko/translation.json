@@ -1116,7 +1116,9 @@
     "starting": "만드는 중...",
     "needMore": "배역 {{count}}개를 모두 채워주세요",
     "adultRequired": "이 상황극은 성인 인증이 필요해요",
-    "loadFailed": "불러오지 못했어요"
+    "loadFailed": "불러오지 못했어요",
+    "followedSection": "팔로우한 캐릭터",
+    "allSection": "다른 캐릭터"
   },
   "groupChat": {
     "title": "단체 톡방 - Pesona",

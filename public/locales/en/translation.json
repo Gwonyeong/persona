@@ -1116,7 +1116,9 @@
     "starting": "Creating...",
     "needMore": "Fill all {{count}} roles",
     "adultRequired": "This roleplay requires adult verification",
-    "loadFailed": "Failed to load"
+    "loadFailed": "Failed to load",
+    "followedSection": "Following",
+    "allSection": "Other characters"
   },
   "groupChat": {
     "title": "Group Chat - Pesona",

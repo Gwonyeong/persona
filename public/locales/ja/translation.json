@@ -1116,7 +1116,9 @@
     "starting": "作成中...",
     "needMore": "{{count}}つの配役をすべて埋めてください",
     "adultRequired": "このロールプレイは成人認証が必要です",
-    "loadFailed": "読み込めませんでした"
+    "loadFailed": "読み込めませんでした",
+    "followedSection": "フォロー中のキャラ",
+    "allSection": "その他のキャラ"
   },
   "groupChat": {
     "title": "グループチャット - Pesona",
