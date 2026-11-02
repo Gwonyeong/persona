@@ -1,8 +1,15 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import useStore from '../store/useStore'
 
+// 모달 CTA 수치 — 상점의 최소 패키지(masks_30)와 라이트 구독 일일 지급량.
+// 가격은 로케일 pricing.masks30 (₩/¥/$) 을 그대로 쓴다.
+const STARTER_PACK_COUNT = 30
+const SUBSCRIPTION_DAILY_COUNT = 30
+
 export default function InsufficientMasksModal({ open, onClose, currentStyle, spriteBackgroundImage, profileUrl }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const adultVerified = useStore((s) => !!s.user?.adultVerified)
 
@@ -63,7 +70,7 @@ export default function InsufficientMasksModal({ open, onClose, currentStyle, sp
         )}
 
         <div className="px-5 pt-5 pb-4">
-          <h3 className="text-lg font-bold text-white mb-5">마스크가 필요해요!</h3>
+          <h3 className="text-lg font-bold text-white mb-5">{t('insufficientMasksModal.title')}</h3>
 
           <button
             type="button"
@@ -74,7 +81,7 @@ export default function InsufficientMasksModal({ open, onClose, currentStyle, sp
             className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors mb-2"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            1,400원으로 60개 충전하기
+            {t('insufficientMasksModal.buyPack', { price: t('pricing.masks30'), count: STARTER_PACK_COUNT })}
           </button>
           <button
             type="button"
@@ -85,7 +92,7 @@ export default function InsufficientMasksModal({ open, onClose, currentStyle, sp
             className="w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-100 text-sm font-medium transition-colors"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            구독으로 바로 30개 충전하기
+            {t('insufficientMasksModal.subscribe', { count: SUBSCRIPTION_DAILY_COUNT })}
           </button>
         </div>
       </div>

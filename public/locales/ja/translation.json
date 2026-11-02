@@ -1537,5 +1537,10 @@
     "partsBadge": "{{count}}パート",
     "unplayed": "まだプレイしていません",
     "empty": "まだ公開されたストーリーがありません。"
+  },
+  "insufficientMasksModal": {
+    "title": "マスクが必要です！",
+    "buyPack": "{{price}}で{{count}}個チャージ",
+    "subscribe": "サブスクですぐに{{count}}個チャージ"
   }
 }

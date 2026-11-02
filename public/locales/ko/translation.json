@@ -1537,5 +1537,10 @@
     "partsBadge": "{{count}}파트",
     "unplayed": "아직 플레이하지 않음",
     "empty": "아직 공개된 스토리가 없어요."
+  },
+  "insufficientMasksModal": {
+    "title": "마스크가 필요해요!",
+    "buyPack": "{{price}}으로 {{count}}개 충전하기",
+    "subscribe": "구독으로 바로 {{count}}개 충전하기"
   }
 }

@@ -1537,5 +1537,10 @@
     "partsBadge": "{{count}} parts",
     "unplayed": "Not played yet",
     "empty": "No stories published yet."
+  },
+  "insufficientMasksModal": {
+    "title": "You need more masks!",
+    "buyPack": "Get {{count}} masks for {{price}}",
+    "subscribe": "Subscribe and get {{count}} masks now"
   }
 }
