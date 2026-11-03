@@ -1507,6 +1507,7 @@
     "subscribeFreeTitle": "Free with a subscription",
     "subscribeFreeBody": "With LIGHT, every mask-locked story episode is free to play.",
     "browsePlans": "See plans",
+    "subscribeForFree": "Subscribe to play free",
     "unlockNow": "Unlock · {{count}}",
     "loadFailed": "Failed to load the story.",
     "goBack": "Go back",

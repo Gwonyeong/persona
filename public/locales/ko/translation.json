@@ -1507,6 +1507,7 @@
     "subscribeFreeTitle": "구독하면 무료로 이용할 수 있어요",
     "subscribeFreeBody": "LIGHT 구독 중에는 마스크 해금이 필요한 스토리를 모두 무료로 진행할 수 있어요.",
     "browsePlans": "요금제 구경하러 가기",
+    "subscribeForFree": "구독하고 무료로 보기",
     "unlockNow": "해금하기 · {{count}}",
     "loadFailed": "스토리를 불러오지 못했습니다.",
     "goBack": "돌아가기",

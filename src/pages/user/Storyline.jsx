@@ -674,6 +674,14 @@ export default function Storyline() {
           >
             <MaskIcon /> {t('storyline.episodeUnlockButton', { count: error.unlockCost })}
           </button>
+          {/* 잠금 화면에서도 구독 경로를 바로 노출 — 모달까지 안 가도 보이게 */}
+          <button
+            onClick={() => navigate('/mask-shop?tab=subscription')}
+            className="w-full max-w-xs py-3 rounded-xl bg-white/10 active:bg-white/20 text-white text-sm font-semibold"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {t('storyline.subscribeForFree')}
+          </button>
         </div>
 
         {/* 해금 전 안내 — 구독하면 무료. 해금하기 / 요금제 구경하러 가기 */}
