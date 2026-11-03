@@ -166,6 +166,8 @@ export default function Storyline() {
 
   const [storyline, setStoryline] = useState(null)
   const [error, setError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0) // 마스크 해금 직후 같은 id 로 다시 불러오기
+  const [purchasing, setPurchasing] = useState(false)
 
   // 현재 위치
   const [nodeIndex, setNodeIndex] = useState(0)
@@ -276,12 +278,35 @@ export default function Storyline() {
             navigate(`/login?returnTo=${encodeURIComponent(`/storylines/${id}`)}`, { replace: true })
             return
           }
-          setError({ locked: true, reason: e.data.reason })
+          // PURCHASE_REQUIRED 는 잠금 화면에 제목·썸네일·가격·잔액이 필요해서 응답을 통째로 보관
+          setError({ ...e.data, locked: true, reason: e.data.reason })
+          if (e.data.masks != null) setMasks(e.data.masks)
           return
         }
         setError(e?.message || 'Failed to load')
       })
-  }, [id])
+  }, [id, reloadKey])
+
+  // 마스크 해금 화 — 결제 후 같은 화를 다시 불러온다. 부족하면 상점으로
+  const purchaseEpisode = async () => {
+    if (purchasing || !error?.unlockCost) return
+    if ((masks ?? 0) < error.unlockCost) {
+      navigate('/mask-shop')
+      return
+    }
+    setPurchasing(true)
+    try {
+      const res = await api.post(`/storylines/${id}/unlock`)
+      if (res.masks != null) setMasks(res.masks)
+      setError(null)
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      if (e?.status === 402) navigate('/mask-shop')
+      else setToast(t('storyline.unlockFailed'))
+    } finally {
+      setPurchasing(false)
+    }
+  }
 
   // 토스트 자동 사라짐
   useEffect(() => {
@@ -619,6 +644,43 @@ export default function Storyline() {
   }
 
   // ── 렌더링 분기 결정 ───────────────────────────────────
+  if (error && typeof error === 'object' && error.reason === 'PURCHASE_REQUIRED') {
+    const short = (masks ?? 0) < error.unlockCost
+    return (
+      <div className="relative w-full h-dvh bg-black text-white overflow-hidden">
+        {error.thumbnailImage && (
+          <img src={error.thumbnailImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-45" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute left-3 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/40 text-white"
+          style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          aria-label={t('storyline.goBack')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <div className="absolute inset-x-0 bottom-0 px-6 flex flex-col items-center text-center gap-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+          <p className="text-lg font-bold leading-snug">{error.title}</p>
+          {error.description && <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">{error.description}</p>}
+          <p className="text-sm text-amber-300 font-semibold mt-3">{t('storyline.episodeUnlockDesc', { count: error.unlockCost })}</p>
+          <p className="text-[11px] text-gray-400">{t('storyline.balance', { count: masks ?? 0 })}</p>
+          <button
+            onClick={purchaseEpisode}
+            disabled={purchasing}
+            className="mt-3 w-full max-w-xs py-3 rounded-xl bg-amber-600 active:bg-amber-700 text-white text-sm font-bold disabled:opacity-50"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {purchasing
+              ? t('storyline.unlocking')
+              : short
+                ? t('storyline.chargeMasks')
+                : <><MaskIcon /> {t('storyline.episodeUnlockButton', { count: error.unlockCost })}</>}
+          </button>
+        </div>
+      </div>
+    )
+  }
   if (error) {
     const isLocked = typeof error === 'object' && error?.locked
     // 성인 전용 스토리 — 로그인 안내 대신 성인 인증으로 보낸다

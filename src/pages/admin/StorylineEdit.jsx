@@ -160,6 +160,7 @@ export default function StorylineEdit() {
         scenarioId: storyline.scenarioId ?? '',
         partOrder: storyline.partOrder ?? 0,
         adultOnly: !!storyline.adultOnly,
+        unlockCost: storyline.unlockCost ?? 0,
       })
       // 같은 캐릭터의 시나리오 목록 — 셀렉트박스용
       if (storyline.characterId) {
@@ -191,6 +192,7 @@ export default function StorylineEdit() {
       status: s.status,
       sortOrder: s.sortOrder,
       adultOnly: !!s.adultOnly,
+      unlockCost: s.unlockCost ?? 0,
       assetLibrary: s.assetLibrary || { backgrounds: [], characters: [] },
       ...(s.assetPrompts ? { assetPrompts: s.assetPrompts } : {}),
       ...(s.assetUrls ? { assetUrls: s.assetUrls } : {}),
@@ -635,6 +637,7 @@ export default function StorylineEdit() {
         scenarioId: meta.scenarioId === '' ? null : parseInt(meta.scenarioId),
         partOrder: parseInt(meta.partOrder) || 0,
         adultOnly: !!meta.adultOnly,
+        unlockCost: Math.max(0, parseInt(meta.unlockCost) || 0),
       }
       const { storyline: updated } = await api.put(`/admin/storylines/${id}`, payload)
       setStoryline((prev) => ({ ...prev, ...updated }))
@@ -910,6 +913,16 @@ export default function StorylineEdit() {
               <span className="block text-[11px] text-gray-500">성인 인증 유저만 진행 가능. 미인증 유저는 인증 화면으로 안내되고, 목록 카드엔 19 배지가 붙습니다. NSFW 영상이 있으면 반드시 체크.</span>
             </span>
           </label>
+          <Field label="진행 해금 비용 (마스크)">
+            <input
+              type="number"
+              min="0"
+              value={meta.unlockCost ?? 0}
+              onChange={(e) => setMeta({ ...meta, unlockCost: e.target.value })}
+              className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2.5 text-sm text-gray-200 focus:border-indigo-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-gray-500 mt-1.5">0 = 무료. 0보다 크면 유저가 이 마스크를 한 번 내고 열어야 진행할 수 있습니다 (영구 해금, ADMIN은 통과). 성인 시리즈는 2화부터 5.</p>
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="시나리오 (파트 묶음)">
               <select

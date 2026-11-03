@@ -1502,6 +1502,8 @@
     "adultRequiredBody": "19세 이상 성인 인증을 마친 분만 볼 수 있는 스토리예요.",
     "adultVerify": "성인 인증하기",
     "adultOnlyCard": "성인 인증 필요",
+    "episodeUnlockDesc": "이 화는 {{count}} 마스크로 열 수 있어요. 한 번 열면 계속 볼 수 있어요.",
+    "episodeUnlockButton": "{{count}} 마스크로 열기",
     "loadFailed": "스토리를 불러오지 못했습니다.",
     "goBack": "돌아가기",
     "loading": "로딩 중...",

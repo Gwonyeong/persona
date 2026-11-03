@@ -6,6 +6,7 @@ import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import { AdultLockedThumb } from '../../components/StoryGridCard'
+import MaskIcon from '../../components/MaskIcon'
 
 // 시나리오 상세 — 파트를 한 장씩 넘겨 보는 캐러셀.
 // 넘기기는 CSS scroll-snap 으로 — WebView 에서 JS 드래그보다 관성/스냅이 자연스럽다.
@@ -265,6 +266,10 @@ export default function Scenario() {
 
                       {/* 진행 상태 / TEST */}
                       <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
+                        {/* 마스크 해금 화 — 아직 안 연 경우만 가격 배지 */}
+                        {s.unlockCost > 0 && !s.purchased && !s.adultLocked && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-600/90 text-white text-[10px] rounded-full font-bold"><MaskIcon /> {s.unlockCost}</span>
+                        )}
                         {s.progress?.status === 'COMPLETED' && (
                           <span className="px-2 py-0.5 bg-emerald-600/90 text-white text-[10px] rounded-full font-semibold">{t('scenario.completed')}</span>
                         )}

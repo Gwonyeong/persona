@@ -1502,6 +1502,8 @@
     "adultRequiredBody": "This story is only available to verified adults (19+).",
     "adultVerify": "Verify age",
     "adultOnlyCard": "Adults only",
+    "episodeUnlockDesc": "Unlock this episode for {{count}} masks. Once unlocked, it's yours to replay.",
+    "episodeUnlockButton": "Unlock for {{count}}",
     "loadFailed": "Failed to load the story.",
     "goBack": "Go back",
     "loading": "Loading...",

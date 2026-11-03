@@ -1020,6 +1020,11 @@ export default function CharacterDetail() {
                       <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/55 to-transparent pointer-events-none" />
                     )}
 
+                    {s.unlockCost > 0 && !s.purchased && !s.adultLocked && (
+                      <div className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 bg-amber-600/90 text-white text-[10px] rounded-full font-bold">
+                        <MaskIcon /> {s.unlockCost}
+                      </div>
+                    )}
                     {s.progress?.status === 'COMPLETED' && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 bg-emerald-600/90 text-white text-[10px] rounded-full font-semibold">
                         완료
