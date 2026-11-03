@@ -168,7 +168,6 @@ export default function Storyline() {
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0) // 마스크 해금 직후 같은 id 로 다시 불러오기
   const [purchasing, setPurchasing] = useState(false)
-  const [unlockConfirmOpen, setUnlockConfirmOpen] = useState(false) // 해금 전 "구독하면 무료" 안내 모달
 
   // 현재 위치
   const [nodeIndex, setNodeIndex] = useState(0)
@@ -299,7 +298,6 @@ export default function Storyline() {
     try {
       const res = await api.post(`/storylines/${id}/unlock`)
       if (res.masks != null) setMasks(res.masks)
-      setUnlockConfirmOpen(false)
       setError(null)
       setReloadKey((k) => k + 1)
     } catch (e) {
@@ -668,12 +666,19 @@ export default function Storyline() {
           <p className="text-sm text-amber-300 font-semibold mt-3">{t('storyline.episodeUnlockDesc', { count: error.unlockCost })}</p>
           <p className="text-[11px] text-gray-400">{t('storyline.balance', { count: masks ?? 0 })}</p>
           <button
-            onClick={() => setUnlockConfirmOpen(true)}
-            className="mt-3 w-full max-w-xs py-3 rounded-xl bg-amber-600 active:bg-amber-700 text-white text-sm font-bold"
+            onClick={purchaseEpisode}
+            disabled={purchasing}
+            className="mt-3 w-full max-w-xs py-3 rounded-xl bg-amber-600 active:bg-amber-700 text-white text-sm font-bold disabled:opacity-50"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            <MaskIcon /> {t('storyline.episodeUnlockButton', { count: error.unlockCost })}
+            {purchasing
+              ? t('storyline.unlocking')
+              : short
+                ? t('storyline.chargeMasks')
+                : <><MaskIcon /> {t('storyline.episodeUnlockButton', { count: error.unlockCost })}</>}
           </button>
+          {/* 구독자 무료 안내 — 구독 경로를 같은 화면에 */}
+          <p className="text-[11px] text-indigo-200 leading-relaxed mt-2">{t('storyline.subscribeFreeBody')}</p>
           {/* 잠금 화면에서도 구독 경로를 바로 노출 — 모달까지 안 가도 보이게 */}
           <button
             onClick={() => navigate('/mask-shop?tab=subscription')}
@@ -684,41 +689,6 @@ export default function Storyline() {
           </button>
         </div>
 
-        {/* 해금 전 안내 — 구독하면 무료. 해금하기 / 요금제 구경하러 가기 */}
-        {unlockConfirmOpen && (
-          <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/70" onClick={() => !purchasing && setUnlockConfirmOpen(false)}>
-            <div
-              className="w-full bg-gray-950 border-t border-gray-800 rounded-t-3xl px-6 pt-6 text-center"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 20px)' }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-base font-bold">{t('storyline.subscribeFreeTitle')}</p>
-              <p className="text-xs text-gray-400 leading-relaxed mt-2">{t('storyline.subscribeFreeBody')}</p>
-              <p className="text-[11px] text-gray-500 mt-3">{t('storyline.balance', { count: masks ?? 0 })}</p>
-              <div className="flex flex-col gap-2 mt-4">
-                <button
-                  onClick={() => navigate('/mask-shop?tab=subscription')}
-                  className="w-full py-3 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-sm font-bold"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {t('storyline.browsePlans')}
-                </button>
-                <button
-                  onClick={purchaseEpisode}
-                  disabled={purchasing}
-                  className="w-full py-3 rounded-xl bg-gray-800 active:bg-gray-700 text-white text-sm font-semibold disabled:opacity-50"
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {purchasing
-                    ? t('storyline.unlocking')
-                    : short
-                      ? t('storyline.chargeMasks')
-                      : <><MaskIcon /> {t('storyline.unlockNow', { count: error.unlockCost })}</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
