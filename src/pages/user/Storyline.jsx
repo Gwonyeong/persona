@@ -621,6 +621,8 @@ export default function Storyline() {
   // ── 렌더링 분기 결정 ───────────────────────────────────
   if (error) {
     const isLocked = typeof error === 'object' && error?.locked
+    // 성인 전용 스토리 — 로그인 안내 대신 성인 인증으로 보낸다
+    const needsAdult = isLocked && error.reason === 'ADULT_VERIFICATION_REQUIRED'
     return (
       <div className="flex flex-col items-center justify-center h-dvh bg-black text-gray-400 gap-3 px-6 text-center">
         {isLocked ? (
@@ -631,19 +633,21 @@ export default function Storyline() {
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </div>
-            <p className="text-white text-sm font-bold">{t('storyline.loginRequiredTitle')}</p>
-            <p className="text-xs leading-relaxed">{t('storyline.loginRequiredBody')}</p>
+            <p className="text-white text-sm font-bold">{t(needsAdult ? 'storyline.adultRequiredTitle' : 'storyline.loginRequiredTitle')}</p>
+            <p className="text-xs leading-relaxed">{t(needsAdult ? 'storyline.adultRequiredBody' : 'storyline.loginRequiredBody')}</p>
           </>
         ) : (
           <p>{t('storyline.loadFailed')}</p>
         )}
         {isLocked ? (
           <button
-            onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/storylines/${id}`)}`, { replace: true })}
+            onClick={() => needsAdult
+              ? navigate('/adult-verify')
+              : navigate(`/login?returnTo=${encodeURIComponent(`/storylines/${id}`)}`, { replace: true })}
             className="mt-2 px-5 py-2.5 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-sm font-semibold"
             style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
           >
-            {t('common.login')}
+            {needsAdult ? t('storyline.adultVerify') : t('common.login')}
           </button>
         ) : (
           <button onClick={() => navigate(-1)} className="text-sm text-indigo-400 mt-1" style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}>{t('storyline.goBack')}</button>

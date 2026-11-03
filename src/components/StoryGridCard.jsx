@@ -16,7 +16,9 @@ export default function StoryGridCard({ story: s }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const locked = !!s.locked
-  const thumb = usableUrl(s.thumbnailImage) || usableUrl(s.character?.profileImage)
+  // 성인 전용 + 미인증 — 서버가 썸네일을 비워 보낸다. 캐릭터 프로필로 폴백하지 않고 19 플레이스홀더를 그린다
+  const adultLocked = !!s.adultLocked
+  const thumb = adultLocked ? null : usableUrl(s.thumbnailImage) || usableUrl(s.character?.profileImage)
   const progress = s.progress // 'COMPLETED' | 'IN_PROGRESS' | null | undefined
   const parts = s.partCount ?? 1 // 2 이상이면 연작 묶음 — 화수 뱃지를 띄운다
   // 미플레이 점은 서버가 명시적으로 false 를 줄 때만. null 은 "모른다"(비로그인)이므로 띄우지 않는다.
@@ -26,6 +28,7 @@ export default function StoryGridCard({ story: s }) {
   // 잠금(=비로그인)이면 플레이어의 403 왕복 없이 바로 로그인으로. 로그인 후 원래 목적지로 복귀.
   const handleClick = () => {
     if (locked) navigate(`/login?returnTo=${encodeURIComponent(target)}`)
+    else if (adultLocked) navigate('/adult-verify')
     else navigate(target)
   }
 
@@ -36,7 +39,14 @@ export default function StoryGridCard({ story: s }) {
       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
       aria-label={s.title || ''}
     >
-      {thumb ? (
+      {adultLocked ? (
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black flex flex-col items-center justify-center gap-1.5">
+          <div className="w-14 h-14 rounded-full border-[3px] border-red-500 flex items-center justify-center">
+            <span className="text-red-500 text-xl font-black tracking-tight">19</span>
+          </div>
+          <span className="text-[10px] text-gray-400 font-semibold">{t('storyline.adultOnlyCard')}</span>
+        </div>
+      ) : thumb ? (
         <img
           src={resizedImageUrl(thumb, IMG_W.CARD)}
           alt=""
@@ -50,7 +60,7 @@ export default function StoryGridCard({ story: s }) {
       )}
 
       {/* 상단 뱃지 — 좌측: 진행 상태 / 연작 화수, 우측: TEST / 미플레이 점 */}
-      {(progress || parts > 1 || s.status === 'TEST' || unplayed) && (
+      {(progress || parts > 1 || s.status === 'TEST' || s.adultOnly || unplayed) && (
         <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center gap-1">
           {progress === 'COMPLETED' && (
             <span className="px-1.5 py-0.5 bg-emerald-600/90 text-white text-[9px] rounded-full font-semibold">{t('scenario.completed')}</span>
@@ -65,6 +75,9 @@ export default function StoryGridCard({ story: s }) {
           )}
           {/* 우측 묶음 — TEST 와 미플레이 점이 같은 자리를 다투지 않게 한 줄로 */}
           <div className="ml-auto flex items-center gap-1">
+            {s.adultOnly && !adultLocked && (
+              <span className="px-1.5 py-0.5 bg-red-600/90 text-white text-[9px] rounded-full font-bold">19</span>
+            )}
             {s.status === 'TEST' && (
               <span className="px-1.5 py-0.5 bg-amber-600/90 text-white text-[9px] rounded-full font-semibold">TEST</span>
             )}
@@ -79,7 +92,7 @@ export default function StoryGridCard({ story: s }) {
       )}
 
       {/* 잠금 (미로그인) */}
-      {locked && (
+      {locked && !adultLocked && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-8 h-8 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/20">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-white">

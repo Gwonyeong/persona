@@ -1498,6 +1498,10 @@
   "storyline": {
     "loginRequiredTitle": "로그인이 필요해요",
     "loginRequiredBody": "로그인 후 스토리를 진행할 수 있어요.",
+    "adultRequiredTitle": "성인 인증이 필요해요",
+    "adultRequiredBody": "19세 이상 성인 인증을 마친 분만 볼 수 있는 스토리예요.",
+    "adultVerify": "성인 인증하기",
+    "adultOnlyCard": "성인 인증 필요",
     "loadFailed": "스토리를 불러오지 못했습니다.",
     "goBack": "돌아가기",
     "loading": "로딩 중...",

@@ -1498,6 +1498,10 @@
   "storyline": {
     "loginRequiredTitle": "Login required",
     "loginRequiredBody": "Log in to continue the story.",
+    "adultRequiredTitle": "Adult verification required",
+    "adultRequiredBody": "This story is only available to verified adults (19+).",
+    "adultVerify": "Verify age",
+    "adultOnlyCard": "Adults only",
     "loadFailed": "Failed to load the story.",
     "goBack": "Go back",
     "loading": "Loading...",

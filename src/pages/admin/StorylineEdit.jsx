@@ -159,6 +159,7 @@ export default function StorylineEdit() {
         sortOrder: storyline.sortOrder ?? 0,
         scenarioId: storyline.scenarioId ?? '',
         partOrder: storyline.partOrder ?? 0,
+        adultOnly: !!storyline.adultOnly,
       })
       // 같은 캐릭터의 시나리오 목록 — 셀렉트박스용
       if (storyline.characterId) {
@@ -189,6 +190,7 @@ export default function StorylineEdit() {
       ...(s.coverImage !== undefined ? { coverImage: s.coverImage } : {}),
       status: s.status,
       sortOrder: s.sortOrder,
+      adultOnly: !!s.adultOnly,
       assetLibrary: s.assetLibrary || { backgrounds: [], characters: [] },
       ...(s.assetPrompts ? { assetPrompts: s.assetPrompts } : {}),
       ...(s.assetUrls ? { assetUrls: s.assetUrls } : {}),
@@ -632,6 +634,7 @@ export default function StorylineEdit() {
         // null 명시 허용 (시나리오에서 떼서 단독으로)
         scenarioId: meta.scenarioId === '' ? null : parseInt(meta.scenarioId),
         partOrder: parseInt(meta.partOrder) || 0,
+        adultOnly: !!meta.adultOnly,
       }
       const { storyline: updated } = await api.put(`/admin/storylines/${id}`, payload)
       setStoryline((prev) => ({ ...prev, ...updated }))
@@ -895,6 +898,18 @@ export default function StorylineEdit() {
               />
             </Field>
           </div>
+          <label className="flex items-start gap-2 text-sm text-gray-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!meta.adultOnly}
+              onChange={(e) => setMeta({ ...meta, adultOnly: e.target.checked })}
+              className="mt-0.5"
+            />
+            <span>
+              성인 전용 (19)
+              <span className="block text-[11px] text-gray-500">성인 인증 유저만 진행 가능. 미인증 유저는 인증 화면으로 안내되고, 목록 카드엔 19 배지가 붙습니다. NSFW 영상이 있으면 반드시 체크.</span>
+            </span>
+          </label>
           <div className="grid grid-cols-2 gap-3">
             <Field label="시나리오 (파트 묶음)">
               <select
