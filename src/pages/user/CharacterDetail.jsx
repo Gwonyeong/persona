@@ -97,6 +97,7 @@ import ProfileVariantPicker from '../../components/ProfileVariantPicker'
 import OnboardingSpotlight from '../../components/OnboardingSpotlight'
 import useBackHandler from '../../hooks/useBackHandler'
 import { shouldShowReview, requestInAppReview, markReviewShown } from '../../lib/review'
+import { AdultLockedThumb } from '../../components/StoryGridCard'
 
 const NORMAL_EMOTIONS = ['NEUTRAL', 'HAPPY', 'ANGRY', 'SAD', 'SHY', 'WORRIED']
 const AROUSED_EMOTIONS = ['AROUSED_TEASE', 'AROUSED_TOPLESS', 'AROUSED_NUDE', 'AROUSED_FOREPLAY', 'AROUSED_INSERT', 'AROUSED_INSERT_ALT', 'AROUSED_CLIMAX', 'AROUSED_AFTERGLOW']
@@ -147,6 +148,11 @@ export default function CharacterDetail() {
   const handleStorylineClick = (s) => {
     if (!token) {
       goToLogin(navigate)
+      return
+    }
+    // 성인 전용 + 미인증 — 플레이어 403 왕복 없이 바로 성인 인증으로
+    if (s.adultLocked) {
+      navigate('/adult-verify')
       return
     }
     navigate(`/storylines/${s.id}`)
@@ -922,11 +928,13 @@ export default function CharacterDetail() {
                 {scenarios.map((sc) => (
                   <button
                     key={`sc-${sc.id}`}
-                    onClick={() => navigate(`/scenarios/${sc.id}`)}
+                    onClick={() => (sc.adultLocked && token ? navigate('/adult-verify') : navigate(`/scenarios/${sc.id}`))}
                     className="flex-shrink-0 w-[180px] aspect-[9/16] rounded-xl overflow-hidden relative bg-gray-900 border border-indigo-500/40 hover:border-indigo-500 transition-colors snap-start"
                     style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                   >
-                    {sc.thumbnailImage ? (
+                    {sc.adultLocked ? (
+                      <AdultLockedThumb />
+                    ) : sc.thumbnailImage ? (
                       <img src={sc.thumbnailImage} alt={sc.title} className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/60 to-purple-900/40 flex items-center justify-center text-indigo-300/40">
@@ -967,7 +975,9 @@ export default function CharacterDetail() {
                     {/* 슬라이드쇼 — premiumMedia 항목들을 페이드 회전, 잠긴 항목은 약한 블러 */}
                     {/* 비디오라도 포스터 이미지가 있으면 <img>로 렌더 — 영상 다운로드 회피.
                         포스터 없는 레거시 비디오만 <video preload="metadata"> fallback. */}
-                    {media.length > 0 ? (
+                    {s.adultLocked ? (
+                      <AdultLockedThumb />
+                    ) : media.length > 0 ? (
                       media.map((m, idx) => {
                         const isActive = idx === activeIdx
                         const blur = !m.unlocked

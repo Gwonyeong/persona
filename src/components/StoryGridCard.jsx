@@ -12,6 +12,19 @@ export function usableUrl(url) {
   return typeof url === 'string' && /^https?:\/\//.test(url) ? url : null
 }
 
+// 성인 전용 + 미인증 썸네일 자리 — 서버가 썸네일/미디어를 비워 보낸다. 홈·캐릭터 상세·시나리오 파트 카드 공용
+export function AdultLockedThumb() {
+  const { t } = useTranslation()
+  return (
+    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black flex flex-col items-center justify-center gap-1.5">
+      <div className="w-14 h-14 rounded-full border-[3px] border-red-500 flex items-center justify-center">
+        <span className="text-red-500 text-xl font-black tracking-tight">19</span>
+      </div>
+      <span className="text-[10px] text-gray-400 font-semibold">{t('storyline.adultOnlyCard')}</span>
+    </div>
+  )
+}
+
 export default function StoryGridCard({ story: s }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -40,12 +53,7 @@ export default function StoryGridCard({ story: s }) {
       aria-label={s.title || ''}
     >
       {adultLocked ? (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black flex flex-col items-center justify-center gap-1.5">
-          <div className="w-14 h-14 rounded-full border-[3px] border-red-500 flex items-center justify-center">
-            <span className="text-red-500 text-xl font-black tracking-tight">19</span>
-          </div>
-          <span className="text-[10px] text-gray-400 font-semibold">{t('storyline.adultOnlyCard')}</span>
-        </div>
+        <AdultLockedThumb />
       ) : thumb ? (
         <img
           src={resizedImageUrl(thumb, IMG_W.CARD)}

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
+import { AdultLockedThumb } from '../../components/StoryGridCard'
 
 // 시나리오 상세 — 파트를 한 장씩 넘겨 보는 캐러셀.
 // 넘기기는 CSS scroll-snap 으로 — WebView 에서 JS 드래그보다 관성/스냅이 자연스럽다.
@@ -126,6 +127,10 @@ export default function Scenario() {
       goToLogin(navigate)
       return
     }
+    if (part.adultLocked) {
+      navigate('/adult-verify')
+      return
+    }
     navigate(`/storylines/${part.id}`)
   }
 
@@ -215,7 +220,9 @@ export default function Scenario() {
                       }`}
                       style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                     >
-                      {media.length > 0 ? (
+                      {s.adultLocked ? (
+                        <AdultLockedThumb />
+                      ) : media.length > 0 ? (
                         media.map((m, i) => {
                           const visible = i === mediaIdx
                           const blur = !m.unlocked
