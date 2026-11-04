@@ -173,6 +173,7 @@
     "deleteSituationDescription": "'{{title}}' 상황극의 진행 내용이 모두 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
   },
   "chat": {
+    "prologueSkip": "건너뛰기",
     "online": "활동 중",
     "aiGeneratedImage": "AI 생성 이미지",
     "generatingImage": "사진을 준비하고 있어요...",

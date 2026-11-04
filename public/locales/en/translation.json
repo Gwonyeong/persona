@@ -173,6 +173,7 @@
     "deleteSituationDescription": "All progress in the roleplay \"{{title}}\" will be deleted. This cannot be undone."
   },
   "chat": {
+    "prologueSkip": "Skip",
     "online": "Online",
     "aiGeneratedImage": "AI Generated Image",
     "generatingImage": "Preparing a photo...",

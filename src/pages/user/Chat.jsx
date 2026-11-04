@@ -19,6 +19,7 @@ import useBackHandler from '../../hooks/useBackHandler'
 import { formatChatTime } from '../../lib/timeFormat'
 import { formatVirtualTimeParts } from '../../lib/virtualTime'
 import { isVideoUrl, SpriteMedia, CrossfadeMedia } from '../../components/SpriteMedia'
+import PrologueOverlay, { extractPrologue } from '../../components/PrologueOverlay'
 // import AdBanner from '../../components/AdBanner'
 
 // 이미지 생성 기능 임시 비활성화 (현재 SFW 이미지만 생성되어 UI에서 잠시 내림).
@@ -242,21 +243,28 @@ const MessageLine = memo(function MessageLine({
         </div>
       )}
       <div className={`flex items-end gap-1.5 ${isCharacter ? 'justify-start' : 'justify-end'}`}>
+        {/* 캐릭터 행동 묘사(《》)는 가운데 정렬된 독립 줄 — p 를 가로 전체로 펴야 화면 중앙에 온다 */}
         <p
           className={`text-[14px] leading-relaxed whitespace-pre-wrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] ${
             isCharacter ? 'text-gray-50' : 'text-indigo-200/95'
-          }`}
+          } ${isCharacter && filteredSegs.some((seg) => seg.type === 'action') ? 'flex-1 min-w-0' : ''}`}
         >
-          {filteredSegs.map((seg, i) => (
-            <Fragment key={i}>
-              {i > 0 && (seg.type === 'action' || filteredSegs[i - 1].type === 'action') ? '\n' : ''}
-              {seg.type === 'action' ? (
-                <span className="italic text-gray-400/80 text-[13px]">{actionWrap(seg.value)}</span>
-              ) : (
-                seg.value
-              )}
-            </Fragment>
-          ))}
+          {filteredSegs.map((seg, i) => {
+            const centerAction = isCharacter && seg.type === 'action'
+            const nearAction = i > 0 && (seg.type === 'action' || filteredSegs[i - 1].type === 'action')
+            return (
+              <Fragment key={i}>
+                {/* 블록 줄은 그 자체로 줄바꿈되므로 구분 개행은 유저 () 행동에만 */}
+                {nearAction && !centerAction && !(isCharacter && filteredSegs[i - 1].type === 'action') ? '\n' : ''}
+                {seg.type === 'action' ? (
+                  <span className={`italic text-gray-400/80 text-[13px] ${centerAction ? 'block text-center my-0.5' : ''}`}>{actionWrap(seg.value)}</span>
+                ) : (
+                  // 캐릭터 본문은 블록 행동 줄 앞뒤 공백·개행을 걷어 빈 줄이 안 생기게
+                  isCharacter ? seg.value.trim() : seg.value
+                )}
+              </Fragment>
+            )
+          })}
         </p>
         {isCharacter && msg.audioUrl && (
           <button
@@ -529,6 +537,11 @@ export default function Chat() {
       .catch(() => setSituationCards([]))
   }, [conversation?.characterId])
   const [messages, setMessages] = useState([])
+  // 첫 등장 프롤로그 연출 — 유저가 첫 메시지를 보내기 전까지 진입할 때마다 재생 (PrologueOverlay)
+  const [prologue, setPrologue] = useState(null)
+  // FULL 모드 채팅창 상단이 상단 overlay(상태 패널·액션 버튼)와 겹치지 않도록 overlay 하단 위치를 잰다
+  const topOverlayRef = useRef(null)
+  const [topOverlayBottom, setTopOverlayBottom] = useState(0)
   // 채팅 스타일 토글 상태 — { styles: [{id, unlocked, disabled, ...}], hasNewStyle: bool }
   const [chatStyles, setChatStyles] = useState(null)
   // 렌더 페이지네이션 — 처음엔 최근 PAGE_SIZE개만 DOM에 그려서 입력 lag 차단
@@ -892,6 +905,7 @@ export default function Chat() {
       setChatMode(conv.chatMode === 'NORMAL' ? 'NORMAL' : 'ROLEPLAY')
       setChatModel(conv.chatModel === 'BASIC' ? 'BASIC' : 'ADVANCED')
       setMessages(conv.messages.filter(isRenderable))
+      setPrologue(extractPrologue(conv.messages, { hasMoreBefore: !!conv.hasMoreBefore }))
       const lastCharMsg = [...conv.messages].reverse().find((m) => m.role === 'CHARACTER')
       if (lastCharMsg?.emotion) setCurrentEmotion(lastCharMsg.emotion)
       // 추천답변: 대화의 마지막 발화가 캐릭터일 때(=유저 차례)만 그 메시지의 suggestedReplies 노출
@@ -904,6 +918,17 @@ export default function Chat() {
       })
     })
   }, [id, token])
+
+  useEffect(() => {
+    const el = topOverlayRef.current
+    if (!el) return
+    const measure = () => setTopOverlayBottom(el.offsetTop + el.offsetHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    window.addEventListener('resize', measure)
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
+  }, [conversation])
 
   // 읽음 동기화는 useReadSync 로 일원화 (진입 1회 + 전송당 burst + 퇴장 keepalive).
   // 기존엔 5초 고정 간격으로 60초를 훑어 전송당 12회였다 — 실측에서 이 호출이 전체
@@ -1555,6 +1580,156 @@ export default function Chat() {
     api.patch('/auth/onboarding', { key: 'chatTour' }).catch(() => {})
   }
 
+  // 채팅 모델 변경 버튼 — FULL(전체 배경) 모드는 상단 설정 버튼 아래, 그 외 모드는 입력창 액션 메뉴 안
+  const modelButton = (
+    <button
+      onClick={() => setShowModelSheet(true)}
+      disabled={!token}
+      className={`h-7 px-2 rounded-full text-[10px] font-semibold flex items-center gap-0.5 shadow transition-colors whitespace-nowrap flex-shrink-0 bg-gray-800/80 hover:bg-gray-700/80 ${
+        chatModel === 'ADVANCED'
+          ? 'ring-1 ring-amber-400 text-amber-300'
+          : 'text-white'
+      } disabled:opacity-40`}
+      style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+      aria-label={t('chat.modelSelectorTitle')}
+      data-onboarding-target="model-btn"
+    >
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+      {chatModel === 'ADVANCED' ? t('chat.modelAdvanced') : t('chat.modelBasic')}
+    </button>
+  )
+
+  // FULL 모드 세로 배치 — 상단 overlay(상태 패널·액션 버튼) → 해금 바 → 채팅창 순으로 절대 겹치지 않게.
+  // 기본은 채팅창 40% 지점 시작 + 해금 바는 그 바로 위. 상단 overlay 가 길게 내려오는 기기/상태에선
+  // 해금 바가 overlay 아래로, 채팅창은 다시 그 아래로 밀린다. (채팅창 pt-10 = 40px 그라데이션 여백)
+  const UNLOCK_BAR_H = 44
+  const FULL_GAP = 8
+  const unlockBarTop = `max(calc(40% - ${UNLOCK_BAR_H + FULL_GAP}px), ${topOverlayBottom + FULL_GAP}px)`
+  const fullChatTop = bubbleNeedsUnlock
+    ? `max(40%, ${topOverlayBottom + FULL_GAP + UNLOCK_BAR_H + FULL_GAP - 40}px)`
+    : `max(40%, ${Math.max(0, topOverlayBottom + FULL_GAP - 40)}px)`
+
+  // 추가 기능 토글 + 펼침 메뉴 — FULL 모드는 입력바 안, 그 외 모드는 입력창 위 별도 행
+  const actionMenu = (
+    <div className="ml-auto relative h-8 flex items-center justify-end pointer-events-auto">
+      <button
+        onClick={() => setShowInputButtons(true)}
+        className={`w-8 h-8 rounded-full bg-gray-900/75 border border-gray-800/50 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-800/80 transition-opacity duration-200 ${
+          showInputButtons ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        aria-label={t('chat2.actionMenuOpen')}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+        </svg>
+      </button>
+      <div className={`absolute right-0 top-0 bg-gray-900/75 border border-gray-800/50 rounded-full pl-1.5 pr-0.5 py-0.5 flex items-center gap-1.5 origin-right transition-all duration-300 ease-out ${
+        showInputButtons ? 'opacity-100 scale-x-100 pointer-events-auto' : 'opacity-0 scale-x-0 pointer-events-none'
+      }`}>
+      {(character.voiceId || tourActive) && (
+        <div className="relative">
+          {excitedTooltipVisible && characterStatus?.isExcited && (
+            <div
+              ref={excitedTooltipRef}
+              className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-red-600 text-white text-xs rounded-lg shadow-lg whitespace-nowrap animate-slide-up z-30"
+              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {t('chat.excitedTooltip')}
+              <div className="absolute top-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-600" />
+            </div>
+          )}
+          <button
+            ref={voiceButtonRef}
+            onClick={() => {
+              if (tourActive && !character.voiceId) return
+              setVoiceMode((v) => {
+                const next = !v
+                api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
+                return next
+              })
+            }}
+            disabled={!token || (tourActive && !character.voiceId)}
+            className={`relative w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
+              characterStatus?.isExcited
+                ? 'ring-2 ring-red-400'
+                : voiceMode
+                  ? 'ring-2 ring-emerald-400'
+                  : canUseFreeVoice
+                    ? 'ring-2 ring-emerald-400'
+                    : ''
+            } disabled:opacity-40`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+            data-onboarding-target="voice-btn"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={canUseFreeVoice && !characterStatus?.isExcited ? '#6ee7b7' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {voiceMode ? (
+                <>
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </>
+              ) : (
+                <>
+                  <line x1="18" y1="9" x2="22" y2="13" />
+                  <line x1="22" y1="9" x2="18" y2="13" />
+                </>
+              )}
+            </svg>
+            {canUseFreeVoice && (
+              <span className="absolute -bottom-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[9px] font-bold flex items-center justify-center shadow">
+                {remainingFreeVoiceUses}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+      {IMAGE_GEN_ENABLED && (
+      <button
+        onClick={() => {
+          setShowImageGenModal(true)
+          api.get(`/characters/${conversation.characterId}`).then(({ character: c }) => {
+            const allImages = (c.feedPosts || []).flatMap((p) => (p.images || []).map((img) => img.filePath)).filter(Boolean)
+            const shuffled = allImages.sort(() => Math.random() - 0.5)
+            setPreviewFeedImages(shuffled.slice(0, 3))
+          }).catch(() => {})
+        }}
+        disabled={generatingImage || !token}
+        className="w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 disabled:opacity-40 flex items-center justify-center shadow transition-colors"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        data-onboarding-target="image-gen-btn"
+      >
+        {generatingImage ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
+            <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
+          </svg>
+        )}
+      </button>
+      )}
+      {spriteMode !== 'FULL' && modelButton}
+      <button
+        onClick={() => setShowInputButtons(false)}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+        style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+        aria-label={t('chat2.actionMenuClose')}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+      </div>
+    </div>
+  )
+
   const handleBack = () => {
     if (window.history.state?.idx > 0) {
       navigate(-1)
@@ -1663,7 +1838,7 @@ export default function Chat() {
           </div>
         )}
         {/* FULL 모드: sprite를 화면 상단부 배경으로 깔고, 메시지는 하단 박스에서 스크롤.
-            sprite 영역 = 화면 위 60%, 메시지 박스 = 하단 40%.
+            sprite 영역 = 화면 위 40%, 메시지 박스 = 하단 60% (2026-11-04 58%→40%로 확장).
             미해금 영상이 있으면 배경 자체를 블러 영상으로 깔고 해금 버튼만 박스 바로 위 우측에 띄운다.
             해금 시 src는 같은 영상 그대로라 레이어 교체 없이 블러만 걷힌다. */}
         {spriteMode === 'FULL' && activeSpriteUrl && (
@@ -1686,8 +1861,8 @@ export default function Chat() {
             {bubbleNeedsUnlock && (
               <button
                 type="button"
-                className="absolute left-8 right-8 py-2.5 bg-black/75 backdrop-blur-sm border border-white/20 rounded-xl flex items-center justify-center gap-2 shadow-lg pointer-events-auto z-30"
-                style={{ bottom: 'calc(42% + 24px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                className="absolute left-8 right-8 bg-black/75 backdrop-blur-sm border border-white/20 rounded-xl flex items-center justify-center gap-2 shadow-lg pointer-events-auto z-30"
+                style={{ top: unlockBarTop, height: UNLOCK_BAR_H, outline: 'none', WebkitTapHighlightColor: 'transparent' }}
                 onClick={(e) => { e.stopPropagation(); if (!unlockingVideo) handleUnlockEmotionVideo() }}
               >
                 <span className="flex items-center gap-1 text-white text-sm font-bold leading-none">
@@ -1702,7 +1877,7 @@ export default function Chat() {
           </div>
         )}
         {/* 상단 overlay — 상태 panel(접기 가능) + 액션 버튼 행 (항상 표시) */}
-        <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top) + 44px)' }}>
+        <div ref={topOverlayRef} className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: 'calc(env(safe-area-inset-top) + 44px)' }}>
           {showStatusPanel && (
             <div className="bg-gray-900/75 border border-gray-800/50 rounded-2xl mx-3 mt-2 px-4 pt-3 pb-3 animate-slide-down pointer-events-auto" onClick={(e) => e.stopPropagation()}>
               {(() => {
@@ -1864,8 +2039,9 @@ export default function Chat() {
                 </svg>
               </button>
             </div>
-            {/* 채팅 설정 페이지 진입 — 새 스타일 보유 시 emerald 보더 + 툴팁 */}
-            <div className="relative">
+            {/* 채팅 설정 페이지 진입 — 새 스타일 보유 시 emerald 보더 + 툴팁.
+                FULL 모드에선 채팅 모델 버튼이 설정 버튼 바로 아래에 붙는다 (툴팁은 그 아래). */}
+            <div className="relative flex flex-col items-center gap-1.5">
               <button
                 onClick={() => navigate(`/chats/${id}/settings`)}
                 className={`w-11 h-11 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow-lg transition-colors border-2 ${
@@ -1881,6 +2057,7 @@ export default function Chat() {
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
               </button>
+              {spriteMode === 'FULL' && modelButton}
               {chatStyles?.hasNewStyle && (
                 <div className="absolute right-0 top-full mt-1.5 px-2.5 py-1 rounded-md bg-emerald-500 text-emerald-950 text-[10px] font-bold whitespace-nowrap shadow-lg pointer-events-none">
                   새 스타일! 설정에서 적용해보세요
@@ -1901,10 +2078,11 @@ export default function Chat() {
         }
         style={(() => {
           if (spriteMode === 'FULL') {
-            const fadeMask = 'linear-gradient(to bottom, black 0%, black calc(100% - env(safe-area-inset-bottom) - 115px), transparent calc(100% - env(safe-area-inset-bottom) - 90px))'
+            // 하단 여백 = 입력바(~52px) + 여유. 미니 버튼 행은 FULL 모드에서 입력바 안으로 들어가 그만큼 채팅이 내려온다.
+            const fadeMask = 'linear-gradient(to bottom, black 0%, black calc(100% - env(safe-area-inset-bottom) - 77px), transparent calc(100% - env(safe-area-inset-bottom) - 52px))'
             return {
-              top: '58%',
-              paddingBottom: 'calc(env(safe-area-inset-bottom) + 110px)',
+              top: fullChatTop, // 상단 overlay·해금 바와 겹치지 않는 시작점 (위 fullChatTop 참고)
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 72px)',
               backgroundImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.85) 60%, rgba(0,0,0,0.95) 100%)',
               maskImage: fadeMask,
               WebkitMaskImage: fadeMask,
@@ -2125,140 +2303,13 @@ export default function Chat() {
             </div>
           </div>
         )}
-        {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치 */}
-        <div className="flex items-center gap-2 px-3 mb-1.5">
-          <div className="ml-auto relative h-8 flex items-center justify-end pointer-events-auto">
-            <button
-              onClick={() => setShowInputButtons(true)}
-              className={`w-8 h-8 rounded-full bg-gray-900/75 border border-gray-800/50 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-800/80 transition-opacity duration-200 ${
-                showInputButtons ? 'opacity-0 pointer-events-none' : 'opacity-100'
-              }`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={t('chat2.actionMenuOpen')}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-              </svg>
-            </button>
-            <div className={`absolute right-0 top-0 bg-gray-900/75 border border-gray-800/50 rounded-full pl-1.5 pr-0.5 py-0.5 flex items-center gap-1.5 origin-right transition-all duration-300 ease-out ${
-              showInputButtons ? 'opacity-100 scale-x-100 pointer-events-auto' : 'opacity-0 scale-x-0 pointer-events-none'
-            }`}>
-            {(character.voiceId || tourActive) && (
-              <div className="relative">
-                {excitedTooltipVisible && characterStatus?.isExcited && (
-                  <div
-                    ref={excitedTooltipRef}
-                    className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-red-600 text-white text-xs rounded-lg shadow-lg whitespace-nowrap animate-slide-up z-30"
-                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  >
-                    {t('chat.excitedTooltip')}
-                    <div className="absolute top-full right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-600" />
-                  </div>
-                )}
-                <button
-                  ref={voiceButtonRef}
-                  onClick={() => {
-                    if (tourActive && !character.voiceId) return
-                    setVoiceMode((v) => {
-                      const next = !v
-                      api.patch(`/conversations/${id}/voice-mode`, { enabled: next }).catch(() => {})
-                      return next
-                    })
-                  }}
-                  disabled={!token || (tourActive && !character.voiceId)}
-                  className={`relative w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 flex items-center justify-center shadow transition-colors ${
-                    characterStatus?.isExcited
-                      ? 'ring-2 ring-red-400'
-                      : voiceMode
-                        ? 'ring-2 ring-emerald-400'
-                        : canUseFreeVoice
-                          ? 'ring-2 ring-emerald-400'
-                          : ''
-                  } disabled:opacity-40`}
-                  style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-                  data-onboarding-target="voice-btn"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={canUseFreeVoice && !characterStatus?.isExcited ? '#6ee7b7' : 'white'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    {voiceMode ? (
-                      <>
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                      </>
-                    ) : (
-                      <>
-                        <line x1="18" y1="9" x2="22" y2="13" />
-                        <line x1="22" y1="9" x2="18" y2="13" />
-                      </>
-                    )}
-                  </svg>
-                  {canUseFreeVoice && (
-                    <span className="absolute -bottom-1 -right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-emerald-300 text-emerald-900 text-[9px] font-bold flex items-center justify-center shadow">
-                      {remainingFreeVoiceUses}
-                    </span>
-                  )}
-                </button>
-              </div>
-            )}
-            {IMAGE_GEN_ENABLED && (
-            <button
-              onClick={() => {
-                setShowImageGenModal(true)
-                api.get(`/characters/${conversation.characterId}`).then(({ character: c }) => {
-                  const allImages = (c.feedPosts || []).flatMap((p) => (p.images || []).map((img) => img.filePath)).filter(Boolean)
-                  const shuffled = allImages.sort(() => Math.random() - 0.5)
-                  setPreviewFeedImages(shuffled.slice(0, 3))
-                }).catch(() => {})
-              }}
-              disabled={generatingImage || !token}
-              className="w-7 h-7 rounded-full bg-gray-800/80 hover:bg-gray-700/80 disabled:opacity-40 flex items-center justify-center shadow transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              data-onboarding-target="image-gen-btn"
-            >
-              {generatingImage ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="animate-spin">
-                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m12.728 0l-2.121-2.121M8.757 8.757L6.636 6.636" />
-                </svg>
-              )}
-            </button>
-            )}
-            <button
-              onClick={() => setShowModelSheet(true)}
-              disabled={!token}
-              className={`h-7 px-2 rounded-full text-[10px] font-semibold flex items-center gap-0.5 shadow transition-colors whitespace-nowrap flex-shrink-0 bg-gray-800/80 hover:bg-gray-700/80 ${
-                chatModel === 'ADVANCED'
-                  ? 'ring-1 ring-amber-400 text-amber-300'
-                  : 'text-white'
-              } disabled:opacity-40`}
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={t('chat.modelSelectorTitle')}
-              data-onboarding-target="model-btn"
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-              {chatModel === 'ADVANCED' ? t('chat.modelAdvanced') : t('chat.modelBasic')}
-            </button>
-            <button
-              onClick={() => setShowInputButtons(false)}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
-              style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
-              aria-label={t('chat2.actionMenuClose')}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-            </div>
+        {/* 추가 기능 미니 버튼 행 — 채팅 영역 바로 위에 독립 배치.
+            FULL 모드는 이 행을 없애고 토글을 입력바 안으로 옮겨, 행 높이만큼 채팅창이 아래로 내려온다. */}
+        {spriteMode !== 'FULL' && (
+          <div className="flex items-center gap-2 px-3 mb-1.5">
+            {actionMenu}
           </div>
-        </div>
+        )}
         <div className="px-3 py-1.5 border-t border-gray-800/30 bg-gray-900/30 pointer-events-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
           {attachedFeed && (
             <div className="mb-2 flex items-center gap-2 bg-gray-800 rounded-xl px-3 py-2">
@@ -2284,6 +2335,7 @@ export default function Chat() {
           )}
           <div className="flex gap-2 items-end">
             <textarea ref={textareaRef} value={input} maxLength={300} onChange={(e) => { setInput(e.target.value.slice(0, 300)); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 116) + 'px' }} placeholder={t('chat.inputPlaceholder')} rows={1} className="flex-1 h-10 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none resize-none" />
+            {spriteMode === 'FULL' && <div className="h-10 flex items-center flex-shrink-0">{actionMenu}</div>}
             <button
               onClick={handleInsertParens}
               type="button"
@@ -2611,8 +2663,16 @@ export default function Chat() {
           )}
         </div>
       )}
+      {prologue && (
+        <PrologueOverlay
+          steps={prologue.steps}
+          fallbackImage={latestCharacterSpriteUrl}
+          characterName={character.name}
+          onDone={() => setPrologue(null)}
+        />
+      )}
       <OnboardingSpotlight
-        active={tourActive}
+        active={tourActive && !prologue}
         steps={tourSteps}
         onComplete={completeTour}
       />

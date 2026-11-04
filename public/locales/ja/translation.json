@@ -173,6 +173,7 @@
     "deleteSituationDescription": "「{{title}}」の進行データはすべて削除されます。この操作は取り消せません。"
   },
   "chat": {
+    "prologueSkip": "スキップ",
     "online": "オンライン",
     "aiGeneratedImage": "AI生成画像",
     "generatingImage": "写真を準備しています...",
