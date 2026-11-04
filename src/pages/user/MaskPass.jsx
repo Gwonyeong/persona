@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
@@ -291,6 +291,8 @@ export default function MaskPass() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const kind = kindFromParam(searchParams.get('kind'))
+  const kindRef = useRef(kind)
+  kindRef.current = kind
   const { setMasks } = useStore()
   const [data, setData] = useState(null)
   const [unclaimedByKind, setUnclaimedByKind] = useState({ SPEND: 0, PURCHASE: 0 })
@@ -304,18 +306,20 @@ export default function MaskPass() {
   }
 
   // 활성 트랙 전체 + 탭 뱃지용 트랙별 미수령 수를 함께 읽는다.
+  // 탭을 빠르게 바꾸면 이전 트랙 응답이 늦게 도착할 수 있어, 현재 탭과 다른 응답은 버린다.
   async function load(activeKind = kind) {
     try {
       const [result, minimal] = await Promise.all([
         api.get(`/mask-pass?kind=${activeKind}`),
         api.get('/mask-pass?minimal=true').catch(() => null),
       ])
+      if (activeKind !== kindRef.current) return
       setData(result)
       if (minimal?.unclaimedByKind) setUnclaimedByKind(minimal.unclaimedByKind)
     } catch (e) {
       console.error(e)
     } finally {
-      setLoading(false)
+      if (activeKind === kindRef.current) setLoading(false)
     }
   }
 
