@@ -126,6 +126,19 @@ function buildPosterMap(storyline) {
   return map
 }
 
+// 프리미엄 채팅 미디어 식별자 — 잠긴 동안 서버가 mediaUrl 을 비워 보내므로 mediaKey 로 식별 (구 응답은 URL)
+function premiumKeyOf(line) {
+  return line?.mediaKey || line?.mediaUrl || null
+}
+
+// CHAT 미디어 아이템이 영상인지 — variant 'video' 또는 premium 의 mediaType/확장자
+function isChatMediaVideo(line) {
+  if (line?.variant === 'video') return true
+  if (line?.mediaType === 'video') return true
+  if (line?.mediaType === 'image') return false
+  return isBgVideoUrl(line?.mediaUrl)
+}
+
 // 시퀀스 nodeIndex 시점 직전까지의 sticky 음향(bgmUrl/bgsUrl) 마지막 값 추적.
 // 진행도 불러오기 시 이전 노드들에서 설정됐던 BGM/BGS를 그대로 이어 재생하기 위함.
 function findLatestStickyBefore(sequence, nodeIndex, field) {
@@ -232,9 +245,9 @@ export default function Storyline() {
   // ── 데이터 로드 ─────────────────────────────────────────
   useEffect(() => {
     api.get(`/storylines/${id}`)
-      .then(({ storyline, progress, unlockedMediaUrls, unlockedNodeIds, nextPart }) => {
+      .then(({ storyline, progress, unlockedMediaUrls, unlockedMediaKeys, unlockedNodeIds, nextPart }) => {
         setStoryline(storyline)
-        setUnlockedMedia(new Set(unlockedMediaUrls || []))
+        setUnlockedMedia(new Set(unlockedMediaKeys || unlockedMediaUrls || []))
         setHistoricalNodeIds(new Set(unlockedNodeIds || []))
         setNextPart(nextPart || null)
 
@@ -344,7 +357,7 @@ export default function Storyline() {
       if (libType === 'video' || libType === 'image') return libType
       return isBgVideoUrl(url) ? 'video' : 'image'
     }
-    const push = (url, hint, unlocked) => {
+    const push = (url, hint, unlocked, posterHint) => {
       if (!url) return
       if (seen.has(url)) {
         // 같은 URL이 다른 곳에서 unlocked로 나오면 잠금 해제로 승격
@@ -354,7 +367,7 @@ export default function Storyline() {
       }
       seen.set(url, out.length)
       const type = detectType(url, hint)
-      const posterUrl = type === 'video' ? posterMap.get(url) : null
+      const posterUrl = type === 'video' ? (posterMap.get(url) || posterHint) : null
       out.push({ url, type, unlocked: !!unlocked, ...(posterUrl ? { posterUrl } : {}) })
     }
 
@@ -393,9 +406,10 @@ export default function Storyline() {
     for (const n of storyline.nodes || []) {
       if (n.nodeType !== 'CHAT') continue
       for (const it of (n.script || [])) {
-        if (it?.mode === 'media' && it.variant === 'premium' && it.mediaUrl) {
-          push(it.mediaUrl, it.mediaType, !!unlockedMedia?.has(it.mediaUrl))
-        }
+        if (it?.mode !== 'media' || it.variant !== 'premium') continue
+        // 잠긴 항목은 서버가 원본을 비워 보낸다 → 블러가 구워진 previewUrl 로 대신 노출
+        if (it.mediaUrl) push(it.mediaUrl, it.mediaType, !!unlockedMedia?.has(premiumKeyOf(it)), it.posterUrl)
+        else if (it.previewUrl) push(it.previewUrl, 'image', false)
       }
     }
     return out
@@ -857,8 +871,8 @@ export default function Storyline() {
           selectingChoiceId={selectingChoiceId}
           onMediaClick={setChatLightbox}
           unlockedMedia={unlockedMedia}
-          onUnlockRequest={(line) => setUnlockModal({ mediaUrl: line.mediaUrl, maskCost: line.maskCost || 0 })}
-          onMediaPreview={(line) => setMediaLightbox({ url: line.mediaUrl, type: line.variant === 'video' ? 'video' : 'image' })}
+          onUnlockRequest={(line) => setUnlockModal({ mediaKey: line.mediaKey, mediaUrl: line.mediaUrl, maskCost: line.maskCost || 0 })}
+          onMediaPreview={(line) => setMediaLightbox({ url: line.mediaUrl, type: isChatMediaVideo(line) ? 'video' : 'image', posterUrl: line.posterUrl })}
         />
       )}
 
@@ -966,7 +980,7 @@ export default function Storyline() {
           {mediaLightbox.type === 'video' ? (
             <video
               src={mediaLightbox.url}
-              poster={posterMap.get(mediaLightbox.url) || undefined}
+              poster={posterMap.get(mediaLightbox.url) || mediaLightbox.posterUrl || undefined}
               className="h-full w-auto max-w-none"
               autoPlay loop controls playsInline
               onClick={(e) => e.stopPropagation()}
@@ -1029,11 +1043,24 @@ export default function Storyline() {
                   }
                   setUnlocking(true)
                   try {
-                    const res = await api.post(`/storylines/${id}/unlock-media`, { mediaUrl: unlockModal.mediaUrl })
+                    const res = await api.post(`/storylines/${id}/unlock-media`, unlockModal.mediaKey
+                      ? { mediaKey: unlockModal.mediaKey }
+                      : { mediaUrl: unlockModal.mediaUrl })
                     if (res.masks != null) setMasks(res.masks)
+                    // 잠긴 아이템은 mediaUrl 이 비어 있다 → 해금 응답의 원본·포스터로 스크립트를 채운다
+                    if (unlockModal.mediaKey && res.mediaUrl) {
+                      const key = unlockModal.mediaKey
+                      const fill = (it) => (it?.mediaKey === key
+                        ? { ...it, mediaUrl: res.mediaUrl, locked: false, ...(res.posterUrl ? { posterUrl: res.posterUrl } : {}) }
+                        : it)
+                      setStoryline((prev) => prev && ({
+                        ...prev,
+                        nodes: (prev.nodes || []).map((n) => (Array.isArray(n.script) ? { ...n, script: n.script.map(fill) } : n)),
+                      }))
+                    }
                     setUnlockedMedia((prev) => {
                       const next = new Set(prev)
-                      next.add(unlockModal.mediaUrl)
+                      next.add(unlockModal.mediaKey || unlockModal.mediaUrl)
                       return next
                     })
                     setUnlockModal(null)
@@ -1277,7 +1304,7 @@ function ChatBlockView({ chatBlock, storyline, posterMap, user, masks, showChoic
                   posterMap={posterMap}
                   profileUrl={profileUrl}
                   characterName={characterName}
-                  isUnlocked={!!unlockedMedia && unlockedMedia.has(line.mediaUrl)}
+                  isUnlocked={!!unlockedMedia && unlockedMedia.has(premiumKeyOf(line))}
                   onUnlockRequest={onUnlockRequest}
                   onPreview={onMediaPreview}
                   onMediaLoaded={scrollToBottom}
@@ -1409,9 +1436,11 @@ function UserInputButton({ item, userName, onClick }) {
 // ───────────────────────────────────────────────────────────
 function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocked, onUnlockRequest, onPreview, onMediaLoaded }) {
   const { t } = useTranslation()
-  const isVideo = line.variant === 'video'
+  const isVideo = isChatMediaVideo(line)
   const isPremium = line.variant === 'premium'
-  const locked = isPremium && !isUnlocked
+  // 서버가 원본을 비워 보낸 잠금 아이템도 잠금으로 본다 (해금 응답으로 채워지기 전까지)
+  const locked = isPremium && (!isUnlocked || !line.mediaUrl)
+  const poster = posterMap?.get(line.mediaUrl) || line.posterUrl || undefined
 
   const handleClick = (e) => {
     e.stopPropagation()
@@ -1440,10 +1469,23 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
           onClick={handleClick}
           style={{ outline: 'none', WebkitTapHighlightColor: 'transparent', maxWidth: '220px' }}
         >
-          {isVideo ? (
+          {locked ? (
+            // 잠금 — 원본 대신 블러가 구워진 티저(previewUrl). 없으면 빈 카드
+            line.previewUrl ? (
+              <img
+                src={line.previewUrl}
+                alt=""
+                className="w-full max-h-[280px] object-cover blur-sm scale-[1.02]"
+                loading="lazy"
+                onLoad={onMediaLoaded}
+              />
+            ) : (
+              <div className="w-[220px] h-[280px] bg-gradient-to-br from-gray-800 to-gray-950" />
+            )
+          ) : isVideo ? (
             <video
               src={line.mediaUrl}
-              poster={posterMap?.get(line.mediaUrl) || undefined}
+              poster={poster}
               className="w-full max-h-[280px] object-cover bg-black"
               muted
               loop
@@ -1456,14 +1498,14 @@ function ChatMediaBubble({ line, posterMap, profileUrl, characterName, isUnlocke
             <img
               src={line.mediaUrl}
               alt=""
-              className={`w-full max-h-[280px] object-cover transition-all ${locked ? 'blur-sm scale-[1.02]' : ''}`}
+              className="w-full max-h-[280px] object-cover transition-all"
               loading="lazy"
               onLoad={onMediaLoaded}
             />
           )}
 
           {/* 영상 인디케이터 */}
-          {isVideo && (
+          {isVideo && !locked && (
             <div className="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center bg-black/60 rounded-full pointer-events-none">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3" /></svg>
             </div>
