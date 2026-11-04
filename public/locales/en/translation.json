@@ -1,6 +1,12 @@
 {
   "maskPass": {
     "title": "Mask Pass",
+    "tabSpend": "Spend Pass",
+    "tabPurchase": "Purchase Pass",
+    "spendHint": "Rewards unlock as you spend masks",
+    "purchaseHint": "Rewards unlock as you buy masks (first-purchase bonus excluded)",
+    "totalPurchased": "Total Purchased",
+    "goShop": "Mask Shop",
     "totalUsage": "Total Spent",
     "noRewards": "No rewards yet",
     "unclaimedCount": "You have {{count}} reward(s) to claim",

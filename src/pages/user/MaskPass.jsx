@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
@@ -277,19 +277,41 @@ function ClaimResultModal({ grant, onClose }) {
   )
 }
 
+// 패스 트랙 — SPEND(사용 누적) / PURCHASE(구매 누적). URL ?kind=purchase 로 딥링크 가능.
+const KINDS = ['SPEND', 'PURCHASE']
+const KIND_TAB_KEY = { SPEND: 'maskPass.tabSpend', PURCHASE: 'maskPass.tabPurchase' }
+
+function kindFromParam(raw) {
+  const k = String(raw || '').toUpperCase()
+  return KINDS.includes(k) ? k : 'SPEND'
+}
+
 export default function MaskPass() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const kind = kindFromParam(searchParams.get('kind'))
   const { setMasks } = useStore()
   const [data, setData] = useState(null)
+  const [unclaimedByKind, setUnclaimedByKind] = useState({ SPEND: 0, PURCHASE: 0 })
   const [loading, setLoading] = useState(true)
   const [claimingId, setClaimingId] = useState(null)
   const [grant, setGrant] = useState(null)
 
-  async function load() {
+  function setKind(next) {
+    if (next === kind) return
+    setSearchParams(next === 'SPEND' ? {} : { kind: next.toLowerCase() }, { replace: true })
+  }
+
+  // 활성 트랙 전체 + 탭 뱃지용 트랙별 미수령 수를 함께 읽는다.
+  async function load(activeKind = kind) {
     try {
-      const result = await api.get('/mask-pass')
+      const [result, minimal] = await Promise.all([
+        api.get(`/mask-pass?kind=${activeKind}`),
+        api.get('/mask-pass?minimal=true').catch(() => null),
+      ])
       setData(result)
+      if (minimal?.unclaimedByKind) setUnclaimedByKind(minimal.unclaimedByKind)
     } catch (e) {
       console.error(e)
     } finally {
@@ -298,8 +320,11 @@ export default function MaskPass() {
   }
 
   useEffect(() => {
-    load()
-  }, [])
+    setLoading(true)
+    setData(null)
+    load(kind)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind])
 
   async function handleClaim(tier) {
     if (claimingId) return
@@ -341,7 +366,9 @@ export default function MaskPass() {
   }
 
   const maxThreshold = data?.tiers?.length ? data.tiers[data.tiers.length - 1].threshold : 1000
-  const progress = data ? Math.min(100, (data.lifetimeMasksSpent / maxThreshold) * 100) : 0
+  const progressValue = data?.progress ?? data?.lifetimeMasksSpent ?? 0
+  const progress = data ? Math.min(100, (progressValue / maxThreshold) * 100) : 0
+  const isPurchase = kind === 'PURCHASE'
 
   return (
     <div className="relative min-h-full bg-gray-950 text-gray-100 pb-12">
@@ -361,14 +388,47 @@ export default function MaskPass() {
         <h1 className="text-base font-bold">{t('maskPass.title')}</h1>
       </div>
 
+      {/* 트랙 탭: 사용 패스 / 구매 패스 */}
+      <div className="px-4 pt-3">
+        <div className="flex p-1 bg-gray-900 border border-gray-800 rounded-xl">
+          {KINDS.map((k) => {
+            const active = k === kind
+            const badge = unclaimedByKind[k] || 0
+            return (
+              <button
+                key={k}
+                onClick={() => setKind(k)}
+                className={`relative flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${
+                  active ? 'bg-amber-500 text-gray-950' : 'text-gray-400 hover:text-gray-200'
+                }`}
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t(KIND_TAB_KEY[k])}
+                {badge > 0 && (
+                  <span
+                    className={`absolute top-1 right-2 min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                      active ? 'bg-gray-950 text-amber-300' : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {badge}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {/* 진행도 */}
-      <div className="px-4 pt-4 pb-2">
+      <div className="px-4 pt-3 pb-2">
         <div className="bg-gradient-to-br from-amber-950/30 to-gray-900 border border-amber-700/30 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div>
-              <p className="text-xs text-amber-400 mb-1 tracking-wider">{t('maskPass.totalUsage')}</p>
+              <p className="text-xs text-amber-400 mb-1 tracking-wider">
+                {t(isPurchase ? 'maskPass.totalPurchased' : 'maskPass.totalUsage')}
+              </p>
               <p className="text-2xl font-bold text-gray-100">
-                {data?.lifetimeMasksSpent?.toLocaleString() || 0}
+                {progressValue.toLocaleString()}
                 <span className="text-sm text-gray-400 font-normal ml-1">/ {maxThreshold.toLocaleString()}</span>
               </p>
             </div>
@@ -380,8 +440,22 @@ export default function MaskPass() {
               style={{ width: `${progress}%` }}
             />
           </div>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <p className="text-xs text-gray-400">
+              {t(isPurchase ? 'maskPass.purchaseHint' : 'maskPass.spendHint')}
+            </p>
+            {isPurchase && (
+              <button
+                onClick={() => navigate('/mask-shop')}
+                className="flex-shrink-0 px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-500/15 text-amber-300 border border-amber-600/40 hover:bg-amber-500/25 transition-colors"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('maskPass.goShop')}
+              </button>
+            )}
+          </div>
           {!!data?.unclaimedEligibleCount && (
-            <p className="mt-3 text-xs text-amber-300">
+            <p className="mt-2 text-xs text-amber-300">
               {t('maskPass.unclaimedCount', { count: data.unclaimedEligibleCount })}
             </p>
           )}

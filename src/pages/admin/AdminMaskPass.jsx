@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../lib/api'
 
+// 패스 트랙 — SPEND(사용 누적) / PURCHASE(구매 누적)
+const PASS_KINDS = [
+  { value: 'SPEND', label: '사용 패스', unit: '마스크 사용', hint: '유저가 마스크를 사용한 누적량(lifetimeMasksSpent)이 진행도입니다.' },
+  { value: 'PURCHASE', label: '구매 패스', unit: '마스크 구매', hint: '유저가 결제로 받은 기본 마스크 누적량(lifetimeMasksPurchased)이 진행도입니다. 첫 구매 보너스는 제외됩니다.' },
+]
+const KIND_BY_VALUE = Object.fromEntries(PASS_KINDS.map((k) => [k.value, k]))
+
 const REWARD_TYPES = [
   { value: 'MASK', label: '마스크' },
   { value: 'VOICE', label: '특별 보이스' },
@@ -150,7 +157,8 @@ function CharacterPicker({ characters, value, onChange, requireVoiceId = false }
   )
 }
 
-function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslationsUpdated }) {
+function TierForm({ initial, defaultKind = 'SPEND', characters, onSubmit, onCancel, busy, onTranslationsUpdated }) {
+  const [kind, setKind] = useState(initial?.kind || defaultKind)
   const [threshold, setThreshold] = useState(initial?.threshold ?? '')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [rewardType, setRewardType] = useState(initial?.rewardType || 'MASK')
@@ -198,6 +206,7 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
       return
     }
     const fd = new FormData()
+    fd.append('kind', kind)
     fd.append('threshold', String(parseInt(threshold, 10)))
     fd.append('title', title || '')
     fd.append('rewardType', rewardType)
@@ -259,9 +268,22 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+      <label className="block">
+        <span className="text-xs text-gray-400">패스 트랙</span>
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
+          className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+        >
+          {PASS_KINDS.map((k) => (
+            <option key={k.value} value={k.value}>{k.label} — {k.unit} 누적</option>
+          ))}
+        </select>
+        <span className="block mt-1 text-[11px] text-gray-500">{KIND_BY_VALUE[kind]?.hint}</span>
+      </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs text-gray-400">임계치 (누적 마스크 사용)</span>
+          <span className="text-xs text-gray-400">임계치 (누적 {KIND_BY_VALUE[kind]?.unit || '마스크'})</span>
           <input
             type="number"
             value={threshold}
@@ -671,6 +693,7 @@ function TierForm({ initial, characters, onSubmit, onCancel, busy, onTranslation
 }
 
 export default function AdminMaskPass() {
+  const [kind, setKind] = useState('SPEND')
   const [tiers, setTiers] = useState([])
   const [characters, setCharacters] = useState([])
   const [loading, setLoading] = useState(true)
@@ -700,7 +723,14 @@ export default function AdminMaskPass() {
   // tier list에 preview 정보를 부착 (어드민 UI는 maskPass.js의 enrichTierPayloads를 안 거쳐서 raw payload만 옴)
   // 간단한 lookup으로 character name 정도만 보강
   const sortedTiers = useMemo(() => {
-    return [...tiers].sort((a, b) => a.threshold - b.threshold || a.id - b.id)
+    return tiers
+      .filter((t) => (t.kind || 'SPEND') === kind)
+      .sort((a, b) => a.threshold - b.threshold || a.id - b.id)
+  }, [tiers, kind])
+  const countByKind = useMemo(() => {
+    const out = { SPEND: 0, PURCHASE: 0 }
+    for (const t of tiers) out[t.kind || 'SPEND'] = (out[t.kind || 'SPEND'] || 0) + 1
+    return out
   }, [tiers])
 
   async function save(fd) {
@@ -721,7 +751,7 @@ export default function AdminMaskPass() {
   }
 
   async function remove(tier) {
-    if (!confirm(`임계치 ${tier.threshold} 티어 삭제? 클레임이 있으면 삭제 안 됨.`)) return
+    if (!confirm(`[${KIND_BY_VALUE[tier.kind]?.label || tier.kind}] 임계치 ${tier.threshold} 티어 삭제? 클레임이 있으면 삭제 안 됨.`)) return
     try {
       await api.delete(`/admin/mask-pass-tiers/${tier.id}`)
       await load()
@@ -815,15 +845,40 @@ export default function AdminMaskPass() {
         </button>
       </div>
 
+      {/* 트랙 탭 */}
+      <div className="flex gap-1 p-1 mb-3 bg-gray-900 border border-gray-800 rounded-xl">
+        {PASS_KINDS.map((k) => (
+          <button
+            key={k.value}
+            onClick={() => {
+              setKind(k.value)
+              setEditing(null)
+            }}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${
+              kind === k.value ? 'bg-amber-500 text-gray-950' : 'text-gray-400 hover:text-gray-200'
+            }`}
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {k.label} <span className="text-xs font-normal opacity-70">({countByKind[k.value] || 0})</span>
+          </button>
+        ))}
+      </div>
+
       <p className="text-xs text-gray-500 mb-3">
-        정렬은 항상 임계치 오름차순입니다. 보상 타입을 선택하면 해당 타입에 맞는 파일·필드가 나타납니다.
+        {KIND_BY_VALUE[kind]?.hint} 정렬은 항상 임계치 오름차순입니다. 보상 타입을 선택하면 해당 타입에 맞는 파일·필드가 나타납니다.
       </p>
 
       {editing === 'new' && (
         <div className="mb-4">
-          <p className="text-xs text-gray-400 mb-2">새 티어</p>
-          <TierForm characters={characters} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
+          <p className="text-xs text-gray-400 mb-2">새 티어 — {KIND_BY_VALUE[kind]?.label}</p>
+          <TierForm defaultKind={kind} characters={characters} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
         </div>
+      )}
+
+      {!loading && sortedTiers.length === 0 && editing !== 'new' && (
+        <p className="text-sm text-gray-500 py-6 text-center">
+          {KIND_BY_VALUE[kind]?.label}에 등록된 티어가 없습니다. "+ 티어 추가"로 만들어 주세요.
+        </p>
       )}
 
       {loading && <p className="text-sm text-gray-500">불러오는 중...</p>}
@@ -837,7 +892,7 @@ export default function AdminMaskPass() {
               <div className="flex items-start gap-3 p-3 bg-gray-900 border border-gray-800 rounded-xl">
                 <div className="w-16 text-center flex-shrink-0">
                   <p className="text-base font-bold text-gray-100">{t.threshold.toLocaleString()}</p>
-                  <p className="text-[10px] text-gray-500">마스크</p>
+                  <p className="text-[10px] text-gray-500">{KIND_BY_VALUE[t.kind]?.unit || '마스크'}</p>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-100">

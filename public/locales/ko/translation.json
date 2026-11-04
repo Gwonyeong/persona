@@ -1,6 +1,12 @@
 {
   "maskPass": {
     "title": "마스크 패스",
+    "tabSpend": "사용 패스",
+    "tabPurchase": "구매 패스",
+    "spendHint": "마스크를 사용할수록 보상이 쌓여요",
+    "purchaseHint": "마스크를 구매할수록 보상이 쌓여요 (첫 구매 보너스 제외)",
+    "totalPurchased": "총 구매량",
+    "goShop": "마스크 상점",
     "totalUsage": "총 사용량",
     "noRewards": "아직 등록된 보상이 없어요",
     "unclaimedCount": "받을 수 있는 보상이 {{count}}개 있어요",

@@ -1,6 +1,12 @@
 {
   "maskPass": {
     "title": "マスクパス",
+    "tabSpend": "消費パス",
+    "tabPurchase": "購入パス",
+    "spendHint": "マスクを使うほど報酬が貯まります",
+    "purchaseHint": "マスクを購入するほど報酬が貯まります（初回購入ボーナスは除く）",
+    "totalPurchased": "累計購入",
+    "goShop": "マスクショップ",
     "totalUsage": "累計消費",
     "noRewards": "まだ報酬がありません",
     "unclaimedCount": "受け取れる報酬が{{count}}個あります",
