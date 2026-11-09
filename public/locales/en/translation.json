@@ -1467,7 +1467,16 @@
       "on": "On — show reply candidates.",
       "toggleLabel": "Show suggested replies"
     },
-    "title": "Chat settings"
+    "title": "Chat settings",
+    "userNickname": {
+      "heading": "My name in this room",
+      "description": "The name the characters will call you in this room. Leave it blank to use your profile name.",
+      "placeholder": "Enter a name",
+      "save": "Save",
+      "saved": "Saved. It applies from the next message.",
+      "error": "Couldn't save. Please try again in a moment.",
+      "reset": "Use my profile name"
+    }
   },
   "situationCards": {
     "button": "Roleplay",

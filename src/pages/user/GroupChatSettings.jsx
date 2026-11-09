@@ -10,16 +10,24 @@ const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 const SPRITE_MODES = ['BUBBLE', 'OFF']
 // 텍스트 스트리밍(타자기) 속도 — 서버(GroupChat.streamSpeed)에서 관리.
 const STREAM_SPEEDS = ['SLOW', 'DEFAULT', 'FAST']
+// 이 방에서 쓸 내 이름 — 서버(GroupChat.userNickname). 서버 검증과 같은 길이 제한.
+const NICKNAME_MAX = 20
+// 서버가 제거하는 문자(프롬프트 태그를 깨는 문자)를 입력 단계에서 미리 걸러 저장값과 화면값을 일치시킨다.
+const sanitizeNickname = (v) => v.replace(/[\[\]《》{}"\r\n\t]/g, '')
 
 export default function GroupChatSettings() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { token } = useStore()
+  const { token, user } = useStore()
   const { t } = useTranslation()
 
   const [spriteMode, setSpriteMode] = useState('BUBBLE')
   const [streamSpeed, setStreamSpeed] = useState('DEFAULT')
   const [suggestEnabled, setSuggestEnabled] = useState(true)
+  const [savedNickname, setSavedNickname] = useState('') // 서버에 저장된 값 ('' = 계정 이름 사용)
+  const [nicknameInput, setNicknameInput] = useState('')
+  const [nicknameSaving, setNicknameSaving] = useState(false)
+  const [nicknameStatus, setNicknameStatus] = useState(null) // 'saved' | 'error' | null
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -33,12 +41,34 @@ export default function GroupChatSettings() {
         setSpriteMode(groupChat?.spriteMode || 'BUBBLE')
         setStreamSpeed(groupChat?.streamSpeed || 'DEFAULT')
         setSuggestEnabled(groupChat?.suggestedRepliesEnabled !== false)
+        setSavedNickname(groupChat?.userNickname || '')
+        setNicknameInput(groupChat?.userNickname || '')
       })
       .catch((err) => {
         if (err.status === 404) navigate(`/group-chats/${id}`, { replace: true })
       })
       .finally(() => setLoading(false))
   }, [id, token, navigate])
+
+  const saveNickname = async (value) => {
+    if (nicknameSaving) return
+    setNicknameSaving(true)
+    setNicknameStatus(null)
+    try {
+      const res = await api.patch(`/group-chats/${id}/user-nickname`, { nickname: value })
+      const next = res?.userNickname || ''
+      setSavedNickname(next)
+      setNicknameInput(next)
+      setNicknameStatus('saved')
+    } catch (err) {
+      console.error('Update group user nickname error:', err)
+      setNicknameStatus('error')
+    } finally {
+      setNicknameSaving(false)
+    }
+  }
+
+  const nicknameDirty = nicknameInput.trim() !== savedNickname
 
   const handleToggleSuggest = async () => {
     if (saving) return
@@ -115,6 +145,64 @@ export default function GroupChatSettings() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}>
+        <section>
+          <h2 className="text-sm font-semibold text-white mb-1">
+            {t('groupChatSettings.userNickname.heading', { defaultValue: '이 방에서 내 이름' })}
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">
+            {t('groupChatSettings.userNickname.description', { defaultValue: '캐릭터들이 이 방에서 나를 부를 이름이에요. 비워두면 프로필 이름으로 불러요.' })}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={nicknameInput}
+              maxLength={NICKNAME_MAX}
+              onChange={(e) => {
+                setNicknameInput(sanitizeNickname(e.target.value))
+                setNicknameStatus(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && nicknameDirty && !nicknameSaving) saveNickname(nicknameInput.trim())
+              }}
+              placeholder={user?.name || t('groupChatSettings.userNickname.placeholder', { defaultValue: '이름 입력' })}
+              disabled={nicknameSaving}
+              className="flex-1 min-w-0 px-4 py-3 rounded-xl bg-gray-900 border border-gray-800 text-sm text-white placeholder-gray-600 focus:border-indigo-500/60"
+              style={NO_OUTLINE}
+            />
+            <button
+              onClick={() => saveNickname(nicknameInput.trim())}
+              disabled={!nicknameDirty || nicknameSaving}
+              className={`flex-shrink-0 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                nicknameDirty && !nicknameSaving ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+              }`}
+              style={NO_OUTLINE}
+            >
+              {t('groupChatSettings.userNickname.save', { defaultValue: '저장' })}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mt-2 min-h-[20px]">
+            <p className={`text-[11px] ${nicknameStatus === 'error' ? 'text-red-400' : 'text-gray-500'}`}>
+              {nicknameStatus === 'saved'
+                ? t('groupChatSettings.userNickname.saved', { defaultValue: '저장했어요. 다음 대화부터 적용돼요.' })
+                : nicknameStatus === 'error'
+                  ? t('groupChatSettings.userNickname.error', { defaultValue: '저장하지 못했어요. 잠시 후 다시 시도해 주세요.' })
+                  : `${nicknameInput.length}/${NICKNAME_MAX}`}
+            </p>
+            {savedNickname && (
+              <button
+                onClick={() => saveNickname('')}
+                disabled={nicknameSaving}
+                className="text-[11px] text-gray-400 hover:text-white underline underline-offset-2"
+                style={NO_OUTLINE}
+              >
+                {t('groupChatSettings.userNickname.reset', { defaultValue: '프로필 이름으로 되돌리기' })}
+              </button>
+            )}
+          </div>
+        </section>
+
         <section>
           <h2 className="text-sm font-semibold text-white mb-1">
             {t('groupChatSettings.spriteMode.heading', { defaultValue: '표정 이미지 표시' })}

@@ -1467,7 +1467,16 @@
       "on": "켜짐 — 답변 후보를 보여줍니다.",
       "toggleLabel": "추천 답변 표시"
     },
-    "title": "채팅 설정"
+    "title": "채팅 설정",
+    "userNickname": {
+      "heading": "이 방에서 내 이름",
+      "description": "캐릭터들이 이 방에서 나를 부를 이름이에요. 비워두면 프로필 이름으로 불러요.",
+      "placeholder": "이름 입력",
+      "save": "저장",
+      "saved": "저장했어요. 다음 대화부터 적용돼요.",
+      "error": "저장하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      "reset": "프로필 이름으로 되돌리기"
+    }
   },
   "situationCards": {
     "button": "상황극",
