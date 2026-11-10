@@ -253,6 +253,13 @@ export default function Scenario() {
                             />
                           )
                         })
+                      ) : s.coverImage ? (
+                        <img
+                          src={s.coverImage}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover"
+                          draggable={false}
+                        />
                       ) : (
                         <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 to-purple-900/30" />
                       )}

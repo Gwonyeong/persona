@@ -7,6 +7,7 @@ import { getTagInfo } from '../../lib/tagLabel'
 import useStore from '../../store/useStore'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
+import StyleTicketIcon from '../../components/StyleTicketIcon'
 import LazyVideo from '../../components/LazyVideo'
 
 function getImageUrl(filePath) {
@@ -483,8 +484,10 @@ export default function CharacterDetail() {
 
   // 상점 의상(SHOP 스타일) 구매 — 마스크 차감 후 통째 해금
   const [purchasingStyleId, setPurchasingStyleId] = useState(null)
-  const handlePurchaseStyle = async (style, variant = 'set') => {
+  // payWith: 'ticket' 이면 마스크 대신 의상 구매권 1장으로 세트(영상 포함)를 받는다.
+  const handlePurchaseStyle = async (style, variant = 'set', payWith = 'masks') => {
     if (!user) return goToLogin()
+    const useTicket = payWith === 'ticket'
     if (!style?.maskCost || style.maskCost <= 0 || purchasingStyleId) return
     // 성인 전용 의상은 성인 인증 완료 유저만 구매 가능
     if (style.adultOnly && !user.adultVerified) {
@@ -492,14 +495,22 @@ export default function CharacterDetail() {
       return
     }
     const cost = variant === 'single' ? (style.singleMaskCost ?? 10) : style.maskCost
-    if ((user.masks ?? 0) < cost) {
+    if (useTicket) {
+      // 구매권은 되돌릴 수 없으니 한 번 더 확인한다
+      if (!window.confirm(t('maskShop.styleTicketConfirm', { name: style.name || '' }))) return
+    } else if ((user.masks ?? 0) < cost) {
       alert(t('character.insufficientMasks'))
       navigate('/mask-shop?tab=subscription')
       return
     }
+    // 구매권은 항상 세트(영상 포함)
+    if (useTicket) variant = 'set'
     setPurchasingStyleId(style.id)
     try {
-      const res = await api.post(`/characters/${id}/styles/${style.id}/purchase`, { variant })
+      const res = await api.post(
+        `/characters/${id}/styles/${style.id}/purchase`,
+        useTicket ? { variant: 'set', payWith: 'ticket' } : { variant },
+      )
       setCharacter((prev) => {
         if (!prev) return prev
         return {
@@ -520,11 +531,20 @@ export default function CharacterDetail() {
           ),
         }
       })
-      if (res.masks !== undefined) setUser({ ...user, masks: res.masks })
+      if (res.masks !== undefined || res.styleTickets !== undefined) {
+        setUser({
+          ...user,
+          ...(res.masks !== undefined ? { masks: res.masks } : {}),
+          ...(res.styleTickets !== undefined ? { styleTickets: res.styleTickets } : {}),
+        })
+      }
     } catch (err) {
       if (err?.error === 'INSUFFICIENT_MASKS') {
         alert(t('character.insufficientMasks'))
         navigate('/mask-shop?tab=subscription')
+      } else if (err?.error === 'NO_STYLE_TICKET') {
+        setUser({ ...user, styleTickets: 0 })
+        alert(t('maskShop.styleTicketNone'))
       } else {
         alert(t('character.unlockFailed'))
       }
@@ -707,6 +727,21 @@ export default function CharacterDetail() {
                   {t('maskShop.styleAdultVerify')}
                 </button>
               ) : (
+                <>
+                {/* 의상 구매권 — 마스크 대신 1장으로 세트 전체 */}
+                {(user?.styleTickets ?? 0) > 0 && selectedStyle.maskCost > 0 && (
+                  <button
+                    onClick={() => handlePurchaseStyle(selectedStyle, 'set', 'ticket')}
+                    disabled={purchasingStyleId === selectedStyle.id}
+                    className="w-full mb-2 py-2 rounded-lg bg-amber-500 text-gray-950 text-xs font-bold disabled:opacity-50 flex flex-col items-center gap-0.5"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <StyleTicketIcon /> {t('maskShop.styleUseTicket')} · {t('maskShop.styleTicketOwned', { count: user.styleTickets })}
+                    </span>
+                    <span className="text-[9px] text-gray-900/80 font-normal">{t('maskShop.styleTicketDesc')}</span>
+                  </button>
+                )}
                 <div className="flex gap-2">
                   {/* 세트 */}
                   <button
@@ -737,6 +772,7 @@ export default function CharacterDetail() {
                     </button>
                   )}
                 </div>
+                </>
               )}
             </div>
           )}

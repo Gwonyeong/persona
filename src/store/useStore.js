@@ -17,6 +17,9 @@ const useStore = create((set) => ({
     set({ token })
   },
   setMasks: (masks) => set({ masks }),
+  // 의상 구매권 잔량 (구매 패스 보상). /auth/me 의 user.styleTickets 를 그대로 쓴다.
+  setStyleTickets: (styleTickets) =>
+    set((s) => ({ user: s.user ? { ...s.user, styleTickets } : s.user })),
   setSubscription: (subscription) => set({ subscription }),
   setSafetyMode: (safetyMode) =>
     set((s) => ({ user: s.user ? { ...s.user, safetyMode } : s.user })),

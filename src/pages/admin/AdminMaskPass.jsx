@@ -15,6 +15,7 @@ const REWARD_TYPES = [
   { value: 'PROFILE', label: '프로필 이미지' },
   { value: 'STYLE', label: '패스 전용 의상 (+특별 상황극 카드)' },
   { value: 'STORY', label: '패스 전용 스토리' },
+  { value: 'STYLE_TICKET', label: '의상 구매권 (상점 의상 골라 받기)' },
 ]
 
 const ACCEPT_BY_TYPE = {
@@ -173,6 +174,8 @@ function TierForm({ initial, defaultKind = 'SPEND', characters, rewardOptions, o
   // 타입별 필드
   const payload = initial?.rewardPayload || {}
   const [amount, setAmount] = useState(payload.amount || '')
+  // STYLE_TICKET — 의상 구매권 장수
+  const [ticketCount, setTicketCount] = useState(payload.count || 1)
   const [rewardTitle, setRewardTitle] = useState(payload.title || payload.preview?.title || '')
   // 보상 제목 다국어 (GALLERY/PROFILE). 서버 preview.titleEn/Ja 로 프리필.
   const [rewardTitleEn, setRewardTitleEn] = useState(payload.preview?.titleEn || '')
@@ -227,6 +230,13 @@ function TierForm({ initial, defaultKind = 'SPEND', characters, rewardOptions, o
         return
       }
       fd.append('amount', String(parseInt(amount, 10)))
+    } else if (rewardType === 'STYLE_TICKET') {
+      const n = parseInt(ticketCount, 10)
+      if (!Number.isFinite(n) || n < 1 || n > 20) {
+        alert('구매권 장수는 1~20 사이로 입력해주세요')
+        return
+      }
+      fd.append('count', String(n))
     } else if (rewardType === 'VOICE') {
       if (!characterId) {
         alert('캐릭터를 선택해주세요')
@@ -458,6 +468,27 @@ function TierForm({ initial, defaultKind = 'SPEND', characters, rewardOptions, o
               className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
             />
           </label>
+        )}
+
+        {rewardType === 'STYLE_TICKET' && (
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-xs text-gray-400">지급할 구매권 장수</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={ticketCount}
+                onChange={(e) => setTicketCount(e.target.value)}
+                placeholder="1"
+                className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+              />
+            </label>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              구매권 1장 = 상점 의상(SHOP) 1벌을 세트(이미지 + 영상 전체)로 받습니다. 어떤 의상을 받을지는 유저가 상점에서 고릅니다.
+              마스크 원장에는 남지 않고, 사용 패스 진행도(마스크 사용 누적)도 오르지 않습니다. 성인 전용 의상은 성인 인증을 마친 유저만 받을 수 있습니다.
+            </p>
+          </div>
         )}
 
         {rewardType === 'STYLE' && (
@@ -864,6 +895,7 @@ export default function AdminMaskPass() {
     const preview = t.rewardPayload?.preview
     const charName = preview?.character?.name
     if (t.rewardType === 'MASK') return `마스크 ${t.rewardPayload?.amount || 0}개`
+    if (t.rewardType === 'STYLE_TICKET') return `🎟 의상 구매권 ${t.rewardPayload?.count || 1}장`
     if (t.rewardType === 'VOICE') return `🎵 ${charName || '?'} — ${t.rewardPayload?.title || t.rewardPayload?.text?.slice(0, 20) || '음성'}`
     if (t.rewardType === 'GALLERY') return `🖼 ${charName || '?'} 갤러리 ${preview?.count ? `(${preview.count}장)` : ''}`
     if (t.rewardType === 'PROFILE') return `👤 ${charName || '?'} 프로필`

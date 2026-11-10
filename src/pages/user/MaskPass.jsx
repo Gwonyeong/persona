@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '../../lib/api'
 import useStore from '../../store/useStore'
 import MaskIcon from '../../components/MaskIcon'
+import StyleTicketIcon from '../../components/StyleTicketIcon'
 
 const REWARD_LABEL_KEY = {
   MASK: 'maskPass.rewardMask',
@@ -13,6 +14,7 @@ const REWARD_LABEL_KEY = {
   PROFILE: 'maskPass.rewardProfile',
   STYLE: 'maskPass.rewardStyle',
   STORY: 'maskPass.rewardStory',
+  STYLE_TICKET: 'maskPass.rewardStyleTicket',
 }
 
 function RewardPreview({ tier }) {
@@ -28,6 +30,20 @@ function RewardPreview({ tier }) {
       <div className="flex items-center gap-2">
         <MaskIcon style={{ width: 28, height: 28 }} />
         <span className="font-bold text-base text-gray-100">{t('maskPass.maskAmount', { count: amount })}</span>
+      </div>
+    )
+  }
+  if (rewardType === 'STYLE_TICKET') {
+    const count = rewardPayload?.count || 1
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="w-12 h-12 rounded-lg bg-amber-500/15 border border-amber-500/40 flex items-center justify-center flex-shrink-0 text-amber-300">
+          <StyleTicketIcon style={{ width: 24, height: 24 }} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-gray-100">{t('maskPass.styleTicketCount', { count })}</p>
+          <p className="text-[11px] text-amber-300/90 truncate">{t('maskPass.styleTicketDesc')}</p>
+        </div>
       </div>
     )
   }
@@ -274,6 +290,16 @@ function ClaimResultModal({ grant, onClose }) {
               <span className="text-3xl font-bold text-gray-100">+{payload?.amount || 0}</span>
             </div>
           )}
+          {type === 'STYLE_TICKET' && (
+            <div className="flex flex-col items-center gap-3 w-full">
+              <div className="flex items-center gap-3 text-amber-300">
+                <StyleTicketIcon style={{ width: 48, height: 48 }} />
+                <span className="text-3xl font-bold text-gray-100">+{payload?.count || 1}</span>
+              </div>
+              <p className="text-base font-bold text-gray-100">{t('maskPass.rewardStyleTicket')}</p>
+              <p className="text-xs text-gray-400 text-center leading-relaxed">{t('maskPass.styleTicketHint')}</p>
+            </div>
+          )}
           {type === 'VOICE' && payload?.audioUrl && (
             <audio src={payload.audioUrl} controls autoPlay className="w-full" />
           )}
@@ -350,6 +376,18 @@ function ClaimResultModal({ grant, onClose }) {
             {t(type === 'STORY' ? 'maskPass.goStory' : 'maskPass.goCharacter')}
           </button>
         )}
+        {type === 'STYLE_TICKET' && (
+          <button
+            onClick={() => {
+              onClose()
+              navigate('/mask-shop?tab=styles')
+            }}
+            className="w-full mb-2 py-3 bg-sky-500 text-gray-950 font-bold rounded-xl hover:bg-sky-400 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {t('maskPass.goShopStyles')}
+          </button>
+        )}
         <button
           onClick={onClose}
           className="w-full py-3 bg-amber-500 text-gray-950 font-bold rounded-xl hover:bg-amber-400 transition-colors"
@@ -378,7 +416,7 @@ export default function MaskPass() {
   const kind = kindFromParam(searchParams.get('kind'))
   const kindRef = useRef(kind)
   kindRef.current = kind
-  const { setMasks } = useStore()
+  const { setMasks, setStyleTickets } = useStore()
   const [data, setData] = useState(null)
   const [unclaimedByKind, setUnclaimedByKind] = useState({ SPEND: 0, PURCHASE: 0 })
   const [loading, setLoading] = useState(true)
@@ -423,6 +461,10 @@ export default function MaskPass() {
       // 마스크 보상이면 useStore에도 반영
       if (result.grant?.newMasksBalance !== undefined) {
         setMasks(result.grant.newMasksBalance)
+      }
+      // 의상 구매권이면 잔량을 스토어에 반영 (상점 의상 화면이 바로 '구매권으로 받기'를 띄우도록)
+      if (result.grant?.newStyleTickets !== undefined) {
+        setStyleTickets(result.grant.newStyleTickets)
       }
       // 보상 표시용으로 tier preview를 grant.payload에 머지
       const grantToShow = {

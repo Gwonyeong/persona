@@ -11,6 +11,7 @@ import { isAdMobAvailable, initAdMob, showRewardedAd } from '../../lib/admob'
 import { requestInAppReview, REVIEW_REWARD_UI_ENABLED } from '../../lib/review'
 import { goToLogin } from '../../lib/auth'
 import MaskIcon from '../../components/MaskIcon'
+import StyleTicketIcon from '../../components/StyleTicketIcon'
 import ShopPromoSection from '../../components/ShopPromoSection'
 import {
   isNativeApp,
@@ -24,7 +25,9 @@ const YOONHARIN_IMAGE_URL = 'https://zstwgwszakivdnhwbuei.supabase.co/storage/v1
 
 export default function MaskShop() {
   const { t } = useTranslation()
-  const { token, masks, setMasks, subscription, user } = useStore()
+  const { token, masks, setMasks, setStyleTickets, subscription, user } = useStore()
+  // 의상 구매권 잔량 (구매 패스 보상) — 있으면 의상 상세에 '구매권으로 받기'가 뜬다
+  const styleTickets = user?.styleTickets ?? 0
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initialTab = ['subscription', 'shop', 'free', 'styles'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'shop'
@@ -319,9 +322,11 @@ export default function MaskShop() {
   }, [activeTab, shopStyles, stylesLoading])
 
   // 상점 표정 스타일 구매 — variant: 'set'(이미지+영상, maskCost) | 'single'(이미지만, singleMaskCost)
-  const purchaseStyle = async (item, variant = 'set') => {
+  // payWith: 'ticket' 이면 마스크 대신 의상 구매권 1장으로 세트(영상 포함)를 받는다.
+  const purchaseStyle = async (item, variant = 'set', payWith = 'masks') => {
     if (requireLogin()) return
     if (purchasingStyleId) return
+    const useTicket = payWith === 'ticket'
     // 성인 전용 의상은 성인 인증 완료 유저만 구매 가능
     if (item.adultOnly && !user?.adultVerified) {
       navigate('/adult-verify')
@@ -329,22 +334,32 @@ export default function MaskShop() {
     }
     // 가격 0 은 variant 단위로 유효하다 (예: 단일 무료 + 세트 150). 0 이면 잔액 검사 없이 받는다.
     const cost = variant === 'single' ? (item.singleMaskCost ?? 10) : item.maskCost
-    if (masks < cost) {
+    if (useTicket) {
+      // 구매권은 되돌릴 수 없으니 한 번 더 확인한다
+      if (!window.confirm(t('maskShop.styleTicketConfirm', { name: item.name || '' }))) return
+    } else if (masks < cost) {
       setDetailStyle(null)
       setActiveTab('shop')
       return
     }
     setPurchasingStyleId(item.styleId)
     try {
-      const res = await api.post(`/characters/${item.characterId}/styles/${item.styleId}/purchase`, { variant })
+      const res = await api.post(
+        `/characters/${item.characterId}/styles/${item.styleId}/purchase`,
+        useTicket ? { variant: 'set', payWith: 'ticket' } : { variant },
+      )
       if (res.masks !== undefined) setMasks(res.masks)
-      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: variant } : s)))
+      if (res.styleTickets !== undefined) setStyleTickets(res.styleTickets)
+      setShopStyles((prev) => prev.map((s) => (s.styleId === item.styleId ? { ...s, owned: true, ownedVariant: useTicket ? 'set' : variant } : s)))
       setDetailStyle(null)
-      setToast({ kind: 'success', text: t('maskShop.stylePurchased') })
+      setToast({ kind: 'success', text: t(useTicket ? 'maskShop.styleTicketUsed' : 'maskShop.stylePurchased') })
     } catch (err) {
       if (err?.error === 'INSUFFICIENT_MASKS') {
         setDetailStyle(null)
         setActiveTab('shop')
+      } else if (err?.error === 'NO_STYLE_TICKET') {
+        setStyleTickets(0)
+        setToast({ kind: 'error', text: t('maskShop.styleTicketNone') })
       } else setToast({ kind: 'error', text: t('common.error') })
     } finally {
       setPurchasingStyleId(null)
@@ -1055,6 +1070,16 @@ export default function MaskShop() {
       {activeTab === 'styles' && (
         <div>
           <p className="text-xs text-gray-500 mb-4">{t('maskShop.stylesTagline')}</p>
+          {/* 의상 구매권 보유 안내 (구매 패스 보상) */}
+          {styleTickets > 0 && (
+            <div className="mb-4 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 flex items-center gap-2.5">
+              <span className="text-amber-300 text-lg flex-shrink-0"><StyleTicketIcon /></span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-amber-200">{t('maskShop.styleTicketBanner', { count: styleTickets })}</p>
+                <p className="text-[11px] text-amber-200/70 leading-snug">{t('maskShop.styleTicketBannerDesc')}</p>
+              </div>
+            </div>
+          )}
           {stylesLoading ? (
             <p className="text-sm text-gray-500 text-center py-10">{t('common.loading')}</p>
           ) : !shopStyles || shopStyles.length === 0 ? (
@@ -1269,6 +1294,20 @@ export default function MaskShop() {
               </button>
             ) : (
               <div className="flex flex-col gap-2">
+                {/* 의상 구매권 — 마스크 대신 1장으로 세트 전체 (무료 의상엔 안 띄운다) */}
+                {styleTickets > 0 && detailStyle.maskCost > 0 && (
+                  <button
+                    onClick={() => purchaseStyle(detailStyle, 'set', 'ticket')}
+                    disabled={purchasingStyleId === detailStyle.styleId}
+                    className="w-full py-3 rounded-xl bg-amber-500 text-gray-950 active:bg-amber-400 transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-0.5"
+                    style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <span className="text-sm font-bold inline-flex items-center gap-1.5">
+                      <StyleTicketIcon /> {t('maskShop.styleUseTicket')} · {t('maskShop.styleTicketOwned', { count: styleTickets })}
+                    </span>
+                    <span className="text-[10px] text-gray-900/80">{t('maskShop.styleTicketDesc')}</span>
+                  </button>
+                )}
                 {/* 세트 — 이미지 + 연계 영상 전체 */}
                 <button
                   onClick={() => purchaseStyle(detailStyle, 'set')}
