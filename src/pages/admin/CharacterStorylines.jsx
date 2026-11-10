@@ -114,6 +114,11 @@ export default function CharacterStorylines() {
                   >
                     {sc.status}
                   </div>
+                  {sc.passExclusive && (
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-600/90 text-white">
+                      패스 전용
+                    </div>
+                  )}
                 </div>
                 <div className="p-3">
                   <p className="font-semibold text-sm text-gray-100 line-clamp-1">{sc.title}</p>
@@ -257,6 +262,7 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
   const [thumbnailImage, setThumbnailImage] = useState(scenario?.thumbnailImage || '')
   const [status, setStatus] = useState(scenario?.status || 'DRAFT')
   const [sortOrder, setSortOrder] = useState(scenario?.sortOrder ?? 0)
+  const [passExclusive, setPassExclusive] = useState(!!scenario?.passExclusive)
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
@@ -294,6 +300,7 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
         thumbnailImage: thumbnailImage.trim() || null,
         status,
         sortOrder: parseInt(sortOrder) || 0,
+        passExclusive,
       }
       if (isNew) {
         await api.post(`/admin/characters/${characterId}/scenarios`, body)
@@ -393,6 +400,22 @@ function ScenarioEditModal({ characterId, scenario, onClose, onSaved }) {
               />
             </div>
           </div>
+          <label className="flex items-start gap-2 p-3 rounded-lg border border-sky-800/50 bg-sky-950/20 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={passExclusive}
+              onChange={(e) => setPassExclusive(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-sky-500"
+            />
+            <span>
+              <span className="block text-sm text-gray-100">마스크 패스 전용</span>
+              <span className="block text-[11px] text-gray-500 mt-0.5">
+                1화부터 잠기고 마스크·구독으로는 열 수 없습니다. 마스크 패스 티어(패스 전용 스토리) 보상으로만 열리며,
+                받은 유저에겐 안의 유료 영상 카드·프리미엄 선택지도 무료입니다.
+                {!isNew && scenario?.passExclusive && !passExclusive && ' ⚠ 끄면 이미 받은 유저 외에도 일반 규칙(마스크 해금)으로 열립니다.'}
+              </span>
+            </span>
+          </label>
           {error && <p className="text-sm text-red-400">{error}</p>}
         </div>
         <div className="p-5 border-t border-gray-800 flex gap-2 justify-end">

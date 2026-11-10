@@ -83,6 +83,9 @@ export default function StoryGridCard({ story: s }) {
           )}
           {/* 우측 묶음 — TEST 와 미플레이 점이 같은 자리를 다투지 않게 한 줄로 */}
           <div className="ml-auto flex items-center gap-1">
+            {s.passExclusive && (
+              <span className="px-1.5 py-0.5 bg-sky-600/90 text-white text-[9px] rounded-full font-bold">{t('passLock.badge')}</span>
+            )}
             {s.adultOnly && !adultLocked && (
               <span className="px-1.5 py-0.5 bg-red-600/90 text-white text-[9px] rounded-full font-bold">19</span>
             )}

@@ -7,6 +7,13 @@ const NO_OUTLINE = { outline: 'none', WebkitTapHighlightColor: 'transparent' }
 
 // 상황극(VN) 카드 선택 페이지. V1 채팅 헤더의 카드 아이콘에서 진입.
 // 경로: /chats/:id/situations?c=<characterId>  (id=conversationId, c=characterId)
+// 잠긴 특별 상황극의 의상 바로가기 — 상점 / 마스크 패스(패스 전용 의상은 구매 패스 보상) / 가챠
+function styleShortcutPath(unlockMode) {
+  if (unlockMode === 'SHOP') return '/mask-shop?tab=styles'
+  if (unlockMode === 'PASS') return '/mask-pass?kind=purchase'
+  return '/gacha'
+}
+
 export default function SituationCards() {
   const { id } = useParams() // 진입 시점 conversationId (뒤로가기 복귀용)
   const [searchParams] = useSearchParams()
@@ -57,7 +64,7 @@ export default function SituationCards() {
   const onCardTap = (card) => {
     if (card.locked) {
       if (card.lockReason === 'style') {
-        navigate(card.requiredStyle?.unlockMode === 'SHOP' ? '/mask-shop?tab=styles' : '/gacha')
+        navigate(styleShortcutPath(card.requiredStyle?.unlockMode))
       } else {
         navigate('/adult-verify')
       }
@@ -160,11 +167,11 @@ export default function SituationCards() {
                     )}
                     <p className="text-amber-200 text-[10px] font-semibold text-center leading-tight max-w-[68px] line-clamp-1">{card.requiredStyle?.name}</p>
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(card.requiredStyle?.unlockMode === 'SHOP' ? '/mask-shop?tab=styles' : '/gacha') }}
+                      onClick={(e) => { e.stopPropagation(); navigate(styleShortcutPath(card.requiredStyle?.unlockMode)) }}
                       className="px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-amber-950 text-[10px] font-bold whitespace-nowrap"
                       style={NO_OUTLINE}
                     >
-                      {card.requiredStyle?.unlockMode === 'SHOP' ? '상점' : '가챠'} ▸
+                      {card.requiredStyle?.unlockMode === 'PASS' ? t('passLock.shortcut') : card.requiredStyle?.unlockMode === 'SHOP' ? '상점' : '가챠'} ▸
                     </button>
                   </div>
                 )}

@@ -267,7 +267,11 @@ export default function Scenario() {
                       {/* 진행 상태 / TEST */}
                       <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
                         {/* 마스크 해금 화 — 아직 안 연 경우만 가격 배지 */}
-                        {s.unlockCost > 0 && !s.purchased && !s.adultLocked && (
+                        {/* 패스 전용 — 마스크 가격 대신 패스 배지 */}
+                        {s.passExclusive && !s.purchased && !s.adultLocked && (
+                          <span className="px-2 py-0.5 bg-sky-600/90 text-white text-[10px] rounded-full font-bold">{t('passLock.badge')}</span>
+                        )}
+                        {!s.passExclusive && s.unlockCost > 0 && !s.purchased && !s.adultLocked && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-600/90 text-white text-[10px] rounded-full font-bold"><MaskIcon /> {s.unlockCost}</span>
                         )}
                         {s.progress?.status === 'COMPLETED' && (

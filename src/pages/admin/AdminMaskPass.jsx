@@ -13,6 +13,8 @@ const REWARD_TYPES = [
   { value: 'VOICE', label: '특별 보이스' },
   { value: 'GALLERY', label: '특별 이미지/영상' },
   { value: 'PROFILE', label: '프로필 이미지' },
+  { value: 'STYLE', label: '패스 전용 의상 (+특별 상황극 카드)' },
+  { value: 'STORY', label: '패스 전용 스토리' },
 ]
 
 const ACCEPT_BY_TYPE = {
@@ -157,7 +159,7 @@ function CharacterPicker({ characters, value, onChange, requireVoiceId = false }
   )
 }
 
-function TierForm({ initial, defaultKind = 'SPEND', characters, onSubmit, onCancel, busy, onTranslationsUpdated }) {
+function TierForm({ initial, defaultKind = 'SPEND', characters, rewardOptions, onSubmit, onCancel, busy, onTranslationsUpdated }) {
   const [kind, setKind] = useState(initial?.kind || defaultKind)
   const [threshold, setThreshold] = useState(initial?.threshold ?? '')
   const [title, setTitle] = useState(initial?.title ?? '')
@@ -180,6 +182,13 @@ function TierForm({ initial, defaultKind = 'SPEND', characters, onSubmit, onCanc
     payload.characterId || payload.preview?.character?.id || '',
   )
   const [voiceText, setVoiceText] = useState(payload.text || '')
+  // STYLE / STORY — 패스 전용 의상(unlockMode=PASS) / 패스 전용 시나리오(passExclusive)
+  const [styleId, setStyleId] = useState(payload.styleId ? String(payload.styleId) : '')
+  const [scenarioId, setScenarioId] = useState(payload.scenarioId ? String(payload.scenarioId) : '')
+  const passStyles = rewardOptions?.styles || []
+  const passScenarios = rewardOptions?.scenarios || []
+  const pickedStyle = passStyles.find((st) => String(st.id) === styleId)
+  const pickedScenario = passScenarios.find((sc) => String(sc.id) === scenarioId)
   const [file, setFile] = useState(null)
   // GALLERY 다중 파일
   const [galleryFiles, setGalleryFiles] = useState([]) // 새로 추가할 파일들
@@ -262,6 +271,18 @@ function TierForm({ initial, defaultKind = 'SPEND', characters, onSubmit, onCanc
       fd.append('rewardTitle', rewardTitle || '')
       fd.append('rewardTitleEn', rewardTitleEn || '')
       fd.append('rewardTitleJa', rewardTitleJa || '')
+    } else if (rewardType === 'STYLE') {
+      if (!styleId) {
+        alert('패스 전용 의상을 선택해주세요')
+        return
+      }
+      fd.append('styleId', styleId)
+    } else if (rewardType === 'STORY') {
+      if (!scenarioId) {
+        alert('패스 전용 스토리를 선택해주세요')
+        return
+      }
+      fd.append('scenarioId', scenarioId)
     }
     onSubmit(fd)
   }
@@ -437,6 +458,82 @@ function TierForm({ initial, defaultKind = 'SPEND', characters, onSubmit, onCanc
               className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
             />
           </label>
+        )}
+
+        {rewardType === 'STYLE' && (
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-xs text-gray-400">패스 전용 의상</span>
+              <select
+                value={styleId}
+                onChange={(e) => setStyleId(e.target.value)}
+                className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+              >
+                <option value="">— 선택 —</option>
+                {passStyles.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.character?.name} · {st.name} (#{st.id}){st.isPublic ? '' : ' [숨김]'} — 표정 {st.imageCount}장 · 카드 {st.situationCards.length}장
+                  </option>
+                ))}
+              </select>
+            </label>
+            {passStyles.length === 0 && (
+              <p className="text-[11px] text-amber-400">
+                해금 방식이 "패스 전용(PASS)"인 의상이 없습니다. 표정 관리에서 의상의 해금 방식을 패스 전용으로 바꿔주세요.
+              </p>
+            )}
+            {pickedStyle && (
+              <div className="flex gap-3 items-start">
+                {pickedStyle.imageUrl && <img src={pickedStyle.imageUrl} alt="" className="w-16 h-24 object-cover rounded border border-gray-800" />}
+                <div className="text-[11px] text-gray-400 space-y-1">
+                  {!pickedStyle.isPublic && <p className="text-amber-400">⚠ 숨김 의상 — 받아도 유저 화면에 안 보입니다. 공개로 바꿔주세요.</p>}
+                  {pickedStyle.imageCount === 0 && <p className="text-amber-400">⚠ 표정 이미지가 없습니다.</p>}
+                  <p>함께 열리는 특별 상황극 카드:</p>
+                  {pickedStyle.situationCards.length ? (
+                    pickedStyle.situationCards.map((c) => (
+                      <p key={c.id} className="text-gray-200">{c.emoji || '🎬'} {c.title}</p>
+                    ))
+                  ) : (
+                    <p className="text-gray-500">(연결된 카드 없음 — 카드의 styleId 를 이 의상으로 지정하면 함께 열립니다)</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {rewardType === 'STORY' && (
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-xs text-gray-400">패스 전용 스토리 (시나리오)</span>
+              <select
+                value={scenarioId}
+                onChange={(e) => setScenarioId(e.target.value)}
+                className="mt-1 w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-sm"
+              >
+                <option value="">— 선택 —</option>
+                {passScenarios.map((sc) => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.character?.name} · {sc.title} (#{sc.id}) [{sc.status}] — 공개 {sc.publishedParts}/{sc.partCount}화
+                  </option>
+                ))}
+              </select>
+            </label>
+            {passScenarios.length === 0 && (
+              <p className="text-[11px] text-amber-400">
+                "패스 전용"으로 표시된 시나리오가 없습니다. 스토리 관리에서 시나리오의 "마스크 패스 전용"을 켜주세요.
+              </p>
+            )}
+            {pickedScenario && (
+              <div className="flex gap-3 items-start">
+                {pickedScenario.thumbnailImage && <img src={pickedScenario.thumbnailImage} alt="" className="w-16 h-24 object-cover rounded border border-gray-800" />}
+                <div className="text-[11px] text-gray-400 space-y-1">
+                  {pickedScenario.status !== 'PUBLISHED' && <p className="text-amber-400">⚠ 시나리오가 {pickedScenario.status} 상태 — 받아도 유저에게 안 보입니다.</p>}
+                  <p>받으면 전 화가 열리고, 안의 유료 영상 카드·프리미엄 선택지도 무료입니다.</p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {rewardType === 'VOICE' && (
@@ -696,6 +793,7 @@ export default function AdminMaskPass() {
   const [kind, setKind] = useState('SPEND')
   const [tiers, setTiers] = useState([])
   const [characters, setCharacters] = useState([])
+  const [rewardOptions, setRewardOptions] = useState({ styles: [], scenarios: [] })
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -703,12 +801,14 @@ export default function AdminMaskPass() {
   async function load() {
     setLoading(true)
     try {
-      const [tiersRes, charsRes] = await Promise.all([
+      const [tiersRes, charsRes, optionsRes] = await Promise.all([
         api.get('/admin/mask-pass-tiers'),
         api.get('/admin/characters'),
+        api.get('/admin/mask-pass-reward-options').catch(() => null),
       ])
       setTiers(tiersRes.tiers || [])
       setCharacters(charsRes.characters || [])
+      if (optionsRes) setRewardOptions({ styles: optionsRes.styles || [], scenarios: optionsRes.scenarios || [] })
     } catch (e) {
       console.error(e)
     } finally {
@@ -767,6 +867,11 @@ export default function AdminMaskPass() {
     if (t.rewardType === 'VOICE') return `🎵 ${charName || '?'} — ${t.rewardPayload?.title || t.rewardPayload?.text?.slice(0, 20) || '음성'}`
     if (t.rewardType === 'GALLERY') return `🖼 ${charName || '?'} 갤러리 ${preview?.count ? `(${preview.count}장)` : ''}`
     if (t.rewardType === 'PROFILE') return `👤 ${charName || '?'} 프로필`
+    if (t.rewardType === 'STYLE') {
+      const cards = preview?.situationCards?.length || 0
+      return `👗 ${charName || '?'} — ${preview?.name || `의상 #${t.rewardPayload?.styleId}`}${cards ? ` + 상황극 카드 ${cards}장` : ''}`
+    }
+    if (t.rewardType === 'STORY') return `📖 ${charName || '?'} — ${preview?.title || `시나리오 #${t.rewardPayload?.scenarioId}`} (${preview?.partCount ?? '?'}화)`
     return t.rewardType
   }
 
@@ -782,6 +887,12 @@ export default function AdminMaskPass() {
     const preview = payload.preview || {}
     if (tier.rewardType === 'VOICE' && payload.audioUrl) {
       return <audio src={payload.audioUrl} controls className="w-full max-w-xs mt-2" />
+    }
+    if (tier.rewardType === 'STYLE' && preview.imageUrl) {
+      return <img src={preview.imageUrl} alt="" className="mt-2 max-h-28 rounded border border-gray-800" />
+    }
+    if (tier.rewardType === 'STORY' && preview.thumbnailImage) {
+      return <img src={preview.thumbnailImage} alt="" className="mt-2 max-h-28 rounded border border-gray-800" />
     }
     if (tier.rewardType === 'PROFILE' && preview.imageUrl) {
       return (
@@ -871,7 +982,7 @@ export default function AdminMaskPass() {
       {editing === 'new' && (
         <div className="mb-4">
           <p className="text-xs text-gray-400 mb-2">새 티어 — {KIND_BY_VALUE[kind]?.label}</p>
-          <TierForm defaultKind={kind} characters={characters} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
+          <TierForm defaultKind={kind} characters={characters} rewardOptions={rewardOptions} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
         </div>
       )}
 
@@ -887,7 +998,7 @@ export default function AdminMaskPass() {
         {sortedTiers.map((t) => (
           <div key={t.id}>
             {editing?.id === t.id ? (
-              <TierForm initial={t} characters={characters} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
+              <TierForm initial={t} characters={characters} rewardOptions={rewardOptions} onSubmit={save} onCancel={() => setEditing(null)} busy={busy} />
             ) : (
               <div className="flex items-start gap-3 p-3 bg-gray-900 border border-gray-800 rounded-xl">
                 <div className="w-16 text-center flex-shrink-0">

@@ -742,7 +742,21 @@ export default function CharacterDetail() {
           )}
 
           {/* 선택된 스타일이 해금 안 된 GACHA 면 안내 배너 + 가챠 바로가기 */}
-          {selectedStyle && !selectedStyle.unlocked && selectedStyle.unlockMode !== 'SHOP' && (
+          {/* 패스 전용 의상 — 마스크 패스 보상으로만 열린다 */}
+          {selectedStyle && !selectedStyle.unlocked && selectedStyle.unlockMode === 'PASS' && (
+            <div className="mt-3 p-3 rounded-lg bg-sky-950/40 border border-sky-800/60 flex items-center gap-3">
+              <span className="text-lg">👗</span>
+              <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">{t('passLock.styleLocked')}</div>
+              <button
+                onClick={() => navigate('/mask-pass?kind=purchase')}
+                className="flex-shrink-0 px-3 py-1.5 rounded-full bg-sky-500 hover:bg-sky-400 text-gray-950 text-xs font-bold"
+                style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {t('passLock.goPass')} →
+              </button>
+            </div>
+          )}
+          {selectedStyle && !selectedStyle.unlocked && selectedStyle.unlockMode !== 'SHOP' && selectedStyle.unlockMode !== 'PASS' && (
             <div className="mt-3 p-3 rounded-lg bg-gray-900/80 border border-gray-700/60 flex items-center gap-3">
               <span className="text-lg">🎁</span>
               <div className="flex-1 min-w-0 text-xs text-gray-200 leading-relaxed">
@@ -952,6 +966,9 @@ export default function CharacterDetail() {
                     </div>
                     {sc.status === 'TEST' && (
                       <div className="absolute top-2 right-2 px-2 py-0.5 bg-amber-600/90 text-white text-[10px] rounded-full font-semibold">TEST</div>
+                    )}
+                    {sc.passExclusive && sc.status !== 'TEST' && (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-sky-600/90 text-white text-[10px] rounded-full font-bold">{t('passLock.badge')}</div>
                     )}
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent px-3 pt-10 pb-3 text-left">
                       <p className="font-semibold text-sm text-white line-clamp-1">{sc.title}</p>

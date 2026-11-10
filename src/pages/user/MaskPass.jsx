@@ -11,6 +11,8 @@ const REWARD_LABEL_KEY = {
   VOICE: 'maskPass.rewardVoice',
   GALLERY: 'maskPass.rewardGallery',
   PROFILE: 'maskPass.rewardProfile',
+  STYLE: 'maskPass.rewardStyle',
+  STORY: 'maskPass.rewardStory',
 }
 
 function RewardPreview({ tier }) {
@@ -18,6 +20,7 @@ function RewardPreview({ tier }) {
   const { rewardType, rewardPayload, claimed } = tier
   // GALLERY/PROFILE 미수령 시 미리보기용 약한 블러 (수령하면 해제)
   const visualBlur = !claimed && (rewardType === 'GALLERY' || rewardType === 'PROFILE')
+  // 의상·스토리는 티저가 구매 동기라 블러 없이 보여준다 (썸네일은 서버가 SFW 표정/성인 커버 제외로 골라 내린다)
   const blurClass = visualBlur ? 'blur-sm scale-105' : ''
   if (rewardType === 'MASK') {
     const amount = rewardPayload?.amount || 0
@@ -103,6 +106,49 @@ function RewardPreview({ tier }) {
         <div className="min-w-0">
           <p className="text-xs text-gray-400">{preview?.character?.name || ''}</p>
           <p className="text-sm text-gray-100 truncate">{preview?.title || t('maskPass.fallbackProfile')}</p>
+        </div>
+      </div>
+    )
+  }
+  if (rewardType === 'STYLE') {
+    const preview = rewardPayload?.preview
+    const cards = preview?.situationCards || []
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="relative w-12 h-16 rounded-lg overflow-hidden border border-sky-700/50 flex-shrink-0 bg-gray-800">
+          {preview?.imageUrl && <img src={preview.imageUrl} alt="" className="w-full h-full object-cover object-top" />}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-gray-400">{preview?.character?.name || ''}</p>
+          <p className="text-sm text-gray-100 truncate">{preview?.name || t('maskPass.fallbackStyle')}</p>
+          {cards.length > 0 && (
+            <p className="text-[11px] text-sky-300 truncate">
+              🎬 {cards.length > 1 ? t('maskPass.styleWithCardsMany', { title: cards[0].title, count: cards.length - 1 }) : cards[0].title}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (rewardType === 'STORY') {
+    const preview = rewardPayload?.preview
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="relative w-12 h-16 rounded-lg overflow-hidden border border-sky-700/50 flex-shrink-0 bg-gray-800">
+          {preview?.thumbnailImage ? (
+            <img src={preview.thumbnailImage} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-gray-400">
+              {preview?.adultOnly ? '19' : '📖'}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-gray-400">{preview?.character?.name || ''}</p>
+          <p className="text-sm text-gray-100 truncate">{preview?.title || t('maskPass.fallbackStory')}</p>
+          {preview?.partCount > 0 && (
+            <p className="text-[11px] text-sky-300">{t('maskPass.storyParts', { count: preview.partCount })}</p>
+          )}
         </div>
       </div>
     )
@@ -204,6 +250,7 @@ function TierCard({ tier, onClaim, claiming, onConditionClick }) {
 
 function ClaimResultModal({ grant, onClose }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   if (!grant) return null
   const { type, payload } = grant
   const characterName = payload?.preview?.character?.name
@@ -256,6 +303,31 @@ function ClaimResultModal({ grant, onClose }) {
           {type === 'PROFILE' && payload?.preview?.imageUrl && (
             <img src={payload.preview.imageUrl} alt="" className="w-32 h-32 rounded-full object-cover border-2 border-amber-400" />
           )}
+          {type === 'STYLE' && (
+            <div className="flex flex-col items-center gap-3 w-full">
+              {payload?.preview?.imageUrl && (
+                <img src={payload.preview.imageUrl} alt="" className="w-36 aspect-[9/16] rounded-xl object-cover object-top border-2 border-sky-400" />
+              )}
+              <p className="text-base font-bold text-gray-100">{payload?.preview?.name}</p>
+              {(payload?.preview?.situationCards || []).length > 0 && (
+                <div className="w-full p-3 rounded-xl bg-sky-950/40 border border-sky-800/50">
+                  <p className="text-[11px] text-sky-300 mb-1">{t('maskPass.styleCardsUnlocked')}</p>
+                  {payload.preview.situationCards.map((c) => (
+                    <p key={c.id} className="text-sm text-gray-100 truncate">{c.emoji || '🎬'} {c.title}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {type === 'STORY' && (
+            <div className="flex flex-col items-center gap-3 w-full">
+              {payload?.preview?.thumbnailImage && (
+                <img src={payload.preview.thumbnailImage} alt="" className="w-36 aspect-[9/16] rounded-xl object-cover border-2 border-sky-400" />
+              )}
+              <p className="text-base font-bold text-gray-100 text-center">{payload?.preview?.title}</p>
+              <p className="text-xs text-gray-400 text-center">{t('maskPass.storyHint')}</p>
+            </div>
+          )}
         </div>
 
         {type === 'GALLERY' && (
@@ -265,6 +337,19 @@ function ClaimResultModal({ grant, onClose }) {
           <p className="text-center text-xs text-gray-400 mb-4">{t('maskPass.profileHint')}</p>
         )}
 
+        {(type === 'STYLE' || type === 'STORY') && (payload?.styleId || payload?.scenarioId) && (
+          <button
+            onClick={() => {
+              onClose()
+              if (type === 'STORY') navigate(`/scenarios/${payload.scenarioId}`)
+              else if (payload?.preview?.character?.id) navigate(`/characters/${payload.preview.character.id}`)
+            }}
+            className="w-full mb-2 py-3 bg-sky-500 text-gray-950 font-bold rounded-xl hover:bg-sky-400 transition-colors"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {t(type === 'STORY' ? 'maskPass.goStory' : 'maskPass.goCharacter')}
+          </button>
+        )}
         <button
           onClick={onClose}
           className="w-full py-3 bg-amber-500 text-gray-950 font-bold rounded-xl hover:bg-amber-400 transition-colors"

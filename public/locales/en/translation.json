@@ -32,7 +32,17 @@
     "adultConfirmClaim": "Adult verification is required. Go to the verification page?",
     "purchaseConfirmCondition": "This reward requires a mask purchase. Go to the shop?",
     "adultConfirmCondition": "This reward requires adult verification. Go to the verification page?",
-    "claimFailed": "Failed to claim reward"
+    "claimFailed": "Failed to claim reward",
+    "rewardStyle": "Pass-exclusive outfit",
+    "rewardStory": "Pass-exclusive story",
+    "fallbackStyle": "Special outfit",
+    "fallbackStory": "Special story",
+    "styleWithCardsMany": "{{title}} +{{count}} more",
+    "storyParts": "{{count}} episodes",
+    "styleCardsUnlocked": "Special scenarios unlocked",
+    "storyHint": "All episodes are unlocked, including every video card inside.",
+    "goStory": "Go to story",
+    "goCharacter": "Go to character"
   },
   "gacha": {
     "pageTitle": "Gacha — Pesona",
@@ -1566,5 +1576,12 @@
     "title": "You need more masks!",
     "buyPack": "Get {{count}} masks for {{price}}",
     "subscribe": "Subscribe and get {{count}} masks now"
+  },
+  "passLock": {
+    "badge": "Pass only",
+    "storyLocked": "This story can only be unlocked as a Mask Pass reward",
+    "styleLocked": "This outfit is a Mask Pass reward",
+    "goPass": "View Mask Pass",
+    "shortcut": "Pass"
   }
 }

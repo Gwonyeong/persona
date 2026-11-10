@@ -493,6 +493,7 @@ export function AddStyleRow({ character, colSpan, onAdded }) {
               <option value="DEFAULT">기본 (대화 해금)</option>
               <option value="GACHA">가챠 전용</option>
               <option value="SHOP">상점 구매</option>
+              <option value="PASS">마스크 패스 전용</option>
             </select>
             {unlockMode === 'SHOP' && (
               <input
@@ -609,6 +610,11 @@ export function CharacterRow({ character, style, isFirstStyle = true, emotions, 
                     {style.unlockMode === 'GACHA' && (
                       <span className="text-[9px] bg-fuchsia-900/60 text-fuchsia-300 px-1 py-0.5 rounded font-semibold">
                         GACHA
+                      </span>
+                    )}
+                    {style.unlockMode === 'PASS' && (
+                      <span className="text-[9px] bg-sky-900/60 text-sky-300 px-1 py-0.5 rounded font-semibold">
+                        PASS
                       </span>
                     )}
                     {style.unlockMode === 'SHOP' && (
@@ -1023,7 +1029,13 @@ function StyleEditModal({ style, onClose, onChanged }) {
           <option value="DEFAULT">기본 (대화 해금)</option>
           <option value="GACHA">가챠 전용</option>
           <option value="SHOP">상점 구매</option>
+          <option value="PASS">마스크 패스 전용</option>
         </select>
+        {unlockMode === 'PASS' && (
+          <p className="text-[11px] text-gray-500 -mt-2 mb-3">
+            상점·가챠에 나오지 않고, 마스크 패스 티어(패스 전용 의상) 보상으로만 열립니다. 이 의상에 연결된 특별 상황극 카드도 함께 열립니다.
+          </p>
+        )}
 
         {unlockMode === 'SHOP' && (
           <>

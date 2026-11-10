@@ -658,6 +658,38 @@ export default function Storyline() {
   }
 
   // ── 렌더링 분기 결정 ───────────────────────────────────
+  // 마스크 패스 전용 화 — 마스크·구독으로 못 열고 패스 보상으로만 열린다
+  if (error && typeof error === 'object' && error.reason === 'PASS_REQUIRED') {
+    return (
+      <div className="relative w-full h-dvh bg-black text-white overflow-hidden">
+        {error.thumbnailImage && (
+          <img src={error.thumbnailImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-45" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute left-3 z-10 w-9 h-9 flex items-center justify-center rounded-full bg-black/40 text-white"
+          style={{ top: 'calc(env(safe-area-inset-top) + 12px)', outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          aria-label={t('storyline.goBack')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <div className="absolute inset-x-0 bottom-0 px-6 flex flex-col items-center text-center gap-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 32px)' }}>
+          <span className="px-2.5 py-0.5 bg-sky-600/90 text-white text-[11px] rounded-full font-bold">{t('passLock.badge')}</span>
+          <p className="text-lg font-bold leading-snug">{error.title}</p>
+          {error.description && <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">{error.description}</p>}
+          <p className="text-sm text-sky-300 font-semibold mt-3">{t('passLock.storyLocked')}</p>
+          <button
+            onClick={() => navigate('/mask-pass?kind=purchase')}
+            className="mt-3 w-full max-w-xs py-3 rounded-xl bg-sky-500 active:bg-sky-600 text-gray-950 text-sm font-bold"
+            style={{ outline: 'none', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {t('passLock.goPass')}
+          </button>
+        </div>
+      </div>
+    )
+  }
   if (error && typeof error === 'object' && error.reason === 'PURCHASE_REQUIRED') {
     const short = (masks ?? 0) < error.unlockCost
     return (

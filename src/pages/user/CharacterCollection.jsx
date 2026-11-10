@@ -81,7 +81,8 @@ export default function CharacterCollection() {
       // 성인 전용 의상은 미인증 시 인증 페이지로
       if (o.adultOnly && !user?.adultVerified) { navigate('/adult-verify'); return }
       setBuyStyle(o)
-    } else setShowGachaHint(true)
+    } else if (o.unlockMode === 'PASS') navigate('/mask-pass?kind=purchase')
+    else setShowGachaHint(true)
   }
 
   // 상점 의상 구매 (마스크 차감 → StyleUnlock, 스타일 내 표정·영상 통째 해금)
@@ -349,6 +350,12 @@ export default function CharacterCollection() {
                           className={`absolute inset-0 w-full h-full object-cover ${o.owned ? '' : 'brightness-[0.35]'}`}
                           loading="lazy"
                         />
+                      )}
+                      {/* 패스 전용 의상: 마스크 패스 보상 뱃지 */}
+                      {!o.owned && o.unlockMode === 'PASS' && (
+                        <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-sky-600/90 text-[10px] font-semibold text-white">
+                          {t('passLock.badge')}
+                        </div>
                       )}
                       {/* 상점 구매 가능 의상: 가격 뱃지 노출 */}
                       {buyable && (

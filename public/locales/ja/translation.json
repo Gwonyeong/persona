@@ -32,7 +32,17 @@
     "adultConfirmClaim": "成人認証が必要です。認証ページに移動しますか？",
     "purchaseConfirmCondition": "この報酬にはマスクの購入履歴が必要です。ショップに移動しますか？",
     "adultConfirmCondition": "この報酬には成人認証が必要です。認証ページに移動しますか？",
-    "claimFailed": "報酬の受け取りに失敗しました"
+    "claimFailed": "報酬の受け取りに失敗しました",
+    "rewardStyle": "パス限定衣装",
+    "rewardStory": "パス限定ストーリー",
+    "fallbackStyle": "特別衣装",
+    "fallbackStory": "特別ストーリー",
+    "styleWithCardsMany": "{{title}} ほか{{count}}件",
+    "storyParts": "全{{count}}話",
+    "styleCardsUnlocked": "一緒に解放されたシチュエーション",
+    "storyHint": "全話が解放されました。中の動画カードもすべて無料です。",
+    "goStory": "ストーリーを見る",
+    "goCharacter": "キャラクターを見る"
   },
   "gacha": {
     "pageTitle": "ガチャ — Pesona",
@@ -1566,5 +1576,12 @@
     "title": "マスクが必要です！",
     "buyPack": "{{price}}で{{count}}個チャージ",
     "subscribe": "サブスクですぐに{{count}}個チャージ"
+  },
+  "passLock": {
+    "badge": "パス限定",
+    "storyLocked": "マスクパスの報酬でのみ解放できるストーリーです",
+    "styleLocked": "マスクパスの報酬で手に入る衣装です",
+    "goPass": "マスクパスを見る",
+    "shortcut": "パス"
   }
 }

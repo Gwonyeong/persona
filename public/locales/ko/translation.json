@@ -32,7 +32,17 @@
     "adultConfirmClaim": "성인인증이 필요해요. 인증 페이지로 이동할까요?",
     "purchaseConfirmCondition": "이 보상은 마스크 구매 이력이 필요해요. 상점으로 이동할까요?",
     "adultConfirmCondition": "이 보상은 성인인증이 필요해요. 인증 페이지로 이동할까요?",
-    "claimFailed": "보상 수령 실패"
+    "claimFailed": "보상 수령 실패",
+    "rewardStyle": "패스 전용 의상",
+    "rewardStory": "패스 전용 스토리",
+    "fallbackStyle": "특별 의상",
+    "fallbackStory": "특별 스토리",
+    "styleWithCardsMany": "{{title}} 외 {{count}}장",
+    "storyParts": "전 {{count}}화",
+    "styleCardsUnlocked": "함께 열린 특별 상황극",
+    "storyHint": "전 화가 열렸어요. 안의 영상 카드도 모두 무료예요.",
+    "goStory": "스토리 보러 가기",
+    "goCharacter": "캐릭터 보러 가기"
   },
   "gacha": {
     "pageTitle": "가챠 — 페소나",
@@ -1566,5 +1576,12 @@
     "title": "마스크가 필요해요!",
     "buyPack": "{{price}}으로 {{count}}개 충전하기",
     "subscribe": "구독으로 바로 {{count}}개 충전하기"
+  },
+  "passLock": {
+    "badge": "패스 전용",
+    "storyLocked": "마스크 패스 보상으로만 열 수 있는 스토리예요",
+    "styleLocked": "마스크 패스 보상으로 받을 수 있는 의상이에요",
+    "goPass": "마스크 패스 보기",
+    "shortcut": "패스"
   }
 }
